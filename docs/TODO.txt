@@ -1,0 +1,32 @@
+server:
+- fix crash/oom/inf loop when importing
+- fix omitted data blocks
+- support finding flags stolen that were stored more than 5 minutes ago
+- fully support sub queries
+- support sub queries in tags
+- support relative times in tags
+- support http
+- support websocket, including compression
+- support udp
+- support quic and http/2
+- support is:started|finished
+- support pcap groups, they have their own indexes & snapshots and may only be combined with packets in the same group
+- fix ip4 defragmentation (snapshottable, list of packages that are source for a reassembled pkg)
+- support ip6 defragmenting
+- support sctp
+- group by support using variables
+- add tests
+
+ui:
+- add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
+- add keyboard handlers (escape, prev/next stream)
+- marking something (e.g. when you want to copy it) in the results view moves you to the stream, it should not
+- vll. sachen markieren und per keyboard press zum filter adden
+- back button
+- deep links
+- optional search result snippets
+
+both:
+- support decoders in data for search and display
+- calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
+- add documentation
