@@ -416,7 +416,7 @@
               <v-card-actions>
                 <v-btn
                   text
-                  :href="'/download/' + streamData.Stream.ID + '.pcap'"
+                  :href="'/api/download/' + streamData.Stream.ID + '.pcap'"
                   target="_blank"
                 >
                   Download PCAP
