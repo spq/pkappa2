@@ -11,7 +11,7 @@ server:
 - support quic and http/2
 - support is:started|finished
 - support pcap groups, they have their own indexes & snapshots and may only be combined with packets in the same group
-- fix ip4 defragmentation (snapshottable, list of packages that are source for a reassembled pkg)
+- fix ip4 defragmentation (snapshottable, list of packets that are source for a reassembled pkg)
 - support ip6 defragmenting
 - support sctp
 - group by support using variables
