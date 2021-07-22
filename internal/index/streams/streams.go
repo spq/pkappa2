@@ -80,7 +80,7 @@ func (s *TCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 	}
 	ci := sg.CaptureInfo(0)
 	pmd := pcapmetadata.FromPacketMetadata(&ci)
-	for i := len(s.Packets) - 1; i >= 0; i-- {
+	for i := len(s.Packets) - 1; ; i-- {
 		p := s.Packets[i]
 		if p.Timestamp != ci.Timestamp {
 			continue
@@ -95,10 +95,6 @@ func (s *TCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 		})
 		return
 	}
-	s.Data = append(s.Data, TCPStreamData{
-		Bytes:       sg.Fetch(length),
-		PacketIndex: uint64(len(s.Packets) - 1),
-	})
 }
 
 func (s *TCPStream) ReassemblyComplete(_ reassembly.AssemblerContext) bool {
