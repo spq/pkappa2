@@ -1,6 +1,5 @@
 server:
-- fix crash/oom/inf loop when importing
-- fix omitted data blocks
+- fix crash/oom when importing
 - support finding flags stolen that were stored more than 5 minutes ago
 - fully support sub queries
 - support sub queries in tags
