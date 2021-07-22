@@ -615,12 +615,6 @@ func (w *Writer) AddIndex(r *Reader) (bool, error) {
 		undos = append(undos, f)
 	}
 
-	/*
-		w.packets
-		w.streams
-		w.header
-	*/
-
 	// merge imports
 	importRemap := []uint32{}
 	importCountBefore := len(w.imports)
