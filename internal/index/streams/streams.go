@@ -57,6 +57,7 @@ func (f *TCPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, 
 		tcpstate: reassembly.NewTCPSimpleFSM(reassembly.TCPSimpleFSMOptions{
 			SupportMissingEstablishment: false,
 		}),
+		optchecker: reassembly.NewTCPOptionCheck(),
 	}
 	f.Streams = append(f.Streams, s)
 	return s
