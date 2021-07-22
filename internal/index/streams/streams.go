@@ -1,12 +1,18 @@
 package streams
 
 import (
+	"flag"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/reassembly"
 	pcapmetadata "github.com/spq/pkappa2/internal/index/pcapMetadata"
+)
+
+var (
+	checkTCPState   = flag.Bool("tcp_check_state", true, "enable checking of tcp state")
+	checkTCPOptions = flag.Bool("tcp_check_options", false, "enable checking of tcp options")
 )
 
 type (
@@ -64,13 +70,21 @@ func (f *TCPStreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, 
 }
 
 func (s *TCPStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, start *bool, ac reassembly.AssemblerContext) bool {
-	accept := true
-	accept = accept && s.tcpstate.CheckState(tcp, dir)
-	accept = accept && (s.optchecker.Accept(tcp, ci, dir, nextSeq, start) == nil)
 	// add non-accepted packets, might be interesting when exporting pcaps
 	s.Packets = append(s.Packets, ac.(*AssemblerContext).CaptureInfo)
 	s.PacketDirections = append(s.PacketDirections, dir)
-	return accept
+
+	if *checkTCPState {
+		if !s.tcpstate.CheckState(tcp, dir) {
+			return false
+		}
+	}
+	if *checkTCPOptions {
+		if err := s.optchecker.Accept(tcp, ci, dir, nextSeq, start); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *TCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.AssemblerContext) {
