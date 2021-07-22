@@ -423,20 +423,19 @@ func (s *Stream) Data() ([]Data, error) {
 		if err := binary.Read(br, binary.LittleEndian, &h); err != nil {
 			return nil, err
 		}
-		if h.Length == 0 {
-			break
+		if h.Length != 0 {
+			d := Data{
+				Content: make([]byte, h.Length),
+				Direction: map[uint16]int{
+					flagsDataDirectionClientToServer: DirectionClientToServer,
+					flagsDataDirectionServerToClient: DirectionServerToClient,
+				}[h.Flags&flagsDataDirection],
+			}
+			if err := binary.Read(br, binary.LittleEndian, d.Content); err != nil {
+				return nil, err
+			}
+			data = append(data, d)
 		}
-		d := Data{
-			Content: make([]byte, h.Length),
-			Direction: map[uint16]int{
-				flagsDataDirectionClientToServer: DirectionClientToServer,
-				flagsDataDirectionServerToClient: DirectionServerToClient,
-			}[h.Flags&flagsDataDirection],
-		}
-		if err := binary.Read(br, binary.LittleEndian, d.Content); err != nil {
-			return nil, err
-		}
-		data = append(data, d)
 		if h.Flags&flagsDataHasNext == 0 {
 			break
 		}
