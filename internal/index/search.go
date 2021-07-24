@@ -821,8 +821,14 @@ conditions:
 			progress := make([]progressData, len(*q))
 			buffers := [2][]byte{}
 			bufferOffsets := [2]int{}
-			h := dataHeader{}
+			bufferLengths := [][2]int{{}}
+			streamLength := [2]int{}
+			streamLength[flagsDataDirectionClientToServer/flagsDataDirection] = int(s.ClientBytes)
+			streamLength[flagsDataDirectionServerToClient/flagsDataDirection] = int(s.ServerBytes)
+			keepAllData := false
+		chunkLoop:
 			for {
+				h := dataHeader{}
 				if err := binary.Read(br, binary.LittleEndian, &h); err != nil {
 					return false, err
 				}
@@ -830,15 +836,21 @@ conditions:
 					// fake data block for data-less streams
 					break
 				}
-				direction := uint8((h.Flags & flagsDataDirection) / flagsDataDirection)
-				type regexOcc struct {
-					regex, occ int
-				}
+				gotDirection := uint8((h.Flags & flagsDataDirection) / flagsDataDirection)
 
-				allFinished := h.Flags&flagsDataHasNext == 0
+				tmp := [2]int{
+					bufferOffsets[0] + len(buffers[0]),
+					bufferOffsets[1] + len(buffers[1]),
+				}
+				tmp[gotDirection] += int(h.Length)
+				bufferLengths = append(bufferLengths, tmp)
+
 				for alreadyRead := false; ; {
-					interested := []regexOcc{}
-					wrongDirection, needFullData := false, false
+					type regexOcc struct {
+						regex, occ int
+					}
+					interested := [2][]regexOcc{}
+					needMoreData := [2]bool{}
 					for rIdx := range regexes {
 						r := &regexes[rIdx]
 						for oIdx, o := range r.occurence {
@@ -847,15 +859,10 @@ conditions:
 								continue
 							}
 							e := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
-							f := e.Flags
-							wantDirection := (f & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
+							wantDirection := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
 							// xor with the c2s value for both flag sources to make sure the same number has the same meaning
 							wantDirection ^= query.DataRequirementSequenceFlagsDirectionClientToServer / query.DataRequirementSequenceFlagsDirection
 							wantDirection ^= flagsDataDirectionClientToServer / flagsDataDirection
-							if direction != wantDirection {
-								wrongDirection = true
-								continue
-							}
 							if r.regex == nil {
 								expr := e.Regex
 								for i := len(e.Variables) - 1; i >= 0; i-- {
@@ -876,104 +883,109 @@ conditions:
 								}
 								r.regex = compiled
 							}
-							if p, _ := r.regex.LiteralPrefix(); p == "" {
-								// regexes with no literal prefix should only be checked when the full data is read, they often perform bad otherwise
-								gotAvailable := bufferOffsets[direction] + len(buffers[direction]) + int(h.Length)
-								wantAvaliable := uint64(0)
-								switch direction {
-								case flagsDataDirectionClientToServer / flagsDataDirection:
-									wantAvaliable = s.ClientBytes
-								case flagsDataDirectionServerToClient / flagsDataDirection:
-									wantAvaliable = s.ServerBytes
+							gotAvailable := bufferLengths[len(bufferLengths)-1]
+							gotAllData := gotAvailable[wantDirection] == streamLength[wantDirection]
+							if prefix, _ := r.regex.LiteralPrefix(); prefix != "" {
+								availableBytes := gotAvailable[wantDirection] - p.streamOffset[wantDirection]
+								if availableBytes < len(prefix) {
+									if !gotAllData {
+										needMoreData[wantDirection] = true
+									}
+									continue
 								}
-								if uint64(gotAvailable) != wantAvaliable {
-									needFullData = true
+							} else {
+								// regexes with no literal prefix should only be checked, when the full data
+								// is read, they often perform bad otherwise; we must not skip data for the
+								// other direction as well, as a following regex might need that data
+								if !gotAllData {
+									needMoreData[wantDirection] = true
+									keepAllData = true
+									continue
+								}
+								if gotAvailable[wantDirection] == p.streamOffset[wantDirection] {
 									continue
 								}
 							}
 							// we got new data that this regex is interested in
-							interested = append(interested, regexOcc{
+							interested[wantDirection] = append(interested[wantDirection], regexOcc{
 								regex: rIdx,
 								occ:   oIdx,
 							})
 						}
 					}
-					if !wrongDirection {
-						// all active regex'es are interested in the current direction.
-						// we can release the buffer of the other direction.
-						bufferOffsets[1-direction] += len(buffers[1-direction])
-						buffers[1-direction] = nil
+
+					// check if at least one regex could progress
+					if len(interested[0]) == 0 && len(interested[1]) == 0 && !needMoreData[0] && !needMoreData[1] {
+						break chunkLoop
 					}
-					if len(interested) == 0 && !needFullData {
-						if !wrongDirection {
-							// no-one is interested in more data
-							allFinished = true
-						} else if !alreadyRead {
+
+					if !alreadyRead {
+						alreadyRead = true
+						if keepAllData || needMoreData[gotDirection] || len(interested[gotDirection]) != 0 {
+							// read the new data and append it to the buffer
+							newbuf := make([]byte, len(buffers[gotDirection])+int(h.Length))
+							copy(newbuf, buffers[gotDirection])
+							if err := binary.Read(br, binary.LittleEndian, newbuf[len(buffers[gotDirection]):]); err != nil {
+								return false, err
+							}
+							buffers[gotDirection] = newbuf
+						} else {
 							// no-one was interested in this block of data
 							if _, err := br.Seek(int64(h.Length), io.SeekCurrent); err != nil {
 								return false, err
 							}
-							bufferOffsets[direction] += len(buffers[1-direction]) + int(h.Length)
-							buffers[direction] = nil
+							bufferOffsets[gotDirection] += int(h.Length)
 						}
-						break
 					}
 
-					// at least one regex is interested in the data, read it
-					if !alreadyRead {
-						alreadyRead = true
-						// read the new data and append it to the buffer
-						newbuf := make([]byte, len(buffers[direction])+int(h.Length))
-						copy(newbuf, buffers[direction])
-						if err := binary.Read(br, binary.LittleEndian, newbuf[len(buffers[direction]):]); err != nil {
-							return false, err
+					// drop all data for directions that are not needed anymore
+					if !keepAllData {
+						for direction := 0; direction <= 1; direction++ {
+							if !needMoreData[direction] && len(interested[direction]) == 0 {
+								bufferOffsets[direction] += len(buffers[direction])
+								buffers[direction] = nil
+							}
 						}
-						buffers[direction] = newbuf
-					}
-
-					if len(interested) == 0 {
-						break
 					}
 
 					recheckRegexes := false
-					minStreamPos := bufferOffsets[direction]
-					if !needFullData {
-						minStreamPos += len(buffers[direction])
-					}
-					for _, i := range interested {
-						r := &regexes[i.regex]
-						o := &r.occurence[i.occ]
-						p := &progress[o.condition]
-						d := (*q)[o.condition].(*query.DataCondition)
-						prefix, _ := r.regex.LiteralPrefix()
-
-						if prefix != "" {
-							//the regex has a prefix, find it
-							buffer := buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
-							pos := bytes.Index(buffer, []byte(prefix))
-							if pos < 0 {
-								// the prefix is not in the string, we can discard part of the buffer
-								keepLength := len(prefix) - 1
-								if keepLength > len(buffer) {
-									keepLength = len(buffer)
-								}
-								for ; keepLength != 0 && !bytes.HasSuffix(buffer, []byte(prefix[len(prefix)-keepLength:])); keepLength-- {
-								}
-
-								p.streamOffset[direction] = bufferOffsets[direction] + len(buffers[direction]) - keepLength
-								if minStreamPos > p.streamOffset[direction] {
-									minStreamPos = p.streamOffset[direction]
-								}
-								continue
-							}
-							//skip the part that doesn't have the prefix
-							p.streamOffset[direction] += pos
+					for direction := 0; direction <= 1; direction++ {
+						if len(interested[direction]) == 0 {
+							continue
 						}
-						if prefix != "" || h.Flags&flagsDataHasNext == 0 {
+						minStreamPos := bufferOffsets[direction] + len(buffers[direction])
+						for _, i := range interested[direction] {
+							r := &regexes[i.regex]
+							o := &r.occurence[i.occ]
+							p := &progress[o.condition]
+							d := (*q)[o.condition].(*query.DataCondition)
+							prefix, _ := r.regex.LiteralPrefix()
+
+							if prefix != "" {
+								//the regex has a prefix, find it
+								buffer := buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
+								pos := bytes.Index(buffer, []byte(prefix))
+								if pos < 0 {
+									// the prefix is not in the string, we can discard part of the buffer
+									keepLength := len(prefix) - 1
+									if keepLength > len(buffer) {
+										keepLength = len(buffer)
+									}
+									for ; keepLength != 0 && !bytes.HasSuffix(buffer, []byte(prefix[len(prefix)-keepLength:])); keepLength-- {
+									}
+
+									p.streamOffset[direction] = bufferOffsets[direction] + len(buffers[direction]) - keepLength
+									if minStreamPos > p.streamOffset[direction] {
+										minStreamPos = p.streamOffset[direction]
+									}
+									continue
+								}
+								//skip the part that doesn't have the prefix
+								p.streamOffset[direction] += pos
+							}
 							data := buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
 							res := r.regex.FindSubmatchIndex(data)
 							if res != nil {
-								//fmt.Printf("matched regex %q on stream %d for dir %d at offset %d-%d (int: %d in %+v)\n", r.regex, s.StreamID, direction, p.streamOffset[direction], bufferOffsets[direction], interestedIndex, interested)
 								p.nSuccessful++
 								if p.nSuccessful != len(d.Elements) {
 									// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
@@ -983,7 +995,6 @@ conditions:
 								}
 								variableNames := r.regex.SubexpNames()
 								for i := 2; i < len(res); i += 2 {
-									varContent := string(data[res[i]:res[i+1]])
 									varName := variableNames[i/2]
 									if varName == "" {
 										continue
@@ -994,29 +1005,33 @@ conditions:
 									if p.variables == nil {
 										p.variables = make(map[string]string)
 									}
-									p.variables[varName] = varContent
+									p.variables[varName] = string(data[res[i]:res[i+1]])
 								}
 
 								// update stream offsets: a follow up regex for the same direction
 								// may consume the byte following the match, a regex for the other
 								// direction may start reading from the next received packet,
-								// so everything read so far is out-of reach.
+								// so everything read before is out-of reach.
 								p.streamOffset[direction] += res[1]
-								//TODO: when we captured the whole stream, this makes following matches for the other direction always fail
-								p.streamOffset[1-direction] = bufferOffsets[1-direction] + len(buffers[1-direction])
+								for i := len(bufferLengths) - 1; ; i-- {
+									if bufferLengths[i-1][direction] <= p.streamOffset[direction] {
+										p.streamOffset[1-direction] = bufferLengths[i][1-direction]
+										break
+									}
+								}
+							}
+							if minStreamPos > p.streamOffset[direction] {
+								minStreamPos = p.streamOffset[direction]
 							}
 						}
-						if minStreamPos > p.streamOffset[direction] {
-							minStreamPos = p.streamOffset[direction]
-						}
+						buffers[direction] = buffers[direction][minStreamPos-bufferOffsets[direction]:]
+						bufferOffsets[direction] = minStreamPos
 					}
-					buffers[direction] = buffers[direction][minStreamPos-bufferOffsets[direction]:]
-					bufferOffsets[direction] = minStreamPos
 					if !recheckRegexes {
 						break
 					}
 				}
-				if allFinished {
+				if h.Flags&flagsDataHasNext == 0 {
 					break
 				}
 			}
