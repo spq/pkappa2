@@ -1,7 +1,6 @@
 server:
 - fix crash/oom when importing
-- support finding flags stolen that were stored more than 5 minutes ago
-- fully support sub queries
+- correctly support sub-queries in or'ed conditions (currently, (@sq:id:1 id:@sq:id@) or (@sq:id:2 id:@sq:id@+10) finds streams 1,2,11,12 but should only find 1,12 )
 - support sub queries in tags
 - support relative times in tags
 - support http
