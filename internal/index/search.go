@@ -26,6 +26,19 @@ type (
 	subQuerySelection struct {
 		remaining []map[string]subQueryRanges
 	}
+	searchContext struct {
+		allowedSubQueries subQuerySelection
+		outputVariables   map[string][]string
+	}
+	variableDataEntry struct {
+		uses int
+		data map[string][]string
+	}
+	resultData struct {
+		streams             []*Stream
+		variableAssociation map[uint64]int
+		variableData        []variableDataEntry
+	}
 )
 
 func (sqr subQueryRanges) split(other *subQueryRanges) (overlap subQueryRanges, rest subQueryRanges) {
@@ -148,13 +161,19 @@ func (sqrs *subQueryRanges) addRange(low, high int) {
 	sqrs.ranges = append(sqrs.ranges, subQueryRange{low, high})
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, previousResults map[string][]*Stream, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string][]uint64) (bool, []func(*subQuerySelection, *stream) (bool, error), []func() ([]uint32, error), error) {
-	filters := []func(*subQuerySelection, *stream) (bool, error)(nil)
+func (sqrs *subQueryRanges) addResult(other *subQueryRanges) {
+	for _, r := range other.ranges {
+		sqrs.addRange(r.indexMin, r.indexMax)
+	}
+}
+
+func (r *Reader) buildSearchObjects(subQuery string, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string][]uint64) (bool, []func(*searchContext, *stream) (bool, error), []func() ([]uint32, error), error) {
+	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
 
 	// filter out streams superseeded by newer indexes
 	if len(superseedingIndexes) != 0 {
-		filters = append(filters, func(_ *subQuerySelection, s *stream) (bool, error) {
+		filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
 			for _, r2 := range superseedingIndexes {
 				if _, ok := r2.containedStreamIds[s.StreamID]; ok {
 					return false, nil
@@ -166,14 +185,23 @@ func (r *Reader) buildSearchObjects(subQuery string, previousResults map[string]
 
 	minIDFilter, maxIDFilter := uint64(0), uint64(math.MaxUint64)
 	hostConditionBitmaps := [][]uint64(nil)
-	type occ struct {
-		condition, element int
-	}
-	type regex struct {
-		regex     *binaryregexp.Regexp
-		occurence []occ
-	}
+	type (
+		occ struct {
+			condition, element int
+		}
+		regexFlags byte
+		regex      struct {
+			occurence []occ
+			regex     *binaryregexp.Regexp
+			flags     regexFlags
+		}
+	)
+	const (
+		regexFlagsIsPrecondition regexFlags = 1
+	)
 	regexes := []regex(nil)
+	regexConditions := []int(nil)
+	regexDependencies := map[string]map[string]struct{}{}
 conditions:
 	for cIdx, c := range *q {
 		c := c
@@ -184,7 +212,7 @@ conditions:
 			}
 			bv := tags[cc.TagName]
 			inv := cc.Invert
-			filters = append(filters, func(_ *subQuerySelection, s *stream) (bool, error) {
+			filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
 				idx := int(s.StreamID / 64)
 				bit := s.StreamID % 64
 				res := idx < len(bv) && ((bv[idx]>>bit)&1) != 0
@@ -204,7 +232,7 @@ conditions:
 				continue
 			}
 			if len(cc.SubQueries) == 1 {
-				filters = append(filters, func(_ *subQuerySelection, s *stream) (bool, error) {
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
 					return s.Flags&cc.Mask != cc.Value, nil
 				})
 				continue
@@ -219,7 +247,7 @@ conditions:
 				}
 				subqueries = append(subqueries, sq)
 				curFlagValues := map[uint16]*subQueryRanges{}
-				for pos, res := range previousResults[sq] {
+				for pos, res := range previousResults[sq].streams {
 					f := res.Flags & cc.Mask
 					cfv := curFlagValues[f]
 					if cfv == nil {
@@ -237,7 +265,7 @@ conditions:
 					}
 				}
 			}
-			filters = append(filters, func(sqs *subQuerySelection, s *stream) (bool, error) {
+			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 				forbidden, possible := flagValues[s.Flags&cc.Mask]
 				if !possible {
 					// no combination of sub queries produces the forbidden result
@@ -247,8 +275,8 @@ conditions:
 					// the only combination of sub queries produces the forbidden result
 					return false, nil
 				}
-				sqs.remove(subqueries, forbidden)
-				return !sqs.empty(), nil
+				sc.allowedSubQueries.remove(subqueries, forbidden)
+				return !sc.allowedSubQueries.empty(), nil
 			})
 		case *query.HostCondition:
 			hcsc, hcss := false, false
@@ -291,7 +319,7 @@ conditions:
 				if cc.Mask4.IsUnspecified() && cc.Mask6.IsUnspecified() {
 					// only check if the ip version is the same, can be done on a hg level
 					otherHosts := [2]subQueryRanges{}
-					for rIdx, r := range relevantResults {
+					for rIdx, r := range relevantResults.streams {
 						otherSize := r.r.hostGroups[r.HostGroup].hostSize
 						otherHosts[otherSize/16].add(rIdx)
 					}
@@ -302,14 +330,14 @@ conditions:
 					for hgi, hg := range r.hostGroups {
 						forbiddenSubQueryResultsPerHostGroup[hgi] = &otherHosts[hg.hostSize/16]
 					}
-					filters = append(filters, func(sqs *subQuerySelection, s *stream) (bool, error) {
+					filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 						f := forbiddenSubQueryResultsPerHostGroup[s.HostGroup]
-						sqs.remove([]string{otherSubQuery}, []*subQueryRanges{f})
-						return !sqs.empty(), nil
+						sc.allowedSubQueries.remove([]string{otherSubQuery}, []*subQueryRanges{f})
+						return !sc.allowedSubQueries.empty(), nil
 					})
 					continue
 				}
-				filters = append(filters, func(sqs *subQuerySelection, s *stream) (bool, error) {
+				filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 					myHG := &r.hostGroups[s.HostGroup]
 					myHid := s.ClientHost
 					if myHcss {
@@ -323,7 +351,7 @@ conditions:
 
 					forbidden := subQueryRanges{}
 				outer:
-					for resIdx, res := range relevantResults {
+					for resIdx, res := range relevantResults.streams {
 						otherHG := &res.r.hostGroups[res.HostGroup]
 						if myHG.hostSize != otherHG.hostSize {
 							if !cc.Invert {
@@ -349,8 +377,8 @@ conditions:
 							forbidden.add(resIdx)
 						}
 					}
-					sqs.remove([]string{otherSubQuery}, []*subQueryRanges{&forbidden})
-					return !sqs.empty(), nil
+					sc.allowedSubQueries.remove([]string{otherSubQuery}, []*subQueryRanges{&forbidden})
+					return !sc.allowedSubQueries.empty(), nil
 				})
 				continue
 			}
@@ -463,7 +491,7 @@ conditions:
 			myFactors := factors[subQuery]
 			delete(factors, subQuery)
 			if len(factors) == 0 {
-				filters = append(filters, func(_ *subQuerySelection, s *stream) (bool, error) {
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
 					n := cc.Number
 					n += myFactors.id * int(s.StreamID)
 					n += myFactors.clientBytes * int(s.ClientBytes)
@@ -486,7 +514,7 @@ conditions:
 			for sq, f := range factors {
 				numbers := map[int]int{}
 				results := []subQueryResult(nil)
-				for resId, res := range previousResults[sq] {
+				for resId, res := range previousResults[sq].streams {
 					n := 0
 					n += f.id * int(res.StreamID)
 					n += f.clientBytes * int(res.ClientBytes)
@@ -513,7 +541,14 @@ conditions:
 				minSum += results[0].number
 				maxSum += results[len(results)-1].number
 			}
-			filters = append(filters, func(sqs *subQuerySelection, s *stream) (bool, error) {
+			// combine the ranges of the last subQueryData
+			// element n will contain the range of elements 0..n
+			lastSubQueryData := subQueryData[len(subQueryData)-1]
+			for i, l := 0, len(lastSubQueryData)-1; i < l; i++ {
+				lastSubQueryData[i+1].ranges.addResult(&lastSubQueryData[i].ranges)
+			}
+
+			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 				n := cc.Number
 				n += myFactors.id * int(s.StreamID)
 				n += myFactors.clientBytes * int(s.ClientBytes)
@@ -527,7 +562,8 @@ conditions:
 					return false, nil
 				}
 				// minSum < -n <= maxSum
-				pos := make([]int, len(subQueries))
+				pos := make([]int, len(subQueries)-1)
+				lastSubQueryData := subQueryData[len(subQueryData)-1]
 			outer:
 				for {
 					// calculate the sum
@@ -535,13 +571,25 @@ conditions:
 					for i, j := range pos {
 						sqN += subQueryData[i][j].number
 					}
-					// remove from sqs if not a valid sum
-					if sqN < 0 {
+					// remove from sqs if the lowest possible sum is still invalid
+					if sqN+lastSubQueryData[0].number < 0 {
 						forbidden := []*subQueryRanges(nil)
 						for i, j := range pos {
 							forbidden = append(forbidden, &subQueryData[i][j].ranges)
 						}
-						sqs.remove(subQueries, forbidden)
+						if sqN+lastSubQueryData[len(lastSubQueryData)-1].number < 0 {
+							// the highest possible value also doesn't result in a valid sum
+							// we can remove the whole combination ignoring the last element
+							sc.allowedSubQueries.remove(subQueries[:len(subQueries)-1], forbidden)
+						} else {
+							// the highest possible value results in a valid sum
+							// find the position where the validity changes
+							lastInvalid := sort.Search(len(lastSubQueryData)-2, func(i int) bool {
+								return sqN+lastSubQueryData[i+1].number >= 0
+							})
+							forbidden = append(forbidden, &lastSubQueryData[lastInvalid].ranges)
+							sc.allowedSubQueries.remove(subQueries, forbidden)
+						}
 					}
 					// go to next combination
 					for i := range pos {
@@ -554,7 +602,7 @@ conditions:
 					}
 					break
 				}
-				return !sqs.empty(), nil
+				return !sc.allowedSubQueries.empty(), nil
 			})
 		case *query.TimeCondition:
 			type factor struct {
@@ -577,7 +625,7 @@ conditions:
 			delete(factors, subQuery)
 			startD := cc.Duration + time.Duration(myFactors.ftime+myFactors.ltime)*r.referenceTime.Sub(refTime)
 			if len(factors) == 0 {
-				filter := func(_ *subQuerySelection, s *stream) (bool, error) {
+				filter := func(_ *searchContext, s *stream) (bool, error) {
 					d := startD
 					d += time.Duration(myFactors.ftime) * time.Duration(s.FirstPacketTimeNS)
 					d += time.Duration(myFactors.ltime) * time.Duration(s.LastPacketTimeNS)
@@ -614,7 +662,7 @@ conditions:
 			for sq, f := range factors {
 				durations := map[time.Duration]int{}
 				results := []subQueryResult(nil)
-				for resId, res := range previousResults[sq] {
+				for resId, res := range previousResults[sq].streams {
 					d := time.Duration(f.ftime+f.ltime) * res.r.referenceTime.Sub(refTime)
 					d += time.Duration(f.ftime) * time.Duration(res.FirstPacketTimeNS)
 					d += time.Duration(f.ltime) * time.Duration(res.LastPacketTimeNS)
@@ -638,7 +686,13 @@ conditions:
 				minSum += results[0].duration
 				maxSum += results[len(results)-1].duration
 			}
-			filters = append(filters, func(sqs *subQuerySelection, s *stream) (bool, error) {
+			// combine the ranges of the last subQueryData
+			// element n will contain the range of elements 0..n
+			lastSubQueryData := subQueryData[len(subQueryData)-1]
+			for i, l := 0, len(lastSubQueryData)-1; i < l; i++ {
+				lastSubQueryData[i+1].ranges.addResult(&lastSubQueryData[i].ranges)
+			}
+			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 				d := startD
 				d += time.Duration(myFactors.ftime) * time.Duration(s.FirstPacketTimeNS)
 				d += time.Duration(myFactors.ltime) * time.Duration(s.LastPacketTimeNS)
@@ -649,7 +703,8 @@ conditions:
 					return false, nil
 				}
 				// minSum < -n <= maxSum
-				pos := make([]int, len(subQueries))
+				pos := make([]int, len(subQueries)-1)
+				lastSubQueryData := subQueryData[len(subQueryData)-1]
 			outer:
 				for {
 					// calculate the sum
@@ -657,13 +712,25 @@ conditions:
 					for i, j := range pos {
 						sqD += subQueryData[i][j].duration
 					}
-					// remove from sqs if not a valid sum
-					if sqD < 0 {
+					// remove from sqs if the lowest possible sum is still invalid
+					if sqD+lastSubQueryData[0].duration < 0 {
 						forbidden := []*subQueryRanges(nil)
 						for i, j := range pos {
 							forbidden = append(forbidden, &subQueryData[i][j].ranges)
 						}
-						sqs.remove(subQueries, forbidden)
+						if sqD+lastSubQueryData[len(lastSubQueryData)-1].duration < 0 {
+							// the highest possible value also doesn't result in a valid sum
+							// we can remove the whole combination ignoring the last element
+							sc.allowedSubQueries.remove(subQueries[:len(subQueries)-1], forbidden)
+						} else {
+							// the highest possible value results in a valid sum
+							// find the position where the validity changes
+							lastInvalid := sort.Search(len(lastSubQueryData)-2, func(i int) bool {
+								return sqD+lastSubQueryData[i+1].duration >= 0
+							})
+							forbidden = append(forbidden, &lastSubQueryData[lastInvalid].ranges)
+							sc.allowedSubQueries.remove(subQueries, forbidden)
+						}
 					}
 					// go to next combination
 					for i := range pos {
@@ -676,7 +743,7 @@ conditions:
 					}
 					break
 				}
-				return !sqs.empty(), nil
+				return !sc.allowedSubQueries.empty(), nil
 			})
 		case *query.DataCondition:
 			shouldEvaluate, affectsSubquery := false, false
@@ -700,38 +767,74 @@ conditions:
 			if affectsSubquery {
 				return false, nil, nil, errors.New("SubQueries not yet fully supported")
 			}
+			regexConditions = append(regexConditions, cIdx)
 			for eIdx, e := range cc.Elements {
 				found := (*regex)(nil)
-			regexes:
-				for rIdx := range regexes {
-					r := &regexes[rIdx]
-					o := r.occurence[0]
-					oe := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
-					if e.Regex != oe.Regex {
-						continue
-					}
-					if len(e.Variables) != len(oe.Variables) {
-						continue
-					}
-					for i := range e.Variables {
-						if e.Variables[i] != oe.Variables[i] {
-							continue regexes
+				if len(e.Variables) == 0 {
+					// only variable-less regexes can share a slot as there might be differences in collected variables
+					for rIdx := range regexes {
+						r := &regexes[rIdx]
+						o := r.occurence[0]
+						oe := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
+						if e.Regex != oe.Regex {
+							continue
 						}
+						if len(oe.Variables) != 0 {
+							continue
+						}
+						found = r
+						break
 					}
-					found = r
-					break
 				}
 				if found == nil {
-					var compiled *binaryregexp.Regexp
+					compiled := (*binaryregexp.Regexp)(nil)
+					flags := regexFlags(0)
+					var err error
 					if len(e.Variables) == 0 {
-						var err error
 						compiled, err = binaryregexp.Compile(e.Regex)
 						if err != nil {
 							return false, nil, nil, err
 						}
+					} else {
+						regex := e.Regex
+						for i := len(e.Variables) - 1; i >= 0; i-- {
+							v := e.Variables[i]
+							content := ""
+							if v.SubQuery == "" {
+								//TODO: maybe extract the regex for this variable
+								content = ".*"
+							} else if pr, ok := previousResults[v.SubQuery]; !ok {
+								return false, nil, nil, errors.New("SubQueries not yet fully supported")
+							} else {
+								d1 := regexDependencies[v.SubQuery]
+								if d1 == nil {
+									d1 = make(map[string]struct{})
+								}
+								d1[v.Name] = struct{}{}
+								regexDependencies[v.SubQuery] = d1
+
+								for _, vds := range pr.variableData {
+									for _, vd := range vds.data[v.Name] {
+										content += binaryregexp.QuoteMeta(vd) + "|"
+									}
+								}
+								if len(content) != 0 {
+									content = content[:len(content)-1]
+								}
+								flags = regexFlagsIsPrecondition
+							}
+							regex = regex[:v.Position] + "(?:" + content + ")" + regex[v.Position:]
+						}
+						if flags&regexFlagsIsPrecondition != 0 {
+							compiled, err = binaryregexp.Compile(regex)
+							if err != nil {
+								return false, nil, nil, err
+							}
+						}
 					}
 					regexes = append(regexes, regex{
 						regex: compiled,
+						flags: flags,
 					})
 					found = &regexes[len(regexes)-1]
 				}
@@ -774,7 +877,7 @@ conditions:
 			return false, nil, nil, nil
 		}
 		if someFail {
-			filters = append(filters, func(_ *subQuerySelection, s *stream) (bool, error) {
+			filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
 				hg := hostConditionBitmaps[s.HostGroup]
 				if len(hg) == 0 {
 					return hg != nil, nil
@@ -804,21 +907,135 @@ conditions:
 			return regexes[i].occurence[0].condition < regexes[j].occurence[0].condition
 		})
 
+		impossibleSubQueries := map[string]*subQueryRanges{}
+		type (
+			variableValues struct {
+				quotedData []string
+				results    subQueryRanges
+			}
+			subQueryVariableData struct {
+				variableIndex map[string]int
+				variableData  []variableValues
+			}
+		)
+		possibleSubQueries := map[string]subQueryVariableData{}
+		for sq, vars := range regexDependencies {
+			varNameIndex := make(map[string]int)
+			for v := range vars {
+				varNameIndex[v] = len(varNameIndex)
+			}
+			rd := previousResults[sq]
+			badVarData := map[int]struct{}{}
+			varData := []variableValues(nil)
+			varDataMap := map[int]int{}
+		vardata:
+			for vdi := range rd.variableData {
+				vd := &rd.variableData[vdi]
+				if vd.uses == 0 {
+					continue
+				}
+				quotedData := make([]string, len(varNameIndex))
+				for v, vIdx := range varNameIndex {
+					if ds, ok := vd.data[v]; ok {
+						quoted, first := "", true
+						for _, d := range ds {
+							if first {
+								quoted += "|"
+							}
+							first = false
+							quoted += binaryregexp.QuoteMeta(d)
+						}
+						quotedData[vIdx] = quoted
+						continue
+					}
+					badVarData[vdi] = struct{}{}
+					continue vardata
+				}
+			varDataElement:
+				for i := range varData {
+					vde := &varData[i]
+					for j := range quotedData {
+						if quotedData[j] != vde.quotedData[j] {
+							continue varDataElement
+						}
+					}
+					varDataMap[vdi] = i
+					continue vardata
+				}
+				varDataMap[vdi] = len(varData)
+				varData = append(varData, variableValues{
+					quotedData: quotedData,
+				})
+			}
+			possible := false
+			impossible := &subQueryRanges{}
+			for sIdx, s := range rd.streams {
+				if vdi, ok := rd.variableAssociation[s.StreamID]; ok {
+					if _, ok := badVarData[vdi]; !ok {
+						varData[varDataMap[vdi]].results.add(sIdx)
+						possible = true
+						continue
+					}
+				}
+				// this stream can not succeed as it does not have the right variables
+				impossible.add(sIdx)
+			}
+			if !possible {
+				return false, nil, nil, nil
+			}
+			if !impossible.empty() {
+				impossibleSubQueries[sq] = impossible
+			}
+			possibleSubQueries[sq] = subQueryVariableData{
+				variableIndex: varNameIndex,
+				variableData:  varData,
+			}
+		}
+		if len(impossibleSubQueries) != 0 {
+			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
+				for sq, imp := range impossibleSubQueries {
+					sc.allowedSubQueries.remove([]string{sq}, []*subQueryRanges{imp})
+				}
+				return !sc.allowedSubQueries.empty(), nil
+			})
+		}
+
 		//add filter for scanning the data section
 		sr := io.NewSectionReader(r.file, int64(r.header.Sections[sectionData].Begin), r.header.Sections[sectionData].size())
 		br := seekbufio.NewSeekableBufferReader(sr)
-		filters = append(filters, func(sqs *subQuerySelection, s *stream) (bool, error) {
+		filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 			if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
 				return false, err
 			}
-			type progressData struct {
-				streamOffset [2]int
-				// how many regexes were sucessful
-				nSuccessful int
-				// the variables collected on the way
-				variables map[string]string
+			type (
+				progressVariantFlag byte
+				progressVariant     struct {
+					streamOffset [2]int
+					// how many regexes were sucessful
+					nSuccessful int
+					// the variables collected on the way
+					variables map[string]string
+					// the regex to use
+					regex *binaryregexp.Regexp
+					// the variants chosen for this progress
+					variant map[string]int
+					// flags for this progress
+					flags progressVariantFlag
+				}
+				progressGroup struct {
+					variants []progressVariant
+				}
+			)
+			const (
+				progressVariantFlagIsPrecondition      progressVariantFlag = 1
+				progressVariantFlagPreconditionMatched progressVariantFlag = 2
+			)
+			progressGroups := make([]progressGroup, len(*q))
+			for _, pIdx := range regexConditions {
+				progressGroups[pIdx] = progressGroup{
+					variants: make([]progressVariant, 1),
+				}
 			}
-			progress := make([]progressData, len(*q))
 			buffers := [2][]byte{}
 			bufferOffsets := [2]int{}
 			bufferLengths := [][2]int{{}}
@@ -847,70 +1064,115 @@ conditions:
 
 				for alreadyRead := false; ; {
 					type regexOcc struct {
-						regex, occ int
+						regex, occ, variant int
 					}
 					interested := [2][]regexOcc{}
 					needMoreData := [2]bool{}
 					for rIdx := range regexes {
 						r := &regexes[rIdx]
 						for oIdx, o := range r.occurence {
-							p := &progress[o.condition]
-							if o.element != p.nSuccessful {
-								continue
-							}
 							e := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
 							wantDirection := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
 							// xor with the c2s value for both flag sources to make sure the same number has the same meaning
 							wantDirection ^= query.DataRequirementSequenceFlagsDirectionClientToServer / query.DataRequirementSequenceFlagsDirection
 							wantDirection ^= flagsDataDirectionClientToServer / flagsDataDirection
-							if r.regex == nil {
-								expr := e.Regex
-								for i := len(e.Variables) - 1; i >= 0; i-- {
-									v := e.Variables[i]
-									if v.SubQuery != subQuery {
-										//TODO: maybe wrap this whole code in a function that is repeatedly called for all values from the previous results
-										return false, errors.New("SubQueries not yet fully supported")
-									}
-									content, ok := p.variables[v.Name]
-									if !ok {
-										return false, fmt.Errorf("variable %q not defined", v.Name)
-									}
-									expr = fmt.Sprintf("%s(?:%s)%s", expr[:v.Position], binaryregexp.QuoteMeta(content), expr[v.Position:])
-								}
-								compiled, err := binaryregexp.Compile(expr)
-								if err != nil {
-									return false, err
-								}
-								r.regex = compiled
-							}
+
 							gotAvailable := bufferLengths[len(bufferLengths)-1]
 							gotAllData := gotAvailable[wantDirection] == streamLength[wantDirection]
-							if prefix, _ := r.regex.LiteralPrefix(); prefix != "" {
-								availableBytes := gotAvailable[wantDirection] - p.streamOffset[wantDirection]
-								if availableBytes < len(prefix) {
+
+							ps := &progressGroups[o.condition]
+							for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
+								newProgresses := []progressVariant(nil)
+								p := &ps.variants[pIdx]
+								if o.element != p.nSuccessful {
+									continue
+								}
+								if p.regex == nil {
+									if r.regex != nil && p.flags&progressVariantFlagIsPrecondition == 0 {
+										p.regex = r.regex
+										p.flags = progressVariantFlag((r.flags&regexFlagsIsPrecondition)/regexFlagsIsPrecondition) * progressVariantFlagIsPrecondition
+									} else {
+										expr := e.Regex
+										for i := len(e.Variables) - 1; i >= 0; i-- {
+											v := e.Variables[i]
+											content := ""
+											if v.SubQuery == "" {
+												ok := false
+												content, ok = p.variables[v.Name]
+												if !ok {
+													return false, fmt.Errorf("variable %q not defined", v.Name)
+												}
+												content = binaryregexp.QuoteMeta(content)
+											} else {
+												variant, ok := p.variant[v.SubQuery]
+												if !ok {
+													// we have not yet split this progress element
+													// the precondition regex matched, split this progress element
+													for j := 1; j < len(possibleSubQueries[v.SubQuery].variableData); j++ {
+														np := progressVariant{
+															streamOffset: p.streamOffset,
+															nSuccessful:  p.nSuccessful,
+															variant:      map[string]int{v.SubQuery: j},
+														}
+														for k, v := range p.variant {
+															np.variant[k] = v
+														}
+														if p.variables != nil {
+															np.variables = make(map[string]string)
+															for k, v := range p.variables {
+																np.variables[k] = v
+															}
+														}
+														newProgresses = append(newProgresses, np)
+													}
+													if p.variant == nil {
+														p.variant = make(map[string]int)
+													}
+													p.variant[v.SubQuery] = 0
+												}
+												psq := possibleSubQueries[v.SubQuery]
+												vIdx := psq.variableIndex[v.Name]
+												content = psq.variableData[variant].quotedData[vIdx]
+											}
+											expr = fmt.Sprintf("%s(?:%s)%s", expr[:v.Position], content, expr[v.Position:])
+										}
+										compiled, err := binaryregexp.Compile(expr)
+										if err != nil {
+											return false, err
+										}
+										p.regex = compiled
+										p.flags = 0
+									}
+								}
+								ps.variants = append(ps.variants, newProgresses...)
+								if prefix, _ := p.regex.LiteralPrefix(); prefix != "" {
+									availableBytes := gotAvailable[wantDirection] - p.streamOffset[wantDirection]
+									if availableBytes < len(prefix) {
+										if !gotAllData {
+											needMoreData[wantDirection] = true
+										}
+										continue
+									}
+								} else {
+									// regexes with no literal prefix should only be checked, when the full data
+									// is read, they often perform bad otherwise; we must not skip data for the
+									// other direction as well, as a following regex might need that data
 									if !gotAllData {
 										needMoreData[wantDirection] = true
+										keepAllData = true
+										continue
 									}
-									continue
+									if gotAvailable[wantDirection] == p.streamOffset[wantDirection] {
+										continue
+									}
 								}
-							} else {
-								// regexes with no literal prefix should only be checked, when the full data
-								// is read, they often perform bad otherwise; we must not skip data for the
-								// other direction as well, as a following regex might need that data
-								if !gotAllData {
-									needMoreData[wantDirection] = true
-									keepAllData = true
-									continue
-								}
-								if gotAvailable[wantDirection] == p.streamOffset[wantDirection] {
-									continue
-								}
+								// we got new data that this regex is interested in
+								interested[wantDirection] = append(interested[wantDirection], regexOcc{
+									regex:   rIdx,
+									occ:     oIdx,
+									variant: pIdx,
+								})
 							}
-							// we got new data that this regex is interested in
-							interested[wantDirection] = append(interested[wantDirection], regexOcc{
-								regex: rIdx,
-								occ:   oIdx,
-							})
 						}
 					}
 
@@ -957,9 +1219,10 @@ conditions:
 						for _, i := range interested[direction] {
 							r := &regexes[i.regex]
 							o := &r.occurence[i.occ]
-							p := &progress[o.condition]
 							d := (*q)[o.condition].(*query.DataCondition)
-							prefix, _ := r.regex.LiteralPrefix()
+							pg := &progressGroups[o.condition]
+							p := &pg.variants[i.variant]
+							prefix, _ := p.regex.LiteralPrefix()
 
 							if prefix != "" {
 								//the regex has a prefix, find it
@@ -984,16 +1247,22 @@ conditions:
 								p.streamOffset[direction] += pos
 							}
 							data := buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
-							res := r.regex.FindSubmatchIndex(data)
-							if res != nil {
+							res := p.regex.FindSubmatchIndex(data)
+							if res != nil && p.flags&progressVariantFlagIsPrecondition != 0 {
+								p.regex = nil
+								p.flags |= progressVariantFlagPreconditionMatched
+								recheckRegexes = true
+							} else if res != nil {
 								p.nSuccessful++
+								p.flags = 0
 								if p.nSuccessful != len(d.Elements) {
 									// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
 									recheckRegexes = true
 								} else if d.Inverted {
 									return false, nil
 								}
-								variableNames := r.regex.SubexpNames()
+								variableNames := p.regex.SubexpNames()
+								p.regex = nil
 								for i := 2; i < len(res); i += 2 {
 									varName := variableNames[i/2]
 									if varName == "" {
@@ -1036,15 +1305,47 @@ conditions:
 				}
 			}
 
-			// check if any of the regexe's failed
-			for pIdx, p := range progress {
-				d, ok := (*q)[pIdx].(*query.DataCondition)
-				if !ok {
-					continue
-				}
-				nUnsuccessful := len(d.Elements) - p.nSuccessful
-				if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
-					return false, nil
+			// check if any of the regexe's failed and collect variable contents
+			for _, cIdx := range regexConditions {
+				d := (*q)[cIdx].(*query.DataCondition)
+				pg := &progressGroups[cIdx]
+				for pIdx := range pg.variants {
+					p := &pg.variants[pIdx]
+					nUnsuccessful := len(d.Elements) - p.nSuccessful
+					if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
+						if len(p.variant) == 0 {
+							return false, nil
+						}
+						sqs := []string(nil)
+						forbidden := []*subQueryRanges(nil)
+						for sq, v := range p.variant {
+							sqs = append(sqs, sq)
+							badSQR := &possibleSubQueries[sq].variableData[v].results
+							forbidden = append(forbidden, badSQR)
+
+						}
+						sc.allowedSubQueries.remove(sqs, forbidden)
+						if sc.allowedSubQueries.empty() {
+							return false, nil
+						}
+						continue
+					}
+					if p.variables == nil {
+						continue
+					}
+					if sc.outputVariables == nil {
+						sc.outputVariables = make(map[string][]string)
+					}
+				outer:
+					for n, v := range p.variables {
+						values := sc.outputVariables[n]
+						for _, on := range values {
+							if n == on {
+								continue outer
+							}
+						}
+						sc.outputVariables[n] = append(values, v)
+					}
 				}
 			}
 			return true, nil
@@ -1189,10 +1490,10 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 		}
 	}
 
-	allResults := map[string][]*Stream{}
+	allResults := map[string]resultData{}
 	moreResults := false
 	for _, subQuery := range qs.SubQueries() {
-		results := []*Stream{}
+		results := resultData{}
 		sorter := sortingLess
 		resultLimit := limit + skip
 		if subQuery != "" {
@@ -1204,7 +1505,7 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 			idx := indexes[i]
 
 			//get all filters and lookups for each sub-query
-			filtersList := [][]func(*subQuerySelection, *stream) (bool, error){}
+			filtersList := [][]func(*searchContext, *stream) (bool, error){}
 			lookupsList := [][]func() ([]uint32, error){}
 			for qID := range qs {
 				//build search structures
@@ -1213,32 +1514,32 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 					return nil, false, err
 				}
 				if !possible {
+					//TODO: do we need to remember the impossible query elements for later evaluated sub-queries?
 					continue
 				}
 				filtersList = append(filtersList, filters)
 				lookupsList = append(lookupsList, lookups)
 			}
 			if len(filtersList) != 0 {
-				streams, dropped, err := idx.searchStreams(results, allResults, filtersList, lookupsList, sorter, resultLimit)
+				dropped, err := idx.searchStreams(&results, allResults, filtersList, lookupsList, sorter, resultLimit)
 				if err != nil {
 					return nil, false, err
 				}
 				if subQuery == "" && dropped {
 					moreResults = true
 				}
-				results = streams
 			}
 		}
 		allResults[subQuery] = results
 	}
 	results := allResults[""]
-	if uint(len(results)) <= skip {
+	if uint(len(results.streams)) <= skip {
 		return nil, false, nil
 	}
-	return results[skip:], moreResults, nil
+	return results.streams[skip:], moreResults, nil
 }
 
-func (r *Reader) searchStreams(currentResults []*Stream, subQueryResults map[string][]*Stream, allFilters [][]func(*subQuerySelection, *stream) (bool, error), allLookups [][]func() ([]uint32, error), sortingLess func(a, b *Stream) bool, limit uint) ([]*Stream, bool, error) {
+func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, allFilters [][]func(*searchContext, *stream) (bool, error), allLookups [][]func() ([]uint32, error), sortingLess func(a, b *Stream) bool, limit uint) (bool, error) {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
 	for _, ls := range allLookups {
@@ -1255,7 +1556,7 @@ func (r *Reader) searchStreams(currentResults []*Stream, subQueryResults map[str
 			for _, l := range ls {
 				newStreamIndexes, err := l()
 				if err != nil {
-					return nil, false, err
+					return false, err
 				}
 				if len(newStreamIndexes) == 0 {
 					streamIndexesOfQuery = nil
@@ -1289,7 +1590,8 @@ func (r *Reader) searchStreams(currentResults []*Stream, subQueryResults map[str
 			}
 		}
 		if len(streamIndexes) == 0 {
-			return nil, false, nil
+			result.streams = nil
+			return false, nil
 		}
 	}
 
@@ -1306,56 +1608,101 @@ func (r *Reader) searchStreams(currentResults []*Stream, subQueryResults map[str
 		}
 
 		// check if the sorting and limit would allow this stream
-		if limit != 0 && sortingLess != nil && uint(len(currentResults)) >= limit && !sortingLess(ss, currentResults[limit-1]) {
+		if limit != 0 && sortingLess != nil && uint(len(result.streams)) >= limit && !sortingLess(ss, result.streams[limit-1]) {
 			resultsDropped = true
 			return nil
 		}
 
-		matchingByAny := false
+	queryGroup:
 		for _, fi := range filterIndexes {
-			sqs := subQuerySelection{}
 			tmp := map[string]subQueryRanges{}
 			for k, v := range subQueryResults {
-				tmp[k] = subQueryRanges{[]subQueryRange{{0, len(v) - 1}}}
+				tmp[k] = subQueryRanges{[]subQueryRange{{0, len(v.streams) - 1}}}
 			}
-			sqs.remaining = append(sqs.remaining, tmp)
-			matchingByThis := true
+			sc := &searchContext{
+				allowedSubQueries: subQuerySelection{
+					remaining: []map[string]subQueryRanges{tmp},
+				},
+			}
 			for _, f := range allFilters[fi] {
-				matching, err := f(&sqs, s)
+				matching, err := f(sc, s)
 				if err != nil {
 					return err
 				}
-				matchingByThis = matching
-				if !matchingByThis {
-					break
+				if !matching {
+					continue queryGroup
 				}
 			}
-			matchingByAny = matchingByThis
-			if matchingByAny {
-				break
+			//TODO: do we have to check other query groups for following sub queries?
+
+			if limit != 0 && uint(len(result.streams)) >= limit {
+				// drop the last result
+				r := &result.streams[len(result.streams)-1]
+				if d, ok := result.variableAssociation[(*r).StreamID]; ok {
+					result.variableData[d].uses--
+					delete(result.variableAssociation, (*r).StreamID)
+				}
+				*r = nil
+				resultsDropped = true
+			} else {
+				result.streams = append(result.streams, nil)
 			}
-		}
-		if !matchingByAny {
-			return nil
-		}
-		if limit != 0 && uint(len(currentResults)) >= limit {
-			// drop the last result
-			currentResults[len(currentResults)-1] = nil
-			resultsDropped = true
-		} else {
-			currentResults = append(currentResults, nil)
-		}
-		// insert the result at the right place
-		pos := len(currentResults) - 1
-		if sortingLess != nil {
-			pos = sort.Search(len(currentResults)-1, func(i int) bool {
-				return sortingLess(ss, currentResults[i])
-			})
-			for i := len(currentResults) - 1; i > pos; i-- {
-				currentResults[i] = currentResults[i-1]
+
+			// insert the result at the right place
+			pos := len(result.streams) - 1
+			if sortingLess != nil {
+				pos = sort.Search(len(result.streams)-1, func(i int) bool {
+					return sortingLess(ss, result.streams[i])
+				})
+				for i := len(result.streams) - 1; i > pos; i-- {
+					result.streams[i] = result.streams[i-1]
+				}
 			}
+			result.streams[pos] = ss
+			if sc.outputVariables == nil {
+				break queryGroup
+			}
+			if result.variableAssociation == nil {
+				result.variableAssociation = make(map[uint64]int)
+			}
+			freeSlot := len(result.variableData)
+		outer:
+			for i := range result.variableData {
+				d := &result.variableData[i]
+				if d.uses == 0 {
+					freeSlot = i
+				}
+				if len(d.data) != len(sc.outputVariables) {
+					continue
+				}
+				for k, vs := range sc.outputVariables {
+					ovs, ok := d.data[k]
+					if !ok {
+						continue outer
+					}
+					if len(vs) != len(ovs) {
+						continue outer
+					}
+					for j := range vs {
+						if vs[j] != ovs[j] {
+							continue outer
+						}
+					}
+				}
+				d.uses++
+				result.variableAssociation[s.StreamID] = i
+				break queryGroup
+			}
+			if freeSlot == len(result.variableData) {
+				result.variableData = append(result.variableData, variableDataEntry{})
+			}
+			result.variableData[freeSlot] = variableDataEntry{
+				uses: 1,
+				data: sc.outputVariables,
+			}
+			result.variableAssociation[s.StreamID] = freeSlot
+			break
 		}
-		currentResults[pos] = ss
 		return nil
 	}
 	if len(streamIndexes) != 0 {
@@ -1368,7 +1715,7 @@ func (r *Reader) searchStreams(currentResults []*Stream, subQueryResults map[str
 		})
 		for _, si := range sortedStreamIndexes {
 			if err := filterAndAddToResult(streamIndexes[si], si); err != nil {
-				return nil, false, err
+				return false, err
 			}
 		}
 	} else {
@@ -1378,9 +1725,9 @@ func (r *Reader) searchStreams(currentResults []*Stream, subQueryResults map[str
 		}
 		for si, sc := 0, r.StreamCount(); si < sc; si++ {
 			if err := filterAndAddToResult(filtersToApply, uint32(si)); err != nil {
-				return nil, false, err
+				return false, err
 			}
 		}
 	}
-	return currentResults, resultsDropped, nil
+	return resultsDropped, nil
 }
