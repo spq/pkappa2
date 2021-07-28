@@ -2,6 +2,7 @@ package builder
 
 import (
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/google/gopacket"
@@ -21,6 +22,11 @@ func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pc
 	if updateInfo {
 		info = &pcapmetadata.PcapInfo{
 			Filename: pcapFilename,
+		}
+		if s, err := os.Stat(filepath.Join(pcapDir, pcapFilename)); err != nil {
+			return nil, nil, err
+		} else {
+			info.Filesize = uint64(s.Size())
 		}
 	}
 	for packetIndex := uint64(0); ; packetIndex++ {

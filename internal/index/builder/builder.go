@@ -29,10 +29,14 @@ type (
 	}
 )
 
-func New(pcapDir, indexDir, snapshotDir string) (*Builder, error) {
+func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata.PcapInfo) (*Builder, error) {
 	b := Builder{
 		indexDir:    indexDir,
 		snapshotDir: snapshotDir,
+	}
+	cachedKnownPcapsMap := map[string]*pcapmetadata.PcapInfo{}
+	for _, p := range cachedKnownPcaps {
+		cachedKnownPcapsMap[p.Filename] = p
 	}
 	// read all existing pcaps to build the info structs
 	pcaps, err := ioutil.ReadDir(pcapDir)
@@ -43,9 +47,12 @@ func New(pcapDir, indexDir, snapshotDir string) (*Builder, error) {
 		if p.IsDir() || !strings.HasSuffix(p.Name(), ".pcap") {
 			continue
 		}
-		info, _, err := readPackets(pcapDir, p.Name(), nil)
-		if err != nil {
-			return nil, err
+		info := cachedKnownPcapsMap[p.Name()]
+		if info == nil || info.Filesize != uint64(p.Size()) {
+			info, _, err = readPackets(pcapDir, p.Name(), nil)
+			if err != nil {
+				return nil, err
+			}
 		}
 		b.knownPcaps = append(b.knownPcaps, info)
 	}

@@ -76,22 +76,17 @@ type (
 			Name       string
 			Definition string
 		}
+		Pcaps []*pcapmetadata.PcapInfo
 	}
 )
 
 func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
-	b, err := builder.New(pcapDir, indexDir, snapshotDir)
-	if err != nil {
-		return nil, err
-	}
-
 	mgr := Manager{
 		PcapDir:     pcapDir,
 		IndexDir:    indexDir,
 		SnapshotDir: snapshotDir,
 		StateDir:    stateDir,
 
-		builder:        b,
 		usedIndexes:    make(map[*index.Reader]uint),
 		tags:           make(map[string]*tag),
 		currentVersion: 1,
@@ -120,6 +115,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
 		return nil, err
 	}
 	stateTimestamp := time.Time{}
+	cachedKnownPcapData := []*pcapmetadata.PcapInfo(nil)
 nextStateFile:
 	for _, fn := range stateFilenames {
 		f, err := os.Open(fn)
@@ -186,6 +182,16 @@ nextStateFile:
 		mgr.tags = newTags
 		mgr.stateFilename = fn
 		stateTimestamp = s.Saved
+		cachedKnownPcapData = s.Pcaps
+	}
+
+	mgr.builder, err = builder.New(pcapDir, indexDir, snapshotDir, cachedKnownPcapData)
+	if err != nil {
+		return nil, err
+	}
+	if len(mgr.builder.KnownPcaps()) != len(cachedKnownPcapData) {
+		//nolint:errcheck
+		mgr.saveState()
 	}
 
 	mgr.jobs = make(chan func())
@@ -204,6 +210,7 @@ nextStateFile:
 func (mgr *Manager) saveState() error {
 	j := stateFile{
 		Saved: time.Now(),
+		Pcaps: mgr.builder.KnownPcaps(),
 	}
 	for n, t := range mgr.tags {
 		j.Tags = append(j.Tags, struct {
@@ -262,6 +269,8 @@ func (mgr *Manager) importPcapJob(filename string, existingIndexes []*index.Read
 		}
 		mgr.startTaggingJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
+		//nolint:errcheck
+		mgr.saveState()
 	}
 }
 

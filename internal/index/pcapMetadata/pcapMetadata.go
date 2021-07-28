@@ -9,6 +9,7 @@ import (
 type (
 	PcapInfo struct {
 		Filename           string
+		Filesize           uint64
 		PacketTimestampMin time.Time
 		PacketTimestampMax time.Time
 	}
