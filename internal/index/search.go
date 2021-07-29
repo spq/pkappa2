@@ -1479,7 +1479,7 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 			idx := indexes[i]
 
 			sortingLookup := (func() ([]uint32, error))(nil)
-			if section, ok := sorterLookupSections[sorting[0].Key]; ok {
+			if section, ok := sorterLookupSections[sorting[0].Key]; sorter != nil && ok {
 				res := []uint32(nil)
 				reverse := sorting[0].Dir == query.SortingDirDescending
 				sortingLookup = func() ([]uint32, error) {
@@ -1487,8 +1487,10 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 						res = make([]uint32, idx.StreamCount())
 						idx.readObject(section, 0, 0, res)
 						if reverse {
-							for i, l := 0, len(res); i < l; i++ {
-								res[i], res[l-i-1] = res[l-i-1], res[i]
+							for i, j := 0, len(res)-1; i < j; {
+								res[i], res[j] = res[j], res[i]
+								i++
+								j--
 							}
 						}
 					}
@@ -1540,8 +1542,13 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 	}
 	// a map of index to list of sub-queries that matched this id
-	streamIndexes := map[uint32][]int{}
+	type streamIndex struct {
+		si    uint32
+		parts []int
+	}
+	streamIndexes := []streamIndex(nil)
 	if useLookups {
+		streamIndexesPosition := map[uint32]int{}
 		for qID, ls := range allLookups {
 			streamIndexesOfQuery := []uint32(nil)
 			for _, l := range ls {
@@ -1576,8 +1583,18 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 					break
 				}
 			}
-			for _, s := range streamIndexesOfQuery {
-				streamIndexes[s] = append(streamIndexes[s], qID)
+			for _, si := range streamIndexesOfQuery {
+				pos, ok := streamIndexesPosition[si]
+				if ok {
+					sis := &streamIndexes[pos]
+					sis.parts = append(sis.parts, qID)
+				} else {
+					streamIndexesPosition[si] = len(streamIndexes)
+					streamIndexes = append(streamIndexes, streamIndex{
+						si:    si,
+						parts: []int{qID},
+					})
+				}
 			}
 		}
 		if len(streamIndexes) == 0 {
@@ -1694,16 +1711,9 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		return nil
 	}
 	if len(streamIndexes) != 0 {
-		sortedStreamIndexes := make([]uint32, 0, len(streamIndexes))
-		for s := range streamIndexes {
-			sortedStreamIndexes = append(sortedStreamIndexes, s)
-		}
-		sort.Slice(sortedStreamIndexes, func(i, j int) bool {
-			return sortedStreamIndexes[i] < sortedStreamIndexes[j]
-		})
-		for _, si := range sortedStreamIndexes {
-			if err := filterAndAddToResult(streamIndexes[si], si); err != nil {
-				return false, err
+		for _, si := range streamIndexes {
+			if err := filterAndAddToResult(si.parts, si.si); err != nil {
+				return err
 			}
 		}
 	} else {
