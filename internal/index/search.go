@@ -38,6 +38,7 @@ type (
 		streams             []*Stream
 		variableAssociation map[uint64]int
 		variableData        []variableDataEntry
+		resultDropped       uint
 	}
 )
 
@@ -1465,7 +1466,6 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 	}
 
 	allResults := map[string]resultData{}
-	moreResults := false
 	for _, subQuery := range qs.SubQueries() {
 		results := resultData{}
 		sorter := sortingLess
@@ -1515,12 +1515,9 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 				lookupsList = append(lookupsList, lookups)
 			}
 			if len(filtersList) != 0 {
-				dropped, err := idx.searchStreams(&results, allResults, filtersList, lookupsList, sorter, resultLimit)
+				err := idx.searchStreams(&results, allResults, filtersList, lookupsList, sorter, resultLimit)
 				if err != nil {
 					return nil, false, err
-				}
-				if subQuery == "" && dropped {
-					moreResults = true
 				}
 			}
 		}
@@ -1530,10 +1527,10 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 	if uint(len(results.streams)) <= skip {
 		return nil, false, nil
 	}
-	return results.streams[skip:], moreResults, nil
+	return results.streams[skip:], results.resultDropped != 0, nil
 }
 
-func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, allFilters [][]func(*searchContext, *stream) (bool, error), allLookups [][]func() ([]uint32, error), sortingLess func(a, b *Stream) bool, limit uint) (bool, error) {
+func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, allFilters [][]func(*searchContext, *stream) (bool, error), allLookups [][]func() ([]uint32, error), sortingLess func(a, b *Stream) bool, limit uint) error {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
 	for _, ls := range allLookups {
@@ -1550,7 +1547,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 			for _, l := range ls {
 				newStreamIndexes, err := l()
 				if err != nil {
-					return false, err
+					return err
 				}
 				if len(newStreamIndexes) == 0 {
 					streamIndexesOfQuery = nil
@@ -1584,13 +1581,11 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 			}
 		}
 		if len(streamIndexes) == 0 {
-			result.streams = nil
-			return false, nil
+			return nil
 		}
 	}
 
 	// apply filters to lookup results or all streams, if no lookups could be used
-	resultsDropped := false
 	filterAndAddToResult := func(filterIndexes []int, si uint32) error {
 		s, err := r.streamByIndex(si)
 		if err != nil {
@@ -1602,8 +1597,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 
 		// check if the sorting and limit would allow this stream
-		if limit != 0 && sortingLess != nil && uint(len(result.streams)) >= limit && !sortingLess(ss, result.streams[limit-1]) {
-			resultsDropped = true
+		if result.resultDropped != 0 && limit != 0 && sortingLess != nil && uint(len(result.streams)) >= limit && !sortingLess(ss, result.streams[limit-1]) {
 			return nil
 		}
 
@@ -1637,7 +1631,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 					delete(result.variableAssociation, (*r).StreamID)
 				}
 				*r = nil
-				resultsDropped = true
+				result.resultDropped++
 			} else {
 				result.streams = append(result.streams, nil)
 			}
@@ -1719,9 +1713,9 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 		for si, sc := 0, r.StreamCount(); si < sc; si++ {
 			if err := filterAndAddToResult(filtersToApply, uint32(si)); err != nil {
-				return false, err
+				return err
 			}
 		}
 	}
-	return resultsDropped, nil
+	return nil
 }
