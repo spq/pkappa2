@@ -1354,125 +1354,90 @@ conditions:
 	return true, filters, lookups, nil
 }
 
+var (
+	sorterFunctions = map[query.SortingKey]func(a, b *Stream) bool{
+		query.SortingKeyID: func(a, b *Stream) bool {
+			return a.stream.StreamID < b.stream.StreamID
+		},
+		query.SortingKeyClientBytes: func(a, b *Stream) bool {
+			return a.stream.ClientBytes < b.stream.ClientBytes
+		},
+		query.SortingKeyServerBytes: func(a, b *Stream) bool {
+			return a.stream.ServerBytes < b.stream.ServerBytes
+		},
+		query.SortingKeyFirstPacketTime: func(a, b *Stream) bool {
+			if a.r == b.r {
+				return a.stream.FirstPacketTimeNS < b.stream.FirstPacketTimeNS
+			}
+			at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.FirstPacketTimeNS))
+			bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.FirstPacketTimeNS))
+			return at.Before(bt)
+		},
+		query.SortingKeyLastPacketTime: func(a, b *Stream) bool {
+			if a.r == b.r {
+				return a.stream.LastPacketTimeNS < b.stream.LastPacketTimeNS
+			}
+			at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.LastPacketTimeNS))
+			bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.LastPacketTimeNS))
+			return at.Before(bt)
+		},
+		query.SortingKeyClientHost: func(a, b *Stream) bool {
+			if a.stream.ClientHost == b.stream.ClientHost && a.r == b.r && a.stream.HostGroup == b.stream.HostGroup {
+				return false
+			}
+			ah := a.r.hostGroups[a.stream.HostGroup].get(a.stream.ClientHost)
+			bh := b.r.hostGroups[b.stream.HostGroup].get(b.stream.ClientHost)
+			cmp := bytes.Compare(ah, bh)
+			return cmp < 0
+		},
+		query.SortingKeyServerHost: func(a, b *Stream) bool {
+			if a.stream.ServerHost == b.stream.ServerHost && a.r == b.r && a.stream.HostGroup == b.stream.HostGroup {
+				return false
+			}
+			ah := a.r.hostGroups[a.stream.HostGroup].get(a.stream.ServerHost)
+			bh := b.r.hostGroups[b.stream.HostGroup].get(b.stream.ServerHost)
+			cmp := bytes.Compare(ah, bh)
+			return cmp < 0
+		},
+		query.SortingKeyClientPort: func(a, b *Stream) bool {
+			return a.stream.ClientPort < b.stream.ClientPort
+		},
+		query.SortingKeyServerPort: func(a, b *Stream) bool {
+			return a.stream.ServerPort < b.stream.ServerPort
+		},
+	}
+)
+
 func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet, sorting []query.Sorting, limit, skip uint, tags map[string][]uint64) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
-	sorters := []func(a, b *Stream) bool{}
-	sorterFunctions := map[query.SortingDir]map[query.SortingKey]func(a, b *Stream) bool{
-		query.SortingDirAscending: map[query.SortingKey]func(a *Stream, b *Stream) bool{
-			query.SortingKeyID: func(a, b *Stream) bool {
-				return a.stream.StreamID < b.stream.StreamID
-			},
-			query.SortingKeyClientBytes: func(a, b *Stream) bool {
-				return a.stream.ClientBytes < b.stream.ClientBytes
-			},
-			query.SortingKeyServerBytes: func(a, b *Stream) bool {
-				return a.stream.ServerBytes < b.stream.ServerBytes
-			},
-			query.SortingKeyFirstPacketTime: func(a, b *Stream) bool {
-				if a.r == b.r {
-					return a.stream.FirstPacketTimeNS < b.stream.FirstPacketTimeNS
-				}
-				at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.FirstPacketTimeNS))
-				bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.FirstPacketTimeNS))
-				return at.Before(bt)
-			},
-			query.SortingKeyLastPacketTime: func(a, b *Stream) bool {
-				if a.r == b.r {
-					return a.stream.LastPacketTimeNS < b.stream.LastPacketTimeNS
-				}
-				at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.LastPacketTimeNS))
-				bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.LastPacketTimeNS))
-				return at.Before(bt)
-			},
-			query.SortingKeyClientHost: func(a, b *Stream) bool {
-				if a.stream.ClientHost == b.stream.ClientHost && a.r == b.r && a.stream.HostGroup == b.stream.HostGroup {
-					return false
-				}
-				ah := a.r.hostGroups[a.stream.HostGroup].get(a.stream.ClientHost)
-				bh := b.r.hostGroups[b.stream.HostGroup].get(b.stream.ClientHost)
-				cmp := bytes.Compare(ah, bh)
-				return cmp < 0
-			},
-			query.SortingKeyServerHost: func(a, b *Stream) bool {
-				if a.stream.ServerHost == b.stream.ServerHost && a.r == b.r && a.stream.HostGroup == b.stream.HostGroup {
-					return false
-				}
-				ah := a.r.hostGroups[a.stream.HostGroup].get(a.stream.ServerHost)
-				bh := b.r.hostGroups[b.stream.HostGroup].get(b.stream.ServerHost)
-				cmp := bytes.Compare(ah, bh)
-				return cmp < 0
-			},
-			query.SortingKeyClientPort: func(a, b *Stream) bool {
-				return a.stream.ClientPort < b.stream.ClientPort
-			},
-			query.SortingKeyServerPort: func(a, b *Stream) bool {
-				return a.stream.ServerPort < b.stream.ServerPort
-			},
-		},
-		query.SortingDirDescending: map[query.SortingKey]func(a *Stream, b *Stream) bool{
-			query.SortingKeyID: func(a, b *Stream) bool {
-				return a.stream.StreamID > b.stream.StreamID
-			},
-			query.SortingKeyClientBytes: func(a, b *Stream) bool {
-				return a.stream.ClientBytes > b.stream.ClientBytes
-			},
-			query.SortingKeyServerBytes: func(a, b *Stream) bool {
-				return a.stream.ServerBytes > b.stream.ServerBytes
-			},
-			query.SortingKeyFirstPacketTime: func(a, b *Stream) bool {
-				if a.r == b.r {
-					return a.stream.FirstPacketTimeNS > b.stream.FirstPacketTimeNS
-				}
-				at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.FirstPacketTimeNS))
-				bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.FirstPacketTimeNS))
-				return at.After(bt)
-			},
-			query.SortingKeyLastPacketTime: func(a, b *Stream) bool {
-				if a.r == b.r {
-					return a.stream.LastPacketTimeNS > b.stream.LastPacketTimeNS
-				}
-				at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.LastPacketTimeNS))
-				bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.LastPacketTimeNS))
-				return at.After(bt)
-			},
-			query.SortingKeyClientHost: func(a, b *Stream) bool {
-				if a.stream.ClientHost == b.stream.ClientHost && a.r == b.r && a.stream.HostGroup == b.stream.HostGroup {
-					return false
-				}
-				ah := a.r.hostGroups[a.stream.HostGroup].get(a.stream.ClientHost)
-				bh := b.r.hostGroups[b.stream.HostGroup].get(b.stream.ClientHost)
-				cmp := bytes.Compare(ah, bh)
-				return cmp > 0
-			},
-			query.SortingKeyServerHost: func(a, b *Stream) bool {
-				if a.stream.ServerHost == b.stream.ServerHost && a.r == b.r && a.stream.HostGroup == b.stream.HostGroup {
-					return false
-				}
-				ah := a.r.hostGroups[a.stream.HostGroup].get(a.stream.ServerHost)
-				bh := b.r.hostGroups[b.stream.HostGroup].get(b.stream.ServerHost)
-				cmp := bytes.Compare(ah, bh)
-				return cmp > 0
-			},
-			query.SortingKeyClientPort: func(a, b *Stream) bool {
-				return a.stream.ClientPort > b.stream.ClientPort
-			},
-			query.SortingKeyServerPort: func(a, b *Stream) bool {
-				return a.stream.ServerPort > b.stream.ServerPort
-			},
-		},
-	}
 	var sortingLess func(a, b *Stream) bool
-	switch len(sorting) {
-	case 0:
+	if len(sorting) == 0 {
 		// default search order is -ftime
-		sortingLess = sorterFunctions[query.SortingDirDescending][query.SortingKeyFirstPacketTime]
+		sorting = []query.Sorting{{
+			Key: query.SortingKeyFirstPacketTime,
+			Dir: query.SortingDirDescending,
+		}}
+	}
+	switch len(sorting) {
 	case 1:
-		sortingLess = sorterFunctions[sorting[0].Dir][sorting[0].Key]
+		sortingLess = sorterFunctions[sorting[0].Key]
+		if sorting[0].Dir == query.SortingDirDescending {
+			sortingLess = func(a, b *Stream) bool {
+				return sortingLess(b, a)
+			}
+		}
 	default:
+		sorters := []func(a, b *Stream) bool{}
 		for _, s := range sorting {
-			sorters = append(sorters, sorterFunctions[s.Dir][s.Key])
+			f := sorterFunctions[s.Key]
+			if s.Dir == query.SortingDirDescending {
+				f = func(a, b *Stream) bool {
+					return f(b, a)
+				}
+			}
+			sorters = append(sorters, f)
 		}
 		sortingLess = func(a, b *Stream) bool {
 			for _, sorter := range sorters {
