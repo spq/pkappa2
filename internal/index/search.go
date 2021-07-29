@@ -1355,6 +1355,11 @@ conditions:
 }
 
 var (
+	sorterLookupSections = map[query.SortingKey]section{
+		query.SortingKeyID:              sectionStreamsByStreamID,
+		query.SortingKeyFirstPacketTime: sectionStreamsByFirstPacketTime,
+		query.SortingKeyLastPacketTime:  sectionStreamsByLastPacketTime,
+	}
 	sorterFunctions = map[query.SortingKey]func(a, b *Stream) bool{
 		query.SortingKeyID: func(a, b *Stream) bool {
 			return a.stream.StreamID < b.stream.StreamID
@@ -1424,20 +1429,24 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 	case 1:
 		sortingLess = sorterFunctions[sorting[0].Key]
 		if sorting[0].Dir == query.SortingDirDescending {
+			asc := sortingLess
 			sortingLess = func(a, b *Stream) bool {
-				return sortingLess(b, a)
+				return asc(b, a)
 			}
 		}
 	default:
 		sorters := []func(a, b *Stream) bool{}
 		for _, s := range sorting {
-			f := sorterFunctions[s.Key]
-			if s.Dir == query.SortingDirDescending {
-				f = func(a, b *Stream) bool {
-					return f(b, a)
-				}
+			af := sorterFunctions[s.Key]
+			df := func(a, b *Stream) bool {
+				return af(b, a)
 			}
-			sorters = append(sorters, f)
+			switch s.Dir {
+			case query.SortingDirAscending:
+				sorters = append(sorters, af)
+			case query.SortingDirDescending:
+				sorters = append(sorters, df)
+			}
 		}
 		sortingLess = func(a, b *Stream) bool {
 			for _, sorter := range sorters {
@@ -1469,6 +1478,23 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 			i--
 			idx := indexes[i]
 
+			sortingLookup := (func() ([]uint32, error))(nil)
+			if section, ok := sorterLookupSections[sorting[0].Key]; ok {
+				res := []uint32(nil)
+				reverse := sorting[0].Dir == query.SortingDirDescending
+				sortingLookup = func() ([]uint32, error) {
+					if res == nil {
+						res = make([]uint32, idx.StreamCount())
+						idx.readObject(section, 0, 0, res)
+						if reverse {
+							for i, l := 0, len(res); i < l; i++ {
+								res[i], res[l-i-1] = res[l-i-1], res[i]
+							}
+						}
+					}
+					return res, nil
+				}
+			}
 			//get all filters and lookups for each sub-query
 			filtersList := [][]func(*searchContext, *stream) (bool, error){}
 			lookupsList := [][]func() ([]uint32, error){}
@@ -1481,6 +1507,9 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 				if !possible {
 					//TODO: do we need to remember the impossible query elements for later evaluated sub-queries?
 					continue
+				}
+				if len(lookups) == 0 && sortingLookup != nil {
+					lookups = append(lookups, sortingLookup)
 				}
 				filtersList = append(filtersList, filters)
 				lookupsList = append(lookupsList, lookups)
