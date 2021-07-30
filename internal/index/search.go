@@ -31,14 +31,18 @@ type (
 		allowedSubQueries subQuerySelection
 		outputVariables   map[string][]string
 	}
-	variableDataEntry struct {
+	variableDataValue struct {
+		name, value string
+		queryParts  bitmask.ShortBitmask
+	}
+	variableDataCollection struct {
 		uses int
-		data map[string][]string
+		data []variableDataValue
 	}
 	resultData struct {
 		streams             []*Stream
 		variableAssociation map[uint64]int
-		variableData        []variableDataEntry
+		variableData        []variableDataCollection
 		resultDropped       uint
 	}
 	queryPart struct {
@@ -820,9 +824,11 @@ conditions:
 								d1[v.Name] = struct{}{}
 								regexDependencies[v.SubQuery] = d1
 
-								for _, vds := range pr.variableData {
-									for _, vd := range vds.data[v.Name] {
-										content += binaryregexp.QuoteMeta(vd) + "|"
+								for _, vdc := range pr.variableData {
+									for _, vdv := range vdc.data {
+										if vdv.name == v.Name {
+											content += binaryregexp.QuoteMeta(vdv.value) + "|"
+										}
 									}
 								}
 								if len(content) != 0 {
@@ -943,20 +949,22 @@ conditions:
 				}
 				quotedData := make([]string, len(varNameIndex))
 				for v, vIdx := range varNameIndex {
-					if ds, ok := vd.data[v]; ok {
-						quoted, first := "", true
-						for _, d := range ds {
-							if first {
-								quoted += "|"
-							}
-							first = false
-							quoted += binaryregexp.QuoteMeta(d)
+					quoted, first := "", true
+					for _, d := range vd.data {
+						if d.name != v {
+							continue
 						}
-						quotedData[vIdx] = quoted
-						continue
+						if first {
+							quoted += "|"
+						}
+						first = false
+						quoted += binaryregexp.QuoteMeta(d.value)
 					}
-					badVarData[vdi] = struct{}{}
-					continue vardata
+					if first {
+						badVarData[vdi] = struct{}{}
+						continue vardata
+					}
+					quotedData[vIdx] = quoted
 				}
 			varDataElement:
 				for i := range varData {
@@ -1630,6 +1638,9 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 			return nil
 		}
 
+		matchingQueryParts := bitmask.ShortBitmask{}
+		matchingSearchContexts := []*searchContext(nil)
+
 	queryGroup:
 		for qpIdx, qpLen := 0, activeQueryParts.Len(); qpIdx < qpLen; qpIdx++ {
 			if !activeQueryParts.IsSet(uint(qpIdx)) {
@@ -1653,76 +1664,117 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 					continue queryGroup
 				}
 			}
-			//TODO: do we have to check other query groups for following sub queries?
-
-			if limit != 0 && uint(len(result.streams)) >= limit {
-				// drop the last result
-				r := &result.streams[len(result.streams)-1]
-				if d, ok := result.variableAssociation[(*r).StreamID]; ok {
-					result.variableData[d].uses--
-					delete(result.variableAssociation, (*r).StreamID)
-				}
-				*r = nil
-				result.resultDropped++
-			} else {
-				result.streams = append(result.streams, nil)
-			}
-
-			// insert the result at the right place
-			pos := len(result.streams) - 1
-			if sortingLess != nil {
-				pos = sort.Search(len(result.streams)-1, func(i int) bool {
-					return sortingLess(ss, result.streams[i])
-				})
-				for i := len(result.streams) - 1; i > pos; i-- {
-					result.streams[i] = result.streams[i-1]
-				}
-			}
-			result.streams[pos] = ss
-			if sc.outputVariables == nil {
-				break queryGroup
-			}
-			if result.variableAssociation == nil {
-				result.variableAssociation = make(map[uint64]int)
-			}
-			freeSlot := len(result.variableData)
-		outer:
-			for i := range result.variableData {
-				d := &result.variableData[i]
-				if d.uses == 0 {
-					freeSlot = i
-				}
-				if len(d.data) != len(sc.outputVariables) {
-					continue
-				}
-				for k, vs := range sc.outputVariables {
-					ovs, ok := d.data[k]
-					if !ok {
-						continue outer
-					}
-					if len(vs) != len(ovs) {
-						continue outer
-					}
-					for j := range vs {
-						if vs[j] != ovs[j] {
-							continue outer
-						}
-					}
-				}
-				d.uses++
-				result.variableAssociation[s.StreamID] = i
-				break queryGroup
-			}
-			if freeSlot == len(result.variableData) {
-				result.variableData = append(result.variableData, variableDataEntry{})
-			}
-			result.variableData[freeSlot] = variableDataEntry{
-				uses: 1,
-				data: sc.outputVariables,
-			}
-			result.variableAssociation[s.StreamID] = freeSlot
-			break
+			matchingQueryParts.Set(uint(qpIdx))
+			matchingSearchContexts = append(matchingSearchContexts, sc)
 		}
+		if matchingQueryParts.IsZero() {
+			return nil
+		}
+		if limit != 0 && uint(len(result.streams)) >= limit {
+			// drop the last result
+			r := &result.streams[len(result.streams)-1]
+			if d, ok := result.variableAssociation[(*r).StreamID]; ok {
+				result.variableData[d].uses--
+				delete(result.variableAssociation, (*r).StreamID)
+			}
+			*r = nil
+			result.resultDropped++
+		} else {
+			result.streams = append(result.streams, nil)
+		}
+
+		// insert the result at the right place
+		pos := len(result.streams) - 1
+		if sortingLess != nil {
+			pos = sort.Search(len(result.streams)-1, func(i int) bool {
+				return sortingLess(ss, result.streams[i])
+			})
+			for i := len(result.streams) - 1; i > pos; i-- {
+				result.streams[i] = result.streams[i-1]
+			}
+		}
+		result.streams[pos] = ss
+
+		vdv := []variableDataValue(nil)
+		for scIdx, qpIdx, qpLen := -1, 0, matchingQueryParts.Len(); qpIdx < qpLen; qpIdx++ {
+			if !matchingQueryParts.IsSet(uint(qpIdx)) {
+				continue
+			}
+			scIdx++
+			sc := matchingSearchContexts[scIdx]
+			if sc.outputVariables == nil {
+				continue
+			}
+			qp := bitmask.ShortBitmask{}
+			qp.Set(uint(qpIdx))
+			for k, vs := range sc.outputVariables {
+			values:
+				for _, v := range vs {
+					for i := range vdv {
+						vdvp := &vdv[i]
+						if k != vdvp.name {
+							continue
+						}
+						if v != vdvp.value {
+							continue
+						}
+						vdvp.queryParts.Set(uint(qpIdx))
+						continue values
+					}
+					vdv = append(vdv, variableDataValue{
+						name:       k,
+						value:      v,
+						queryParts: qp,
+					})
+				}
+			}
+		}
+		if len(vdv) == 0 {
+			return nil
+		}
+		sort.Slice(vdv, func(i, j int) bool {
+			a, b := &vdv[i], &vdv[j]
+			if a.name != b.name {
+				return a.name < b.name
+			}
+			return a.value < b.value
+		})
+		if result.variableAssociation == nil {
+			result.variableAssociation = make(map[uint64]int)
+		}
+		freeSlot := len(result.variableData)
+	varData:
+		for i := range result.variableData {
+			d := &result.variableData[i]
+			if d.uses == 0 {
+				freeSlot = i
+			}
+			if len(d.data) != len(vdv) {
+				continue
+			}
+			for j := range vdv {
+				if vdv[j].name != d.data[j].name {
+					continue varData
+				}
+				if vdv[j].value != d.data[j].value {
+					continue varData
+				}
+				if !vdv[j].queryParts.Equal(d.data[j].queryParts) {
+					continue varData
+				}
+			}
+			d.uses++
+			result.variableAssociation[s.StreamID] = i
+			return nil
+		}
+		if freeSlot == len(result.variableData) {
+			result.variableData = append(result.variableData, variableDataCollection{})
+		}
+		result.variableData[freeSlot] = variableDataCollection{
+			uses: 1,
+			data: vdv,
+		}
+		result.variableAssociation[s.StreamID] = freeSlot
 		return nil
 	}
 	if len(streamIndexes) != 0 {
