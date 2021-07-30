@@ -40,6 +40,11 @@ type (
 		variableData        []variableDataEntry
 		resultDropped       uint
 	}
+	queryPart struct {
+		filters  []func(*searchContext, *stream) (bool, error)
+		lookups  []func() ([]uint32, error)
+		possible bool
+	}
 )
 
 func (sqr subQueryRanges) split(other *subQueryRanges) (overlap subQueryRanges, rest subQueryRanges) {
@@ -168,7 +173,7 @@ func (sqrs *subQueryRanges) addResult(other *subQueryRanges) {
 	}
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string][]uint64) (bool, []func(*searchContext, *stream) (bool, error), []func() ([]uint32, error), error) {
+func (r *Reader) buildSearchObjects(subQuery string, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string][]uint64) (queryPart, error) {
 	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
 
@@ -303,7 +308,7 @@ conditions:
 			}
 			if subQueryAffected {
 				if len(cc.Host) != 0 || len(cc.HostConditionSources) != 2 || (hcsc && hcss) {
-					return false, nil, nil, errors.New("complex host condition not supported")
+					return queryPart{}, errors.New("complex host condition not supported")
 				}
 				otherSubQuery := ""
 				myHcss := hcss
@@ -644,7 +649,7 @@ conditions:
 					if matchesOnEarlyPacket != matchesOnLatePacket {
 						filters = append(filters, filter)
 					} else if !matchesOnEarlyPacket {
-						return false, nil, nil, nil
+						return queryPart{}, nil
 					}
 				} else {
 					filters = append(filters, filter)
@@ -752,7 +757,7 @@ conditions:
 				if e.SubQuery == subQuery {
 					for _, v := range e.Variables {
 						if _, ok := previousResults[v.SubQuery]; v.SubQuery != subQuery && !ok {
-							return false, nil, nil, errors.New("SubQueries not yet fully supported")
+							return queryPart{}, errors.New("SubQueries not yet fully supported")
 						}
 					}
 					shouldEvaluate = true
@@ -766,7 +771,7 @@ conditions:
 				continue
 			}
 			if affectsSubquery {
-				return false, nil, nil, errors.New("SubQueries not yet fully supported")
+				return queryPart{}, errors.New("SubQueries not yet fully supported")
 			}
 			regexConditions = append(regexConditions, cIdx)
 			for eIdx, e := range cc.Elements {
@@ -794,7 +799,7 @@ conditions:
 					if len(e.Variables) == 0 {
 						compiled, err = binaryregexp.Compile(e.Regex)
 						if err != nil {
-							return false, nil, nil, err
+							return queryPart{}, err
 						}
 					} else {
 						regex := e.Regex
@@ -805,7 +810,7 @@ conditions:
 								//TODO: maybe extract the regex for this variable
 								content = ".*"
 							} else if pr, ok := previousResults[v.SubQuery]; !ok {
-								return false, nil, nil, errors.New("SubQueries not yet fully supported")
+								return queryPart{}, errors.New("SubQueries not yet fully supported")
 							} else {
 								d1 := regexDependencies[v.SubQuery]
 								if d1 == nil {
@@ -829,7 +834,7 @@ conditions:
 						if flags&regexFlagsIsPrecondition != 0 {
 							compiled, err = binaryregexp.Compile(regex)
 							if err != nil {
-								return false, nil, nil, err
+								return queryPart{}, err
 							}
 						}
 					}
@@ -849,7 +854,7 @@ conditions:
 	if minIDFilter == maxIDFilter {
 		idx, ok := r.containedStreamIds[minIDFilter]
 		if !ok {
-			return false, nil, nil, nil
+			return queryPart{}, nil
 		}
 		lookups = append(lookups, func() ([]uint32, error) {
 			return []uint32{idx}, nil
@@ -875,7 +880,7 @@ conditions:
 			}
 		}
 		if !someSucceed {
-			return false, nil, nil, nil
+			return queryPart{}, nil
 		}
 		if someFail {
 			filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
@@ -982,7 +987,7 @@ conditions:
 				impossible.add(sIdx)
 			}
 			if !possible {
-				return false, nil, nil, nil
+				return queryPart{}, nil
 			}
 			if !impossible.empty() {
 				impossibleSubQueries[sq] = impossible
@@ -1352,7 +1357,11 @@ conditions:
 			return true, nil
 		})
 	}
-	return true, filters, lookups, nil
+	return queryPart{
+		filters:  filters,
+		lookups:  lookups,
+		possible: true,
+	}, nil
 }
 
 var (
@@ -1498,29 +1507,21 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 				}
 			}
 			//get all filters and lookups for each sub-query
-			filtersList := [][]func(*searchContext, *stream) (bool, error){}
-			lookupsList := [][]func() ([]uint32, error){}
+			queryParts := make([]queryPart, 0, len(qs))
 			for qID := range qs {
 				//build search structures
-				possible, filters, lookups, err := idx.buildSearchObjects(subQuery, allResults, refTime, &qs[qID], indexes[i+1:], tags)
+				queryPart, err := idx.buildSearchObjects(subQuery, allResults, refTime, &qs[qID], indexes[i+1:], tags)
 				if err != nil {
 					return nil, false, err
 				}
-				if !possible {
-					//TODO: do we need to remember the impossible query elements for later evaluated sub-queries?
-					continue
+				if queryPart.possible && len(queryPart.lookups) == 0 && sortingLookup != nil {
+					queryPart.lookups = append(queryPart.lookups, sortingLookup)
 				}
-				if len(lookups) == 0 && sortingLookup != nil {
-					lookups = append(lookups, sortingLookup)
-				}
-				filtersList = append(filtersList, filters)
-				lookupsList = append(lookupsList, lookups)
+				queryParts = append(queryParts, queryPart)
 			}
-			if len(filtersList) != 0 {
-				err := idx.searchStreams(&results, allResults, filtersList, lookupsList, sorter, resultLimit)
-				if err != nil {
-					return nil, false, err
-				}
+			err := idx.searchStreams(&results, allResults, queryParts, sorter, resultLimit)
+			if err != nil {
+				return nil, false, err
 			}
 		}
 		allResults[subQuery] = results
@@ -1532,26 +1533,35 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 	return results.streams[skip:], results.resultDropped != 0, nil
 }
 
-func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, allFilters [][]func(*searchContext, *stream) (bool, error), allLookups [][]func() ([]uint32, error), sortingLess func(a, b *Stream) bool, limit uint) error {
+func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, sortingLess func(a, b *Stream) bool, limit uint) error {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
-	for _, ls := range allLookups {
-		if len(ls) == 0 {
-			useLookups = false
-			break
+	allImpossible := true
+	for _, qp := range queryParts {
+		if qp.possible {
+			allImpossible = false
 		}
+		if len(qp.lookups) == 0 {
+			useLookups = false
+		}
+	}
+	if allImpossible {
+		return nil
 	}
 	// a map of index to list of sub-queries that matched this id
 	type streamIndex struct {
-		si    uint32
-		parts []int
+		si               uint32
+		activeQueryParts []int
 	}
 	streamIndexes := []streamIndex(nil)
 	if useLookups {
 		streamIndexesPosition := map[uint32]int{}
-		for qID, ls := range allLookups {
+		for qpIdx, qp := range queryParts {
+			if !qp.possible {
+				continue
+			}
 			streamIndexesOfQuery := []uint32(nil)
-			for _, l := range ls {
+			for _, l := range qp.lookups {
 				newStreamIndexes, err := l()
 				if err != nil {
 					return err
@@ -1587,12 +1597,12 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 				pos, ok := streamIndexesPosition[si]
 				if ok {
 					sis := &streamIndexes[pos]
-					sis.parts = append(sis.parts, qID)
+					sis.activeQueryParts = append(sis.activeQueryParts, qpIdx)
 				} else {
 					streamIndexesPosition[si] = len(streamIndexes)
 					streamIndexes = append(streamIndexes, streamIndex{
-						si:    si,
-						parts: []int{qID},
+						si:               si,
+						activeQueryParts: []int{qpIdx},
 					})
 				}
 			}
@@ -1603,7 +1613,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 	}
 
 	// apply filters to lookup results or all streams, if no lookups could be used
-	filterAndAddToResult := func(filterIndexes []int, si uint32) error {
+	filterAndAddToResult := func(activeQueryParts []int, si uint32) error {
 		s, err := r.streamByIndex(si)
 		if err != nil {
 			return err
@@ -1619,7 +1629,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 
 	queryGroup:
-		for _, fi := range filterIndexes {
+		for _, qpIdx := range activeQueryParts {
 			tmp := map[string]subQueryRanges{}
 			for k, v := range subQueryResults {
 				tmp[k] = subQueryRanges{[]subQueryRange{{0, len(v.streams) - 1}}}
@@ -1629,7 +1639,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 					remaining: []map[string]subQueryRanges{tmp},
 				},
 			}
-			for _, f := range allFilters[fi] {
+			for _, f := range queryParts[qpIdx].filters {
 				matching, err := f(sc, s)
 				if err != nil {
 					return err
@@ -1712,17 +1722,19 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 	}
 	if len(streamIndexes) != 0 {
 		for _, si := range streamIndexes {
-			if err := filterAndAddToResult(si.parts, si.si); err != nil {
+			if err := filterAndAddToResult(si.activeQueryParts, si.si); err != nil {
 				return err
 			}
 		}
 	} else {
-		filtersToApply := make([]int, 0, len(allFilters))
-		for i := 0; i < len(allFilters); i++ {
-			filtersToApply = append(filtersToApply, i)
+		activeQueryParts := make([]int, 0, len(queryParts))
+		for qpIdx, qp := range queryParts {
+			if qp.possible {
+				activeQueryParts = append(activeQueryParts, qpIdx)
+			}
 		}
 		for si, sc := 0, r.StreamCount(); si < sc; si++ {
-			if err := filterAndAddToResult(filtersToApply, uint32(si)); err != nil {
+			if err := filterAndAddToResult(activeQueryParts, uint32(si)); err != nil {
 				return err
 			}
 		}
