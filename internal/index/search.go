@@ -12,6 +12,7 @@ import (
 
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/seekbufio"
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 	"rsc.io/binaryregexp"
 )
 
@@ -1551,7 +1552,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 	// a map of index to list of sub-queries that matched this id
 	type streamIndex struct {
 		si               uint32
-		activeQueryParts []int
+		activeQueryParts bitmask.ShortBitmask
 	}
 	streamIndexes := []streamIndex(nil)
 	if useLookups {
@@ -1597,13 +1598,14 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 				pos, ok := streamIndexesPosition[si]
 				if ok {
 					sis := &streamIndexes[pos]
-					sis.activeQueryParts = append(sis.activeQueryParts, qpIdx)
+					sis.activeQueryParts.Set(uint(qpIdx))
 				} else {
 					streamIndexesPosition[si] = len(streamIndexes)
 					streamIndexes = append(streamIndexes, streamIndex{
 						si:               si,
-						activeQueryParts: []int{qpIdx},
+						activeQueryParts: bitmask.ShortBitmask{},
 					})
+					streamIndexes[len(streamIndexes)-1].activeQueryParts.Set(uint(qpIdx))
 				}
 			}
 		}
@@ -1613,7 +1615,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 	}
 
 	// apply filters to lookup results or all streams, if no lookups could be used
-	filterAndAddToResult := func(activeQueryParts []int, si uint32) error {
+	filterAndAddToResult := func(activeQueryParts bitmask.ShortBitmask, si uint32) error {
 		s, err := r.streamByIndex(si)
 		if err != nil {
 			return err
@@ -1629,7 +1631,10 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 
 	queryGroup:
-		for _, qpIdx := range activeQueryParts {
+		for qpIdx, qpLen := 0, activeQueryParts.Len(); qpIdx < qpLen; qpIdx++ {
+			if !activeQueryParts.IsSet(uint(qpIdx)) {
+				continue
+			}
 			tmp := map[string]subQueryRanges{}
 			for k, v := range subQueryResults {
 				tmp[k] = subQueryRanges{[]subQueryRange{{0, len(v.streams) - 1}}}
@@ -1727,10 +1732,10 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 			}
 		}
 	} else {
-		activeQueryParts := make([]int, 0, len(queryParts))
+		activeQueryParts := bitmask.ShortBitmask{}
 		for qpIdx, qp := range queryParts {
 			if qp.possible {
-				activeQueryParts = append(activeQueryParts, qpIdx)
+				activeQueryParts.Set(uint(qpIdx))
 			}
 		}
 		for si, sc := 0, r.StreamCount(); si < sc; si++ {
