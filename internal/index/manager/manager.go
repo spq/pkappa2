@@ -383,7 +383,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, newVersion uint, referenced
 				maxStreamID = i.MaxStreamID()
 			}
 		}
-		streams, _, err := index.SearchStreams(indexes, q.ReferenceTime, q.Conditions, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, uint(maxStreamID)+1, 0, referencedTags)
+		streams, _, err := index.SearchStreams(indexes, q.ReferenceTime, q.Conditions, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, referencedTags)
 		if err != nil {
 			return err
 		}
