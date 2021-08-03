@@ -13,6 +13,7 @@ import (
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/seekbufio"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
+	regexanalysis "github.com/spq/pkappa2/internal/tools/regexAnalysis"
 	"rsc.io/binaryregexp"
 )
 
@@ -41,6 +42,7 @@ type (
 	}
 	resultData struct {
 		streams             []*Stream
+		matchingQueryPart   []subQueryRanges
 		variableAssociation map[uint64]int
 		variableData        []variableDataCollection
 		resultDropped       uint
@@ -89,6 +91,14 @@ func (sqr *subQueryRanges) empty() bool {
 	return len(sqr.ranges) == 0
 }
 
+func (sqr *subQueryRanges) copy() subQueryRanges {
+	res := subQueryRanges{
+		ranges: make([]subQueryRange, len(sqr.ranges)),
+	}
+	copy(res.ranges, sqr.ranges)
+	return res
+}
+
 func (sqs *subQuerySelection) remove(subqueries []string, forbidden []*subQueryRanges) {
 	oldRemaining := sqs.remaining
 	sqs.remaining = []map[string]subQueryRanges(nil)
@@ -125,6 +135,36 @@ func (sqs *subQuerySelection) empty() bool {
 
 func (sqrs *subQueryRanges) add(id int) {
 	sqrs.addRange(id, id)
+}
+
+func (sqrs *subQueryRanges) pop() {
+	last := &sqrs.ranges[len(sqrs.ranges)-1]
+	if last.indexMin != last.indexMax {
+		last.indexMax--
+		return
+	}
+	sqrs.ranges = sqrs.ranges[:len(sqrs.ranges)-1]
+}
+
+func (sqrs *subQueryRanges) last() int {
+	if len(sqrs.ranges) != 0 {
+		last := &sqrs.ranges[len(sqrs.ranges)-1]
+		return last.indexMax
+	}
+	return -1
+}
+
+func (sqrs *subQueryRanges) insert(id int) {
+	for i := range sqrs.ranges {
+		r := &sqrs.ranges[i]
+		if r.indexMin >= id {
+			r.indexMin++
+		}
+		if r.indexMax >= id {
+			r.indexMax++
+		}
+	}
+	sqrs.add(id)
 }
 
 func (sqrs *subQueryRanges) addRange(low, high int) {
@@ -178,7 +218,7 @@ func (sqrs *subQueryRanges) addResult(other *subQueryRanges) {
 	}
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string][]uint64) (queryPart, error) {
+func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string][]uint64) (queryPart, error) {
 	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
 
@@ -200,15 +240,18 @@ func (r *Reader) buildSearchObjects(subQuery string, previousResults map[string]
 		occ struct {
 			condition, element int
 		}
-		regexFlags byte
-		regex      struct {
-			occurence []occ
-			regex     *binaryregexp.Regexp
-			flags     regexFlags
+		regexVariant struct {
+			regex          *binaryregexp.Regexp
+			prefix         []byte
+			acceptedLength regexanalysis.AcceptedLengths
+			childSubQuery  string
+			children       []regexVariant
+			isPrecondition bool
 		}
-	)
-	const (
-		regexFlagsIsPrecondition regexFlags = 1
+		regex struct {
+			occurence []occ
+			root      regexVariant
+		}
 	)
 	regexes := []regex(nil)
 	regexConditions := []int(nil)
@@ -779,82 +822,50 @@ conditions:
 				return queryPart{}, errors.New("SubQueries not yet fully supported")
 			}
 			regexConditions = append(regexConditions, cIdx)
+		regexElements:
 			for eIdx, e := range cc.Elements {
-				found := (*regex)(nil)
-				if len(e.Variables) == 0 {
-					// only variable-less regexes can share a slot as there might be differences in collected variables
-					for rIdx := range regexes {
-						r := &regexes[rIdx]
-						o := r.occurence[0]
-						oe := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
-						if e.Regex != oe.Regex {
-							continue
-						}
-						if len(oe.Variables) != 0 {
-							continue
-						}
-						found = r
-						break
+			previousRegexes:
+				for rIdx := range regexes {
+					r := &regexes[rIdx]
+					o := r.occurence[0]
+					oe := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
+					if e.Regex != oe.Regex {
+						continue
 					}
-				}
-				if found == nil {
-					compiled := (*binaryregexp.Regexp)(nil)
-					flags := regexFlags(0)
-					var err error
-					if len(e.Variables) == 0 {
-						compiled, err = binaryregexp.Compile(e.Regex)
-						if err != nil {
-							return queryPart{}, err
-						}
-					} else {
-						regex := e.Regex
-						for i := len(e.Variables) - 1; i >= 0; i-- {
-							v := e.Variables[i]
-							content := ""
-							if v.SubQuery == "" {
-								//TODO: maybe extract the regex for this variable
-								content = ".*"
-							} else if pr, ok := previousResults[v.SubQuery]; !ok {
-								return queryPart{}, errors.New("SubQueries not yet fully supported")
-							} else {
-								d1 := regexDependencies[v.SubQuery]
-								if d1 == nil {
-									d1 = make(map[string]struct{})
-								}
-								d1[v.Name] = struct{}{}
-								regexDependencies[v.SubQuery] = d1
-
-								for _, vdc := range pr.variableData {
-									for _, vdv := range vdc.data {
-										if vdv.name == v.Name {
-											content += binaryregexp.QuoteMeta(vdv.value) + "|"
-										}
-									}
-								}
-								if len(content) != 0 {
-									content = content[:len(content)-1]
-								}
-								flags = regexFlagsIsPrecondition
-							}
-							regex = regex[:v.Position] + "(?:" + content + ")" + regex[v.Position:]
-						}
-						if flags&regexFlagsIsPrecondition != 0 {
-							compiled, err = binaryregexp.Compile(regex)
-							if err != nil {
-								return queryPart{}, err
-							}
+					if len(e.Variables) != len(oe.Variables) {
+						continue
+					}
+					for vIdx := range e.Variables {
+						if e.Variables[vIdx] != oe.Variables[vIdx] {
+							continue previousRegexes
 						}
 					}
-					regexes = append(regexes, regex{
-						regex: compiled,
-						flags: flags,
+					r.occurence = append(r.occurence, occ{
+						condition: cIdx,
+						element:   eIdx,
 					})
-					found = &regexes[len(regexes)-1]
+					continue regexElements
 				}
-				found.occurence = append(found.occurence, occ{
+				regexes = append(regexes, regex{})
+				r := &regexes[len(regexes)-1]
+				r.occurence = append(r.occurence, occ{
 					condition: cIdx,
 					element:   eIdx,
 				})
+				for _, v := range e.Variables {
+					if v.SubQuery == "" {
+						continue
+					}
+					if _, ok := previousResults[v.SubQuery]; !ok {
+						return queryPart{}, errors.New("SubQueries not yet fully supported")
+					}
+					dep := regexDependencies[v.SubQuery]
+					if dep == nil {
+						dep = make(map[string]struct{})
+					}
+					dep[v.Name] = struct{}{}
+					regexDependencies[v.SubQuery] = dep
+				}
 			}
 		}
 	}
@@ -949,22 +960,18 @@ conditions:
 				}
 				quotedData := make([]string, len(varNameIndex))
 				for v, vIdx := range varNameIndex {
-					quoted, first := "", true
+					quoted := ""
 					for _, d := range vd.data {
-						if d.name != v {
+						if d.queryParts.IsSet(uint(queryPartIndex)) && d.name != v {
 							continue
 						}
-						if first {
-							quoted += "|"
-						}
-						first = false
-						quoted += binaryregexp.QuoteMeta(d.value)
+						quoted += binaryregexp.QuoteMeta(d.value) + "|"
 					}
-					if first {
+					if quoted == "" {
 						badVarData[vdi] = struct{}{}
 						continue vardata
 					}
-					quotedData[vIdx] = quoted
+					quotedData[vIdx] = quoted[:len(quoted)-1]
 				}
 			varDataElement:
 				for i := range varData {
@@ -1006,6 +1013,143 @@ conditions:
 				variableData:  varData,
 			}
 		}
+		for rIdx := range regexes {
+			r := &regexes[rIdx]
+			o := &r.occurence[0]
+			c := (*q)[o.condition].(*query.DataCondition)
+			e := &c.Elements[o.element]
+			if len(e.Variables) == 0 {
+				var err error
+				if r.root.regex, err = binaryregexp.Compile(e.Regex); err != nil {
+					return queryPart{}, err
+				}
+				prefix, complete := r.root.regex.LiteralPrefix()
+				r.root.prefix = []byte(prefix)
+				if complete {
+					r.root.acceptedLength = regexanalysis.AcceptedLengths{
+						MinLength: uint(len(prefix)),
+						MaxLength: uint(len(prefix)),
+					}
+				} else {
+					if r.root.acceptedLength, err = regexanalysis.AcceptedLength(e.Regex); err != nil {
+						return queryPart{}, err
+					}
+				}
+				continue
+			}
+
+			precomputeSubQueries := []string{""}
+			usesLocalVariables := false
+		variables:
+			for _, v := range e.Variables {
+				if v.SubQuery == "" {
+					usesLocalVariables = true
+					continue
+				}
+				for _, sq := range precomputeSubQueries[1:] {
+					if sq == v.SubQuery {
+						continue variables
+					}
+				}
+				precomputeSubQueries = append(precomputeSubQueries, v.SubQuery)
+			}
+			variantCount := map[string]int{
+				"": 1,
+			}
+			for _, sq := range precomputeSubQueries[1:] {
+				variantCount[sq] = len(possibleSubQueries[sq].variableData)
+			}
+			if usesLocalVariables {
+				precomputeSubQueries = precomputeSubQueries[:1]
+			} else {
+				sort.Slice(precomputeSubQueries[1:], func(i, j int) bool {
+					a, b := precomputeSubQueries[i+1], precomputeSubQueries[j+1]
+					return variantCount[a] < variantCount[b]
+				})
+				count := 1
+				for l, sq := range precomputeSubQueries[1:] {
+					if count >= 10_000 {
+						precomputeSubQueries = precomputeSubQueries[:l+1]
+						break
+					}
+					count *= variantCount[sq]
+				}
+			}
+			for depth := range precomputeSubQueries {
+				position := make([]int, depth+1)
+
+			variants:
+				for {
+					isPrecondition := false
+					regex := e.Regex
+					for i := len(e.Variables) - 1; i >= 0; i-- {
+						v := e.Variables[i]
+						content := ""
+						if v.SubQuery == "" {
+							//TODO: maybe extract the regex for this variable
+							content = ".*"
+							isPrecondition = true
+						} else {
+							psq := possibleSubQueries[v.SubQuery]
+							vdMin, vdMax := 0, variantCount[v.SubQuery]
+							for pIdx, sq := range precomputeSubQueries[1 : depth+1] {
+								if v.SubQuery == sq {
+									pos := position[pIdx+1]
+									vdMin, vdMax = pos, pos+1
+									break
+								}
+							}
+							vIdx := psq.variableIndex[v.Name]
+							for vdIdx := vdMin; vdIdx < vdMax; vdIdx++ {
+								content += psq.variableData[vdIdx].quotedData[vIdx] + "|"
+							}
+							content = content[:len(content)-1]
+							if vdMax-vdMin != 1 {
+								isPrecondition = true
+							}
+						}
+						regex = regex[:v.Position] + "(?:" + content + ")" + regex[v.Position:]
+					}
+					root := &r.root
+					for _, p := range position[1:] {
+						root = &root.children[p]
+					}
+					if depth+1 < len(precomputeSubQueries) {
+						root.childSubQuery = precomputeSubQueries[depth+1]
+						root.children = make([]regexVariant, variantCount[root.childSubQuery])
+					}
+
+					var err error
+					if root.regex, err = binaryregexp.Compile(regex); err != nil {
+						return queryPart{}, err
+					}
+					prefix, complete := root.regex.LiteralPrefix()
+					root.prefix = []byte(prefix)
+					if complete {
+						root.acceptedLength = regexanalysis.AcceptedLengths{
+							MinLength: uint(len(prefix)),
+							MaxLength: uint(len(prefix)),
+						}
+					} else {
+						if root.acceptedLength, err = regexanalysis.AcceptedLength(regex); err != nil {
+							return queryPart{}, err
+						}
+					}
+					root.isPrecondition = isPrecondition
+
+					for pIdx := range position[1:] {
+						pIdx++
+						p := &position[pIdx]
+						*p++
+						if *p < variantCount[precomputeSubQueries[pIdx]] {
+							continue variants
+						}
+						*p = 0
+					}
+					break
+				}
+			}
+		}
 		if len(impossibleSubQueries) != 0 {
 			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 				for sq, imp := range impossibleSubQueries {
@@ -1032,6 +1176,10 @@ conditions:
 					variables map[string]string
 					// the regex to use
 					regex *binaryregexp.Regexp
+					// the accepted length by the regex
+					acceptedLength regexanalysis.AcceptedLengths
+					// the prefix of the regex
+					prefix []byte
 					// the variants chosen for this progress
 					variant map[string]int
 					// flags for this progress
@@ -1042,8 +1190,11 @@ conditions:
 				}
 			)
 			const (
-				progressVariantFlagIsPrecondition      progressVariantFlag = 1
-				progressVariantFlagPreconditionMatched progressVariantFlag = 2
+				progressVariantFlagState                    progressVariantFlag = 3
+				progressVariantFlagStateUninitialzed        progressVariantFlag = 0
+				progressVariantFlagStateExact               progressVariantFlag = 1
+				progressVariantFlagStatePrecondition        progressVariantFlag = 2
+				progressVariantFlagStatePreconditionMatched progressVariantFlag = 3
 			)
 			progressGroups := make([]progressGroup, len(*q))
 			for _, pIdx := range regexConditions {
@@ -1077,15 +1228,17 @@ conditions:
 				tmp[gotDirection] += int(h.Length)
 				bufferLengths = append(bufferLengths, tmp)
 
+				type interest struct {
+					condition, variant int
+				}
+				interested := [2][]interest{}
 				for alreadyRead := false; ; {
-					type regexOcc struct {
-						regex, occ, variant int
-					}
-					interested := [2][]regexOcc{}
+					interested[0] = interested[0][:0]
+					interested[1] = interested[1][:0]
 					needMoreData := [2]bool{}
 					for rIdx := range regexes {
 						r := &regexes[rIdx]
-						for oIdx, o := range r.occurence {
+						for _, o := range r.occurence {
 							e := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
 							wantDirection := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
 							// xor with the c2s value for both flag sources to make sure the same number has the same meaning
@@ -1097,17 +1250,81 @@ conditions:
 
 							ps := &progressGroups[o.condition]
 							for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
-								newProgresses := []progressVariant(nil)
 								p := &ps.variants[pIdx]
 								if o.element != p.nSuccessful {
 									continue
 								}
 								if p.regex == nil {
-									if r.regex != nil && p.flags&progressVariantFlagIsPrecondition == 0 {
-										p.regex = r.regex
-										p.flags = progressVariantFlag((r.flags&regexFlagsIsPrecondition)/regexFlagsIsPrecondition) * progressVariantFlagIsPrecondition
-									} else {
+									root := &r.root
+									for {
+										if root.childSubQuery == "" {
+											break
+										}
+										v, ok := p.variant[root.childSubQuery]
+										if !ok {
+											break
+										}
+										root = &root.children[v]
+									}
+									explodeOneVariant := false
+									switch p.flags & progressVariantFlagState {
+									case progressVariantFlagStateUninitialzed:
+										if root.regex != nil {
+											p.regex = root.regex
+											p.prefix = root.prefix
+											p.acceptedLength = root.acceptedLength
+											if root.isPrecondition {
+												p.flags = progressVariantFlagStatePrecondition
+											} else {
+												p.flags = progressVariantFlagStateExact
+											}
+										}
+									case progressVariantFlagStateExact:
+										panic("why am i here?")
+									case progressVariantFlagStatePrecondition:
+										panic("why am i here?")
+									case progressVariantFlagStatePreconditionMatched:
+										if root.childSubQuery == "" {
+											explodeOneVariant = true
+											break
+										}
+										for cIdx, c := range root.children[1:] {
+											np := progressVariant{
+												streamOffset:   p.streamOffset,
+												nSuccessful:    p.nSuccessful,
+												regex:          c.regex,
+												acceptedLength: c.acceptedLength,
+												prefix:         c.prefix,
+												variant: map[string]int{
+													root.childSubQuery: cIdx,
+												},
+											}
+											for sq, v := range p.variant {
+												np.variant[sq] = v
+											}
+											if p.variables != nil {
+												np.variables = make(map[string]string)
+												for n, v := range p.variables {
+													np.variables[n] = v
+												}
+											}
+											if c.isPrecondition {
+												np.flags = progressVariantFlagStatePrecondition
+											} else {
+												np.flags = progressVariantFlagStateExact
+											}
+											if cIdx == 0 {
+												ps.variants[pIdx] = np
+											} else {
+												ps.variants = append(ps.variants, np)
+											}
+										}
+										p = &ps.variants[pIdx]
+									}
+
+									if p.regex == nil {
 										expr := e.Regex
+										p.flags = progressVariantFlagStateExact
 										for i := len(e.Variables) - 1; i >= 0; i-- {
 											v := e.Variables[i]
 											content := ""
@@ -1119,56 +1336,77 @@ conditions:
 												}
 												content = binaryregexp.QuoteMeta(content)
 											} else {
-												variant, ok := p.variant[v.SubQuery]
-												if !ok {
-													// we have not yet split this progress element
-													// the precondition regex matched, split this progress element
-													for j := 1; j < len(possibleSubQueries[v.SubQuery].variableData); j++ {
-														np := progressVariant{
-															streamOffset: p.streamOffset,
-															nSuccessful:  p.nSuccessful,
-															variant:      map[string]int{v.SubQuery: j},
-														}
-														for k, v := range p.variant {
-															np.variant[k] = v
-														}
-														if p.variables != nil {
-															np.variables = make(map[string]string)
-															for k, v := range p.variables {
-																np.variables[k] = v
-															}
-														}
-														newProgresses = append(newProgresses, np)
-													}
-													if p.variant == nil {
-														p.variant = make(map[string]int)
-													}
-													p.variant[v.SubQuery] = 0
-												}
 												psq := possibleSubQueries[v.SubQuery]
 												vIdx := psq.variableIndex[v.Name]
-												content = psq.variableData[variant].quotedData[vIdx]
+												variant, ok := p.variant[v.SubQuery]
+												if ok || explodeOneVariant {
+													if !ok {
+														explodeOneVariant = false
+														// we have not yet split this progress element
+														// the precondition regex matched, split this progress element
+														for j := 1; j < len(psq.variableData); j++ {
+															np := progressVariant{
+																streamOffset: p.streamOffset,
+																nSuccessful:  p.nSuccessful,
+																flags:        progressVariantFlagStateUninitialzed,
+																variant:      map[string]int{v.SubQuery: j},
+															}
+															for k, v := range p.variant {
+																np.variant[k] = v
+															}
+															if p.variables != nil {
+																np.variables = make(map[string]string)
+																for n, v := range p.variables {
+																	np.variables[n] = v
+																}
+															}
+															ps.variants = append(ps.variants, np)
+														}
+														p = &ps.variants[pIdx]
+														if p.variant == nil {
+															p.variant = make(map[string]int)
+														}
+														p.variant[v.SubQuery] = 0
+													}
+													content = psq.variableData[variant].quotedData[vIdx]
+												} else {
+													p.flags = progressVariantFlagStatePrecondition
+													for _, vd := range psq.variableData {
+														content += vd.quotedData[vIdx] + "|"
+													}
+													content = content[:len(content)-1]
+												}
 											}
 											expr = fmt.Sprintf("%s(?:%s)%s", expr[:v.Position], content, expr[v.Position:])
 										}
-										compiled, err := binaryregexp.Compile(expr)
-										if err != nil {
+										var err error
+										if p.regex, err = binaryregexp.Compile(expr); err != nil {
 											return false, err
 										}
-										p.regex = compiled
-										p.flags = 0
+										prefix, complete := p.regex.LiteralPrefix()
+										root.prefix = []byte(prefix)
+										if complete {
+											p.acceptedLength = regexanalysis.AcceptedLengths{
+												MinLength: uint(len(prefix)),
+												MaxLength: uint(len(prefix)),
+											}
+										} else {
+											if p.acceptedLength, err = regexanalysis.AcceptedLength(expr); err != nil {
+												return false, err
+											}
+										}
 									}
 								}
-								ps.variants = append(ps.variants, newProgresses...)
-								if prefix, _ := p.regex.LiteralPrefix(); prefix != "" {
-									availableBytes := gotAvailable[wantDirection] - p.streamOffset[wantDirection]
-									if availableBytes < len(prefix) {
-										if !gotAllData {
-											needMoreData[wantDirection] = true
-										}
-										continue
+								// TODO: check if we ran this query with the available data already
+
+								availableBytes := gotAvailable[wantDirection] - p.streamOffset[wantDirection]
+								if uint(availableBytes) < p.acceptedLength.MinLength {
+									if !gotAllData {
+										needMoreData[wantDirection] = true
 									}
-								} else {
+									continue
+								}
+								if len(p.prefix) == 0 {
 									// regexes with no literal prefix should only be checked, when the full data
 									// is read, they often perform bad otherwise; we must not skip data for the
 									// other direction as well, as a following regex might need that data
@@ -1177,15 +1415,12 @@ conditions:
 										keepAllData = true
 										continue
 									}
-									if gotAvailable[wantDirection] == p.streamOffset[wantDirection] {
-										continue
-									}
 								}
+
 								// we got new data that this regex is interested in
-								interested[wantDirection] = append(interested[wantDirection], regexOcc{
-									regex:   rIdx,
-									occ:     oIdx,
-									variant: pIdx,
+								interested[wantDirection] = append(interested[wantDirection], interest{
+									condition: o.condition,
+									variant:   pIdx,
 								})
 							}
 						}
@@ -1230,26 +1465,23 @@ conditions:
 						if len(interested[direction]) == 0 {
 							continue
 						}
-						minStreamPos := bufferOffsets[direction] + len(buffers[direction])
+						minStreamPos := bufferOffsets[direction]
+						if !needMoreData[direction] {
+							minStreamPos += len(buffers[direction])
+						}
 						for _, i := range interested[direction] {
-							r := &regexes[i.regex]
-							o := &r.occurence[i.occ]
-							d := (*q)[o.condition].(*query.DataCondition)
-							pg := &progressGroups[o.condition]
+							pg := &progressGroups[i.condition]
 							p := &pg.variants[i.variant]
-							prefix, _ := p.regex.LiteralPrefix()
 
-							if prefix != "" {
+							buffer := buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
+							if len(p.prefix) != 0 {
 								//the regex has a prefix, find it
-								buffer := buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
-								pos := bytes.Index(buffer, []byte(prefix))
+								pos := bytes.Index(buffer, p.prefix)
 								if pos < 0 {
 									// the prefix is not in the string, we can discard part of the buffer
-									keepLength := len(prefix) - 1
+									keepLength := len(p.prefix) - 1
 									if keepLength > len(buffer) {
 										keepLength = len(buffer)
-									}
-									for ; keepLength != 0 && !bytes.HasSuffix(buffer, []byte(prefix[len(prefix)-keepLength:])); keepLength-- {
 									}
 
 									p.streamOffset[direction] = bufferOffsets[direction] + len(buffers[direction]) - keepLength
@@ -1260,16 +1492,20 @@ conditions:
 								}
 								//skip the part that doesn't have the prefix
 								p.streamOffset[direction] += pos
+								buffer = buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
 							}
-							data := buffers[direction][p.streamOffset[direction]-bufferOffsets[direction]:]
-							res := p.regex.FindSubmatchIndex(data)
-							if res != nil && p.flags&progressVariantFlagIsPrecondition != 0 {
-								p.regex = nil
-								p.flags |= progressVariantFlagPreconditionMatched
+							res := p.regex.FindSubmatchIndex(buffer)
+							if res == nil {
+								if p.acceptedLength.MaxLength < uint(bufferOffsets[direction]+len(buffers[direction])-p.streamOffset[direction]) {
+									p.streamOffset[direction] = bufferOffsets[direction] + len(buffers[direction]) + 1 - int(p.acceptedLength.MaxLength)
+								}
+							} else if p.flags&progressVariantFlagState == progressVariantFlagStatePrecondition {
 								recheckRegexes = true
-							} else if res != nil {
+								p.regex = nil
+								p.flags += progressVariantFlagStatePreconditionMatched - progressVariantFlagStatePrecondition
+							} else {
 								p.nSuccessful++
-								p.flags = 0
+								d := (*q)[i.condition].(*query.DataCondition)
 								if p.nSuccessful != len(d.Elements) {
 									// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
 									recheckRegexes = true
@@ -1278,6 +1514,7 @@ conditions:
 								}
 								variableNames := p.regex.SubexpNames()
 								p.regex = nil
+								p.flags = 0
 								for i := 2; i < len(res); i += 2 {
 									varName := variableNames[i/2]
 									if varName == "" {
@@ -1289,7 +1526,7 @@ conditions:
 									if p.variables == nil {
 										p.variables = make(map[string]string)
 									}
-									p.variables[varName] = string(data[res[i]:res[i+1]])
+									p.variables[varName] = string(buffer[res[i]:res[i+1]])
 								}
 
 								// update stream offsets: a follow up regex for the same direction
@@ -1485,7 +1722,9 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 
 	allResults := map[string]resultData{}
 	for _, subQuery := range qs.SubQueries() {
-		results := resultData{}
+		results := resultData{
+			matchingQueryPart: make([]subQueryRanges, len(qs)),
+		}
 		sorter := sortingLess
 		resultLimit := limit + skip
 		if subQuery != "" {
@@ -1497,29 +1736,31 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 			idx := indexes[i]
 
 			sortingLookup := (func() ([]uint32, error))(nil)
-			if section, ok := sorterLookupSections[sorting[0].Key]; sorter != nil && ok {
-				res := []uint32(nil)
-				reverse := sorting[0].Dir == query.SortingDirDescending
-				sortingLookup = func() ([]uint32, error) {
-					if res == nil {
-						res = make([]uint32, idx.StreamCount())
-						idx.readObject(section, 0, 0, res)
-						if reverse {
-							for i, j := 0, len(res)-1; i < j; {
-								res[i], res[j] = res[j], res[i]
-								i++
-								j--
+			if resultLimit != 0 {
+				if section, ok := sorterLookupSections[sorting[0].Key]; sorter != nil && ok {
+					res := []uint32(nil)
+					reverse := sorting[0].Dir == query.SortingDirDescending
+					sortingLookup = func() ([]uint32, error) {
+						if res == nil {
+							res = make([]uint32, idx.StreamCount())
+							idx.readObject(section, 0, 0, res)
+							if reverse {
+								for i, j := 0, len(res)-1; i < j; {
+									res[i], res[j] = res[j], res[i]
+									i++
+									j--
+								}
 							}
 						}
+						return res, nil
 					}
-					return res, nil
 				}
 			}
 			//get all filters and lookups for each sub-query
 			queryParts := make([]queryPart, 0, len(qs))
 			for qID := range qs {
 				//build search structures
-				queryPart, err := idx.buildSearchObjects(subQuery, allResults, refTime, &qs[qID], indexes[i+1:], tags)
+				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[i+1:], tags)
 				if err != nil {
 					return nil, false, err
 				}
@@ -1641,14 +1882,17 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		matchingQueryParts := bitmask.ShortBitmask{}
 		matchingSearchContexts := []*searchContext(nil)
 
-	queryGroup:
+	queryPart:
 		for qpIdx, qpLen := 0, activeQueryParts.Len(); qpIdx < qpLen; qpIdx++ {
 			if !activeQueryParts.IsSet(uint(qpIdx)) {
 				continue
 			}
 			tmp := map[string]subQueryRanges{}
 			for k, v := range subQueryResults {
-				tmp[k] = subQueryRanges{[]subQueryRange{{0, len(v.streams) - 1}}}
+				if v.matchingQueryPart[qpIdx].empty() {
+					continue queryPart
+				}
+				tmp[k] = v.matchingQueryPart[qpIdx].copy()
 			}
 			sc := &searchContext{
 				allowedSubQueries: subQuerySelection{
@@ -1661,7 +1905,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 					return err
 				}
 				if !matching {
-					continue queryGroup
+					continue queryPart
 				}
 			}
 			matchingQueryParts.Set(uint(qpIdx))
@@ -1676,6 +1920,11 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 			if d, ok := result.variableAssociation[(*r).StreamID]; ok {
 				result.variableData[d].uses--
 				delete(result.variableAssociation, (*r).StreamID)
+			}
+			for i := range result.matchingQueryPart {
+				if result.matchingQueryPart[i].last() == len(result.streams)-1 {
+					result.matchingQueryPart[i].pop()
+				}
 			}
 			*r = nil
 			result.resultDropped++
@@ -1700,6 +1949,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 			if !matchingQueryParts.IsSet(uint(qpIdx)) {
 				continue
 			}
+			result.matchingQueryPart[qpIdx].insert(pos)
 			scIdx++
 			sc := matchingSearchContexts[scIdx]
 			if sc.outputVariables == nil {
