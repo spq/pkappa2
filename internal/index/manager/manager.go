@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/bits"
 	"os"
 	"sort"
 	"time"
@@ -16,13 +15,14 @@ import (
 	pcapmetadata "github.com/spq/pkappa2/internal/index/pcapMetadata"
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 )
 
 type (
 	tag struct {
 		definition      string
 		referencedTags  []string
-		matchingStreams []uint64
+		matchingStreams bitmask.LongBitmask
 		matchingCount   uint
 		version         uint
 	}
@@ -311,7 +311,7 @@ outer:
 				continue outer
 			}
 		}
-		referencedTags := make(map[string][]uint64, len(t.referencedTags))
+		referencedTags := make(map[string]bitmask.LongBitmask, len(t.referencedTags))
 		for _, tn := range t.referencedTags {
 			referencedTags[tn] = mgr.tags[tn].matchingStreams
 		}
@@ -323,8 +323,8 @@ outer:
 			}
 		}
 		mgr.taggingJobRunning = true
-		indexes, releaser := mgr.getIndexesCopy(startIndex, len(mgr.indexes))
-		go mgr.updateTagJob(n, *t, mgr.currentVersion, referencedTags, indexes, releaser)
+		indexes, releaser := mgr.getIndexesCopy(0, len(mgr.indexes))
+		go mgr.updateTagJob(n, *t, mgr.currentVersion, referencedTags, indexes, startIndex, releaser)
 		return
 	}
 }
@@ -371,47 +371,31 @@ func (mgr *Manager) mergeIndexesJob(offset int, maxVersion uint, indexes []*inde
 	}
 }
 
-func (mgr *Manager) updateTagJob(name string, t tag, newVersion uint, referencedTags map[string][]uint64, indexes []*index.Reader, releaser IndexReleaser) {
+func (mgr *Manager) updateTagJob(name string, t tag, newVersion uint, referencedTags map[string]bitmask.LongBitmask, indexes []*index.Reader, firstNewIndex int, releaser IndexReleaser) {
 	err := func() error {
 		q, err := query.Parse(t.definition)
 		if err != nil {
 			return err
 		}
-		maxStreamID := uint64(0)
-		for _, i := range indexes {
-			if maxStreamID < i.MaxStreamID() {
-				maxStreamID = i.MaxStreamID()
-			}
-		}
-		streams, _, err := index.SearchStreams(indexes, q.ReferenceTime, q.Conditions, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, referencedTags)
+		streams, _, err := index.SearchStreams(indexes, firstNewIndex, q.ReferenceTime, q.Conditions, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, referencedTags)
 		if err != nil {
 			return err
 		}
-		l := (maxStreamID / 64) + 1
-		if l < uint64(len(t.matchingStreams)) {
-			l = uint64(len(t.matchingStreams))
-		}
-		newBitset := make([]uint64, l)
-		copy(newBitset, t.matchingStreams)
-		for _, i := range indexes {
+		for _, i := range indexes[firstNewIndex:] {
 			for id := range i.StreamIDs() {
-				newBitset[id/64] &= ^(uint64(1) << (id % 64))
+				t.matchingStreams.Unset(uint(id))
 			}
 		}
 		for _, s := range streams {
-			newBitset[s.ID()/64] |= uint64(1) << (s.ID() % 64)
+			t.matchingStreams.Set(uint(s.ID()))
 		}
-		t.matchingCount = 0
-		for _, b := range newBitset {
-			t.matchingCount += uint(bits.OnesCount64(b))
-		}
-		t.matchingStreams = newBitset
+		t.matchingCount = uint(t.matchingStreams.OnesCount())
 		return nil
 	}()
 	if err != nil {
 		log.Printf("updateTagJob failed: %q", err)
 		t.matchingCount = 0
-		t.matchingStreams = nil
+		t.matchingStreams = bitmask.LongBitmask{}
 	}
 	mgr.jobs <- func() {
 		ot, ok := mgr.tags[name]
@@ -444,17 +428,17 @@ func (mgr *Manager) getIndexesCopy(start, end int) ([]*index.Reader, IndexReleas
 	return indexes, mgr.lock(indexes)
 }
 
-func (mgr *Manager) GetIndexes(tags []string) ([]*index.Reader, map[string][]uint64, IndexReleaser, error) {
+func (mgr *Manager) GetIndexes(tags []string) ([]*index.Reader, map[string]bitmask.LongBitmask, IndexReleaser, error) {
 	type res struct {
 		indexes  []*index.Reader
 		releaser IndexReleaser
-		tags     map[string][]uint64
+		tags     map[string]bitmask.LongBitmask
 		err      error
 	}
 	c := make(chan res)
 	mgr.jobs <- func() {
 		err := func() error {
-			tagMasks := map[string][]uint64{}
+			tagMasks := map[string]bitmask.LongBitmask{}
 			minVersion := uint(math.MaxUint64)
 			for _, tn := range tags {
 				t, ok := mgr.tags[tn]
@@ -590,9 +574,6 @@ func (mgr *Manager) AddTag(name, queryString string) error {
 	}
 	if q.Conditions.HasRelativeTimes() {
 		return errors.New("relative times not yet supported in tags")
-	}
-	if len(q.Conditions.SubQueries()) != 1 {
-		return errors.New("subqueries not yet supported in tags")
 	}
 	referencedTags := q.Conditions.ReferencedTags()
 	for _, tn := range referencedTags {

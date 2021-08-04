@@ -218,7 +218,7 @@ func (sqrs *subQueryRanges) addResult(other *subQueryRanges) {
 	}
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string][]uint64) (queryPart, error) {
+func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string]bitmask.LongBitmask) (queryPart, error) {
 	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
 
@@ -265,13 +265,15 @@ conditions:
 				continue
 			}
 			bv := tags[cc.TagName]
-			inv := cc.Invert
-			filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
-				idx := int(s.StreamID / 64)
-				bit := s.StreamID % 64
-				res := idx < len(bv) && ((bv[idx]>>bit)&1) != 0
-				return res != inv, nil
-			})
+			if !cc.Invert {
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+					return bv.IsSet(uint(s.StreamID)), nil
+				})
+			} else {
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+					return !bv.IsSet(uint(s.StreamID)), nil
+				})
+			}
 		case *query.FlagCondition:
 			shouldEvaluate := false
 			for _, sq := range cc.SubQueries {
@@ -1669,7 +1671,7 @@ var (
 	}
 )
 
-func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet, sorting []query.Sorting, limit, skip uint, tags map[string][]uint64) ([]*Stream, bool, error) {
+func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time, qs query.ConditionsSet, sorting []query.Sorting, limit, skip uint, tags map[string]bitmask.LongBitmask) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
@@ -1720,8 +1722,10 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 		}
 	}
 
+	requiredResultCount := map[string]int{}
 	allResults := map[string]resultData{}
-	for _, subQuery := range qs.SubQueries() {
+	subQueries := qs.SubQueries()
+	for _, subQuery := range subQueries {
 		results := resultData{
 			matchingQueryPart: make([]subQueryRanges, len(qs)),
 		}
@@ -1731,9 +1735,37 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 			sorter = nil
 			resultLimit = 0
 		}
-		for i := len(indexes); i > 0; {
-			i--
-			idx := indexes[i]
+
+		firstAllowedIndex := 0
+		if len(subQueries) == 1 {
+			firstAllowedIndex = firstRequiredIndex
+		}
+		for idxIdx := len(indexes) - 1; idxIdx >= firstAllowedIndex; idxIdx-- {
+			if idxIdx+1 == firstRequiredIndex && len(subQueries) == 2 {
+				// this is the first non-required index
+				if subQuery != "" {
+					// save the result length for later reducing to this position
+					requiredResultCount[subQuery] = len(results.streams)
+				} else {
+					// filter the sub query results to those from one of the required indexes
+					for sq := range allResults {
+						rrc := requiredResultCount[sq]
+						for qID := range qs {
+							m := &allResults[sq].matchingQueryPart[qID]
+							if rrc == 0 {
+								m.ranges = nil
+							} else {
+								nm, _ := m.split(&subQueryRanges{
+									ranges: []subQueryRange{{0, rrc - 1}},
+								})
+								*m = nm
+							}
+						}
+					}
+				}
+			}
+
+			idx := indexes[idxIdx]
 
 			sortingLookup := (func() ([]uint32, error))(nil)
 			if resultLimit != 0 {
@@ -1760,7 +1792,7 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 			queryParts := make([]queryPart, 0, len(qs))
 			for qID := range qs {
 				//build search structures
-				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[i+1:], tags)
+				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], tags)
 				if err != nil {
 					return nil, false, err
 				}
@@ -1773,6 +1805,9 @@ func SearchStreams(indexes []*Reader, refTime time.Time, qs query.ConditionsSet,
 			if err != nil {
 				return nil, false, err
 			}
+		}
+		if len(results.streams) == 0 {
+			return nil, false, nil
 		}
 		allResults[subQuery] = results
 	}

@@ -312,7 +312,7 @@ func main() {
 			return
 		}
 		defer indexesReleaser.Release(mgr)
-		res, hasMore, err := index.SearchStreams(indexes, qq.ReferenceTime, qq.Conditions, qq.Sorting, qq.Limit, page*qq.Limit, tags)
+		res, hasMore, err := index.SearchStreams(indexes, 0, qq.ReferenceTime, qq.Conditions, qq.Sorting, qq.Limit, page*qq.Limit, tags)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 			return
