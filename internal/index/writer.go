@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/google/gopacket/reassembly"
-	pcapmetadata "github.com/spq/pkappa2/internal/index/pcapMetadata"
 	"github.com/spq/pkappa2/internal/index/streams"
+	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 	"github.com/spq/pkappa2/internal/tools/seekbufio"
 )
 

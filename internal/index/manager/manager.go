@@ -12,10 +12,10 @@ import (
 
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
-	pcapmetadata "github.com/spq/pkappa2/internal/index/pcapMetadata"
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
+	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
 
 type (

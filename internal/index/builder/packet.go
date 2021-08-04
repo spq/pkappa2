@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
-	pcapmetadata "github.com/spq/pkappa2/internal/index/pcapMetadata"
+	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
 
 func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pcapmetadata.PcapInfo, []gopacket.Packet, error) {

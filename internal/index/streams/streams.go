@@ -7,7 +7,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/reassembly"
-	pcapmetadata "github.com/spq/pkappa2/internal/index/pcapMetadata"
+	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
 
 var (

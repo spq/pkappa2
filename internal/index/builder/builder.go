@@ -14,9 +14,9 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/reassembly"
 	"github.com/spq/pkappa2/internal/index"
-	pcapmetadata "github.com/spq/pkappa2/internal/index/pcapMetadata"
 	"github.com/spq/pkappa2/internal/index/streams"
 	"github.com/spq/pkappa2/internal/tools"
+	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
 
 type (
