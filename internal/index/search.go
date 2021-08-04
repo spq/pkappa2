@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/spq/pkappa2/internal/query"
-	"github.com/spq/pkappa2/internal/seekbufio"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
 	regexanalysis "github.com/spq/pkappa2/internal/tools/regexAnalysis"
+	"github.com/spq/pkappa2/internal/tools/seekbufio"
 	"rsc.io/binaryregexp"
 )
 
