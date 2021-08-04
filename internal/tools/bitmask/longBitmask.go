@@ -55,7 +55,7 @@ func (bm LongBitmask) LeadingZeros() int {
 func (bm *LongBitmask) Set(bit uint) {
 	idx, lbit := bit/64, bit%64
 	if idx >= uint(len(bm.mask)) {
-		bm.mask = append(bm.mask, make([]uint64, uint(len(bm.mask)+1)-idx)...)
+		bm.mask = append(bm.mask, make([]uint64, idx+1-uint(len(bm.mask)))...)
 	}
 	bm.mask[idx] |= 1 << lbit
 }
@@ -71,7 +71,7 @@ func (bm *LongBitmask) Unset(bit uint) {
 func (bm *LongBitmask) Flip(bit uint) {
 	idx, lbit := bit/64, bit%64
 	if idx >= uint(len(bm.mask)) {
-		bm.mask = append(bm.mask, make([]uint64, uint(len(bm.mask)+1)-idx)...)
+		bm.mask = append(bm.mask, make([]uint64, idx+1-uint(len(bm.mask)))...)
 	}
 	bm.mask[idx] ^= 1 << lbit
 }
