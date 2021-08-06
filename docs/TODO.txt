@@ -1,6 +1,6 @@
 server:
 - fix crash/oom when importing
-- support sub queries in tags
+- support data variables in grouping
 - support relative times in tags
 - support http
 - support websocket, including compression
@@ -11,7 +11,6 @@ server:
 - fix ip4 defragmentation (snapshottable, list of packets that are source for a reassembled pkg)
 - support ip6 defragmenting
 - support sctp
-- group by support using variables
 - add tests
 
 ui:

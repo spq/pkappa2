@@ -249,6 +249,14 @@
                     <code>100</code>, the value <code>0</code> means unlimited.
                   </td>
                 </tr>
+                <tr>
+                  <th>Grouping</th>
+                  <td><code>group:"@sport@"</code></td>
+                  <td width="100%">
+                    Group the results by the variables listed in the arguments.
+                    Currently sub-query variables are not supported.
+                  </td>
+                </tr>
               </tbody>
             </v-simple-table>
           </v-card>

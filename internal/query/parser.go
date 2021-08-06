@@ -24,6 +24,7 @@ type (
 		timezone      *time.Location
 		sortTerm      *sortTerm
 		limitTerm     *limitTerm
+		groupTerm     *groupTerm
 	}
 	queryRoot struct {
 		Term *queryOrCondition `parser:"@@?"`
@@ -43,6 +44,7 @@ type (
 		Term      *queryTerm        `parser:"| @( SubQuery? Key ( UnquotedValue | QuotedValue ) )"`
 		SortTerm  *sortTerm         `parser:"| ( SortKey @( UnquotedValue | QuotedValue ) )"`
 		LimitTerm *limitTerm        `parser:"| ( LimitKey @( UnquotedValue | QuotedValue ) )"`
+		GroupTerm *groupTerm        `parser:"| ( GroupKey @( UnquotedValue | QuotedValue ) )"`
 	}
 	queryTerm struct {
 		SubQuery string
@@ -51,12 +53,19 @@ type (
 	}
 	sortTerm  []Sorting
 	limitTerm uint
+	groupTerm string
+
+	Grouping struct {
+		Constant  string
+		Variables []DataConditionElementVariable
+	}
 
 	Query struct {
 		Debug         []string
 		Conditions    ConditionsSet
 		Sorting       []Sorting
 		Limit         uint
+		Grouping      *Grouping
 		ReferenceTime time.Time
 	}
 )
@@ -83,6 +92,9 @@ var (
 			}, {
 				Name:    "LimitKey",
 				Pattern: `(?i)limit`,
+			}, {
+				Name:    "GroupKey",
+				Pattern: `(?i)group`,
 			}, {
 				Name:    "OperatorOr",
 				Pattern: `(?i)or`,
@@ -266,11 +278,31 @@ func Parse(q string) (*Query, error) {
 	if pc.limitTerm != nil {
 		limit = uint(*pc.limitTerm)
 	}
+	grouping := (*Grouping)(nil)
+	if pc.groupTerm != nil {
+		val := stringParser{}
+		if err := valueStringParser.ParseString("", string(*pc.groupTerm), &val); err != nil {
+			return nil, err
+		}
+		grouping = &Grouping{}
+		for _, e := range val.Elements {
+			if e.Variable == nil {
+				grouping.Constant += e.Content
+				continue
+			}
+			grouping.Variables = append(grouping.Variables, DataConditionElementVariable{
+				Position: uint(len(grouping.Constant)),
+				SubQuery: e.Variable.Sub,
+				Name:     e.Variable.Name,
+			})
+		}
+	}
 	return &Query{
 		Debug:         []string{root.String(), cond.String()},
 		Conditions:    cond,
 		Sorting:       sorting,
 		Limit:         limit,
 		ReferenceTime: pc.referenceTime,
+		Grouping:      grouping,
 	}, nil
 }

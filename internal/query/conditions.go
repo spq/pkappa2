@@ -1667,6 +1667,11 @@ func (c *queryCondition) QueryConditions(pc *parserContext) (ConditionsSet, erro
 			return nil, errors.New("only one limit `filter` is allowed")
 		}
 		pc.limitTerm = c.LimitTerm
+	case c.GroupTerm != nil:
+		if pc.groupTerm != nil {
+			return nil, errors.New("only one group `filter` is allowed")
+		}
+		pc.groupTerm = c.GroupTerm
 	default:
 		return nil, fmt.Errorf("queryCondition is empty")
 	}

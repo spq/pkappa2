@@ -377,7 +377,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, newVersion uint, referenced
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(indexes, firstNewIndex, q.ReferenceTime, q.Conditions, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, referencedTags)
+		streams, _, err := index.SearchStreams(indexes, firstNewIndex, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, referencedTags)
 		if err != nil {
 			return err
 		}
@@ -574,6 +574,9 @@ func (mgr *Manager) AddTag(name, queryString string) error {
 	}
 	if q.Conditions.HasRelativeTimes() {
 		return errors.New("relative times not yet supported in tags")
+	}
+	if q.Grouping != nil {
+		return errors.New("grouping not allowed in tags")
 	}
 	referencedTags := q.Conditions.ReferencedTags()
 	for _, tn := range referencedTags {

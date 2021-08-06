@@ -18,15 +18,8 @@ import (
 )
 
 type (
-	subQueryRange struct {
-		indexMin, indexMax int
-	}
-	subQueryRanges struct {
-		ranges []subQueryRange
-	}
-
 	subQuerySelection struct {
-		remaining []map[string]subQueryRanges
+		remaining []map[string]bitmask.ConnectedBitmask
 	}
 	searchContext struct {
 		allowedSubQueries subQuerySelection
@@ -42,7 +35,8 @@ type (
 	}
 	resultData struct {
 		streams             []*Stream
-		matchingQueryPart   []subQueryRanges
+		matchingQueryPart   []bitmask.ConnectedBitmask
+		groups              map[string]int
 		variableAssociation map[uint64]int
 		variableData        []variableDataCollection
 		resultDropped       uint
@@ -52,77 +46,35 @@ type (
 		lookups  []func() ([]uint32, error)
 		possible bool
 	}
+	grouper struct {
+		key func(s *Stream) []byte
+	}
 )
 
-func (sqr subQueryRanges) split(other *subQueryRanges) (overlap subQueryRanges, rest subQueryRanges) {
-	bi := 0
-	for _, a := range sqr.ranges {
-		for {
-			if bi >= len(other.ranges) {
-				rest.addRange(a.indexMin, a.indexMax)
-				break
-			}
-			b := other.ranges[bi]
-			if a.indexMax < b.indexMin {
-				rest.addRange(a.indexMin, a.indexMax)
-				break
-			}
-			if b.indexMax < a.indexMin {
-				bi++
-				continue
-			}
-			if a.indexMin < b.indexMin {
-				rest.addRange(a.indexMin, b.indexMin-1)
-				a.indexMin = b.indexMin
-			}
-			if a.indexMax <= b.indexMax {
-				overlap.addRange(a.indexMin, a.indexMax)
-				break
-			}
-			overlap.addRange(a.indexMin, b.indexMax)
-			a.indexMin = b.indexMax + 1
-			bi++
-		}
-	}
-	return
-}
-
-func (sqr *subQueryRanges) empty() bool {
-	return len(sqr.ranges) == 0
-}
-
-func (sqr *subQueryRanges) copy() subQueryRanges {
-	res := subQueryRanges{
-		ranges: make([]subQueryRange, len(sqr.ranges)),
-	}
-	copy(res.ranges, sqr.ranges)
-	return res
-}
-
-func (sqs *subQuerySelection) remove(subqueries []string, forbidden []*subQueryRanges) {
+func (sqs *subQuerySelection) remove(subqueries []string, forbidden []*bitmask.ConnectedBitmask) {
 	oldRemaining := sqs.remaining
-	sqs.remaining = []map[string]subQueryRanges(nil)
+	sqs.remaining = nil
 outer:
 	for _, remaining := range oldRemaining {
 		for sqi, sq := range subqueries {
-			remove, keep := remaining[sq].split(forbidden[sqi])
-			if remove.empty() {
+			old := remaining[sq]
+			remove := old.And(*forbidden[sqi])
+			keep := old.Sub(*forbidden[sqi])
+			if remove.IsZero() {
 				sqs.remaining = append(sqs.remaining, remaining)
 				continue outer
 			}
-			if keep.empty() {
+			if keep.IsZero() {
 				continue
 			}
 			remaining[sq] = remove
-			sqs.remaining = append(sqs.remaining, map[string]subQueryRanges{
+			sqs.remaining = append(sqs.remaining, map[string]bitmask.ConnectedBitmask{
 				sq: keep,
 			})
 			new := &sqs.remaining[len(sqs.remaining)-1]
 			for k, v := range remaining {
 				if k != sq {
-					(*new)[k] = subQueryRanges{
-						ranges: append([]subQueryRange(nil), v.ranges...),
-					}
+					(*new)[k] = v.Copy()
 				}
 			}
 		}
@@ -131,91 +83,6 @@ outer:
 
 func (sqs *subQuerySelection) empty() bool {
 	return len(sqs.remaining) == 0
-}
-
-func (sqrs *subQueryRanges) add(id int) {
-	sqrs.addRange(id, id)
-}
-
-func (sqrs *subQueryRanges) pop() {
-	last := &sqrs.ranges[len(sqrs.ranges)-1]
-	if last.indexMin != last.indexMax {
-		last.indexMax--
-		return
-	}
-	sqrs.ranges = sqrs.ranges[:len(sqrs.ranges)-1]
-}
-
-func (sqrs *subQueryRanges) last() int {
-	if len(sqrs.ranges) != 0 {
-		last := &sqrs.ranges[len(sqrs.ranges)-1]
-		return last.indexMax
-	}
-	return -1
-}
-
-func (sqrs *subQueryRanges) insert(id int) {
-	for i := range sqrs.ranges {
-		r := &sqrs.ranges[i]
-		if r.indexMin >= id {
-			r.indexMin++
-		}
-		if r.indexMax >= id {
-			r.indexMax++
-		}
-	}
-	sqrs.add(id)
-}
-
-func (sqrs *subQueryRanges) addRange(low, high int) {
-	if l := len(sqrs.ranges); l != 0 {
-		indexMax := &sqrs.ranges[l-1].indexMax
-		if *indexMax == low-1 {
-			*indexMax = high
-			return
-		}
-		if low <= *indexMax {
-			// unsorted insert, search for the right place
-			for i := range sqrs.ranges {
-				r := &sqrs.ranges[i]
-				if low >= r.indexMin && high <= r.indexMax {
-					return
-				}
-				if r.indexMax+1 < low {
-					continue
-				}
-				if high+1 < r.indexMin {
-					sqrs.ranges = append(sqrs.ranges[:i], append([]subQueryRange{{low, high}}, sqrs.ranges[i:]...)...)
-					return
-				}
-				if low <= r.indexMin {
-					r.indexMin = low
-				}
-				if high <= r.indexMax {
-					return
-				}
-				r.indexMax = high
-				for i+1 < len(sqrs.ranges) {
-					r2 := &sqrs.ranges[i+1]
-					if r.indexMax+1 < r2.indexMin {
-						break
-					}
-					if r.indexMax < r2.indexMax {
-						r.indexMax = r2.indexMax
-					}
-					sqrs.ranges = append(sqrs.ranges[:i+1], sqrs.ranges[i+2:]...)
-				}
-				return
-			}
-		}
-	}
-	sqrs.ranges = append(sqrs.ranges, subQueryRange{low, high})
-}
-
-func (sqrs *subQueryRanges) addResult(other *subQueryRanges) {
-	for _, r := range other.ranges {
-		sqrs.addRange(r.indexMin, r.indexMax)
-	}
 }
 
 func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string]bitmask.LongBitmask) (queryPart, error) {
@@ -293,7 +160,7 @@ conditions:
 				})
 				continue
 			}
-			flagValues := map[uint16][]*subQueryRanges{
+			flagValues := map[uint16][]*bitmask.ConnectedBitmask{
 				cc.Value & cc.Mask: nil,
 			}
 			subqueries := []string(nil)
@@ -302,21 +169,21 @@ conditions:
 					continue
 				}
 				subqueries = append(subqueries, sq)
-				curFlagValues := map[uint16]*subQueryRanges{}
+				curFlagValues := map[uint16]*bitmask.ConnectedBitmask{}
 				for pos, res := range previousResults[sq].streams {
 					f := res.Flags & cc.Mask
 					cfv := curFlagValues[f]
 					if cfv == nil {
-						cfv = &subQueryRanges{}
+						cfv = &bitmask.ConnectedBitmask{}
 						curFlagValues[f] = cfv
 					}
-					cfv.add(pos)
+					cfv.Set(uint(pos))
 				}
 				tmp := flagValues
-				flagValues = make(map[uint16][]*subQueryRanges)
+				flagValues = make(map[uint16][]*bitmask.ConnectedBitmask)
 				for f1, d1 := range tmp {
 					for f2, d2 := range curFlagValues {
-						d := append(append([]*subQueryRanges(nil), d1...), d2)
+						d := append(append([]*bitmask.ConnectedBitmask(nil), d1...), d2)
 						flagValues[f1^f2] = d
 					}
 				}
@@ -374,21 +241,21 @@ conditions:
 				relevantResults := previousResults[otherSubQuery]
 				if cc.Mask4.IsUnspecified() && cc.Mask6.IsUnspecified() {
 					// only check if the ip version is the same, can be done on a hg level
-					otherHosts := [2]subQueryRanges{}
+					otherHosts := [2]bitmask.ConnectedBitmask{}
 					for rIdx, r := range relevantResults.streams {
 						otherSize := r.r.hostGroups[r.HostGroup].hostSize
-						otherHosts[otherSize/16].add(rIdx)
+						otherHosts[otherSize/16].Set(uint(rIdx))
 					}
 					if !cc.Invert {
 						otherHosts[0], otherHosts[1] = otherHosts[1], otherHosts[0]
 					}
-					forbiddenSubQueryResultsPerHostGroup := make([]*subQueryRanges, len(r.hostGroups))
+					forbiddenSubQueryResultsPerHostGroup := make([]*bitmask.ConnectedBitmask, len(r.hostGroups))
 					for hgi, hg := range r.hostGroups {
 						forbiddenSubQueryResultsPerHostGroup[hgi] = &otherHosts[hg.hostSize/16]
 					}
 					filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 						f := forbiddenSubQueryResultsPerHostGroup[s.HostGroup]
-						sc.allowedSubQueries.remove([]string{otherSubQuery}, []*subQueryRanges{f})
+						sc.allowedSubQueries.remove([]string{otherSubQuery}, []*bitmask.ConnectedBitmask{f})
 						return !sc.allowedSubQueries.empty(), nil
 					})
 					continue
@@ -405,13 +272,13 @@ conditions:
 						mask = cc.Mask6
 					}
 
-					forbidden := subQueryRanges{}
+					forbidden := bitmask.ConnectedBitmask{}
 				outer:
 					for resIdx, res := range relevantResults.streams {
 						otherHG := &res.r.hostGroups[res.HostGroup]
 						if myHG.hostSize != otherHG.hostSize {
 							if !cc.Invert {
-								forbidden.add(resIdx)
+								forbidden.Set(uint(resIdx))
 							}
 							continue
 						}
@@ -425,15 +292,15 @@ conditions:
 								continue
 							}
 							if !cc.Invert {
-								forbidden.add(resIdx)
+								forbidden.Set(uint(resIdx))
 								continue outer
 							}
 						}
 						if cc.Invert {
-							forbidden.add(resIdx)
+							forbidden.Set(uint(resIdx))
 						}
 					}
-					sc.allowedSubQueries.remove([]string{otherSubQuery}, []*subQueryRanges{&forbidden})
+					sc.allowedSubQueries.remove([]string{otherSubQuery}, []*bitmask.ConnectedBitmask{&forbidden})
 					return !sc.allowedSubQueries.empty(), nil
 				})
 				continue
@@ -561,7 +428,7 @@ conditions:
 			type (
 				subQueryResult struct {
 					number int
-					ranges subQueryRanges
+					ranges bitmask.ConnectedBitmask
 				}
 			)
 			subQueryData := [][]subQueryResult(nil)
@@ -578,15 +445,13 @@ conditions:
 					n += f.clientPort * int(res.ClientPort)
 					n += f.serverPort * int(res.ServerPort)
 					if pos, ok := numbers[n]; ok {
-						results[pos].ranges.add(resId)
+						results[pos].ranges.Set(uint(resId))
 						continue
 					}
 					numbers[n] = len(results)
 					results = append(results, subQueryResult{
 						number: n,
-						ranges: subQueryRanges{
-							ranges: []subQueryRange{{resId, resId}},
-						},
+						ranges: bitmask.MakeConnectedBitmask(uint(resId), uint(resId)),
 					})
 				}
 				subQueries = append(subQueries, sq)
@@ -601,7 +466,8 @@ conditions:
 			// element n will contain the range of elements 0..n
 			lastSubQueryData := subQueryData[len(subQueryData)-1]
 			for i, l := 0, len(lastSubQueryData)-1; i < l; i++ {
-				lastSubQueryData[i+1].ranges.addResult(&lastSubQueryData[i].ranges)
+				r := &lastSubQueryData[i+1].ranges
+				*r = r.Or(lastSubQueryData[i].ranges)
 			}
 
 			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
@@ -629,7 +495,7 @@ conditions:
 					}
 					// remove from sqs if the lowest possible sum is still invalid
 					if sqN+lastSubQueryData[0].number < 0 {
-						forbidden := []*subQueryRanges(nil)
+						forbidden := []*bitmask.ConnectedBitmask(nil)
 						for i, j := range pos {
 							forbidden = append(forbidden, &subQueryData[i][j].ranges)
 						}
@@ -709,7 +575,7 @@ conditions:
 			type (
 				subQueryResult struct {
 					duration time.Duration
-					ranges   subQueryRanges
+					ranges   bitmask.ConnectedBitmask
 				}
 			)
 			subQueryData := [][]subQueryResult(nil)
@@ -723,15 +589,13 @@ conditions:
 					d += time.Duration(f.ftime) * time.Duration(res.FirstPacketTimeNS)
 					d += time.Duration(f.ltime) * time.Duration(res.LastPacketTimeNS)
 					if pos, ok := durations[d]; ok {
-						results[pos].ranges.add(resId)
+						results[pos].ranges.Set(uint(resId))
 						continue
 					}
 					durations[d] = len(results)
 					results = append(results, subQueryResult{
 						duration: d,
-						ranges: subQueryRanges{
-							ranges: []subQueryRange{{resId, resId}},
-						},
+						ranges:   bitmask.MakeConnectedBitmask(uint(resId), uint(resId)),
 					})
 				}
 				subQueries = append(subQueries, sq)
@@ -746,7 +610,8 @@ conditions:
 			// element n will contain the range of elements 0..n
 			lastSubQueryData := subQueryData[len(subQueryData)-1]
 			for i, l := 0, len(lastSubQueryData)-1; i < l; i++ {
-				lastSubQueryData[i+1].ranges.addResult(&lastSubQueryData[i].ranges)
+				r := &lastSubQueryData[i+1].ranges
+				*r = r.Or(lastSubQueryData[i].ranges)
 			}
 			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 				d := startD
@@ -770,7 +635,7 @@ conditions:
 					}
 					// remove from sqs if the lowest possible sum is still invalid
 					if sqD+lastSubQueryData[0].duration < 0 {
-						forbidden := []*subQueryRanges(nil)
+						forbidden := []*bitmask.ConnectedBitmask(nil)
 						for i, j := range pos {
 							forbidden = append(forbidden, &subQueryData[i][j].ranges)
 						}
@@ -933,11 +798,11 @@ conditions:
 			return regexes[i].occurence[0].condition < regexes[j].occurence[0].condition
 		})
 
-		impossibleSubQueries := map[string]*subQueryRanges{}
+		impossibleSubQueries := map[string]*bitmask.ConnectedBitmask{}
 		type (
 			variableValues struct {
 				quotedData []string
-				results    subQueryRanges
+				results    bitmask.ConnectedBitmask
 			}
 			subQueryVariableData struct {
 				variableIndex map[string]int
@@ -992,22 +857,22 @@ conditions:
 				})
 			}
 			possible := false
-			impossible := &subQueryRanges{}
+			impossible := &bitmask.ConnectedBitmask{}
 			for sIdx, s := range rd.streams {
 				if vdi, ok := rd.variableAssociation[s.StreamID]; ok {
 					if _, ok := badVarData[vdi]; !ok {
-						varData[varDataMap[vdi]].results.add(sIdx)
+						varData[varDataMap[vdi]].results.Set(uint(sIdx))
 						possible = true
 						continue
 					}
 				}
 				// this stream can not succeed as it does not have the right variables
-				impossible.add(sIdx)
+				impossible.Set(uint(sIdx))
 			}
 			if !possible {
 				return queryPart{}, nil
 			}
-			if !impossible.empty() {
+			if !impossible.IsZero() {
 				impossibleSubQueries[sq] = impossible
 			}
 			possibleSubQueries[sq] = subQueryVariableData{
@@ -1155,7 +1020,7 @@ conditions:
 		if len(impossibleSubQueries) != 0 {
 			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 				for sq, imp := range impossibleSubQueries {
-					sc.allowedSubQueries.remove([]string{sq}, []*subQueryRanges{imp})
+					sc.allowedSubQueries.remove([]string{sq}, []*bitmask.ConnectedBitmask{imp})
 				}
 				return !sc.allowedSubQueries.empty(), nil
 			})
@@ -1571,7 +1436,7 @@ conditions:
 							return false, nil
 						}
 						sqs := []string(nil)
-						forbidden := []*subQueryRanges(nil)
+						forbidden := []*bitmask.ConnectedBitmask(nil)
 						for sq, v := range p.variant {
 							sqs = append(sqs, sq)
 							badSQR := &possibleSubQueries[sq].variableData[v].results
@@ -1671,19 +1536,19 @@ var (
 	}
 )
 
-func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time, qs query.ConditionsSet, sorting []query.Sorting, limit, skip uint, tags map[string]bitmask.LongBitmask) ([]*Stream, bool, error) {
+func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tags map[string]bitmask.LongBitmask) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
 	var sortingLess func(a, b *Stream) bool
-	if len(sorting) == 0 {
+	switch len(sorting) {
+	case 0:
 		// default search order is -ftime
 		sorting = []query.Sorting{{
 			Key: query.SortingKeyFirstPacketTime,
 			Dir: query.SortingDirDescending,
 		}}
-	}
-	switch len(sorting) {
+		fallthrough
 	case 1:
 		sortingLess = sorterFunctions[sorting[0].Key]
 		if sorting[0].Dir == query.SortingDirDescending {
@@ -1722,12 +1587,138 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 		}
 	}
 
+	groupingFuncs := (*grouper)(nil)
+	if grouping != nil {
+		groupingMap := map[string]grouper{
+			"id": {
+				key: func(s *Stream) []byte {
+					b := [8]byte{}
+					binary.LittleEndian.PutUint64(b[:], s.StreamID)
+					return b[:]
+				},
+			},
+			"cport": {
+				key: func(s *Stream) []byte {
+					b := [2]byte{}
+					binary.LittleEndian.PutUint16(b[:], s.ClientPort)
+					return b[:]
+				},
+			},
+			"sport": {
+				key: func(s *Stream) []byte {
+					b := [2]byte{}
+					binary.LittleEndian.PutUint16(b[:], s.ServerPort)
+					return b[:]
+				},
+			},
+			"bytes": {
+				key: func(s *Stream) []byte {
+					b := [8]byte{}
+					binary.LittleEndian.PutUint64(b[:], s.ClientBytes+s.ServerBytes)
+					return b[:]
+				},
+			},
+			"cbytes": {
+				key: func(s *Stream) []byte {
+					b := [8]byte{}
+					binary.LittleEndian.PutUint64(b[:], s.ClientBytes)
+					return b[:]
+				},
+			},
+			"sbytes": {
+				key: func(s *Stream) []byte {
+					b := [8]byte{}
+					binary.LittleEndian.PutUint64(b[:], s.ServerBytes)
+					return b[:]
+				},
+			},
+
+			"ftime": {
+				key: func(s *Stream) []byte {
+					b := [16]byte{}
+					t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+					binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
+					binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
+					return b[:]
+				},
+			},
+			"ltime": {
+				key: func(s *Stream) []byte {
+					b := [16]byte{}
+					t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
+					binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
+					binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
+					return b[:]
+				},
+			},
+			"duration": {
+				key: func(s *Stream) []byte {
+					b := [8]byte{}
+					ft := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+					lt := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
+					binary.LittleEndian.PutUint64(b[:], uint64(lt.Sub(ft)))
+					return b[:]
+				},
+			},
+
+			"chost": {
+				key: func(s *Stream) []byte {
+					hg := s.r.hostGroups[s.HostGroup]
+					return append([]byte{byte(hg.hostSize)}, hg.get(s.ClientHost)...)
+				},
+			},
+			"shost": {
+				key: func(s *Stream) []byte {
+					hg := s.r.hostGroups[s.HostGroup]
+					return append([]byte{byte(hg.hostSize)}, hg.get(s.ServerHost)...)
+				},
+			},
+		}
+		variableGrouper := grouper{
+			key: func(s *Stream) []byte {
+				//TODO: get access to the variables of the result
+				return nil
+			},
+		}
+		groupers := []grouper(nil)
+		for _, v := range grouping.Variables {
+			if v.SubQuery != "" {
+				return nil, false, errors.New("SubQueries not yet fully supported")
+			}
+			g, ok := groupingMap[v.Name]
+			if !ok {
+				g = variableGrouper
+			}
+			groupers = append(groupers, g)
+		}
+		switch len(groupers) {
+		case 0:
+			groupingFuncs = &grouper{
+				key: func(s *Stream) []byte {
+					return nil
+				},
+			}
+		case 1:
+			groupingFuncs = &groupers[0]
+		default:
+			groupingFuncs = &grouper{
+				key: func(s *Stream) []byte {
+					r := []byte(nil)
+					for _, g := range groupers {
+						r = append(r, g.key(s)...)
+					}
+					return r
+				},
+			}
+		}
+	}
+
 	requiredResultCount := map[string]int{}
 	allResults := map[string]resultData{}
 	subQueries := qs.SubQueries()
 	for _, subQuery := range subQueries {
 		results := resultData{
-			matchingQueryPart: make([]subQueryRanges, len(qs)),
+			matchingQueryPart: make([]bitmask.ConnectedBitmask, len(qs)),
 		}
 		sorter := sortingLess
 		resultLimit := limit + skip
@@ -1753,12 +1744,9 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 						for qID := range qs {
 							m := &allResults[sq].matchingQueryPart[qID]
 							if rrc == 0 {
-								m.ranges = nil
+								*m = bitmask.ConnectedBitmask{}
 							} else {
-								nm, _ := m.split(&subQueryRanges{
-									ranges: []subQueryRange{{0, rrc - 1}},
-								})
-								*m = nm
+								*m = m.And(bitmask.MakeConnectedBitmask(0, uint(rrc-1)))
 							}
 						}
 					}
@@ -1801,7 +1789,7 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 				}
 				queryParts = append(queryParts, queryPart)
 			}
-			err := idx.searchStreams(&results, allResults, queryParts, sorter, resultLimit)
+			err := idx.searchStreams(&results, allResults, queryParts, groupingFuncs, sorter, resultLimit)
 			if err != nil {
 				return nil, false, err
 			}
@@ -1818,7 +1806,7 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 	return results.streams[skip:], results.resultDropped != 0, nil
 }
 
-func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, sortingLess func(a, b *Stream) bool, limit uint) error {
+func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
 	allImpossible := true
@@ -1910,8 +1898,22 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 
 		// check if the sorting and limit would allow this stream
-		if result.resultDropped != 0 && limit != 0 && sortingLess != nil && uint(len(result.streams)) >= limit && !sortingLess(ss, result.streams[limit-1]) {
+		if result.resultDropped != 0 && limit != 0 && uint(len(result.streams)) >= limit && (sortingLess == nil || !sortingLess(ss, result.streams[limit-1])) {
 			return nil
+		}
+
+		// check if the sorting within the groupKey allow this stream
+		groupKey := []byte(nil)
+		groupPos := -1
+		if grouper != nil {
+			groupKey = grouper.key(ss)
+			pos, ok := result.groups[string(groupKey)]
+			if ok {
+				groupPos = pos
+				if sortingLess == nil || !sortingLess(ss, result.streams[pos]) {
+					return nil
+				}
+			}
 		}
 
 		matchingQueryParts := bitmask.ShortBitmask{}
@@ -1922,16 +1924,16 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 			if !activeQueryParts.IsSet(uint(qpIdx)) {
 				continue
 			}
-			tmp := map[string]subQueryRanges{}
+			tmp := map[string]bitmask.ConnectedBitmask{}
 			for k, v := range subQueryResults {
-				if v.matchingQueryPart[qpIdx].empty() {
+				if v.matchingQueryPart[qpIdx].IsZero() {
 					continue queryPart
 				}
-				tmp[k] = v.matchingQueryPart[qpIdx].copy()
+				tmp[k] = v.matchingQueryPart[qpIdx].Copy()
 			}
 			sc := &searchContext{
 				allowedSubQueries: subQuerySelection{
-					remaining: []map[string]subQueryRanges{tmp},
+					remaining: []map[string]bitmask.ConnectedBitmask{tmp},
 				},
 			}
 			for _, f := range queryParts[qpIdx].filters {
@@ -1949,42 +1951,74 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		if matchingQueryParts.IsZero() {
 			return nil
 		}
-		if limit != 0 && uint(len(result.streams)) >= limit {
-			// drop the last result
-			r := &result.streams[len(result.streams)-1]
+
+		replacePos := groupPos
+		if replacePos == -1 && limit != 0 && uint(len(result.streams)) >= limit && (sortingLess == nil || !sortingLess(ss, result.streams[limit-1])) {
+			replacePos = len(result.streams) - 1
+		}
+		if replacePos == -1 {
+			// we should not replace any slot
+			replacePos = len(result.streams)
+			result.streams = append(result.streams, nil)
+		} else {
+			r := &result.streams[replacePos]
+			if groupPos != -1 {
+				// we should replace the group slot
+				delete(result.groups, string(groupKey))
+			} else if grouper != nil {
+				// we should replace the last slot
+				delete(result.groups, string(grouper.key(*r)))
+			}
 			if d, ok := result.variableAssociation[(*r).StreamID]; ok {
 				result.variableData[d].uses--
 				delete(result.variableAssociation, (*r).StreamID)
 			}
 			for i := range result.matchingQueryPart {
-				if result.matchingQueryPart[i].last() == len(result.streams)-1 {
-					result.matchingQueryPart[i].pop()
-				}
+				result.matchingQueryPart[i].Extract(uint(replacePos))
 			}
 			*r = nil
-			result.resultDropped++
-		} else {
-			result.streams = append(result.streams, nil)
-		}
-
-		// insert the result at the right place
-		pos := len(result.streams) - 1
-		if sortingLess != nil {
-			pos = sort.Search(len(result.streams)-1, func(i int) bool {
-				return sortingLess(ss, result.streams[i])
-			})
-			for i := len(result.streams) - 1; i > pos; i-- {
-				result.streams[i] = result.streams[i-1]
+			if groupPos == -1 {
+				result.resultDropped++
 			}
 		}
-		result.streams[pos] = ss
+		// replacePos now points to the position of a nil slot that we can use
+
+		// insert the result at the right place
+		insertPos := replacePos
+		if sortingLess != nil {
+			insertPos = sort.Search(len(result.streams)-1, func(i int) bool {
+				if i >= replacePos {
+					i++
+				}
+				return sortingLess(ss, result.streams[i])
+			})
+			if replacePos < insertPos {
+				insertPos++
+				for ; replacePos < insertPos; replacePos++ {
+					result.streams[replacePos] = result.streams[replacePos+1]
+				}
+			} else if replacePos > insertPos {
+				for ; replacePos > insertPos; replacePos-- {
+					result.streams[replacePos] = result.streams[replacePos-1]
+				}
+			}
+		}
+		result.streams[insertPos] = ss
+
+		if grouper != nil {
+			if result.groups == nil {
+				result.groups = make(map[string]int)
+			}
+			result.groups[string(groupKey)] = insertPos
+		}
 
 		vdv := []variableDataValue(nil)
 		for scIdx, qpIdx, qpLen := -1, 0, matchingQueryParts.Len(); qpIdx < qpLen; qpIdx++ {
-			if !matchingQueryParts.IsSet(uint(qpIdx)) {
+			matching := matchingQueryParts.IsSet(uint(qpIdx))
+			result.matchingQueryPart[qpIdx].Inject(uint(insertPos), matching)
+			if !matching {
 				continue
 			}
-			result.matchingQueryPart[qpIdx].insert(pos)
 			scIdx++
 			sc := matchingSearchContexts[scIdx]
 			if sc.outputVariables == nil {
