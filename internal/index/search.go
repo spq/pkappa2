@@ -1953,15 +1953,22 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 
 		replacePos := groupPos
-		if replacePos == -1 && limit != 0 && uint(len(result.streams)) >= limit && (sortingLess == nil || !sortingLess(ss, result.streams[limit-1])) {
-			replacePos = len(result.streams) - 1
+		if groupPos == -1 {
+			if limit == 0 || uint(len(result.streams)) < limit {
+				// we have no limit or the limit is not yet reached
+				replacePos = len(result.streams)
+				result.streams = append(result.streams, nil)
+			} else if sortingLess != nil && sortingLess(ss, result.streams[limit-1]) {
+				// we have a limit but we are better than the last
+				replacePos = len(result.streams) - 1
+			} else {
+				// we have a limit and are worse than the last
+				result.resultDropped++
+				return nil
+			}
 		}
-		if replacePos == -1 {
-			// we should not replace any slot
-			replacePos = len(result.streams)
-			result.streams = append(result.streams, nil)
-		} else {
-			r := &result.streams[replacePos]
+
+		if r := &result.streams[replacePos]; *r != nil {
 			if groupPos != -1 {
 				// we should replace the group slot
 				delete(result.groups, string(groupKey))
