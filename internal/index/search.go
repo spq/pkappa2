@@ -47,7 +47,8 @@ type (
 		possible bool
 	}
 	grouper struct {
-		key func(s *Stream) []byte
+		key  func(s *Stream) []byte
+		vars []string
 	}
 )
 
@@ -1587,128 +1588,105 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 		}
 	}
 
-	groupingFuncs := (*grouper)(nil)
+	groupingData := (*grouper)(nil)
 	if grouping != nil {
-		groupingMap := map[string]grouper{
-			"id": {
-				key: func(s *Stream) []byte {
-					b := [8]byte{}
-					binary.LittleEndian.PutUint64(b[:], s.StreamID)
-					return b[:]
-				},
+		groupingKeyMap := map[string]func(s *Stream) []byte{
+			"id": func(s *Stream) []byte {
+				b := [8]byte{}
+				binary.LittleEndian.PutUint64(b[:], s.StreamID)
+				return b[:]
 			},
-			"cport": {
-				key: func(s *Stream) []byte {
-					b := [2]byte{}
-					binary.LittleEndian.PutUint16(b[:], s.ClientPort)
-					return b[:]
-				},
+			"cport": func(s *Stream) []byte {
+				b := [2]byte{}
+				binary.LittleEndian.PutUint16(b[:], s.ClientPort)
+				return b[:]
 			},
-			"sport": {
-				key: func(s *Stream) []byte {
-					b := [2]byte{}
-					binary.LittleEndian.PutUint16(b[:], s.ServerPort)
-					return b[:]
-				},
+			"sport": func(s *Stream) []byte {
+				b := [2]byte{}
+				binary.LittleEndian.PutUint16(b[:], s.ServerPort)
+				return b[:]
 			},
-			"bytes": {
-				key: func(s *Stream) []byte {
-					b := [8]byte{}
-					binary.LittleEndian.PutUint64(b[:], s.ClientBytes+s.ServerBytes)
-					return b[:]
-				},
+			"bytes": func(s *Stream) []byte {
+				b := [8]byte{}
+				binary.LittleEndian.PutUint64(b[:], s.ClientBytes+s.ServerBytes)
+				return b[:]
 			},
-			"cbytes": {
-				key: func(s *Stream) []byte {
-					b := [8]byte{}
-					binary.LittleEndian.PutUint64(b[:], s.ClientBytes)
-					return b[:]
-				},
+			"cbytes": func(s *Stream) []byte {
+				b := [8]byte{}
+				binary.LittleEndian.PutUint64(b[:], s.ClientBytes)
+				return b[:]
 			},
-			"sbytes": {
-				key: func(s *Stream) []byte {
-					b := [8]byte{}
-					binary.LittleEndian.PutUint64(b[:], s.ServerBytes)
-					return b[:]
-				},
+			"sbytes": func(s *Stream) []byte {
+				b := [8]byte{}
+				binary.LittleEndian.PutUint64(b[:], s.ServerBytes)
+				return b[:]
 			},
 
-			"ftime": {
-				key: func(s *Stream) []byte {
-					b := [16]byte{}
-					t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
-					binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
-					binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
-					return b[:]
-				},
+			"ftime": func(s *Stream) []byte {
+				b := [16]byte{}
+				t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+				binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
+				binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
+				return b[:]
 			},
-			"ltime": {
-				key: func(s *Stream) []byte {
-					b := [16]byte{}
-					t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
-					binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
-					binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
-					return b[:]
-				},
+			"ltime": func(s *Stream) []byte {
+				b := [16]byte{}
+				t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
+				binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
+				binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
+				return b[:]
 			},
-			"duration": {
-				key: func(s *Stream) []byte {
-					b := [8]byte{}
-					ft := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
-					lt := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
-					binary.LittleEndian.PutUint64(b[:], uint64(lt.Sub(ft)))
-					return b[:]
-				},
+			"duration": func(s *Stream) []byte {
+				b := [8]byte{}
+				ft := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+				lt := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
+				binary.LittleEndian.PutUint64(b[:], uint64(lt.Sub(ft)))
+				return b[:]
 			},
 
-			"chost": {
-				key: func(s *Stream) []byte {
-					hg := s.r.hostGroups[s.HostGroup]
-					return append([]byte{byte(hg.hostSize)}, hg.get(s.ClientHost)...)
-				},
+			"chost": func(s *Stream) []byte {
+				hg := s.r.hostGroups[s.HostGroup]
+				return append([]byte{byte(hg.hostSize)}, hg.get(s.ClientHost)...)
 			},
-			"shost": {
-				key: func(s *Stream) []byte {
-					hg := s.r.hostGroups[s.HostGroup]
-					return append([]byte{byte(hg.hostSize)}, hg.get(s.ServerHost)...)
-				},
+			"shost": func(s *Stream) []byte {
+				hg := s.r.hostGroups[s.HostGroup]
+				return append([]byte{byte(hg.hostSize)}, hg.get(s.ServerHost)...)
 			},
 		}
-		variableGrouper := grouper{
-			key: func(s *Stream) []byte {
-				//TODO: get access to the variables of the result
-				return nil
-			},
-		}
-		groupers := []grouper(nil)
+		keyFuncs := []func(s *Stream) []byte(nil)
+		variables := []string(nil)
 		for _, v := range grouping.Variables {
 			if v.SubQuery != "" {
 				return nil, false, errors.New("SubQueries not yet fully supported")
 			}
-			g, ok := groupingMap[v.Name]
-			if !ok {
-				g = variableGrouper
+			g, ok := groupingKeyMap[v.Name]
+			if ok {
+				keyFuncs = append(keyFuncs, g)
+			} else {
+				variables = append(variables, v.Name)
 			}
-			groupers = append(groupers, g)
 		}
-		switch len(groupers) {
+		switch len(keyFuncs) {
 		case 0:
-			groupingFuncs = &grouper{
-				key: func(s *Stream) []byte {
-					return nil
-				},
-			}
+			keyFuncs = append(keyFuncs, func(s *Stream) []byte {
+				return nil
+			})
+			fallthrough
 		case 1:
-			groupingFuncs = &groupers[0]
+			groupingData = &grouper{
+				key:  keyFuncs[0],
+				vars: variables,
+			}
 		default:
-			groupingFuncs = &grouper{
+			groupingData = &grouper{
 				key: func(s *Stream) []byte {
 					r := []byte(nil)
-					for _, g := range groupers {
-						r = append(r, g.key(s)...)
+					for _, f := range keyFuncs {
+						r = append(r, f(s)...)
 					}
 					return r
 				},
+				vars: variables,
 			}
 		}
 	}
@@ -1789,7 +1767,7 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 				}
 				queryParts = append(queryParts, queryPart)
 			}
-			err := idx.searchStreams(&results, allResults, queryParts, groupingFuncs, sorter, resultLimit)
+			err := idx.searchStreams(&results, allResults, queryParts, groupingData, sorter, resultLimit)
 			if err != nil {
 				return nil, false, err
 			}
@@ -1905,7 +1883,7 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		// check if the sorting within the groupKey allow this stream
 		groupKey := []byte(nil)
 		groupPos := -1
-		if grouper != nil {
+		if grouper != nil && len(grouper.vars) == 0 {
 			groupKey = grouper.key(ss)
 			pos, ok := result.groups[string(groupKey)]
 			if ok {
@@ -1950,6 +1928,39 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 		}
 		if matchingQueryParts.IsZero() {
 			return nil
+		}
+
+		if grouper != nil && len(grouper.vars) != 0 {
+			groupKey = grouper.key(ss)
+			for _, vn := range grouper.vars {
+				vvsm := map[string]struct{}{}
+				vvsl := []string(nil)
+				for _, sc := range matchingSearchContexts {
+					for _, vv := range sc.outputVariables[vn] {
+						if _, ok := vvsm[vv]; ok {
+							continue
+						}
+						vvsm[vv] = struct{}{}
+						vvsl = append(vvsl, vv)
+					}
+				}
+				sort.Strings(vvsl)
+				groupKey = append(groupKey, make([]byte, 8)...)
+				binary.LittleEndian.PutUint64(groupKey[len(groupKey)-8:], uint64(len(vvsl)))
+				for _, vv := range vvsl {
+					groupKey = append(groupKey, make([]byte, 8)...)
+					binary.LittleEndian.PutUint64(groupKey[len(groupKey)-8:], uint64(len(vv)))
+					groupKey = append(groupKey, []byte(vv)...)
+				}
+			}
+			pos, ok := result.groups[string(groupKey)]
+			if ok {
+				groupPos = pos
+				if sortingLess == nil || !sortingLess(ss, result.streams[pos]) {
+					result.resultDropped++
+					return nil
+				}
+			}
 		}
 
 		replacePos := groupPos
