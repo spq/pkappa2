@@ -1,9 +1,7 @@
 server:
-- fix crash/oom when importing
-- support data variables in grouping
-- support relative times in tags
 - support http
 - support websocket, including compression
+- improve import speed
 - support udp
 - support quic and http/2
 - support is:started|finished
@@ -11,18 +9,31 @@ server:
 - fix ip4 defragmentation (snapshottable, list of packets that are source for a reassembled pkg)
 - support ip6 defragmenting
 - support sctp
+- support relative times in tags
 - add tests
 
-ui:
-- add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
-- add keyboard handlers (escape, prev/next stream)
-- marking something (e.g. when you want to copy it) in the results view moves you to the stream, it should not
-- vll. sachen markieren und per keyboard press zum filter adden
-- back button
-- deep links
-- optional search result snippets
-
 both:
+- add tag color
+- add tag categories (tag, mark, service)
+- show matching tags, marks and identified service in result and stream view
+- support adding/removing marks to/from streams in result and stream view
+- add timeline with streams over time
+  - optionally per tag/mark/service
+  - with dynamic granularity
+  - anchor point: first packet time
+  - with optional filter
+- add a search history
+- add pcap listing
+- support showing alternatives for groups
+- support showing sub query results
+- add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
+- optional search result snippets
 - support decoders in data for search and display
 - calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
 - add documentation
+
+ui:
+- add keyboard handlers (escape, prev/next stream)
+- marking something (e.g. when you want to copy it) in the results view moves you to the stream, it should not
+- marking something in stream view and pressing a key could add a data filter
+- deep links & back button
