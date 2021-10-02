@@ -15,6 +15,7 @@ import (
 	"github.com/google/gopacket/reassembly"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/streams"
+	"github.com/spq/pkappa2/internal/index/udpreassembly"
 	"github.com/spq/pkappa2/internal/tools"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
@@ -160,12 +161,13 @@ func (b *Builder) FromPcap(pcapDir, pcapFilename string, existingIndexes []*inde
 	// create empty reassemblers
 	ip4defragmenter := ip4defrag.NewIPv4Defragmenter()
 
-	tcpStreamFactory := &streams.TCPStreamFactory{}
+	streamFactory := &streams.StreamFactory{}
 	tcpAssembler := [0x100]*reassembly.Assembler{}
 	for i := range tcpAssembler {
-		pool := reassembly.NewStreamPool(tcpStreamFactory)
+		pool := reassembly.NewStreamPool(streamFactory)
 		tcpAssembler[i] = reassembly.NewAssembler(pool)
 	}
+	udpAssembler := udpreassembly.NewAssembler(streamFactory)
 	// iterate over packets
 	nPacketsAfterSnapshot := uint64(0)
 	previousPacketTimestamp := time.Time{}
@@ -183,8 +185,8 @@ func (b *Builder) FromPcap(pcapDir, pcapFilename string, existingIndexes []*inde
 			// create new snapshot
 			referencedPackets := map[string][]uint64{}
 			// TODO: dump packets from ip4defragmenter
-			for _, s := range tcpStreamFactory.Streams {
-				if s.Complete {
+			for _, s := range streamFactory.Streams {
+				if s.Flags&streams.StreamFlagsComplete != 0 {
 					continue
 				}
 				for _, p := range s.Packets {
@@ -270,7 +272,12 @@ func (b *Builder) FromPcap(pcapDir, pcapFilename string, existingIndexes []*inde
 			}
 			a.AssembleWithContext(packet.NetworkLayer().NetworkFlow(), tcp, &asc)
 		case layers.LayerTypeUDP:
-			// TODO: implement udp support
+			udp := transport.(*layers.UDP)
+			asc := streams.AssemblerContext{
+				CaptureInfo: &packet.Metadata().CaptureInfo,
+			}
+			udpAssembler.FlushCloseOlderThan(tsTimeouted)
+			udpAssembler.AssembleWithContext(packet.NetworkLayer().NetworkFlow(), udp, &asc)
 		default:
 			// TODO: implement sctp support
 		}
@@ -288,7 +295,7 @@ func (b *Builder) FromPcap(pcapDir, pcapFilename string, existingIndexes []*inde
 	indexBuilders := []*index.Writer{}
 	if err := func() error {
 		// dump collected streams to new indexes
-		for _, s := range tcpStreamFactory.Streams {
+		for _, s := range streamFactory.Streams {
 			id := nextStreamID
 			for pi := range s.Packets {
 				pmd := pcapmetadata.FromPacketMetadata(s.Packets[pi])

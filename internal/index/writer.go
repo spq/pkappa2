@@ -148,7 +148,7 @@ func (w *Writer) Filename() string {
 	return w.filename
 }
 
-func (w *Writer) AddStream(s *streams.TCPStream, streamID uint64) (bool, error) {
+func (w *Writer) AddStream(s *streams.Stream, streamID uint64) (bool, error) {
 	// check if we can reference the stream.
 	if len(w.streams) > math.MaxUint32 {
 		return false, nil
@@ -183,7 +183,13 @@ func (w *Writer) AddStream(s *streams.TCPStream, streamID uint64) (bool, error) 
 		PacketInfoStart:   uint32(len(w.packets)),
 		FirstPacketTimeNS: uint64(firstPacketTs.Sub(referenceTime).Nanoseconds()),
 		LastPacketTimeNS:  uint64(lastPacketTs.Sub(referenceTime).Nanoseconds()),
-		Flags:             flagsStreamProtocolTCP | flagsStreamSegmentationNone,
+		Flags:             flagsStreamSegmentationNone,
+	}
+	switch s.Flags & streams.StreamFlagsProtocol {
+	case streams.StreamFlagsProtocolTCP:
+		stream.Flags |= flagsStreamProtocolTCP
+	case streams.StreamFlagsProtocolUDP:
+		stream.Flags |= flagsStreamProtocolUDP
 	}
 
 	// when we can't add a stream to this writer, we might have

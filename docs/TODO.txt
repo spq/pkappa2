@@ -2,7 +2,6 @@ server:
 - support http
 - support websocket, including compression
 - improve import speed
-- support udp
 - support quic and http/2
 - support is:started|finished
 - support pcap groups, they have their own indexes & snapshots and may only be combined with packets in the same group
