@@ -3,7 +3,6 @@ package builder
 import (
 	"bufio"
 	"encoding/binary"
-	"math"
 	"os"
 	"time"
 )
@@ -12,12 +11,12 @@ type (
 	snapshot struct {
 		timestamp         time.Time
 		referencedPackets map[string][]uint64
-		packetCount       uint64
+		chunkCount        uint64
 	}
 
 	snapshotHeader struct {
 		TimestampSec, TimestampNSec int64
-		PacketCount, NumPcaps       uint64
+		ChunkCount, NumPcaps        uint64
 	}
 
 	snapshotEntryHeader struct {
@@ -45,7 +44,7 @@ func loadSnapshots(filename string) ([]*snapshot, error) {
 			return nil, err
 		}
 		ss.timestamp = time.Unix(header.TimestampSec, header.TimestampNSec)
-		ss.packetCount = header.PacketCount
+		ss.chunkCount = header.ChunkCount
 		ss.referencedPackets = make(map[string][]uint64, header.NumPcaps)
 		for ; header.NumPcaps > 0; header.NumPcaps-- {
 			header := snapshotEntryHeader{}
@@ -82,7 +81,7 @@ func saveSnapshots(filename string, snapshots []*snapshot) error {
 		header := snapshotHeader{
 			TimestampSec:  ss.timestamp.Unix(),
 			TimestampNSec: ss.timestamp.UnixNano(),
-			PacketCount:   ss.packetCount,
+			ChunkCount:    ss.chunkCount,
 			NumPcaps:      uint64(len(ss.referencedPackets)),
 		}
 		if err := binary.Write(writer, binary.LittleEndian, &header); err != nil {
@@ -111,22 +110,13 @@ func saveSnapshots(filename string, snapshots []*snapshot) error {
 }
 
 func compactSnapshots(snapshots []*snapshot) []*snapshot {
-	minPacketCount := uint64(math.MaxUint64)
-	for _, s := range snapshots {
-		if minPacketCount > s.packetCount {
-			minPacketCount = s.packetCount
-		}
-	}
-	if minPacketCount == 0 {
-		return nil
-	}
 	for i := len(snapshots) - 3; i >= 0; i -= 2 {
 		a, b, c := snapshots[i], snapshots[i+1], snapshots[i+2]
-		aChunks, bChunks, cChunks := a.packetCount/minPacketCount, b.packetCount/minPacketCount, c.packetCount/minPacketCount
+		aChunks, bChunks, cChunks := a.chunkCount, b.chunkCount, c.chunkCount
 		if aChunks > bChunks || bChunks > cChunks {
 			break
 		}
-		b.packetCount += a.packetCount
+		b.chunkCount += a.chunkCount
 		//remove a
 		snapshots = append(snapshots[:i], snapshots[i+1:]...)
 	}

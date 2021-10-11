@@ -242,10 +242,10 @@ func (mgr *Manager) saveState() error {
 	return nil
 }
 
-func (mgr *Manager) importPcapJob(filename string, existingIndexes []*index.Reader, existingIndexesReleaser IndexReleaser) {
-	createdIndexes, err := mgr.builder.FromPcap(mgr.PcapDir, filename, existingIndexes)
+func (mgr *Manager) importPcapJob(filenames []string, existingIndexes []*index.Reader, existingIndexesReleaser IndexReleaser) {
+	processedFiles, createdIndexes, err := mgr.builder.FromPcap(mgr.PcapDir, filenames, existingIndexes)
 	if err != nil {
-		log.Printf("importPcapJob(%q) failed: %s", filename, err)
+		log.Printf("importPcapJob(%q) failed: %s", filenames, err)
 	}
 	mgr.jobs <- func() {
 		existingIndexesReleaser.release(mgr)
@@ -261,11 +261,11 @@ func (mgr *Manager) importPcapJob(filename string, existingIndexes []*index.Read
 			}
 		}
 		// remove finished job from queue
-		mgr.importJobs = mgr.importJobs[1:]
+		mgr.importJobs = mgr.importJobs[processedFiles:]
 		// start new import job if there are more queued
 		if len(mgr.importJobs) >= 1 {
 			idxs, rel := mgr.getIndexesCopy(0, len(mgr.indexes))
-			go mgr.importPcapJob(mgr.importJobs[0], idxs, rel)
+			go mgr.importPcapJob(mgr.importJobs[:len(mgr.importJobs)], idxs, rel)
 		}
 		mgr.startTaggingJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
@@ -418,7 +418,7 @@ func (mgr *Manager) ImportPcap(filename string) {
 		//start import job when none running
 		if len(mgr.importJobs) == 1 {
 			indexes, releaser := mgr.getIndexesCopy(0, len(mgr.indexes))
-			go mgr.importPcapJob(filename, indexes, releaser)
+			go mgr.importPcapJob(mgr.importJobs[:1], indexes, releaser)
 		}
 	}
 }

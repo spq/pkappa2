@@ -4,20 +4,47 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
 
-func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pcapmetadata.PcapInfo, []gopacket.Packet, error) {
+type (
+	Packet struct {
+		p       gopacket.Packet
+		ci      gopacket.CaptureInfo
+		data    []byte
+		decoder gopacket.Decoder
+	}
+)
+
+func (p *Packet) Parsed() gopacket.Packet {
+	if p.p == nil {
+		p.p = gopacket.NewPacket(p.data, p.decoder, gopacket.NoCopy)
+		md := p.p.Metadata()
+		md.CaptureInfo = p.ci
+		md.Truncated = md.Truncated || p.ci.CaptureLength < p.ci.Length
+	}
+	return p.p
+}
+
+func (p *Packet) Timestamp() time.Time {
+	return p.ci.Timestamp
+}
+
+func (p *Packet) CaptureInfo() *gopacket.CaptureInfo {
+	return &p.ci
+}
+
+func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pcapmetadata.PcapInfo, []Packet, error) {
 	handle, err := pcap.OpenOffline(filepath.Join(pcapDir, pcapFilename))
 	if err != nil {
 		return nil, nil, err
 	}
 	defer handle.Close()
-	src := gopacket.NewPacketSource(handle, handle.LinkType())
-	packets := []gopacket.Packet{}
+	packets := []Packet(nil)
 	updateInfo := info == nil
 	if updateInfo {
 		info = &pcapmetadata.PcapInfo{
@@ -29,26 +56,30 @@ func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pc
 			info.Filesize = uint64(s.Size())
 		}
 	}
+	decoder := handle.LinkType()
 	for packetIndex := uint64(0); ; packetIndex++ {
-		p, err := src.NextPacket()
+		data, ci, err := handle.ReadPacketData()
 		switch err {
 		case io.EOF:
 			return info, packets, nil
 		case nil:
-			md := p.Metadata()
-			pcapmetadata.AddPcapMetadata(&md.CaptureInfo, info, packetIndex)
-			packets = append(packets, p)
-			if updateInfo {
-				ts := md.Timestamp
-				if info.PacketTimestampMin.IsZero() || info.PacketTimestampMin.After(ts) {
-					info.PacketTimestampMin = ts
-				}
-				if info.PacketTimestampMax.Before(ts) {
-					info.PacketTimestampMax = ts
-				}
-			}
 		default:
 			return nil, nil, err
 		}
+		if updateInfo {
+			ts := ci.Timestamp
+			if info.PacketTimestampMin.IsZero() || info.PacketTimestampMin.After(ts) {
+				info.PacketTimestampMin = ts
+			}
+			if info.PacketTimestampMax.Before(ts) {
+				info.PacketTimestampMax = ts
+			}
+		}
+		pcapmetadata.AddPcapMetadata(&ci, info, packetIndex)
+		packets = append(packets, Packet{
+			decoder: decoder,
+			data:    data,
+			ci:      ci,
+		})
 	}
 }

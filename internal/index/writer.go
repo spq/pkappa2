@@ -250,7 +250,7 @@ func (w *Writer) AddStream(s *streams.Stream, streamID uint64) (bool, error) {
 		}
 	})
 	for _, p := range s.Packets {
-		pmds := pcapmetadata.AllFromPacketMetadata(p)
+		pmds := pcapmetadata.AllFromPacketMetadata(&p)
 		for _, pmd := range pmds {
 			e := writerImportEntry{
 				filename: pmd.PcapInfo.Filename,
@@ -285,7 +285,7 @@ func (w *Writer) AddStream(s *streams.Stream, streamID uint64) (bool, error) {
 	lastPacketWithData := len(w.packets)
 	for pIndex, p := range s.Packets {
 		dir := s.PacketDirections[pIndex]
-		pmds := pcapmetadata.AllFromPacketMetadata(p)
+		pmds := pcapmetadata.AllFromPacketMetadata(&p)
 		for _, pmd := range pmds {
 			flags := uint8(flagsPacketHasNext)
 			switch dir {

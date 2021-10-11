@@ -28,7 +28,7 @@ type (
 		ServerAddr       []byte
 		ClientPort       uint16
 		ServerPort       uint16
-		Packets          []*gopacket.CaptureInfo
+		Packets          []gopacket.CaptureInfo
 		PacketDirections []reassembly.TCPFlowDirection
 		Data             []StreamData
 		Flags            StreamFlags
@@ -40,7 +40,7 @@ type (
 		Streams []*Stream
 	}
 	AssemblerContext struct {
-		CaptureInfo *gopacket.CaptureInfo
+		CaptureInfo gopacket.CaptureInfo
 	}
 )
 
@@ -54,7 +54,7 @@ const (
 )
 
 func (ac *AssemblerContext) GetCaptureInfo() gopacket.CaptureInfo {
-	return *ac.CaptureInfo
+	return ac.CaptureInfo
 }
 
 func (f *StreamFactory) NewUDP(netFlow, udpFlow gopacket.Flow) *Stream {
@@ -97,7 +97,7 @@ func (f *StreamFactory) New(netFlow, tcpFlow gopacket.Flow, tcp *layers.TCP, ac 
 
 func (s *Stream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, start *bool, ac reassembly.AssemblerContext) bool {
 	// add non-accepted packets, might be interesting when exporting pcaps
-	s.Packets = append(s.Packets, ac.(*AssemblerContext).CaptureInfo)
+	s.Packets = append(s.Packets, ac.GetCaptureInfo())
 	s.PacketDirections = append(s.PacketDirections, dir)
 
 	if *checkTCPState {
@@ -114,7 +114,7 @@ func (s *Stream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly
 }
 
 func (s *Stream) AddUDPPacket(dir reassembly.TCPFlowDirection, data []byte, ac reassembly.AssemblerContext) {
-	s.Packets = append(s.Packets, ac.(*AssemblerContext).CaptureInfo)
+	s.Packets = append(s.Packets, ac.GetCaptureInfo())
 	s.PacketDirections = append(s.PacketDirections, dir)
 	length := len(data)
 	if length == 0 {
@@ -127,7 +127,7 @@ func (s *Stream) AddUDPPacket(dir reassembly.TCPFlowDirection, data []byte, ac r
 		if p.Timestamp != ci.Timestamp {
 			continue
 		}
-		pmd2 := pcapmetadata.FromPacketMetadata(p)
+		pmd2 := pcapmetadata.FromPacketMetadata(&p)
 		if pmd.PcapInfo != pmd2.PcapInfo || pmd.Index != pmd2.Index {
 			continue
 		}
@@ -151,7 +151,7 @@ func (s *Stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 		if p.Timestamp != ci.Timestamp {
 			continue
 		}
-		pmd2 := pcapmetadata.FromPacketMetadata(p)
+		pmd2 := pcapmetadata.FromPacketMetadata(&p)
 		if pmd.PcapInfo != pmd2.PcapInfo || pmd.Index != pmd2.Index {
 			continue
 		}
