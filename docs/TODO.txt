@@ -1,7 +1,6 @@
 server:
 - support http
 - support websocket, including compression
-- improve import speed
 - support quic and http/2
 - support is:started|finished
 - support pcap groups, they have their own indexes & snapshots and may only be combined with packets in the same group
@@ -10,6 +9,8 @@ server:
 - support sctp
 - support relative times in tags
 - add tests
+- make query language simpler (less @'s)
+- improve import speed by ignoring timedout packages instead of having to flush them before processing a new package
 
 both:
 - add tag color
