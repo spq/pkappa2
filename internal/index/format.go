@@ -30,11 +30,6 @@ type (
 		FirstPacketTime uint64
 		Sections        [sectionsCount]fileHeaderSection
 	}
-	dataHeader struct {
-		Length       uint32
-		Segmentation uint16
-		Flags        uint16
-	}
 	hostGroupEntry struct {
 		Start uint32
 		Count uint16 // add 1: 0 means 1, 0xffff means 0x10000
@@ -68,16 +63,7 @@ type (
 )
 
 const (
-	fileMagic = "pkappa2index\x00\x00\x00\x01"
-
-	flagsDataHasNext                 = 0b0001
-	flagsDataDirection               = 0b0010
-	flagsDataDirectionClientToServer = 0b0000
-	flagsDataDirectionServerToClient = 0b0010
-	flagsDataSegmentation            = 0b1100
-	flagsDataSegmentationNone        = 0b0000
-	flagsDataSegmentationHTTPHeader  = 0b0100
-	flagsDataSegmentationHTTPBody    = 0b1100
+	fileMagic = "pkappa2index\x00\x00\x00\x02"
 
 	flagsHostGroupIPVersion = 0b1
 	flagsHostGroupIP4       = 0b0

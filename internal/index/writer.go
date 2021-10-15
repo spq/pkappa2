@@ -337,56 +337,69 @@ func (w *Writer) AddStream(s *streams.Stream, streamID uint64) (bool, error) {
 			w.packets[lastPacketWithData].SkipPacketsForData = uint8(distance)
 		}
 	}
-	for dIndex := range s.Data {
-		// TODO: write data from multiple packets for the same
-		// direction in one go, don't add data headers in-between.
-		d := &s.Data[dIndex]
-		dir := s.PacketDirections[d.PacketIndex]
-		switch dir {
-		case reassembly.TCPDirClientToServer:
-			stream.ClientBytes += uint64(len(d.Bytes))
-		case reassembly.TCPDirServerToClient:
-			stream.ServerBytes += uint64(len(d.Bytes))
-		}
-		for offset := 0; offset < len(d.Bytes); {
-			l := len(d.Bytes) - offset
-			if l > math.MaxUint32 {
-				l = math.MaxUint32
-			}
-			header := dataHeader{
-				Length: uint32(l),
-			}
-			lastPacket := dIndex == len(s.Data)-1
-			lastChunkOfPacket := offset+l == len(d.Bytes)
-			if !(lastPacket && lastChunkOfPacket) {
-				header.Flags |= flagsDataHasNext
-			}
-			switch dir {
-			case reassembly.TCPDirServerToClient:
-				header.Flags |= flagsDataDirectionServerToClient
-			case reassembly.TCPDirClientToServer:
-				header.Flags |= flagsDataDirectionClientToServer
-			}
-			if err := w.write(&header); err != nil {
-				undo()
-				return false, err
-			}
-			if err := w.write(d.Bytes[offset : offset+l]); err != nil {
-				undo()
-				return false, err
-			}
-			offset += l
-		}
-	}
-	if len(s.Data) == 0 {
-		// no data was written, write a fake header with 0 length
-		if err := w.write(&dataHeader{}); err != nil {
-			undo()
-			return false, err
-		}
-	}
 	// drop the has next flag of the last packet
 	w.packets[len(w.packets)-1].Flags -= flagsPacketHasNext
+
+	for _, wantDir := range []reassembly.TCPFlowDirection{reassembly.TCPDirClientToServer, reassembly.TCPDirServerToClient} {
+		nWritten := 0
+		for dIndex := range s.Data {
+			d := &s.Data[dIndex]
+			if dir := s.PacketDirections[d.PacketIndex]; dir != wantDir {
+				continue
+			}
+			if err := w.write(d.Bytes); err != nil {
+				undo()
+				return false, err
+			}
+			nWritten += len(d.Bytes)
+		}
+		switch wantDir {
+		case reassembly.TCPDirClientToServer:
+			stream.ClientBytes += uint64(nWritten)
+		case reassembly.TCPDirServerToClient:
+			stream.ServerBytes += uint64(nWritten)
+		}
+	}
+	segmentation := []byte(nil)
+	buf := [10]byte{}
+	for dIndex, wantDir := 0, reassembly.TCPDirClientToServer; dIndex < len(s.Data); {
+		d := &s.Data[dIndex]
+		sz := len(d.Bytes)
+		dir := s.PacketDirections[d.PacketIndex]
+		for {
+			dIndex++
+			if dIndex >= len(s.Data) {
+				break
+			}
+			d2 := &s.Data[dIndex]
+			if dir != s.PacketDirections[d2.PacketIndex] {
+				break
+			}
+			sz += len(d2.Bytes)
+		}
+		if dir != wantDir {
+			segmentation = append(segmentation, 0)
+			wantDir = wantDir.Reverse()
+		}
+		pos := len(buf)
+		flag := byte(0)
+		for {
+			pos--
+			buf[pos] = byte(sz&0x7f) | flag
+			flag = 0x80
+			sz >>= 7
+			if sz == 0 {
+				break
+			}
+		}
+		segmentation = append(segmentation, buf[pos:]...)
+		wantDir = wantDir.Reverse()
+	}
+	if err := w.write(segmentation); err != nil {
+		undo()
+		return false, err
+	}
+
 	w.streams = append(w.streams, stream)
 	return true, nil
 }
@@ -766,27 +779,45 @@ func (w *Writer) AddIndex(r *Reader) (bool, error) {
 		}
 		newStream.DataStart -= w.header.Sections[sectionData].Begin
 
-		if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
-			undo()
-			return false, err
-		}
-
-		for {
-			h := dataHeader{}
-			if err := binary.Read(br, binary.LittleEndian, &h); err != nil {
+		if count := s.ClientBytes + s.ServerBytes; count != 0 {
+			if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
 				undo()
 				return false, err
 			}
-			if err := w.write(h); err != nil {
+			if _, err := io.CopyN(w.buffer, br, int64(count)); err != nil {
 				undo()
 				return false, err
 			}
-			if _, err := io.CopyN(w.buffer, br, int64(h.Length)); err != nil {
-				undo()
-				return false, err
-			}
-			if h.Flags&flagsDataHasNext == 0 {
-				break
+			for pos, buf := 0, [4096]byte{}; ; {
+				if count == 0 || pos >= len(buf)-((64+6)/7) {
+					if err := w.write(buf[:pos]); err != nil {
+						undo()
+						return false, err
+					}
+					if count == 0 {
+						break
+					}
+					pos = 0
+				}
+				sz := uint64(0)
+				for {
+					b := byte(0)
+					if err := binary.Read(br, binary.LittleEndian, &b); err != nil {
+						undo()
+						return false, err
+					}
+					sz <<= 7
+					sz |= uint64(b & 0x7f)
+					buf[pos] = b
+					pos++
+					if b < 0x80 {
+						break
+					}
+				}
+				if sz > count {
+					panic(123)
+				}
+				count -= sz
 			}
 		}
 

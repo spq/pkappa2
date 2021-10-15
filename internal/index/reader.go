@@ -418,27 +418,42 @@ func (s *Stream) Data() ([]Data, error) {
 	data := []Data{}
 	sr := io.NewSectionReader(s.r.file, int64(s.r.header.Sections[sectionData].Begin+s.DataStart), s.r.header.Sections[sectionData].size()-int64(s.DataStart))
 	br := bufio.NewReader(sr)
-	for {
-		h := dataHeader{}
-		if err := binary.Read(br, binary.LittleEndian, &h); err != nil {
-			return nil, err
-		}
-		if h.Length != 0 {
-			d := Data{
-				Content: make([]byte, h.Length),
-				Direction: map[uint16]int{
-					flagsDataDirectionClientToServer: DirectionClientToServer,
-					flagsDataDirectionServerToClient: DirectionServerToClient,
-				}[h.Flags&flagsDataDirection],
-			}
-			if err := binary.Read(br, binary.LittleEndian, d.Content); err != nil {
-				return nil, err
-			}
-			data = append(data, d)
-		}
-		if h.Flags&flagsDataHasNext == 0 {
+
+	content := [2][]byte{}
+	content[DirectionClientToServer] = make([]byte, s.ClientBytes)
+	content[DirectionServerToClient] = make([]byte, s.ServerBytes)
+	if err := binary.Read(br, binary.LittleEndian, content[DirectionClientToServer]); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(br, binary.LittleEndian, content[DirectionServerToClient]); err != nil {
+		return nil, err
+	}
+
+	position := [2]uint64{}
+	for dir := DirectionClientToServer; ; dir ^= DirectionClientToServer ^ DirectionServerToClient {
+		if position[DirectionClientToServer] == s.ClientBytes && position[DirectionServerToClient] == s.ServerBytes {
 			break
 		}
+		sz := uint64(0)
+		for {
+			b, err := br.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			sz <<= 7
+			sz |= uint64(b & 0x7f)
+			if b < 0x80 {
+				break
+			}
+		}
+		if sz == 0 {
+			continue
+		}
+		data = append(data, Data{
+			Direction: dir,
+			Content:   content[dir][position[dir]:][:sz],
+		})
+		position[dir] += sz
 	}
 	return data, nil
 }

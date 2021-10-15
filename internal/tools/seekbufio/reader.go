@@ -26,7 +26,8 @@ func (r *SeekableBufferReader) Read(p []byte) (int, error) {
 	n, err := r.b.Read(p)
 	if err != nil {
 		debug.PrintStack()
-		return 0, err
+		panic(err)
+		//return 0, err
 	}
 	r.pos += int64(n)
 	return n, err
