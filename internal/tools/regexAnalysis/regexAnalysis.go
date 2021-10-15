@@ -32,6 +32,69 @@ func NamedCaptures(regexString string) (map[string][]string, error) {
 	return extracts, nil
 }
 
+func ConstantSuffix(regexString string) ([]byte, error) {
+	r, err := syntax.Parse(regexString, syntax.Perl)
+	if err != nil {
+		return nil, err
+	}
+	p, err := syntax.Compile(r.Simplify())
+	if err != nil {
+		return nil, err
+	}
+	evaluate := (func(s *[]byte, pos uint32, seen []uint32) error)(nil)
+	evaluate = func(s *[]byte, pos uint32, seen []uint32) error {
+		for {
+			i := p.Inst[pos]
+			switch i.Op {
+			case syntax.InstRune1, syntax.InstRune, syntax.InstRuneAny, syntax.InstRuneAnyNotNL:
+				if len(i.Rune) == 1 && i.Rune[0] <= 0xFF && syntax.Flags(i.Arg)&syntax.FoldCase == 0 {
+					*s = append(*s, byte(i.Rune[0]))
+				} else {
+					*s = nil
+				}
+				fallthrough
+			case syntax.InstNop, syntax.InstEmptyWidth, syntax.InstCapture:
+				pos = i.Out
+				continue
+			case syntax.InstAlt, syntax.InstAltMatch:
+				for _, p := range seen {
+					if p == pos {
+						*s = nil
+						return nil
+					}
+				}
+				seen = append(seen, pos)
+				s2 := append(make([]byte, 0, len(*s)), *s...)
+				if err := evaluate(&s2, i.Out, seen); err != nil {
+					return err
+				}
+				if err := evaluate(s, i.Arg, seen); err != nil {
+					return err
+				}
+				for i := 0; ; i++ {
+					if i < len(*s) && i < len(s2) {
+						b, b2 := (*s)[len(*s)-i-1], s2[len(s2)-i-1]
+						if b == b2 {
+							continue
+						}
+					}
+					*s = (*s)[len(*s)-i:]
+					break
+				}
+				return nil
+			case syntax.InstMatch:
+				return nil
+			case syntax.InstFail:
+				*s = nil
+				return nil
+			}
+			return fmt.Errorf("unsupported regex op %q", i.String())
+		}
+	}
+	s := []byte(nil)
+	return s, evaluate(&s, uint32(p.Start), nil)
+}
+
 func AcceptedLength(regexString string) (AcceptedLengths, error) {
 	r, err := syntax.Parse(regexString, syntax.Perl)
 	if err != nil {
