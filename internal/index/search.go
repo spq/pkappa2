@@ -110,7 +110,7 @@ func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previou
 		}
 		regexVariant struct {
 			regex          *binaryregexp.Regexp
-			prefix         []byte
+			prefix, suffix []byte
 			acceptedLength regexanalysis.AcceptedLengths
 			childSubQuery  string
 			children       []regexVariant
@@ -898,8 +898,12 @@ conditions:
 						MinLength: uint(len(prefix)),
 						MaxLength: uint(len(prefix)),
 					}
+					r.root.suffix = r.root.prefix
 				} else {
 					if r.root.acceptedLength, err = regexanalysis.AcceptedLength(e.Regex); err != nil {
+						return queryPart{}, err
+					}
+					if r.root.suffix, err = regexanalysis.ConstantSuffix(e.Regex); err != nil {
 						return queryPart{}, err
 					}
 				}
@@ -998,8 +1002,12 @@ conditions:
 							MinLength: uint(len(prefix)),
 							MaxLength: uint(len(prefix)),
 						}
+						root.suffix = root.prefix
 					} else {
 						if root.acceptedLength, err = regexanalysis.AcceptedLength(regex); err != nil {
+							return queryPart{}, err
+						}
+						if root.suffix, err = regexanalysis.ConstantSuffix(regex); err != nil {
 							return queryPart{}, err
 						}
 					}
@@ -1049,6 +1057,8 @@ conditions:
 					acceptedLength regexanalysis.AcceptedLengths
 					// the prefix of the regex
 					prefix []byte
+					// the suffix of the regex
+					suffix []byte
 					// the variants chosen for this progress
 					variant map[string]int
 					// flags for this progress
@@ -1130,6 +1140,7 @@ conditions:
 						dir := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
 
 						ps := &progressGroups[o.condition]
+					outer2:
 						for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
 							p := &ps.variants[pIdx]
 							if o.element != p.nSuccessful {
@@ -1153,6 +1164,7 @@ conditions:
 									if root.regex != nil {
 										p.regex = root.regex
 										p.prefix = root.prefix
+										p.suffix = root.suffix
 										p.acceptedLength = root.acceptedLength
 										if root.isPrecondition {
 											p.flags = progressVariantFlagStatePrecondition
@@ -1176,6 +1188,7 @@ conditions:
 											regex:          c.regex,
 											acceptedLength: c.acceptedLength,
 											prefix:         c.prefix,
+											suffix:         c.suffix,
 											variant: map[string]int{
 												root.childSubQuery: cIdx,
 											},
@@ -1271,8 +1284,12 @@ conditions:
 											MinLength: uint(len(prefix)),
 											MaxLength: uint(len(prefix)),
 										}
+										root.suffix = root.prefix
 									} else {
 										if p.acceptedLength, err = regexanalysis.AcceptedLength(expr); err != nil {
+											return false, err
+										}
+										if p.suffix, err = regexanalysis.ConstantSuffix(expr); err != nil {
 											return false, err
 										}
 									}
@@ -1299,7 +1316,43 @@ conditions:
 									continue
 								}
 							}
-							res := p.regex.FindSubmatchIndex(buffer)
+							if len(p.suffix) != 0 {
+								//the regex has a suffix, find it
+								pos := bytes.LastIndex(buffer, p.suffix)
+								if pos < 0 {
+									// the suffix is not in the string, we can discard part of the buffer
+									p.streamOffset[dir] = len(buffers[dir])
+									continue
+								}
+								//drop the part that doesn't have the suffix
+								buffer = buffer[:pos+len(p.suffix)]
+								if uint(len(buffer)) < p.acceptedLength.MinLength {
+									continue
+								}
+							}
+
+							var res []int
+							if p.acceptedLength.MinLength == p.acceptedLength.MaxLength && len(p.prefix) == 0 && len(p.suffix) != 0 {
+								beforeSuffixLen := int(p.acceptedLength.MinLength) - len(p.suffix)
+								for {
+									pos := bytes.Index(buffer[beforeSuffixLen:], p.suffix)
+									if pos < 0 {
+										p.streamOffset[dir] = len(buffers[dir])
+										continue outer2
+									}
+									p.streamOffset[dir] += pos
+									buffer = buffer[pos:]
+									res = p.regex.FindSubmatchIndex(buffer[:p.acceptedLength.MinLength])
+									if res != nil {
+										break
+									}
+									p.streamOffset[dir]++
+									buffer = buffer[1:]
+								}
+							} else {
+								res = p.regex.FindSubmatchIndex(buffer)
+							}
+
 							if res == nil {
 								p.streamOffset[dir] = len(buffers[dir])
 								continue
