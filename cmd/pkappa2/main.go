@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -319,6 +320,210 @@ func main() {
 		}
 		response.Results = append(response.Results, res...)
 		response.MoreResults = hasMore
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+	})
+	rUser.Get("/api/graph.json", func(w http.ResponseWriter, r *http.Request) {
+		var min, max time.Time
+		delta := 1 * time.Minute
+		if s := r.URL.Query()["delta"]; len(s) == 1 {
+			d, err := time.ParseDuration(s[0])
+			if err != nil || d <= 0 {
+				http.Error(w, fmt.Sprintf("Invalid delta %q: %v", s[0], err), http.StatusBadRequest)
+				return
+			}
+			delta = d
+		}
+		if s := r.URL.Query()["min"]; len(s) == 1 {
+			t, err := time.Parse("1", s[0])
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Invalid min time %q: %v", s[0], err), http.StatusBadRequest)
+				return
+			}
+			min = t.Truncate(delta)
+		}
+		if s := r.URL.Query()["max"]; len(s) == 1 {
+			t, err := time.Parse("1", s[0])
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Invalid max time %q: %v", s[0], err), http.StatusBadRequest)
+				return
+			}
+			max = t.Truncate(delta)
+		}
+		type (
+			Aspect uint8
+		)
+		const (
+			AspectAnchor          Aspect = 0b0001
+			AspectAnchorFirst     Aspect = 0b0000
+			AspectAnchorLast      Aspect = 0b0001
+			AspectType            Aspect = 0b1110
+			AspectTypeConnections Aspect = 0b0000
+			AspectTypeDuration    Aspect = 0b0010
+			AspectTypeBytes       Aspect = 0b0100
+			AspectTypeClientBytes Aspect = 0b0110
+			AspectTypeServerBytes Aspect = 0b1000
+		)
+		aspects := []Aspect(nil)
+		for _, a := range r.URL.Query()["aspect"] {
+			if !func() bool {
+				as := strings.Split(a, "@")
+				if len(as) != 1 && len(as) != 2 {
+					return false
+				}
+				aspect := Aspect(0)
+				if v, ok := map[string]Aspect{
+					"connections": AspectTypeConnections,
+					"duration":    AspectTypeDuration,
+					"bytes":       AspectTypeBytes,
+					"cbytes":      AspectTypeClientBytes,
+					"sbytes":      AspectTypeServerBytes,
+				}[as[0]]; ok {
+					aspect |= v
+				} else {
+					return false
+				}
+				if len(as) == 2 {
+					if v, ok := map[string]Aspect{
+						"first": AspectAnchorFirst,
+						"last":  AspectAnchorLast,
+					}[as[1]]; ok {
+						aspect |= v
+					} else {
+						return false
+					}
+				}
+				aspects = append(aspects, aspect)
+				return true
+			}() {
+				http.Error(w, fmt.Sprintf("Invalid aspect %q: %v", a, err), http.StatusBadRequest)
+				return
+			}
+		}
+		if len(aspects) == 0 {
+			aspects = []Aspect{AspectAnchorFirst | AspectTypeConnections}
+		}
+		sort.Slice(aspects, func(i, j int) bool {
+			a, b := aspects[i], aspects[j]
+			if (a^b)&AspectAnchor != 0 {
+				return a&AspectAnchor < b&AspectAnchor
+			}
+			return a < b
+		})
+
+		indexes, _, releaser, err := mgr.GetIndexes(nil)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer releaser.Release(mgr)
+
+		referenceTime := time.Time{}
+		for _, idx := range indexes {
+			if referenceTime.IsZero() || referenceTime.After(idx.ReferenceTime) {
+				referenceTime = idx.ReferenceTime
+			}
+		}
+
+		counts := map[time.Duration][]uint64{}
+		for i := len(indexes); i > 0; i-- {
+			idx := indexes[i-1]
+			if err := idx.AllStreams(func(s *index.Stream) error {
+				for _, idx2 := range indexes[i:] {
+					if _, ok := idx2.StreamIDs()[s.ID()]; ok {
+						return nil
+					}
+				}
+				var t time.Time
+				skip := false
+				countsEntry := []uint64(nil)
+				countsKey := time.Duration(0)
+				for i, a := range aspects {
+					if i == 0 || (aspects[i-1]^a)&AspectAnchor != 0 {
+						if i != 0 {
+							counts[countsKey] = countsEntry
+						}
+						switch a & AspectAnchor {
+						case AspectAnchorFirst:
+							t = s.FirstPacket()
+						case AspectAnchorLast:
+							t = s.LastPacket()
+						}
+						t = t.Truncate(delta)
+						if skip = (!min.IsZero() && min.After(t)) || (!max.IsZero() && max.Before(t)); skip {
+							continue
+						}
+						ok := false
+						countsKey = t.Sub(referenceTime)
+						if countsEntry, ok = counts[countsKey]; !ok {
+							countsEntry = make([]uint64, len(aspects))
+						}
+					} else if skip {
+						continue
+					}
+
+					d := uint64(0)
+					switch a & AspectType {
+					case AspectTypeConnections:
+						d = 1
+					case AspectTypeBytes:
+						d = s.ClientBytes + s.ServerBytes
+					case AspectTypeClientBytes:
+						d = s.ClientBytes
+					case AspectTypeServerBytes:
+						d = s.ServerBytes
+					case AspectTypeDuration:
+						d = s.LastPacketTimeNS - s.FirstPacketTimeNS
+					}
+					countsEntry[i] += d
+				}
+				counts[countsKey] = countsEntry
+				return nil
+			}); err != nil {
+				http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+		response := struct {
+			Min, Max time.Time
+			Delta    time.Duration
+			Aspects  []string
+			Data     [][]uint64
+		}{}
+		if len(counts) != 0 {
+			response.Delta = delta
+			for _, a := range aspects {
+				response.Aspects = append(response.Aspects, fmt.Sprintf("%s@%s", map[Aspect]string{
+					AspectTypeConnections: "connections",
+					AspectTypeDuration:    "duration",
+					AspectTypeBytes:       "bytes",
+					AspectTypeClientBytes: "cbytes",
+					AspectTypeServerBytes: "sbytes",
+				}[(a&AspectType)], []string{
+					"first", "last",
+				}[(a&AspectAnchor)/AspectAnchor]))
+			}
+			for d := range counts {
+				t := referenceTime.Add(d)
+				if response.Min.IsZero() || response.Min.After(t) {
+					response.Min = t
+				}
+				if response.Max.IsZero() || response.Max.Before(t) {
+					response.Max = t
+				}
+			}
+			for d, v := range counts {
+				t := referenceTime.Add(d).Sub(response.Min) / delta
+				response.Data = append(response.Data, append([]uint64{uint64(t)}, v...))
+			}
+			sort.Slice(response.Data, func(i, j int) bool {
+				return response.Data[i][0] < response.Data[j][0]
+			})
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)

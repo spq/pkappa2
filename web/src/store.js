@@ -21,6 +21,8 @@ const store = new Vuex.Store({
         tags: null,
         tagAddStatus: null,
         tagDelStatus: null,
+
+        graphData: null,
     },
     mutations: {
         searchStarted(state, obj) {
@@ -60,6 +62,9 @@ const store = new Vuex.Store({
         },
         resetTagDelStatus(state, status) {
             state.tagDelStatus = status
+        },
+        resetGraphData(state, data) {
+            state.graphData = data;
         },
     },
     getters: {
@@ -152,6 +157,11 @@ const store = new Vuex.Store({
                 dispatch('updateTags');
             }).catch((data) => {
                 commit('resetTagDelStatus', { error: data, inProgress: false })
+            })
+        },
+        updateGraph({ commit }, { delta, aspects }) {
+            APIClient.getGraph(delta, aspects).then((data) => {
+                commit('resetGraphData', data);
             })
         },
     }

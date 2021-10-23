@@ -9,7 +9,8 @@
         <v-tab :key="1" @click="updateTags()">
           <v-icon>mdi-tag-multiple</v-icon> TAGS
         </v-tab>
-        <v-tab :key="2" v-if="searchResponse != null || searchRunning">
+        <v-tab :key="2"> <v-icon>mdi-chart-areaspline</v-icon> GRAPH </v-tab>
+        <v-tab :key="3" v-if="searchResponse != null || searchRunning">
           <template v-if="searchRunning"> SEARCHING </template>
           <template v-else-if="searchResponse.Error == null">
             {{ searchResponse.Results.length
@@ -21,21 +22,21 @@
           <template v-else> <v-icon>mdi-alert</v-icon> ERROR </template>
         </v-tab>
         <template v-if="streamLoading || streamData != null">
-          <v-tab :key="3">
+          <v-tab :key="4">
             STREAM {{ streamLoading ? "..." : streamData.Stream.ID }}
           </v-tab>
-          <template v-if="tabs == 3">
+          <template v-if="tabs == 4">
             <v-spacer />
             <v-tab
               @click="getStream(prevStreamIndex)"
               :disabled="prevStreamIndex == null"
-              :key="4"
+              :key="5"
               ><v-icon>mdi-chevron-left</v-icon></v-tab
             >
             <v-tab
               @click="getStream(nextStreamIndex)"
               :disabled="nextStreamIndex == null"
-              :key="5"
+              :key="6"
               ><v-icon>mdi-chevron-right</v-icon></v-tab
             >
           </template>
@@ -299,6 +300,28 @@
           </v-simple-table>
         </v-tab-item>
         <v-tab-item :key="2">
+          <v-card>
+            <v-select
+              :items="Object.keys(chartTypes)"
+              v-model="chartType"
+              dense
+            ></v-select>
+            <template v-if="chartType === null"></template>
+            <template v-else-if="chartData === null">
+              <v-progress-linear indeterminate></v-progress-linear>
+            </template>
+            <template v-else>
+              <apexchart
+                type="area"
+                :options="chartOptions"
+                :series="chartData"
+                height="400px"
+              ></apexchart>
+              <v-text-field disabled v-model="chartTimeFilter"></v-text-field>
+            </template>
+          </v-card>
+        </v-tab-item>
+        <v-tab-item :key="3">
           <template v-if="searchRunning">
             <v-progress-linear indeterminate></v-progress-linear>
           </template>
@@ -370,7 +393,7 @@
             </v-card>
           </template>
         </v-tab-item>
-        <v-tab-item :key="3">
+        <v-tab-item :key="4">
           <v-progress-linear
             indeterminate
             v-if="streamData == null && streamLoading"
@@ -511,6 +534,222 @@ export default {
       tabs: 0,
       dataTab: 0,
       newTagName: "",
+      chartOptions: null,
+      chartData: null,
+      chartType: null,
+      chartTimeFilter: "",
+      chartTypes: {
+        "Active Connections": {
+          aspects: ["connections@first", "connections@last"],
+          make(pos) {
+            return {
+              data: [],
+              cur: 0,
+              add(t, data) {
+                const f = data[pos[0]];
+                const l = data[pos[1]];
+                this.cur += f;
+                this.data.push([t, this.cur]);
+                this.cur -= l;
+              },
+              build(data) {
+                data.push({
+                  name: "Connections",
+                  data: this.data,
+                });
+              },
+            };
+          },
+        },
+        "Started Connections": {
+          aspects: ["connections@first"],
+          make(pos) {
+            return {
+              data: [],
+              add(t, data) {
+                this.data.push([t, data[pos[0]]]);
+              },
+              build(data) {
+                data.push({
+                  name: "Connections",
+                  data: this.data,
+                });
+              },
+            };
+          },
+        },
+        "Finished Connections": {
+          aspects: ["connections@last"],
+          make(pos) {
+            return {
+              data: [],
+              add(t, data) {
+                this.data.push([t, data[pos[0]]]);
+              },
+              build(data) {
+                data.push({
+                  name: "Connections",
+                  data: this.data,
+                });
+              },
+            };
+          },
+        },
+        "Total Traffic": {
+          aspects: ["cbytes@first", "sbytes@first"],
+          make(pos) {
+            return {
+              cbytes: [],
+              sbytes: [],
+              add(t, data) {
+                this.cbytes.push([t, -data[pos[0]]]);
+                this.sbytes.push([t, data[pos[1]]]);
+              },
+              build(data, options) {
+                data.push({
+                  name: "Server Bytes",
+                  data: this.sbytes,
+                });
+                data.push({
+                  name: "Client Bytes",
+                  data: this.cbytes,
+                });
+                options.yaxis = {
+                  labels: {
+                    formatter: (v) => {
+                      if (v < 0) v = -v;
+                      let f = 0;
+                      while (v >= 1024) {
+                        v /= 1024;
+                        f++;
+                      }
+                      return (
+                        v.toFixed(1) +
+                        " " +
+                        ["B", "KiB", "MiB", "GiB", "TiB", "PiB"][f]
+                      );
+                    },
+                  },
+                };
+              },
+            };
+          },
+        },
+        "Average Traffic": {
+          aspects: ["cbytes@first", "sbytes@first", "connections@first"],
+          make(pos) {
+            return {
+              cbytes: [],
+              sbytes: [],
+              add(t, data) {
+                let c = data[pos[2]];
+                if (c < 1) c = 1;
+                this.cbytes.push([t, -data[pos[0]] / c]);
+                this.sbytes.push([t, data[pos[1]] / c]);
+              },
+              build(data, options) {
+                data.push({
+                  name: "Server Bytes",
+                  data: this.sbytes,
+                });
+                data.push({
+                  name: "Client Bytes",
+                  data: this.cbytes,
+                });
+                options.yaxis = {
+                  labels: {
+                    formatter: (v) => {
+                      if (v < 0) v = -v;
+                      let f = 0;
+                      while (v >= 1024) {
+                        v /= 1024;
+                        f++;
+                      }
+                      return (
+                        v.toFixed(1) +
+                        " " +
+                        ["B", "KiB", "MiB", "GiB", "TiB", "PiB"][f]
+                      );
+                    },
+                  },
+                };
+              },
+            };
+          },
+        },
+        "Total Duration": {
+          aspects: ["duration@first"],
+          make(pos) {
+            return {
+              data: [],
+              add(t, data) {
+                this.data.push([t, data[pos[0]] / 1_000_000]);
+              },
+              build(data, options) {
+                data.push({
+                  name: "Duration",
+                  data: this.data,
+                });
+                options.yaxis = {
+                  labels: {
+                    formatter: (v) => {
+                      if (v < 1_000) return v + "ms";
+                      v /= 1_000;
+                      if (v < 60) return v.toFixed(3) + "s";
+                      v /= 60;
+                      if (v < 60)
+                        return (
+                          v.toFixed(0) + "m" + ((v % 1) * 60).toFixed(0) + "s"
+                        );
+                      v /= 60;
+                      return (
+                        v.toFixed(0) + "h" + ((v % 1) * 60).toFixed(0) + "m"
+                      );
+                    },
+                  },
+                };
+              },
+            };
+          },
+        },
+        "Average Duration": {
+          aspects: ["duration@first", "connections@first"],
+          make(pos) {
+            return {
+              data: [],
+              add(t, data) {
+                const d = data[pos[0]];
+                const c = data[pos[1]];
+                this.data.push([t, c != 0 ? d / c / 1_000_000 : 0]);
+              },
+              build(data, options) {
+                data.push({
+                  name: "Duration",
+                  data: this.data,
+                });
+                options.yaxis = {
+                  labels: {
+                    formatter: (v) => {
+                      if (v < 1_000) return v + "ms";
+                      v /= 1_000;
+                      if (v < 60) return v.toFixed(3) + "s";
+                      v /= 60;
+                      if (v < 60)
+                        return (
+                          v.toFixed(0) + "m" + ((v % 1) * 60).toFixed(0) + "s"
+                        );
+                      v /= 60;
+                      return (
+                        v.toFixed(0) + "h" + ((v % 1) * 60).toFixed(0) + "m"
+                      );
+                    },
+                  },
+                };
+              },
+            };
+          },
+        },
+      },
     };
   },
   computed: {
@@ -526,7 +765,13 @@ export default {
       "prevSearchPage",
       "nextSearchPage",
     ]),
-    ...mapState(["searchQuery", "tags", "tagAddStatus", "tagDelStatus"]),
+    ...mapState([
+      "searchQuery",
+      "tags",
+      "tagAddStatus",
+      "tagDelStatus",
+      "graphData",
+    ]),
   },
   created() {
     this.updateStatus();
@@ -542,15 +787,16 @@ export default {
       "updateTags",
       "addTag",
       "delTag",
+      "updateGraph",
     ]),
   },
   watch: {
     searchRunning() {
-      this.tabs = 2;
+      this.tabs = 3;
     },
     streamLoading() {
       this.$vuetify.goTo(0, {});
-      this.tabs = 3;
+      this.tabs = 4;
     },
     tagAddStatus(val) {
       if (val.inProgress) return;
@@ -560,6 +806,88 @@ export default {
       }
       this.tabs = 1;
       this.newTagName = "";
+    },
+    chartType(val) {
+      this.chartData = null;
+      this.updateGraph({
+        delta: "1m",
+        aspects: this.chartTypes[val].aspects,
+      });
+    },
+    graphData(val) {
+      const type = this.chartTypes[this.chartType];
+      const valueIndex = [];
+      for (const a of type.aspects) {
+        const i = val.Aspects.indexOf(a);
+        if (i < 0) return;
+        valueIndex.push(i);
+      }
+
+      const delta = val.Delta / 1_000_000;
+      const tMin = Date.parse(val.Min);
+      //const tMax = Date.parse(val.Max);
+
+      const obj = type.make(valueIndex);
+      for (const d of val.Data) {
+        const t = tMin + d.shift() * delta;
+        obj.add(t, d);
+      }
+      const that = this;
+      const updateChartFilter = function (min, max) {
+        if (min !== undefined && max !== undefined) {
+          const fmt = (t) => {
+            t = new Date(t);
+            return `${t.getFullYear()}-${(1 + t.getMonth())
+              .toString()
+              .padStart(2, "0")}-${t.getDate().toString().padStart(2, "0")} ${t
+              .getHours()
+              .toString()
+              .padStart(2, "0")}${t.getMinutes().toString().padStart(2, "0")}`;
+          };
+          that.chartTimeFilter = `time:"${fmt(min)}:${fmt(max + 60_000)}"`;
+        } else {
+          that.chartTimeFilter = "";
+        }
+      };
+      this.chartOptions = {
+        dataLabels: {
+          enabled: false,
+        },
+        xaxis: {
+          type: "datetime",
+          labels: {
+            datetimeUTC: false,
+            datetimeFormatter: {
+              day: "dd. HH:mm",
+              hour: "HH:mm",
+            },
+          },
+        },
+        legend: {
+          position: "top",
+          horizontalAlign: "left",
+        },
+        tooltip: {
+          x: {
+            format: "HH:mm",
+          },
+        },
+        chart: {
+          events: {
+            mounted() {
+              updateChartFilter();
+            },
+            zoomed(ctx, { xaxis }) {
+              updateChartFilter(xaxis.min, xaxis.max);
+            },
+            scrolled(ctx, { xaxis }) {
+              updateChartFilter(xaxis.min, xaxis.max);
+            },
+          },
+        },
+      };
+      this.chartData = [];
+      obj.build(this.chartData, this.chartOptions);
     },
   },
   filters: {

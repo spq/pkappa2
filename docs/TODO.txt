@@ -17,11 +17,8 @@ both:
 - add tag categories (tag, mark, service)
 - show matching tags, marks and identified service in result and stream view
 - support adding/removing marks to/from streams in result and stream view
-- add timeline with streams over time
-  - optionally per tag/mark/service
-  - with dynamic granularity
-  - anchor point: first packet time
-  - with optional filter
+- make graph optionally per tag/mark/service
+- add filter to graph
 - add a search history
 - add pcap listing
 - support showing alternatives for groups

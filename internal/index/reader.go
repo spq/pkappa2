@@ -34,7 +34,7 @@ type (
 		imports    []readerImportEntry
 		hostGroups []readerHostGroup
 
-		referenceTime time.Time
+		ReferenceTime time.Time
 		packetID,
 		firstPacketTimeNS,
 		lastPacketTimeNS struct {
@@ -178,7 +178,7 @@ func NewReader(filename string) (*Reader, error) {
 		}
 
 		// get times
-		r.referenceTime = time.Unix(int64(r.header.FirstPacketTime), 0)
+		r.ReferenceTime = time.Unix(int64(r.header.FirstPacketTime), 0)
 		if s, err := r.minStream(sectionStreamsByFirstPacketTime); err != nil {
 			return err
 		} else {
@@ -390,7 +390,7 @@ func (s *Stream) Packets() ([]Packet, error) {
 		flagsPacketDirectionClientToServer: DirectionClientToServer,
 		flagsPacketDirectionServerToClient: DirectionServerToClient,
 	}
-	refTime := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+	refTime := s.r.ReferenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
 	for i := uint64(s.PacketInfoStart); ; i++ {
 		p, err := s.r.packetByIndex(i)
 		if err != nil {
@@ -457,6 +457,13 @@ func (s *Stream) Data() ([]Data, error) {
 	}
 	return data, nil
 }
+func (s *Stream) FirstPacket() time.Time {
+	return s.r.ReferenceTime.Add(time.Duration(s.FirstPacketTimeNS) * time.Nanosecond).Local()
+}
+
+func (s *Stream) LastPacket() time.Time {
+	return s.r.ReferenceTime.Add(time.Duration(s.LastPacketTimeNS) * time.Nanosecond).Local()
+}
 
 func (s *Stream) MarshalJSON() ([]byte, error) {
 	type SideInfo struct {
@@ -478,8 +485,8 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 		Index                   string
 	}{
 		ID:          s.ID(),
-		FirstPacket: s.r.referenceTime.Add(time.Duration(s.FirstPacketTimeNS) * time.Nanosecond).Local(),
-		LastPacket:  s.r.referenceTime.Add(time.Duration(s.LastPacketTimeNS) * time.Nanosecond).Local(),
+		FirstPacket: s.FirstPacket(),
+		LastPacket:  s.LastPacket(),
 		Client: SideInfo{
 			Host:  s.r.hostGroups[s.HostGroup].get(s.ClientHost).String(),
 			Port:  s.ClientPort,
@@ -493,4 +500,21 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 		Protocol: protocols[s.Flags&flagsStreamProtocol],
 		Index:    s.r.filename,
 	})
+}
+
+func (r *Reader) AllStreams(handler func(*Stream) error) error {
+	for i := 0; i < r.StreamCount(); i++ {
+		s, err := r.streamByIndex(uint32(i))
+		if err != nil {
+			return err
+		}
+		ws, err := s.wrap(r, uint32(i))
+		if err != nil {
+			return err
+		}
+		if err := handler(ws); err != nil {
+			return err
+		}
+	}
+	return nil
 }

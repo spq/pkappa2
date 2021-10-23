@@ -546,7 +546,7 @@ conditions:
 			}
 			myFactors := factors[subQuery]
 			delete(factors, subQuery)
-			startD := cc.Duration + time.Duration(myFactors.ftime+myFactors.ltime)*r.referenceTime.Sub(refTime)
+			startD := cc.Duration + time.Duration(myFactors.ftime+myFactors.ltime)*r.ReferenceTime.Sub(refTime)
 			if len(factors) == 0 {
 				filter := func(_ *searchContext, s *stream) (bool, error) {
 					d := startD
@@ -586,7 +586,7 @@ conditions:
 				durations := map[time.Duration]int{}
 				results := []subQueryResult(nil)
 				for resId, res := range previousResults[sq].streams {
-					d := time.Duration(f.ftime+f.ltime) * res.r.referenceTime.Sub(refTime)
+					d := time.Duration(f.ftime+f.ltime) * res.r.ReferenceTime.Sub(refTime)
 					d += time.Duration(f.ftime) * time.Duration(res.FirstPacketTimeNS)
 					d += time.Duration(f.ltime) * time.Duration(res.LastPacketTimeNS)
 					if pos, ok := durations[d]; ok {
@@ -1480,16 +1480,16 @@ var (
 			if a.r == b.r {
 				return a.stream.FirstPacketTimeNS < b.stream.FirstPacketTimeNS
 			}
-			at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.FirstPacketTimeNS))
-			bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.FirstPacketTimeNS))
+			at := a.r.ReferenceTime.Add(time.Nanosecond * time.Duration(a.stream.FirstPacketTimeNS))
+			bt := b.r.ReferenceTime.Add(time.Nanosecond * time.Duration(b.stream.FirstPacketTimeNS))
 			return at.Before(bt)
 		},
 		query.SortingKeyLastPacketTime: func(a, b *Stream) bool {
 			if a.r == b.r {
 				return a.stream.LastPacketTimeNS < b.stream.LastPacketTimeNS
 			}
-			at := a.r.referenceTime.Add(time.Nanosecond * time.Duration(a.stream.LastPacketTimeNS))
-			bt := b.r.referenceTime.Add(time.Nanosecond * time.Duration(b.stream.LastPacketTimeNS))
+			at := a.r.ReferenceTime.Add(time.Nanosecond * time.Duration(a.stream.LastPacketTimeNS))
+			bt := b.r.ReferenceTime.Add(time.Nanosecond * time.Duration(b.stream.LastPacketTimeNS))
 			return at.Before(bt)
 		},
 		query.SortingKeyClientHost: func(a, b *Stream) bool {
@@ -1606,22 +1606,22 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 
 			"ftime": func(s *Stream) []byte {
 				b := [16]byte{}
-				t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+				t := s.r.ReferenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
 				binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
 				binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
 				return b[:]
 			},
 			"ltime": func(s *Stream) []byte {
 				b := [16]byte{}
-				t := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
+				t := s.r.ReferenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
 				binary.LittleEndian.PutUint64(b[:8], uint64(t.Unix()))
 				binary.LittleEndian.PutUint64(b[8:], uint64(t.UnixNano()))
 				return b[:]
 			},
 			"duration": func(s *Stream) []byte {
 				b := [8]byte{}
-				ft := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
-				lt := s.r.referenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
+				ft := s.r.ReferenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+				lt := s.r.ReferenceTime.Add(time.Nanosecond * time.Duration(s.LastPacketTimeNS))
 				binary.LittleEndian.PutUint64(b[:], uint64(lt.Sub(ft)))
 				return b[:]
 			},
