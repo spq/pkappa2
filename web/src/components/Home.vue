@@ -61,79 +61,10 @@
           <TabTags v-on:searchStreams="searchStreams" />
         </v-tab-item>
         <v-tab-item :key="2">
-          <TabGraph/>
+          <TabGraph />
         </v-tab-item>
         <v-tab-item :key="3">
-          <template v-if="searchRunning">
-            <v-progress-linear indeterminate></v-progress-linear>
-          </template>
-          <template v-else-if="searchResponse != null">
-            <v-alert
-              color="red"
-              type="error"
-              v-if="searchResponse.Error != null"
-              >{{ searchResponse.Error }}</v-alert
-            >
-            <v-simple-table class="streams-table" dense v-else>
-              <template v-slot:default>
-                <thead>
-                  <tr>
-                    <th class="text-left">ID</th>
-                    <th class="text-left">Time</th>
-                    <th class="text-left">Client</th>
-                    <th class="text-left">Bytes</th>
-                    <th class="text-left">Server</th>
-                    <th class="text-left">Bytes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="(stream, index) in searchResponse.Results"
-                    :key="stream.ID"
-                    @click="getStream(index)"
-                  >
-                    <td>{{ stream.ID }}</td>
-                    <td>{{ stream.FirstPacket }}</td>
-                    <td>{{ stream.Client.Host }}:{{ stream.Client.Port }}</td>
-                    <td>{{ stream.Client.Bytes }}</td>
-                    <td>{{ stream.Server.Host }}:{{ stream.Server.Port }}</td>
-                    <td>{{ stream.Server.Bytes }}</td>
-                  </tr>
-                </tbody>
-              </template>
-            </v-simple-table>
-            <v-card class="mr-auto d-flex" tile>
-              <div class="mr-auto">
-                <v-text-field
-                  v-model="newTagName"
-                  hint="Save query as tag"
-                  prepend-inner-icon="mdi-tag"
-                  dense
-                  @keyup.enter="
-                    addTag({ name: newTagName, query: searchQuery })
-                  "
-                  ><template #append>
-                    <v-btn
-                      type="submit"
-                      value="Save"
-                      icon
-                      :loading="tagAddStatus != null && tagAddStatus.inProgress"
-                      @click="addTag({ name: newTagName, query: searchQuery })"
-                    >
-                      <v-icon>mdi-content-save</v-icon>
-                    </v-btn>
-                  </template></v-text-field
-                >
-              </div>
-              <div>
-                <v-pagination
-                  :value="searchPage + 1"
-                  :length="searchPage + (nextSearchPage != null ? 2 : 1)"
-                  @input="switchSearchPage"
-                ></v-pagination>
-              </div>
-            </v-card>
-          </template>
+          <TabResults v-on:showTagTab="tabs = 1" />
         </v-tab-item>
         <v-tab-item :key="4">
           <TabStream />
@@ -147,47 +78,37 @@
 import SearchBar from "./SearchBar.vue";
 import HelpPage from "./HelpPage.vue";
 import TabTags from "./TabTags.vue";
-import TabStream from "./TabStream.vue";
 import TabGraph from "./TabGraph.vue";
+import TabResults from "./TabResults.vue";
+import TabStream from "./TabStream.vue";
+
 import { mapMutations, mapGetters, mapActions, mapState } from "vuex";
 
 export default {
   name: "Home",
-  components: { SearchBar, TabTags, HelpPage, TabStream, TabGraph },
+  components: { SearchBar, TabTags, HelpPage, TabGraph, TabResults, TabStream },
   data() {
     return {
       tabs: 0,
-      newTagName: "",
     };
-  },
-  computed: {
-    ...mapGetters([
-      "searchResponse",
-      "searchRunning",
-      "streamData",
-      "status",
-      "prevStreamIndex",
-      "nextStreamIndex",
-      "streamLoading",
-      "searchPage",
-      "nextSearchPage",
-    ]),
-    ...mapState(["searchQuery", "tagAddStatus"]),
   },
   created() {
     this.updateStatus();
     this.updateTags();
   },
-  methods: {
-    ...mapMutations([]),
-    ...mapActions([
-      "searchStreams",
-      "switchSearchPage",
-      "getStream",
-      "updateStatus",
-      "updateTags",
-      "addTag",
+  computed: {
+    ...mapGetters([
+      "streamData",
+      "streamLoading",
+      "searchRunning",
+      "status",
+      "prevStreamIndex",
+      "nextStreamIndex",
+      "searchResponse",
     ]),
+  },
+  methods: {
+    ...mapActions(["updateStatus", "updateTags", "searchStreams", "getStream"]),
   },
   watch: {
     searchRunning() {
@@ -196,15 +117,6 @@ export default {
     streamLoading() {
       this.$vuetify.goTo(0, {});
       this.tabs = 4;
-    },
-    tagAddStatus(val) {
-      if (val.inProgress) return;
-      if (val.error != null) {
-        alert(val.error.response.data);
-        return;
-      }
-      this.tabs = 1;
-      this.newTagName = "";
     },
   },
 };
