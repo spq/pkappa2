@@ -22,6 +22,7 @@ import (
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/manager"
 	"github.com/spq/pkappa2/internal/query"
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 	"github.com/spq/pkappa2/web"
 )
 
@@ -414,7 +415,7 @@ func main() {
 			return a < b
 		})
 
-		indexes, _, releaser, err := mgr.GetIndexes(nil)
+		indexes, tags, releaser, err := mgr.GetIndexes(r.URL.Query()["tag"])
 		if err != nil {
 			http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
 			return
@@ -428,7 +429,27 @@ func main() {
 			}
 		}
 
-		counts := map[time.Duration][]uint64{}
+		type (
+			tagInfo struct {
+				name string
+				mask bitmask.LongBitmask
+				used map[int]int
+			}
+		)
+		tagInfos := []tagInfo(nil)
+		for tn, tm := range tags {
+			tagInfos = append(tagInfos, tagInfo{
+				name: tn,
+				mask: tm,
+				used: make(map[int]int),
+			})
+		}
+		type tagGroup struct {
+			extends    int
+			extendedBy string
+			counts     map[time.Duration][]uint64
+		}
+		tagGroups := []tagGroup{{}}
 		for i := len(indexes); i > 0; i-- {
 			idx := indexes[i-1]
 			if err := idx.AllStreams(func(s *index.Stream) error {
@@ -437,6 +458,26 @@ func main() {
 						return nil
 					}
 				}
+				tagGroupId := 0
+				for _, ti := range tagInfos {
+					if !ti.mask.IsSet(uint(s.ID())) {
+						continue
+					}
+					newTagGroupId, ok := ti.used[tagGroupId]
+					if !ok {
+						newTagGroupId = len(tagGroups)
+						tagGroups = append(tagGroups, tagGroup{
+							extends:    tagGroupId,
+							extendedBy: ti.name,
+						})
+						ti.used[tagGroupId] = newTagGroupId
+					}
+					tagGroupId = newTagGroupId
+				}
+				tagGroup := &tagGroups[tagGroupId]
+				if tagGroup.counts == nil {
+					tagGroup.counts = make(map[time.Duration][]uint64)
+				}
 				var t time.Time
 				skip := false
 				countsEntry := []uint64(nil)
@@ -444,7 +485,7 @@ func main() {
 				for i, a := range aspects {
 					if i == 0 || (aspects[i-1]^a)&AspectAnchor != 0 {
 						if i != 0 {
-							counts[countsKey] = countsEntry
+							tagGroup.counts[countsKey] = countsEntry
 						}
 						switch a & AspectAnchor {
 						case AspectAnchorFirst:
@@ -458,7 +499,7 @@ func main() {
 						}
 						ok := false
 						countsKey = t.Sub(referenceTime)
-						if countsEntry, ok = counts[countsKey]; !ok {
+						if countsEntry, ok = tagGroup.counts[countsKey]; !ok {
 							countsEntry = make([]uint64, len(aspects))
 						}
 					} else if skip {
@@ -480,7 +521,7 @@ func main() {
 					}
 					countsEntry[i] += d
 				}
-				counts[countsKey] = countsEntry
+				tagGroup.counts[countsKey] = countsEntry
 				return nil
 			}); err != nil {
 				http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
@@ -491,22 +532,25 @@ func main() {
 			Min, Max time.Time
 			Delta    time.Duration
 			Aspects  []string
-			Data     [][]uint64
-		}{}
-		if len(counts) != 0 {
-			response.Delta = delta
-			for _, a := range aspects {
-				response.Aspects = append(response.Aspects, fmt.Sprintf("%s@%s", map[Aspect]string{
-					AspectTypeConnections: "connections",
-					AspectTypeDuration:    "duration",
-					AspectTypeBytes:       "bytes",
-					AspectTypeClientBytes: "cbytes",
-					AspectTypeServerBytes: "sbytes",
-				}[(a&AspectType)], []string{
-					"first", "last",
-				}[(a&AspectAnchor)/AspectAnchor]))
+			Data     []struct {
+				Tags []string
+				Data [][]uint64
 			}
-			for d := range counts {
+		}{}
+		response.Delta = delta
+		for _, a := range aspects {
+			response.Aspects = append(response.Aspects, fmt.Sprintf("%s@%s", map[Aspect]string{
+				AspectTypeConnections: "connections",
+				AspectTypeDuration:    "duration",
+				AspectTypeBytes:       "bytes",
+				AspectTypeClientBytes: "cbytes",
+				AspectTypeServerBytes: "sbytes",
+			}[(a&AspectType)], []string{
+				"first", "last",
+			}[(a&AspectAnchor)/AspectAnchor]))
+		}
+		for _, tg := range tagGroups {
+			for d := range tg.counts {
 				t := referenceTime.Add(d)
 				if response.Min.IsZero() || response.Min.After(t) {
 					response.Min = t
@@ -515,12 +559,30 @@ func main() {
 					response.Max = t
 				}
 			}
-			for d, v := range counts {
+		}
+		for tagGroupId := range tagGroups {
+			tg := &tagGroups[tagGroupId]
+			data := [][]uint64(nil)
+			for d, v := range tg.counts {
 				t := referenceTime.Add(d).Sub(response.Min) / delta
-				response.Data = append(response.Data, append([]uint64{uint64(t)}, v...))
+				data = append(data, append([]uint64{uint64(t)}, v...))
 			}
-			sort.Slice(response.Data, func(i, j int) bool {
-				return response.Data[i][0] < response.Data[j][0]
+			sort.Slice(data, func(i, j int) bool {
+				return data[i][0] < data[j][0]
+			})
+			tagsList := []string{}
+			for tagGroupId != 0 {
+				tagGroupId = tg.extends
+				tagsList = append(tagsList, tg.extendedBy)
+				tg = &tagGroups[tagGroupId]
+			}
+
+			response.Data = append(response.Data, struct {
+				Tags []string
+				Data [][]uint64
+			}{
+				Tags: tagsList,
+				Data: data,
 			})
 		}
 

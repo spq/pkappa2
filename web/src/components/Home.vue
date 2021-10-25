@@ -306,6 +306,54 @@
               v-model="chartType"
               dense
             ></v-select>
+            <v-select
+              :items="chartTagOptions"
+              v-model="chartTagSelection"
+              multiple
+              dense
+            >
+              <template v-slot:item="{ item, attrs, on }">
+                <v-list-item v-if="item.value.startsWith('header/')" dense>
+                  <v-list-item-content>
+                    <v-subheader
+                      >{{ item.text }}
+                      <v-btn
+                        x-small
+                        link
+                        text
+                        @click="
+                          setChartTagOptions(item.value.substring(7), true)
+                        "
+                        >All</v-btn
+                      >
+                      <v-btn
+                        x-small
+                        link
+                        text
+                        @click="
+                          setChartTagOptions(item.value.substring(7), false)
+                        "
+                        >None</v-btn
+                      ></v-subheader
+                    >
+                  </v-list-item-content>
+                </v-list-item>
+                <v-list-item
+                  v-else
+                  v-on="on"
+                  v-bind="attrs"
+                  #default="{ active }"
+                >
+                  <v-list-item-action>
+                    <v-simple-checkbox
+                      :ripple="false"
+                      :value="active"
+                    ></v-simple-checkbox>
+                  </v-list-item-action>
+                  <v-list-item-content>{{ item.text }}</v-list-item-content>
+                </v-list-item>
+              </template>
+            </v-select>
             <template v-if="chartType === null"></template>
             <template v-else-if="chartData === null">
               <v-progress-linear indeterminate></v-progress-linear>
@@ -538,25 +586,44 @@ export default {
       chartData: null,
       chartType: null,
       chartTimeFilter: "",
+      chartTagOptions: null,
+      chartTagSelection: [],
       chartTypes: {
         "Active Connections": {
           aspects: ["connections@first", "connections@last"],
           make(pos) {
             return {
-              data: [],
-              cur: 0,
-              add(t, data) {
-                const f = data[pos[0]];
-                const l = data[pos[1]];
-                this.cur += f;
-                this.data.push([t, this.cur]);
-                this.cur -= l;
+              groups: [],
+              addGroup(tags) {
+                const g = {
+                  tags: tags,
+                  data: [],
+                  cur: 0,
+                  add(t, data) {
+                    if (data === null) {
+                      this.data.push([t, this.cur]);
+                      return;
+                    }
+                    const f = data[pos[0]];
+                    const l = data[pos[1]];
+                    this.cur += f;
+                    this.data.push([t, this.cur]);
+                    this.cur -= l;
+                  },
+                };
+                this.groups.push(g);
+                return g;
               },
               build(data) {
-                data.push({
-                  name: "Connections",
-                  data: this.data,
-                });
+                for (const g of this.groups) {
+                  const hideTags =
+                    this.groups.length == 1 &&
+                    (g.tags === null || g.tags.length == 0);
+                  data.push({
+                    name: hideTags ? "Connections" : `Connections (${g.tags})`,
+                    data: g.data,
+                  });
+                }
               },
             };
           },
@@ -565,15 +632,28 @@ export default {
           aspects: ["connections@first"],
           make(pos) {
             return {
-              data: [],
-              add(t, data) {
-                this.data.push([t, data[pos[0]]]);
+              groups: [],
+              addGroup(tags) {
+                const g = {
+                  tags: tags,
+                  data: [],
+                  add(t, data) {
+                    this.data.push([t, data === null ? 0 : data[pos[0]]]);
+                  },
+                };
+                this.groups.push(g);
+                return g;
               },
               build(data) {
-                data.push({
-                  name: "Connections",
-                  data: this.data,
-                });
+                for (const g of this.groups) {
+                  const hideTags =
+                    this.groups.length == 1 &&
+                    (g.tags === null || g.tags.length == 0);
+                  data.push({
+                    name: hideTags ? "Connections" : `Connections (${g.tags})`,
+                    data: g.data,
+                  });
+                }
               },
             };
           },
@@ -582,15 +662,28 @@ export default {
           aspects: ["connections@last"],
           make(pos) {
             return {
-              data: [],
-              add(t, data) {
-                this.data.push([t, data[pos[0]]]);
+              groups: [],
+              addGroup(tags) {
+                const g = {
+                  tags: tags,
+                  data: [],
+                  add(t, data) {
+                    this.data.push([t, data === null ? 0 : data[pos[0]]]);
+                  },
+                };
+                this.groups.push(g);
+                return g;
               },
               build(data) {
-                data.push({
-                  name: "Connections",
-                  data: this.data,
-                });
+                for (const g of this.groups) {
+                  const hideTags =
+                    this.groups.length == 1 &&
+                    (g.tags === null || g.tags.length == 0);
+                  data.push({
+                    name: hideTags ? "Connections" : `Connections (${g.tags})`,
+                    data: g.data,
+                  });
+                }
               },
             };
           },
@@ -599,21 +692,44 @@ export default {
           aspects: ["cbytes@first", "sbytes@first"],
           make(pos) {
             return {
-              cbytes: [],
-              sbytes: [],
-              add(t, data) {
-                this.cbytes.push([t, -data[pos[0]]]);
-                this.sbytes.push([t, data[pos[1]]]);
+              groups: [],
+              addGroup(tags) {
+                const g = {
+                  tags: tags,
+                  cbytes: [],
+                  sbytes: [],
+                  add(t, data) {
+                    if (data === null) {
+                      this.cbytes.push([t, 0]);
+                      this.sbytes.push([t, 0]);
+                      return;
+                    }
+                    this.cbytes.push([t, -data[pos[0]]]);
+                    this.sbytes.push([t, data[pos[1]]]);
+                  },
+                };
+                this.groups.push(g);
+                return g;
               },
               build(data, options) {
-                data.push({
-                  name: "Server Bytes",
-                  data: this.sbytes,
-                });
-                data.push({
-                  name: "Client Bytes",
-                  data: this.cbytes,
-                });
+                for (const g of this.groups) {
+                  const hideTags =
+                    this.groups.length == 1 &&
+                    (g.tags === null || g.tags.length == 0);
+                  data.push({
+                    name: hideTags
+                      ? "Server Bytes"
+                      : `Server Bytes (${g.tags})`,
+                    data: g.sbytes,
+                  });
+                  data.push({
+                    name: hideTags
+                      ? "Client Bytes"
+                      : `Client Bytes (${g.tags})`,
+                    data: g.cbytes,
+                  });
+                }
+                options.chart.stacked = false;
                 options.yaxis = {
                   labels: {
                     formatter: (v) => {
@@ -638,24 +754,49 @@ export default {
         "Average Traffic": {
           aspects: ["cbytes@first", "sbytes@first", "connections@first"],
           make(pos) {
+            const p0 = pos[0];
+            const p1 = pos[1];
             return {
-              cbytes: [],
-              sbytes: [],
-              add(t, data) {
-                let c = data[pos[2]];
-                if (c < 1) c = 1;
-                this.cbytes.push([t, -data[pos[0]] / c]);
-                this.sbytes.push([t, data[pos[1]] / c]);
+              groups: [],
+              addGroup(tags) {
+                const g = {
+                  tags: tags,
+                  cbytes: [],
+                  sbytes: [],
+                  add(t, data) {
+                    if (data === null) {
+                      this.cbytes.push([t, 0]);
+                      this.sbytes.push([t, 0]);
+                      return;
+                    }
+                    let c = data[pos[2]];
+                    if (c < 1) c = 1;
+                    this.cbytes.push([t, data === null ? 0 : -data[p0] / c]);
+                    this.sbytes.push([t, data === null ? 0 : data[p1] / c]);
+                  },
+                };
+                this.groups.push(g);
+                return g;
               },
               build(data, options) {
-                data.push({
-                  name: "Server Bytes",
-                  data: this.sbytes,
-                });
-                data.push({
-                  name: "Client Bytes",
-                  data: this.cbytes,
-                });
+                for (const g of this.groups) {
+                  const hideTags =
+                    this.groups.length == 1 &&
+                    (g.tags === null || g.tags.length == 0);
+                  data.push({
+                    name: hideTags
+                      ? "Server Bytes"
+                      : `Server Bytes (${g.tags})`,
+                    data: g.sbytes,
+                  });
+                  data.push({
+                    name: hideTags
+                      ? "Client Bytes"
+                      : `Client Bytes (${g.tags})`,
+                    data: g.cbytes,
+                  });
+                }
+                options.chart.stacked = false;
                 options.yaxis = {
                   labels: {
                     formatter: (v) => {
@@ -681,15 +822,31 @@ export default {
           aspects: ["duration@first"],
           make(pos) {
             return {
-              data: [],
-              add(t, data) {
-                this.data.push([t, data[pos[0]] / 1_000_000]);
+              groups: [],
+              addGroup(tags) {
+                const g = {
+                  tags: tags,
+                  data: [],
+                  add(t, data) {
+                    this.data.push([
+                      t,
+                      data === null ? 0 : data[pos[0]] / 1_000_000,
+                    ]);
+                  },
+                };
+                this.groups.push(g);
+                return g;
               },
               build(data, options) {
-                data.push({
-                  name: "Duration",
-                  data: this.data,
-                });
+                for (const g of this.groups) {
+                  const hideTags =
+                    this.groups.length == 1 &&
+                    (g.tags === null || g.tags.length == 0);
+                  data.push({
+                    name: hideTags ? "Duration" : `Duration (${g.tags})`,
+                    data: g.data,
+                  });
+                }
                 options.yaxis = {
                   labels: {
                     formatter: (v) => {
@@ -716,17 +873,30 @@ export default {
           aspects: ["duration@first", "connections@first"],
           make(pos) {
             return {
-              data: [],
-              add(t, data) {
-                const d = data[pos[0]];
-                const c = data[pos[1]];
-                this.data.push([t, c != 0 ? d / c / 1_000_000 : 0]);
+              groups: [],
+              addGroup(tags) {
+                const g = {
+                  tags: tags,
+                  data: [],
+                  add(t, data) {
+                    const d = data === null ? 0 : data[pos[0]];
+                    const c = data === null ? 0 : data[pos[1]];
+                    this.data.push([t, c != 0 ? d / c / 1_000_000 : 0]);
+                  },
+                };
+                this.groups.push(g);
+                return g;
               },
               build(data, options) {
-                data.push({
-                  name: "Duration",
-                  data: this.data,
-                });
+                for (const g of this.groups) {
+                  const hideTags =
+                    this.groups.length == 1 &&
+                    (g.tags === null || g.tags.length == 0);
+                  data.push({
+                    name: hideTags ? "Duration" : `Duration (${g.tags})`,
+                    data: g.data,
+                  });
+                }
                 options.yaxis = {
                   labels: {
                     formatter: (v) => {
@@ -789,6 +959,24 @@ export default {
       "delTag",
       "updateGraph",
     ]),
+    setChartTagOptions(typ, active) {
+      this.$nextTick(() => {
+        const sel = this.chartTagSelection;
+        for (var i = 0; i < sel.length; i++) {
+          if (sel[i].startsWith(`entry/${typ}/`)) {
+            sel.splice(i--, 1);
+          }
+        }
+        if (active) {
+          for (const t of this.chartTagOptions) {
+            if (t.value.startsWith(`entry/${typ}/`)) {
+              sel.push(t.value);
+            }
+          }
+        }
+        this.chartTagSelection = sel;
+      });
+    },
   },
   watch: {
     searchRunning() {
@@ -807,11 +995,51 @@ export default {
       this.tabs = 1;
       this.newTagName = "";
     },
+    tags(val) {
+      const options = [];
+      for (const typ of ["tag", "service", "mark"]) {
+        let first = true;
+        for (const t of val) {
+          if (t.Name.startsWith(typ.toLowerCase() + "/")) {
+            if (first) {
+              first = false;
+              options.push({
+                text: typ.charAt(0).toUpperCase() + typ.substring(1) + "s",
+                value: `header/${typ}`,
+              });
+            }
+            options.push({
+              text: t.Name,
+              value: `entry/${t.Name}`,
+            });
+          }
+        }
+      }
+      this.chartTagOptions = options;
+    },
+    chartTagSelection(val) {
+      if (this.chartType === null) return;
+      const tags = [];
+      for (const t of val) {
+        tags.push(t.substr(6));
+      }
+      this.chartData = null;
+      this.updateGraph({
+        delta: "1m",
+        aspects: this.chartTypes[this.chartType].aspects,
+        tags: tags,
+      });
+    },
     chartType(val) {
+      const tags = [];
+      for (const t of this.chartTagSelection) {
+        tags.push(t.substr(6));
+      }
       this.chartData = null;
       this.updateGraph({
         delta: "1m",
         aspects: this.chartTypes[val].aspects,
+        tags: tags,
       });
     },
     graphData(val) {
@@ -820,7 +1048,7 @@ export default {
       for (const a of type.aspects) {
         const i = val.Aspects.indexOf(a);
         if (i < 0) return;
-        valueIndex.push(i);
+        valueIndex.push(i + 1);
       }
 
       const delta = val.Delta / 1_000_000;
@@ -828,9 +1056,35 @@ export default {
       //const tMax = Date.parse(val.Max);
 
       const obj = type.make(valueIndex);
-      for (const d of val.Data) {
-        const t = tMin + d.shift() * delta;
-        obj.add(t, d);
+      const groups = [];
+      const pos = [];
+      for (const tg of val.Data) {
+        groups.push(obj.addGroup(tg.Tags));
+        pos.push(0);
+      }
+      for (;;) {
+        let min = null;
+        for (let i = 0; i < pos.length; i++) {
+          const p = pos[i];
+          const g = val.Data[i].Data;
+          if (p >= g.length) continue;
+          const v = g[p][0];
+          if (min === null || min > v) min = v;
+        }
+        if (min === null) break;
+        const t = tMin + min * delta;
+        for (let i = 0; i < pos.length; i++) {
+          const p = pos[i];
+          const g = val.Data[i].Data;
+          let v = null;
+          if (p < g.length) v = g[p];
+          if (v != null && v[0] === min) {
+            groups[i].add(t, v);
+            pos[i]++;
+          } else {
+            groups[i].add(t, null);
+          }
+        }
       }
       const that = this;
       const updateChartFilter = function (min, max) {
@@ -873,6 +1127,7 @@ export default {
           },
         },
         chart: {
+          stacked: true,
           events: {
             mounted() {
               updateChartFilter();

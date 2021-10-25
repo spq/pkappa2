@@ -25,11 +25,14 @@ const APIClient = {
     delTag(name) {
         return this.perform('delete', `/tags`, null, { name });
     },
-    getGraph(delta, aspects) {
+    getGraph(delta, aspects, tags) {
         const params = new URLSearchParams();
         params.append("delta", delta);
         for (const a of aspects) {
             params.append("aspect", a);
+        }
+        for (const t of tags) {
+            params.append("tag", t);
         }
         return this.perform('get', '/graph.json', null, params);
     },

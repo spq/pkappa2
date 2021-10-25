@@ -159,8 +159,8 @@ const store = new Vuex.Store({
                 commit('resetTagDelStatus', { error: data, inProgress: false })
             })
         },
-        updateGraph({ commit }, { delta, aspects }) {
-            APIClient.getGraph(delta, aspects).then((data) => {
+        updateGraph({ commit }, { delta, aspects, tags }) {
+            APIClient.getGraph(delta, aspects, tags).then((data) => {
                 commit('resetGraphData', data);
             })
         },
