@@ -35,10 +35,10 @@
         </v-list-item>
         <v-list-item v-else v-on="on" v-bind="attrs" #default="{ active }">
           <v-list-item-action>
-            <v-simple-checkbox
+            <v-checkbox
               :ripple="false"
-              :value="active"
-            ></v-simple-checkbox>
+              :input-value="active"
+            ></v-checkbox>
           </v-list-item-action>
           <v-list-item-content>{{ item.text }}</v-list-item-content>
         </v-list-item>
