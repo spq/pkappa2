@@ -124,7 +124,11 @@ func (qcs ConditionsSet) String() string {
 }
 
 func (c *TagCondition) String() string {
-	return fmt.Sprintf("%s%s%stag:%s", map[bool]string{false: "", true: "-"}[c.Invert], c.SubQuery, map[bool]string{false: ":", true: ""}[c.SubQuery == ""], c.TagName)
+	tagNameSplitted := strings.SplitN(c.TagName, "/", 2)
+	if len(tagNameSplitted) != 2 {
+		tagNameSplitted = []string{"invalid_tag", c.TagName}
+	}
+	return fmt.Sprintf("%s%s%s%s:%s", map[bool]string{false: "", true: "-"}[c.Invert], c.SubQuery, map[bool]string{false: ":", true: ""}[c.SubQuery == ""], tagNameSplitted[0], tagNameSplitted[1])
 }
 
 func (c *FlagCondition) String() string {
@@ -506,12 +510,12 @@ func (c *ImpossibleCondition) invert() ConditionsSet {
 func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 	conds := ConditionsSet(nil)
 	switch t.Key {
-	case "tag":
+	case "tag", "service", "mark":
 		for _, v := range strings.Split(t.Value, ",") {
 			conds = append(conds, Conditions{
 				&TagCondition{
 					SubQuery: t.SubQuery,
-					TagName:  strings.TrimSpace(v),
+					TagName:  fmt.Sprintf("%s/%s", t.Key, strings.TrimSpace(v)),
 				},
 			})
 		}

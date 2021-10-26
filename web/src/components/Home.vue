@@ -82,7 +82,7 @@ import TabGraph from "./TabGraph.vue";
 import TabResults from "./TabResults.vue";
 import TabStream from "./TabStream.vue";
 
-import { mapMutations, mapGetters, mapActions, mapState } from "vuex";
+import { mapGetters, mapActions } from "vuex";
 
 export default {
   name: "Home",

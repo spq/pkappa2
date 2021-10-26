@@ -39,19 +39,31 @@
         <div class="mr-auto">
           <v-text-field
             v-model="newTagName"
-            hint="Save query as tag"
-            prepend-inner-icon="mdi-tag"
+            hint="Save query as tag(default) or service"
             dense
-            @keyup.enter="addTag({ name: newTagName, query: searchQuery })"
+            @keyup.enter="addTag({ name: 'tag/' + newTagName, query: searchQuery })"
             ><template #append>
               <v-btn
                 type="submit"
                 value="Save"
                 icon
                 :loading="tagAddStatus != null && tagAddStatus.inProgress"
-                @click="addTag({ name: newTagName, query: searchQuery })"
+                @click="
+                  addTag({ name: 'tag/' + newTagName, query: searchQuery })
+                "
               >
-                <v-icon>mdi-content-save</v-icon>
+                <v-icon>mdi-tag</v-icon>
+              </v-btn>
+              <v-btn
+                type="button"
+                value="Save as Service"
+                icon
+                :loading="tagAddStatus != null && tagAddStatus.inProgress"
+                @click="
+                  addTag({ name: 'service/' + newTagName, query: searchQuery })
+                "
+              >
+                <v-icon>mdi-anchor</v-icon>
               </v-btn>
             </template></v-text-field
           >
@@ -87,11 +99,7 @@ export default {
     ...mapState(["searchQuery", "tagAddStatus"]),
   },
   methods: {
-    ...mapActions([
-      "switchSearchPage",
-      "getStream",
-      "addTag",
-    ]),
+    ...mapActions(["switchSearchPage", "getStream", "addTag"]),
   },
   watch: {
     tagAddStatus(val) {

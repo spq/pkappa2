@@ -85,7 +85,7 @@ var (
 				Pattern: `(?i)@([a-z0-9]+):`,
 			}, {
 				Name:    "Key",
-				Pattern: `(?i)(id|tag|protocol|[fl]?time|[cs]?(data|port|host|bytes))`,
+				Pattern: `(?i)(id|tag|service|mark|protocol|[fl]?time|[cs]?(data|port|host|bytes))`,
 			}, {
 				Name:    "SortKey",
 				Pattern: `(?i)sort`,

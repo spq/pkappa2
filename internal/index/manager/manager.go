@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/spq/pkappa2/internal/index"
@@ -568,6 +569,9 @@ func (mgr *Manager) ListTags() []TagInfo {
 }
 
 func (mgr *Manager) AddTag(name, queryString string) error {
+	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/")) {
+		return errors.New("invalid tag name (need a tag/ or service/ prefix)")
+	}
 	q, err := query.Parse(queryString)
 	if err != nil {
 		return err

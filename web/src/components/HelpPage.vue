@@ -51,11 +51,11 @@
           </td>
         </tr>
         <tr>
-          <th>Tag&nbsp;filter</th>
-          <td><code>tag:tagname,othertag</code></td>
+          <th>Tag/Service/Mark&nbsp;filter</th>
+          <td><code>tag:tagname,othertag</code> or <code>service:svc</code><code>mark:marked</code></td>
           <td width="100%">
             Restricts the results to streams that were identified as matching to
-            the query of one of the named tags separated by
+            the query of one of the named tags, services or marks. Multiple names are separated by
             <code>,</code>.
           </td>
         </tr>
