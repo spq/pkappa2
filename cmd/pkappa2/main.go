@@ -158,6 +158,46 @@ func main() {
 			return
 		}
 	})
+	rUser.Patch("/api/tags", func(w http.ResponseWriter, r *http.Request) {
+		n := r.URL.Query()["name"]
+		if len(n) != 1 || n[0] == "" {
+			http.Error(w, "`name` parameter missing or empty", http.StatusBadRequest)
+			return
+		}
+		m := r.URL.Query()["method"]
+		if len(m) != 1 || m[0] == "" {
+			http.Error(w, "`method` parameter missing or empty", http.StatusBadRequest)
+			return
+		}
+		var method func([]uint64) manager.UpdateTagOperation
+		switch m[0] {
+		case "mark_add":
+			method = manager.UpdateTagOperationMarkAddStream
+		case "mark_del":
+			method = manager.UpdateTagOperationMarkDelStream
+		default:
+			http.Error(w, fmt.Sprintf("unknown `method`: %q", m[0]), http.StatusBadRequest)
+			return
+		}
+		s := r.URL.Query()["stream"]
+		if len(s) == 0 {
+			http.Error(w, "`stream` parameter missing", http.StatusBadRequest)
+			return
+		}
+		streams := make([]uint64, 0, len(s))
+		for _, n := range s {
+			v, err := strconv.ParseUint(n, 10, 64)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("invalid value for `stream` parameter: %q", n), http.StatusBadRequest)
+				return
+			}
+			streams = append(streams, v)
+		}
+		if err := mgr.UpdateTag(n[0], method(streams)); err != nil {
+			http.Error(w, fmt.Sprintf("update failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	})
 	rUser.Get(`/api/download/{stream:\d+}.pcap`, func(w http.ResponseWriter, r *http.Request) {
 		streamIDStr := chi.URLParam(r, "stream")
 		streamID, err := strconv.ParseUint(streamIDStr, 10, 64)
@@ -165,7 +205,7 @@ func main() {
 			http.Error(w, fmt.Sprintf("invalid stream id %q failed: %v", streamIDStr, err), http.StatusBadRequest)
 			return
 		}
-		stream, streamReleaser, err := mgr.Stream(streamID)
+		stream, _, streamReleaser, err := mgr.Stream(streamID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Stream(%d) failed: %v", streamID, err), http.StatusInternalServerError)
 			return
@@ -241,7 +281,7 @@ func main() {
 			http.Error(w, fmt.Sprintf("invalid stream id %q failed: %v", streamIDStr, err), http.StatusBadRequest)
 			return
 		}
-		stream, streamReleaser, err := mgr.Stream(streamID)
+		stream, tags, streamReleaser, err := mgr.Stream(streamID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Stream(%d) failed: %v", streamID, err), http.StatusInternalServerError)
 			return
@@ -259,9 +299,11 @@ func main() {
 		response := struct {
 			Stream *index.Stream
 			Data   []index.Data
+			Tags   []string
 		}{
 			Stream: stream,
 			Data:   data,
+			Tags:   tags,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

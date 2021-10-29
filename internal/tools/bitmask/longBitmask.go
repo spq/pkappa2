@@ -52,6 +52,24 @@ func (bm LongBitmask) LeadingZeros() int {
 	return -1
 }
 
+func (bm LongBitmask) TrailingZerosAfter(bit uint) int {
+	startIdx, lbit := bit/64, bit%64
+	if startIdx >= uint(len(bm.mask)) {
+		return -1
+	}
+	for idx, m := range bm.mask[startIdx:] {
+		if idx == 0 {
+			m >>= lbit
+			m <<= lbit
+		}
+		if m == 0 {
+			continue
+		}
+		return (idx+int(startIdx))*64 + bits.TrailingZeros64(m) - int(lbit)
+	}
+	return -1
+}
+
 func (bm *LongBitmask) Set(bit uint) {
 	idx, lbit := bit/64, bit%64
 	if idx >= uint(len(bm.mask)) {

@@ -143,10 +143,23 @@ nextStateFile:
 				log.Printf("Invalid tag %q in statefile %q: duplicate name", t.Name, fn)
 				continue nextStateFile
 			}
-			newTags[t.Name] = &tag{
+			nt := &tag{
 				definition:     t.Definition,
 				referencedTags: q.Conditions.ReferencedTags(),
 			}
+			if strings.HasPrefix(t.Name, "mark/") {
+				ids := q.Conditions.StreamIDs()
+				if ids == nil {
+					log.Printf("Invalid tag %q in statefile %q: mark tag is malformed", t.Name, fn)
+					continue nextStateFile
+				}
+				nt.matchingCount = uint(len(ids))
+				nt.version = mgr.currentVersion
+				for _, i := range ids {
+					nt.matchingStreams.Set(uint(i))
+				}
+			}
+			newTags[t.Name] = nt
 		}
 		cyclingTags := map[string]struct{}{}
 		for n, t := range newTags {
@@ -259,6 +272,12 @@ func (mgr *Manager) importPcapJob(filenames []string, existingIndexes []*index.R
 				mgr.nStreams += idx.StreamCount()
 				mgr.nPackets += idx.PacketCount()
 				mgr.indexesVersion = append(mgr.indexesVersion, mgr.currentVersion)
+			}
+			// bump the version of all mark's
+			for tn, t := range mgr.tags {
+				if strings.HasPrefix(tn, "mark/") {
+					t.version = mgr.currentVersion
+				}
 			}
 		}
 		// remove finished job from queue
@@ -476,24 +495,34 @@ func (mgr *Manager) GetIndexes(tags []string) ([]*index.Reader, map[string]bitma
 	return r.indexes, r.tags, r.releaser, r.err
 }
 
-func (mgr *Manager) Stream(streamID uint64) (*index.Stream, IndexReleaser, error) {
+func (mgr *Manager) Stream(streamID uint64) (*index.Stream, []string, IndexReleaser, error) {
 	indexes, _, releaser, err := mgr.GetIndexes(nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer releaser.Release(mgr)
 	for i := len(indexes) - 1; i >= 0; i-- {
 		idx := indexes[i]
 		stream, err := idx.StreamByID(streamID)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if stream == nil {
 			continue
 		}
-		return stream, releaser.extract(i), nil
+		version := mgr.indexesVersion[i]
+		tags := []string{}
+		for tn, ti := range mgr.tags {
+			if ti.version < version {
+				continue
+			}
+			if ti.matchingStreams.IsSet(uint(streamID)) {
+				tags = append(tags, tn)
+			}
+		}
+		return stream, tags, releaser.extract(i), nil
 	}
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 
 func (mgr *Manager) Status() Statistics {
@@ -569,12 +598,21 @@ func (mgr *Manager) ListTags() []TagInfo {
 }
 
 func (mgr *Manager) AddTag(name, queryString string) error {
-	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/")) {
+	isMark := strings.HasPrefix(name, "mark/")
+	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/") || isMark) {
 		return errors.New("invalid tag name (need a tag/ or service/ prefix)")
 	}
 	q, err := query.Parse(queryString)
 	if err != nil {
 		return err
+	}
+	markIDs := []uint64(nil)
+	if isMark {
+		ids := q.Conditions.StreamIDs()
+		if ids == nil {
+			return errors.New("tags of type `mark` have to only contain an `id` filter")
+		}
+		markIDs = ids
 	}
 	if q.Conditions.HasRelativeTimes() {
 		return errors.New("relative times not yet supported in tags")
@@ -600,11 +638,21 @@ func (mgr *Manager) AddTag(name, queryString string) error {
 					return fmt.Errorf("unknown referenced tag %q", t)
 				}
 			}
-			mgr.tags[name] = &tag{
+			t := &tag{
 				definition:     queryString,
 				referencedTags: referencedTags,
 			}
-			mgr.startTaggingJobIfNeeded()
+			if isMark {
+				t.matchingCount = uint(len(markIDs))
+				for _, i := range markIDs {
+					t.matchingStreams.Set(uint(i))
+				}
+				t.version = mgr.currentVersion
+			}
+			mgr.tags[name] = t
+			if !isMark {
+				mgr.startTaggingJobIfNeeded()
+			}
 			return nil
 		}()
 		c <- err
@@ -630,6 +678,142 @@ func (mgr *Manager) DelTag(name string) error {
 				}
 			}
 			delete(mgr.tags, name)
+			return nil
+		}()
+		c <- err
+		close(c)
+		//nolint:errcheck
+		mgr.saveState()
+	}
+	return <-c
+}
+
+type (
+	updateTagOperationInfo struct {
+		markTagAddStreams, markTagDelStreams []uint64
+	}
+	UpdateTagOperation func(*updateTagOperationInfo)
+)
+
+func UpdateTagOperationMarkAddStream(streams []uint64) UpdateTagOperation {
+	s := make([]uint64, 0, len(streams))
+	s = append(s, streams...)
+	return func(i *updateTagOperationInfo) {
+		i.markTagAddStreams = s
+	}
+}
+
+func UpdateTagOperationMarkDelStream(streams []uint64) UpdateTagOperation {
+	s := make([]uint64, 0, len(streams))
+	s = append(s, streams...)
+	return func(i *updateTagOperationInfo) {
+		i.markTagDelStreams = s
+	}
+}
+
+func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
+	info := updateTagOperationInfo{}
+	operation(&info)
+	if len(info.markTagAddStreams) != 0 || len(info.markTagDelStreams) != 0 {
+		if !strings.HasPrefix(name, "mark/") {
+			return fmt.Errorf("tag %q is not of type mark", name)
+		}
+	}
+	maxUsedStreamID := uint64(0)
+	for _, s := range info.markTagAddStreams {
+		if maxUsedStreamID < s+1 {
+			maxUsedStreamID = s + 1
+		}
+	}
+	for _, s := range info.markTagDelStreams {
+		if maxUsedStreamID < s+1 {
+			maxUsedStreamID = s + 1
+		}
+	}
+	if maxUsedStreamID == 0 {
+		// no operation
+		return nil
+	}
+	c := make(chan error)
+	mgr.jobs <- func() {
+		err := func() error {
+			if maxUsedStreamID != 0 {
+				maxExistingStreamID := uint64(0)
+				for _, i := range mgr.indexes {
+					if maxExistingStreamID < i.MaxStreamID()+1 {
+						maxExistingStreamID = i.MaxStreamID() + 1
+					}
+				}
+				if maxUsedStreamID > maxExistingStreamID {
+					return fmt.Errorf("unknown stream id %d", maxUsedStreamID-1)
+				}
+			}
+			t, ok := mgr.tags[name]
+			if !ok {
+				return fmt.Errorf("unknown tag %q", name)
+			}
+			for _, s := range info.markTagAddStreams {
+				if !t.matchingStreams.IsSet(uint(s)) {
+					t.matchingCount++
+					t.matchingStreams.Set(uint(s))
+				}
+			}
+			for _, s := range info.markTagDelStreams {
+				if t.matchingStreams.IsSet(uint(s)) {
+					t.matchingCount--
+					t.matchingStreams.Unset(uint(s))
+				}
+			}
+
+			b := strings.Builder{}
+			if t.matchingCount == 0 {
+				b.WriteString("id:-1")
+			} else {
+				b.WriteString("id:")
+				last := uint(0)
+				for {
+					zeros := t.matchingStreams.TrailingZerosAfter(last)
+					fmt.Printf("lza(%d): %d\n", last, zeros)
+					if zeros < 0 {
+						break
+					}
+					if last != 0 {
+						b.WriteByte(',')
+					}
+					last += uint(zeros)
+					b.WriteString(fmt.Sprintf("%d", last))
+					last++
+				}
+			}
+			t.definition = b.String()
+			affected := map[string]struct{}{name: {}}
+			for {
+				added := false
+				for tn, t := range mgr.tags {
+					if _, ok := affected[tn]; ok {
+						continue
+					}
+					for _, rt := range t.referencedTags {
+						if _, ok := affected[rt]; ok {
+							affected[tn] = struct{}{}
+							added = true
+							break
+						}
+					}
+				}
+				if !added {
+					break
+				}
+			}
+			delete(affected, name)
+			//TODO: do not fully invalidate the affected tags, try to be more clever and only invalidate changed streams if possible
+			for tn := range affected {
+				mgr.tags[tn] = &tag{
+					definition:     mgr.tags[tn].definition,
+					referencedTags: mgr.tags[tn].referencedTags,
+				}
+			}
+			mgr.startTaggingJobIfNeeded()
 			return nil
 		}()
 		c <- err

@@ -23,6 +23,8 @@ const store = new Vuex.Store({
         tagDelStatus: null,
 
         graphData: null,
+
+        markTagNewStatus: null,
     },
     mutations: {
         searchStarted(state, obj) {
@@ -66,6 +68,9 @@ const store = new Vuex.Store({
         resetGraphData(state, data) {
             state.graphData = data;
         },
+        resetMarkTagNewStatus(state, status) {
+            state.markTagNewStatus = status
+        }
     },
     getters: {
         searchResponse(state) {
@@ -163,6 +168,30 @@ const store = new Vuex.Store({
             APIClient.getGraph(delta, aspects, tags).then((data) => {
                 commit('resetGraphData', data);
             })
+        },
+        markTagNew({ dispatch, commit }, { name, streams }) {
+            APIClient.markTagNew(name, streams).then(() => {
+                commit('resetMarkTagNewStatus', { inProgress: false });
+                dispatch('updateTags');
+            }).catch((data) => {
+                commit('resetMarkTagNewStatus', { error: data, inProgress: false });
+            });
+        },
+        markTagAdd({ dispatch, commit }, { name, streams }) {
+            APIClient.markTagAdd(name, streams).then(() => {
+                commit('resetMarkTagUpdateStatus', { inProgress: false });
+                dispatch('updateTags');
+            }).catch((data) => {
+                commit('resetMarkTagUpdateStatus', { error: data, inProgress: false });
+            });
+        },
+        markTagDel({ dispatch, commit }, { name, streams }) {
+            APIClient.markTagDel(name, streams).then(() => {
+                commit('resetMarkTagUpdateStatus', { inProgress: false });
+                dispatch('updateTags');
+            }).catch((data) => {
+                commit('resetMarkTagUpdateStatus', { error: data, inProgress: false });
+            });
         },
     }
 });

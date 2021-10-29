@@ -1874,6 +1874,50 @@ func (cs *ConditionsSet) HasRelativeTimes() bool {
 	return false
 }
 
+// returns a list of stream id's that match the query, returns nil if other conditions exist
+func (cs *ConditionsSet) StreamIDs() []uint64 {
+	if cs.impossible() {
+		return []uint64{}
+	}
+	ids := map[int]struct{}{}
+	for _, ccs := range *cs {
+		min, max := 0, math.MaxInt64
+		for _, cc := range ccs {
+			// Number + X >= 0
+			c, ok := cc.(*NumberCondition)
+			if !ok || len(c.Summands) != 1 {
+				return nil
+			}
+			s := c.Summands[0]
+			if s.SubQuery != "" || s.Type != NumberConditionSummandTypeID {
+				return nil
+			}
+			switch s.Factor {
+			case 1:
+				// ID >= -Number
+				if min < -c.Number {
+					min = -c.Number
+				}
+			case -1:
+				// ID <= Number
+				if max > c.Number {
+					max = c.Number
+				}
+			default:
+				return nil
+			}
+		}
+		for i := min; i <= max; i++ {
+			ids[i] = struct{}{}
+		}
+	}
+	res := make([]uint64, 0, len(ids))
+	for i := range ids {
+		res = append(res, uint64(i))
+	}
+	return res
+}
+
 func (cs *ConditionsSet) UpdateReferenceTime(oldReferenceTime, newReferenceTime time.Time) {
 	delta := oldReferenceTime.Sub(newReferenceTime)
 	if delta == 0 {
