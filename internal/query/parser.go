@@ -64,7 +64,7 @@ type (
 		Debug         []string
 		Conditions    ConditionsSet
 		Sorting       []Sorting
-		Limit         uint
+		Limit         *uint
 		Grouping      *Grouping
 		ReferenceTime time.Time
 	}
@@ -274,10 +274,7 @@ func Parse(q string) (*Query, error) {
 	if pc.sortTerm != nil {
 		sorting = *pc.sortTerm
 	}
-	limit := uint(100)
-	if pc.limitTerm != nil {
-		limit = uint(*pc.limitTerm)
-	}
+	limit := (*uint)(pc.limitTerm)
 	grouping := (*Grouping)(nil)
 	if pc.groupTerm != nil {
 		val := stringParser{}

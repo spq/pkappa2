@@ -24,7 +24,7 @@ const APIClient = {
     delTag(name) {
         return this.perform('delete', `/tags`, null, { name });
     },
-    getGraph(delta, aspects, tags) {
+    getGraph(delta, aspects, tags, query) {
         const params = new URLSearchParams();
         params.append("delta", delta);
         for (const a of aspects) {
@@ -33,10 +33,13 @@ const APIClient = {
         for (const t of tags) {
             params.append("tag", t);
         }
+        if (query) {
+            params.append("query", query);
+        }
         return this.perform('get', '/graph.json', null, params);
     },
     markTagNew(name, streams) {
-        if(streams.length == 0) streams = [-1];
+        if (streams.length == 0) streams = [-1];
         return this.addTag(`mark/${name}`, `id:${streams.join(',')}`)
     },
     markTagAdd(name, streams) {

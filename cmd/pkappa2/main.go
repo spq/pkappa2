@@ -356,7 +356,11 @@ func main() {
 			return
 		}
 		defer indexesReleaser.Release(mgr)
-		res, hasMore, err := index.SearchStreams(indexes, 0, qq.ReferenceTime, qq.Conditions, qq.Grouping, qq.Sorting, qq.Limit, page*qq.Limit, tags)
+		limit := uint(100)
+		if qq.Limit != nil {
+			limit = *qq.Limit
+		}
+		res, hasMore, err := index.SearchStreams(indexes, 0, qq.ReferenceTime, qq.Conditions, qq.Grouping, qq.Sorting, limit, page*limit, tags)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 			return
@@ -395,6 +399,19 @@ func main() {
 				return
 			}
 			max = t.Truncate(delta)
+		}
+		filter := (*query.Query)(nil)
+		if qs := r.URL.Query()["query"]; len(qs) == 1 {
+			q, err := query.Parse(qs[0])
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Invalid query %q: %v", qs[0], err), http.StatusBadRequest)
+				return
+			}
+			if q.Grouping != nil {
+				http.Error(w, fmt.Sprintf("Invalid query %q: grouping not supported", qs[0]), http.StatusBadRequest)
+				return
+			}
+			filter = q
 		}
 		type (
 			Aspect uint8
@@ -457,7 +474,12 @@ func main() {
 			return a < b
 		})
 
-		indexes, tags, releaser, err := mgr.GetIndexes(r.URL.Query()["tag"])
+		neededTags := r.URL.Query()["tag"]
+		if filter != nil {
+			neededTags = append(neededTags, filter.Conditions.ReferencedTags()...)
+		}
+
+		indexes, tags, releaser, err := mgr.GetIndexes(neededTags)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
 			return
@@ -492,84 +514,107 @@ func main() {
 			counts     map[time.Duration][]uint64
 		}
 		tagGroups := []tagGroup{{}}
-		for i := len(indexes); i > 0; i-- {
-			idx := indexes[i-1]
-			if err := idx.AllStreams(func(s *index.Stream) error {
-				for _, idx2 := range indexes[i:] {
-					if _, ok := idx2.StreamIDs()[s.ID()]; ok {
-						return nil
-					}
+		handleStream := func(s *index.Stream) error {
+			tagGroupId := 0
+			for _, ti := range tagInfos {
+				if !ti.mask.IsSet(uint(s.ID())) {
+					continue
 				}
-				tagGroupId := 0
-				for _, ti := range tagInfos {
-					if !ti.mask.IsSet(uint(s.ID())) {
+				newTagGroupId, ok := ti.used[tagGroupId]
+				if !ok {
+					newTagGroupId = len(tagGroups)
+					tagGroups = append(tagGroups, tagGroup{
+						extends:    tagGroupId,
+						extendedBy: ti.name,
+					})
+					ti.used[tagGroupId] = newTagGroupId
+				}
+				tagGroupId = newTagGroupId
+			}
+			tagGroup := &tagGroups[tagGroupId]
+			if tagGroup.counts == nil {
+				tagGroup.counts = make(map[time.Duration][]uint64)
+			}
+			var t time.Time
+			skip := false
+			countsEntry := []uint64(nil)
+			countsKey := time.Duration(0)
+			for i, a := range aspects {
+				if i == 0 || (aspects[i-1]^a)&AspectAnchor != 0 {
+					if i != 0 {
+						tagGroup.counts[countsKey] = countsEntry
+					}
+					switch a & AspectAnchor {
+					case AspectAnchorFirst:
+						t = s.FirstPacket()
+					case AspectAnchorLast:
+						t = s.LastPacket()
+					}
+					t = t.Truncate(delta)
+					if skip = (!min.IsZero() && min.After(t)) || (!max.IsZero() && max.Before(t)); skip {
 						continue
 					}
-					newTagGroupId, ok := ti.used[tagGroupId]
-					if !ok {
-						newTagGroupId = len(tagGroups)
-						tagGroups = append(tagGroups, tagGroup{
-							extends:    tagGroupId,
-							extendedBy: ti.name,
-						})
-						ti.used[tagGroupId] = newTagGroupId
+					ok := false
+					countsKey = t.Sub(referenceTime)
+					if countsEntry, ok = tagGroup.counts[countsKey]; !ok {
+						countsEntry = make([]uint64, len(aspects))
 					}
-					tagGroupId = newTagGroupId
+				} else if skip {
+					continue
 				}
-				tagGroup := &tagGroups[tagGroupId]
-				if tagGroup.counts == nil {
-					tagGroup.counts = make(map[time.Duration][]uint64)
-				}
-				var t time.Time
-				skip := false
-				countsEntry := []uint64(nil)
-				countsKey := time.Duration(0)
-				for i, a := range aspects {
-					if i == 0 || (aspects[i-1]^a)&AspectAnchor != 0 {
-						if i != 0 {
-							tagGroup.counts[countsKey] = countsEntry
-						}
-						switch a & AspectAnchor {
-						case AspectAnchorFirst:
-							t = s.FirstPacket()
-						case AspectAnchorLast:
-							t = s.LastPacket()
-						}
-						t = t.Truncate(delta)
-						if skip = (!min.IsZero() && min.After(t)) || (!max.IsZero() && max.Before(t)); skip {
-							continue
-						}
-						ok := false
-						countsKey = t.Sub(referenceTime)
-						if countsEntry, ok = tagGroup.counts[countsKey]; !ok {
-							countsEntry = make([]uint64, len(aspects))
-						}
-					} else if skip {
-						continue
-					}
 
-					d := uint64(0)
-					switch a & AspectType {
-					case AspectTypeConnections:
-						d = 1
-					case AspectTypeBytes:
-						d = s.ClientBytes + s.ServerBytes
-					case AspectTypeClientBytes:
-						d = s.ClientBytes
-					case AspectTypeServerBytes:
-						d = s.ServerBytes
-					case AspectTypeDuration:
-						d = s.LastPacketTimeNS - s.FirstPacketTimeNS
-					}
-					countsEntry[i] += d
+				d := uint64(0)
+				switch a & AspectType {
+				case AspectTypeConnections:
+					d = 1
+				case AspectTypeBytes:
+					d = s.ClientBytes + s.ServerBytes
+				case AspectTypeClientBytes:
+					d = s.ClientBytes
+				case AspectTypeServerBytes:
+					d = s.ServerBytes
+				case AspectTypeDuration:
+					d = s.LastPacketTimeNS - s.FirstPacketTimeNS
 				}
-				tagGroup.counts[countsKey] = countsEntry
-				return nil
-			}); err != nil {
-				http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
+				countsEntry[i] += d
+			}
+			tagGroup.counts[countsKey] = countsEntry
+			return nil
+		}
+
+		if filter != nil {
+			limit := uint(0)
+			if filter.Limit != nil {
+				limit = *filter.Limit
+			}
+			streams, _, err := index.SearchStreams(indexes, 0, filter.ReferenceTime, filter.Conditions, nil, filter.Sorting, limit, 0, tags)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 				return
 			}
+			for _, s := range streams {
+				if err := handleStream(s); err != nil {
+					http.Error(w, fmt.Sprintf("handleStream failed: %v", err), http.StatusInternalServerError)
+					return
+				}
+			}
+		} else {
+			for i := len(indexes); i > 0; i-- {
+				idx := indexes[i-1]
+				if err := idx.AllStreams(func(s *index.Stream) error {
+					for _, idx2 := range indexes[i:] {
+						if _, ok := idx2.StreamIDs()[s.ID()]; ok {
+							return nil
+						}
+					}
+					return handleStream(s)
+				}); err != nil {
+					http.Error(w, fmt.Sprintf("AllStreams failed: %v", err), http.StatusInternalServerError)
+					return
+				}
+			}
 		}
+
 		response := struct {
 			Min, Max time.Time
 			Delta    time.Duration

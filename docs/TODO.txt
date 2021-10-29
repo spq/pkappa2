@@ -16,7 +16,6 @@ both:
 - add tag color
 - show matching tags, marks and identified service in result and stream view
 - support adding/removing marks to/from streams in result view
-- add filter to graph
 - add a search history
 - add pcap listing
 - support showing alternatives for groups

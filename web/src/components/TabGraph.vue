@@ -1,49 +1,69 @@
 <template>
   <v-card>
-    <v-select
-      :items="Object.keys(chartTypes)"
-      v-model="chartType"
-      dense
-    ></v-select>
-    <v-select
-      :items="chartTagOptions"
-      v-model="chartTagSelection"
-      multiple
-      dense
-    >
-      <template v-slot:item="{ item, attrs, on }">
-        <v-list-item v-if="item.value.startsWith('header/')" dense>
-          <v-list-item-content>
-            <v-subheader
-              >{{ item.text }}
-              <v-btn
-                x-small
-                link
-                text
-                @click="setChartTagOptions(item.value.substring(7), true)"
-                >All</v-btn
+    <v-container>
+      <v-row>
+        <v-col cols="8">
+          <v-text-field dense v-model="chartFilter" label="Filter" @keyup.enter="fetchGraph"></v-text-field>
+        </v-col>
+        <v-col cols="2">
+          <v-select
+            :items="chartTagOptions"
+            v-model="chartTagSelection"
+            multiple
+            dense
+            label="Grouping"
+          >
+            <template v-slot:item="{ item, attrs, on }">
+              <v-list-item v-if="item.value.startsWith('header/')" dense>
+                <v-list-item-content>
+                  <v-subheader
+                    >{{ item.text }}
+                    <v-btn
+                      x-small
+                      link
+                      text
+                      @click="setChartTagOptions(item.value.substring(7), true)"
+                      >All</v-btn
+                    >
+                    <v-btn
+                      x-small
+                      link
+                      text
+                      @click="
+                        setChartTagOptions(item.value.substring(7), false)
+                      "
+                      >None</v-btn
+                    ></v-subheader
+                  >
+                </v-list-item-content>
+              </v-list-item>
+              <v-list-item
+                v-else
+                v-on="on"
+                v-bind="attrs"
+                #default="{ active }"
               >
-              <v-btn
-                x-small
-                link
-                text
-                @click="setChartTagOptions(item.value.substring(7), false)"
-                >None</v-btn
-              ></v-subheader
-            >
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item v-else v-on="on" v-bind="attrs" #default="{ active }">
-          <v-list-item-action>
-            <v-checkbox
-              :ripple="false"
-              :input-value="active"
-            ></v-checkbox>
-          </v-list-item-action>
-          <v-list-item-content>{{ item.text }}</v-list-item-content>
-        </v-list-item>
-      </template>
-    </v-select>
+                <v-list-item-action>
+                  <v-checkbox
+                    :ripple="false"
+                    :input-value="active"
+                  ></v-checkbox>
+                </v-list-item-action>
+                <v-list-item-content>{{ item.text }}</v-list-item-content>
+              </v-list-item>
+            </template>
+          </v-select>
+        </v-col>
+        <v-col cols="2">
+          <v-select
+            :items="Object.keys(chartTypes)"
+            v-model="chartType"
+            dense
+            label="Type"
+          ></v-select>
+        </v-col>
+      </v-row>
+    </v-container>
     <template v-if="chartType === null"></template>
     <template v-else-if="chartData === null">
       <v-progress-linear indeterminate></v-progress-linear>
@@ -71,6 +91,7 @@ export default {
       chartType: null,
       chartTimeFilter: "",
       chartTagSelection: [],
+      chartFilter: "",
       chartTypes: {
         "Active Connections": {
           aspects: ["connections@first", "connections@last"],
@@ -451,22 +472,8 @@ export default {
         this.chartTagSelection = sel;
       });
     },
-  },
-  watch: {
-    chartTagSelection(val) {
+    fetchGraph() {
       if (this.chartType === null) return;
-      const tags = [];
-      for (const t of val) {
-        tags.push(t.substr(6));
-      }
-      this.chartData = null;
-      this.updateGraph({
-        delta: "1m",
-        aspects: this.chartTypes[this.chartType].aspects,
-        tags: tags,
-      });
-    },
-    chartType(val) {
       const tags = [];
       for (const t of this.chartTagSelection) {
         tags.push(t.substr(6));
@@ -474,9 +481,18 @@ export default {
       this.chartData = null;
       this.updateGraph({
         delta: "1m",
-        aspects: this.chartTypes[val].aspects,
+        aspects: this.chartTypes[this.chartType].aspects,
         tags: tags,
+        query: this.chartFilter,
       });
+    },
+  },
+  watch: {
+    chartTagSelection() {
+      this.fetchGraph();
+    },
+    chartType() {
+      this.fetchGraph();
     },
     graphData(val) {
       const type = this.chartTypes[this.chartType];
@@ -503,7 +519,7 @@ export default {
         for (let i = 0; i < pos.length; i++) {
           const p = pos[i];
           const g = val.Data[i].Data;
-          if (p >= g.length) continue;
+          if (g == null || p >= g.length) continue;
           const v = g[p][0];
           if (min === null || min > v) min = v;
         }
@@ -513,7 +529,7 @@ export default {
           const p = pos[i];
           const g = val.Data[i].Data;
           let v = null;
-          if (p < g.length) v = g[p];
+          if (g != null && p < g.length) v = g[p];
           if (v != null && v[0] === min) {
             groups[i].add(t, v);
             pos[i]++;
