@@ -431,13 +431,21 @@ outer:
 		// dump collected streams to new indexes
 		for _, s := range streamFactory.Streams {
 			id := nextStreamID
+			touchedByNewPcaps := false
 		outer:
 			for pi := range s.Packets {
 				pmd := pcapmetadata.FromPacketMetadata(&s.Packets[pi])
 				for _, p := range newPcapInfos {
 					if pmd.PcapInfo == p {
+						touchedByNewPcaps = true
+						if id != nextStreamID {
+							break outer
+						}
 						continue outer
 					}
+				}
+				if id != nextStreamID {
+					continue
 				}
 				for _, idx := range existingIndexes {
 					stream, err := idx.StreamByFirstPacketSource(pmd.PcapInfo.Filename, pmd.Index)
@@ -449,7 +457,12 @@ outer:
 						break
 					}
 				}
-				break
+				if touchedByNewPcaps {
+					break
+				}
+			}
+			if !touchedByNewPcaps {
+				continue
 			}
 			if id == nextStreamID {
 				nextStreamID++
