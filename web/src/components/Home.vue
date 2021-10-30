@@ -82,7 +82,7 @@ import TabGraph from "./TabGraph.vue";
 import TabResults from "./TabResults.vue";
 import TabStream from "./TabStream.vue";
 
-import { mapGetters, mapActions } from "vuex";
+import { mapGetters, mapActions, mapState } from "vuex";
 
 export default {
   name: "Home",
@@ -97,13 +97,12 @@ export default {
     this.updateTags();
   },
   computed: {
-    ...mapGetters([
+    ...mapGetters(["prevStreamIndex", "nextStreamIndex"]),
+    ...mapState([
       "streamData",
+      "status",
       "streamLoading",
       "searchRunning",
-      "status",
-      "prevStreamIndex",
-      "nextStreamIndex",
       "searchResponse",
     ]),
   },

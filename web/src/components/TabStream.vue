@@ -191,8 +191,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(["tags", "markTagUpdateStatus"]),
-    ...mapGetters(["streamData", "streamLoading"]),
+    ...mapState(["streamData", "streamLoading", "tags", "markTagUpdateStatus"]),
     marks: {
       get() {
         return this.streamData.Tags;

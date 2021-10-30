@@ -73,24 +73,6 @@ const store = new Vuex.Store({
         }
     },
     getters: {
-        searchResponse(state) {
-            return state.searchResponse;
-        },
-        searchRunning(state) {
-            return state.searchRunning;
-        },
-        searchPage(state) {
-            return state.searchPage;
-        },
-        streamData(state) {
-            return state.streamData;
-        },
-        streamLoading(state) {
-            return state.streamLoading;
-        },
-        status(state) {
-            return state.status;
-        },
         prevSearchPage(state) {
             if (state.searchPage == null || state.searchPage <= 0)
                 return null;

@@ -41,7 +41,9 @@
             v-model="newTagName"
             hint="Save query as tag(default) or service"
             dense
-            @keyup.enter="addTag({ name: 'tag/' + newTagName, query: searchQuery })"
+            @keyup.enter="
+              addTag({ name: 'tag/' + newTagName, query: searchQuery })
+            "
             ><template #append>
               <v-btn
                 type="submit"
@@ -90,13 +92,14 @@ export default {
     };
   },
   computed: {
-    ...mapGetters([
-      "searchResponse",
-      "searchRunning",
+    ...mapGetters(["nextSearchPage"]),
+    ...mapState([
       "searchPage",
-      "nextSearchPage",
+      "searchRunning",
+      "searchResponse",
+      "searchQuery",
+      "tagAddStatus",
     ]),
-    ...mapState(["searchQuery", "tagAddStatus"]),
   },
   methods: {
     ...mapActions(["switchSearchPage", "getStream", "addTag"]),
