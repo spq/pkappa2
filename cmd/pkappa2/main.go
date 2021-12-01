@@ -22,7 +22,6 @@ import (
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/manager"
 	"github.com/spq/pkappa2/internal/query"
-	"github.com/spq/pkappa2/internal/tools/bitmask"
 	"github.com/spq/pkappa2/web"
 )
 
@@ -205,13 +204,18 @@ func main() {
 			http.Error(w, fmt.Sprintf("invalid stream id %q failed: %v", streamIDStr, err), http.StatusBadRequest)
 			return
 		}
-		stream, _, streamReleaser, err := mgr.Stream(streamID)
+		v := mgr.GetView()
+		defer v.Release()
+		streamContext, err := v.Stream(streamID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Stream(%d) failed: %v", streamID, err), http.StatusInternalServerError)
 			return
 		}
-		defer streamReleaser.Release(mgr)
-		packets, err := stream.Packets()
+		if streamContext.Stream() == nil {
+			http.Error(w, fmt.Sprintf("Stream(%d) not found", streamID), http.StatusNotFound)
+			return
+		}
+		packets, err := streamContext.Stream().Packets()
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Stream(%d).Packets() failed: %v", streamID, err), http.StatusInternalServerError)
 			return
@@ -281,19 +285,25 @@ func main() {
 			http.Error(w, fmt.Sprintf("invalid stream id %q failed: %v", streamIDStr, err), http.StatusBadRequest)
 			return
 		}
-		stream, tags, streamReleaser, err := mgr.Stream(streamID)
+		v := mgr.GetView()
+		defer v.Release()
+		streamContext, err := v.Stream(streamID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Stream(%d) failed: %v", streamID, err), http.StatusInternalServerError)
 			return
 		}
-		if stream == nil {
+		if streamContext.Stream() == nil {
 			http.Error(w, fmt.Sprintf("stream %d not found", streamID), http.StatusNotFound)
 			return
 		}
-		defer streamReleaser.Release(mgr)
-		data, err := stream.Data()
+		data, err := streamContext.Stream().Data()
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Stream(%d).Data() failed: %v", streamID, err), http.StatusInternalServerError)
+			return
+		}
+		tags, err := streamContext.AllTags()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("AllTags() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
 		response := struct {
@@ -301,7 +311,7 @@ func main() {
 			Data   []index.Data
 			Tags   []string
 		}{
-			Stream: stream,
+			Stream: streamContext.Stream(),
 			Data:   data,
 			Tags:   tags,
 		}
@@ -343,29 +353,39 @@ func main() {
 		}
 
 		response := struct {
-			Debug       []string
-			Results     []*index.Stream
+			Debug   []string
+			Results []struct {
+				Stream *index.Stream
+				Tags   []string
+			}
 			MoreResults bool
 		}{
-			Debug:   qq.Debug,
-			Results: []*index.Stream{},
+			Debug: qq.Debug,
+			Results: []struct {
+				Stream *index.Stream
+				Tags   []string
+			}{},
 		}
-		indexes, tags, indexesReleaser, err := mgr.GetIndexes(qq.Conditions.ReferencedTags())
-		if err != nil {
-			http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
-			return
-		}
-		defer indexesReleaser.Release(mgr)
-		limit := uint(100)
-		if qq.Limit != nil {
-			limit = *qq.Limit
-		}
-		res, hasMore, err := index.SearchStreams(indexes, 0, qq.ReferenceTime, qq.Conditions, qq.Grouping, qq.Sorting, limit, page*limit, tags)
+		v := mgr.GetView()
+		defer v.Release()
+		hasMore, err := v.SearchStreams(qq, func(c manager.StreamContext) error {
+			tags, err := c.AllTags()
+			if err != nil {
+				return err
+			}
+			response.Results = append(response.Results, struct {
+				Stream *index.Stream
+				Tags   []string
+			}{
+				Stream: c.Stream(),
+				Tags:   tags,
+			})
+			return nil
+		}, manager.Limit(100, page), manager.PrefetchAllTags())
 		if err != nil {
 			http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 			return
 		}
-		response.Results = append(response.Results, res...)
 		response.MoreResults = hasMore
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -474,37 +494,27 @@ func main() {
 			return a < b
 		})
 
-		neededTags := r.URL.Query()["tag"]
-		if filter != nil {
-			neededTags = append(neededTags, filter.Conditions.ReferencedTags()...)
-		}
+		groupingTags := r.URL.Query()["tag"]
 
-		indexes, tags, releaser, err := mgr.GetIndexes(neededTags)
+		v := mgr.GetView()
+		defer v.Release()
+
+		referenceTime, err := v.ReferenceTime()
 		if err != nil {
-			http.Error(w, fmt.Sprintf("GetIndexes failed: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("ReferenceTime failed: %v", err), http.StatusInternalServerError)
 			return
-		}
-		defer releaser.Release(mgr)
-
-		referenceTime := time.Time{}
-		for _, idx := range indexes {
-			if referenceTime.IsZero() || referenceTime.After(idx.ReferenceTime) {
-				referenceTime = idx.ReferenceTime
-			}
 		}
 
 		type (
 			tagInfo struct {
 				name string
-				mask bitmask.LongBitmask
 				used map[int]int
 			}
 		)
 		tagInfos := []tagInfo(nil)
-		for tn, tm := range tags {
+		for _, tn := range groupingTags {
 			tagInfos = append(tagInfos, tagInfo{
 				name: tn,
-				mask: tm,
 				used: make(map[int]int),
 			})
 		}
@@ -514,10 +524,14 @@ func main() {
 			counts     map[time.Duration][]uint64
 		}
 		tagGroups := []tagGroup{{}}
-		handleStream := func(s *index.Stream) error {
+		handleStream := func(c manager.StreamContext) error {
 			tagGroupId := 0
 			for _, ti := range tagInfos {
-				if !ti.mask.IsSet(uint(s.ID())) {
+				hasTag, err := c.HasTag(ti.name)
+				if err != nil {
+					return err
+				}
+				if !hasTag {
 					continue
 				}
 				newTagGroupId, ok := ti.used[tagGroupId]
@@ -531,6 +545,7 @@ func main() {
 				}
 				tagGroupId = newTagGroupId
 			}
+			s := c.Stream()
 			tagGroup := &tagGroups[tagGroupId]
 			if tagGroup.counts == nil {
 				tagGroup.counts = make(map[time.Duration][]uint64)
@@ -583,35 +598,16 @@ func main() {
 		}
 
 		if filter != nil {
-			limit := uint(0)
-			if filter.Limit != nil {
-				limit = *filter.Limit
-			}
-			streams, _, err := index.SearchStreams(indexes, 0, filter.ReferenceTime, filter.Conditions, nil, filter.Sorting, limit, 0, tags)
+			_, err := v.SearchStreams(filter, handleStream, manager.PrefetchTags(groupingTags))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 				return
 			}
-			for _, s := range streams {
-				if err := handleStream(s); err != nil {
-					http.Error(w, fmt.Sprintf("handleStream failed: %v", err), http.StatusInternalServerError)
-					return
-				}
-			}
 		} else {
-			for i := len(indexes); i > 0; i-- {
-				idx := indexes[i-1]
-				if err := idx.AllStreams(func(s *index.Stream) error {
-					for _, idx2 := range indexes[i:] {
-						if _, ok := idx2.StreamIDs()[s.ID()]; ok {
-							return nil
-						}
-					}
-					return handleStream(s)
-				}); err != nil {
-					http.Error(w, fmt.Sprintf("AllStreams failed: %v", err), http.StatusInternalServerError)
-					return
-				}
+			err := v.AllStreams(handleStream, manager.PrefetchTags(groupingTags))
+			if err != nil {
+				http.Error(w, fmt.Sprintf("AllStreams failed: %v", err), http.StatusInternalServerError)
+				return
 			}
 		}
 

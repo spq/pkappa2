@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"sort"
 	"strings"
@@ -21,17 +20,15 @@ import (
 
 type (
 	tag struct {
-		definition      string
-		referencedTags  []string
-		matchingStreams bitmask.LongBitmask
-		matchingCount   uint
-		version         uint
+		query.TagDetails
+		definition string
+		features   query.FeatureSet
 	}
 	TagInfo struct {
 		Name           string
 		Definition     string
 		MatchingCount  uint
-		IndexesPending uint
+		UncertainCount uint
 		Referenced     bool
 	}
 	Manager struct {
@@ -47,11 +44,14 @@ type (
 
 		builder             *builder.Builder
 		indexes             []*index.Reader
-		indexesVersion      []uint
-		currentVersion      uint
 		nStreams, nPackets  int
+		nextStreamID        uint64
 		nUnmergeableIndexes int
 		stateFilename       string
+		allStreams          bitmask.LongBitmask
+
+		updatedStreamsDuringTaggingJob bitmask.LongBitmask
+		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
 		tags map[string]*tag
 
@@ -69,7 +69,7 @@ type (
 		TaggingJobRunning bool
 	}
 
-	IndexReleaser []*index.Reader
+	indexReleaser []*index.Reader
 
 	stateFile struct {
 		Saved time.Time
@@ -79,6 +79,32 @@ type (
 		}
 		Pcaps []*pcapmetadata.PcapInfo
 	}
+
+	updateTagOperationInfo struct {
+		markTagAddStreams, markTagDelStreams []uint64
+	}
+	UpdateTagOperation func(*updateTagOperationInfo)
+
+	View struct {
+		mgr *Manager
+
+		indexes  []*index.Reader
+		releaser indexReleaser
+
+		tagDetails map[string]query.TagDetails
+	}
+
+	StreamContext struct {
+		s *index.Stream
+		v *View
+	}
+
+	streamsOptions struct {
+		prefetchTags       []string
+		defaultLimit, page uint
+		prefetchAllTags    bool
+	}
+	StreamsOption func(*streamsOptions)
 )
 
 func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
@@ -88,9 +114,8 @@ func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
 		SnapshotDir: snapshotDir,
 		StateDir:    stateDir,
 
-		usedIndexes:    make(map[*index.Reader]uint),
-		tags:           make(map[string]*tag),
-		currentVersion: 1,
+		usedIndexes: make(map[*index.Reader]uint),
+		tags:        make(map[string]*tag),
 	}
 
 	// read all existing indexes and load them
@@ -105,9 +130,11 @@ func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
 			continue
 		}
 		mgr.indexes = append(mgr.indexes, idx)
-		mgr.indexesVersion = append(mgr.indexesVersion, uint(1))
 		mgr.nStreams += idx.StreamCount()
 		mgr.nPackets += idx.PacketCount()
+		if next := idx.MaxStreamID() + 1; mgr.nextStreamID < next {
+			mgr.nextStreamID = next
+		}
 	}
 	mgr.lock(mgr.indexes)
 
@@ -117,6 +144,12 @@ func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
 	}
 	stateTimestamp := time.Time{}
 	cachedKnownPcapData := []*pcapmetadata.PcapInfo(nil)
+	if mgr.nextStreamID != 0 {
+		mgr.allStreams.Set(uint(mgr.nextStreamID - 1))
+		for i := uint64(0); i != mgr.nextStreamID; i++ {
+			mgr.allStreams.Set(uint(i))
+		}
+	}
 nextStateFile:
 	for _, fn := range stateFilenames {
 		f, err := os.Open(fn)
@@ -144,26 +177,27 @@ nextStateFile:
 				continue nextStateFile
 			}
 			nt := &tag{
-				definition:     t.Definition,
-				referencedTags: q.Conditions.ReferencedTags(),
+				TagDetails: query.TagDetails{
+					Uncertain:  mgr.allStreams,
+					Conditions: q.Conditions,
+				},
+				definition: t.Definition,
+				features:   q.Conditions.Features(),
 			}
 			if strings.HasPrefix(t.Name, "mark/") {
-				ids := q.Conditions.StreamIDs()
-				if ids == nil {
+				ids, ok := q.Conditions.StreamIDs(mgr.nextStreamID)
+				if !ok {
 					log.Printf("Invalid tag %q in statefile %q: mark tag is malformed", t.Name, fn)
 					continue nextStateFile
 				}
-				nt.matchingCount = uint(len(ids))
-				nt.version = mgr.currentVersion
-				for _, i := range ids {
-					nt.matchingStreams.Set(uint(i))
-				}
+				nt.Matches = ids
+				nt.Uncertain = bitmask.LongBitmask{}
 			}
 			newTags[t.Name] = nt
 		}
 		cyclingTags := map[string]struct{}{}
 		for n, t := range newTags {
-			for _, tn := range t.referencedTags {
+			for _, tn := range t.referencedTags() {
 				if n == tn {
 					log.Printf("Invalid tag %q in statefile %q: references itself", n, fn)
 					continue nextStateFile
@@ -179,7 +213,7 @@ nextStateFile:
 		for {
 		nextCyclingTag:
 			for n := range cyclingTags {
-				for _, rt := range newTags[n].referencedTags {
+				for _, rt := range newTags[n].referencedTags() {
 					if _, ok := cyclingTags[rt]; ok {
 						continue nextCyclingTag
 					}
@@ -221,6 +255,10 @@ nextStateFile:
 	return &mgr, nil
 }
 
+func (t tag) referencedTags() []string {
+	return append(append([]string(nil), t.features.MainTags...), t.features.SubQueryTags...)
+}
+
 func (mgr *Manager) saveState() error {
 	j := stateFile{
 		Saved: time.Now(),
@@ -256,36 +294,112 @@ func (mgr *Manager) saveState() error {
 	return nil
 }
 
-func (mgr *Manager) importPcapJob(filenames []string, existingIndexes []*index.Reader, existingIndexesReleaser IndexReleaser) {
+func (mgr *Manager) inheritTagUncertainty() {
+	resolvedTags := map[string]struct{}{}
+	for len(resolvedTags) != len(mgr.tags) {
+	outer:
+		for tn, ti := range mgr.tags {
+			if _, ok := resolvedTags[tn]; ok {
+				continue
+			}
+			for _, rtn := range ti.referencedTags() {
+				if _, ok := resolvedTags[rtn]; !ok {
+					continue outer
+				}
+			}
+			resolvedTags[tn] = struct{}{}
+			if len(ti.features.MainTags) == 0 && len(ti.features.SubQueryTags) == 0 {
+				continue
+			}
+			fullyInvalidated := false
+			for _, rtn := range ti.features.SubQueryTags {
+				if !mgr.tags[rtn].Uncertain.IsZero() {
+					//TODO: is a matching stream really uncertain?
+					ti.Uncertain = mgr.allStreams
+					fullyInvalidated = true
+					break
+				}
+			}
+			if !fullyInvalidated {
+				ti.Uncertain = ti.Uncertain.Copy()
+				for _, rtn := range ti.features.MainTags {
+					ti.Uncertain.Or(mgr.tags[rtn].Uncertain)
+				}
+			}
+			mgr.tags[tn] = ti
+		}
+	}
+}
+
+func (mgr *Manager) invalidateTags(updatedStreams, addedStreams bitmask.LongBitmask) {
+	for tn, ti := range mgr.tags {
+		tin := *ti
+		if ti.features.SubQueryFeatures != 0 {
+			//TODO: is a matching stream really uncertain?
+			tin.Uncertain = mgr.allStreams
+		} else if ti.features.MainFeatures&^query.FeatureFilterID == 0 {
+			continue
+		} else {
+			tin.Uncertain = ti.Uncertain.Copy()
+			tin.Uncertain.Or(addedStreams)
+			if ti.features.MainFeatures&(query.FeatureFilterData|query.FeatureFilterTimeAbsolute|query.FeatureFilterTimeRelative) != 0 {
+				tin.Uncertain.Or(updatedStreams)
+			}
+		}
+		mgr.tags[tn] = &tin
+	}
+	mgr.inheritTagUncertainty()
+}
+
+func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, existingIndexes []*index.Reader, existingIndexesReleaser indexReleaser) {
 	processedFiles, createdIndexes, err := mgr.builder.FromPcap(mgr.PcapDir, filenames, existingIndexes)
 	if err != nil {
 		log.Printf("importPcapJob(%q) failed: %s", filenames, err)
+	}
+	updatedStreams := bitmask.LongBitmask{}
+	addedStreams := bitmask.LongBitmask{}
+	newStreamCount, newPacketCount := 0, 0
+	newNextStreamID := nextStreamID
+	for _, idx := range createdIndexes {
+		newStreamCount += idx.StreamCount()
+		newPacketCount += idx.PacketCount()
+		if next := idx.MaxStreamID() + 1; newNextStreamID < next {
+			newNextStreamID = next
+		}
+		for i := range idx.StreamIDs() {
+			if i < nextStreamID {
+				updatedStreams.Set(uint(i))
+			} else {
+				addedStreams.Set(uint(i))
+			}
+		}
+	}
+	mgr.allStreams = bitmask.LongBitmask{}
+	if newNextStreamID != 0 {
+		mgr.allStreams.Set(uint(newNextStreamID - 1))
+		for i := uint64(0); i < newNextStreamID; i++ {
+			mgr.allStreams.Set(uint(i))
+		}
 	}
 	mgr.jobs <- func() {
 		existingIndexesReleaser.release(mgr)
 		// add new indexes if some were created
 		if len(createdIndexes) > 0 {
-			mgr.lock(createdIndexes)
-			mgr.currentVersion++
 			mgr.indexes = append(mgr.indexes, createdIndexes...)
-			for _, idx := range createdIndexes {
-				mgr.nStreams += idx.StreamCount()
-				mgr.nPackets += idx.PacketCount()
-				mgr.indexesVersion = append(mgr.indexesVersion, mgr.currentVersion)
-			}
-			// bump the version of all mark's
-			for tn, t := range mgr.tags {
-				if strings.HasPrefix(tn, "mark/") {
-					t.version = mgr.currentVersion
-				}
-			}
+			mgr.nStreams += newStreamCount
+			mgr.nPackets += newPacketCount
+			mgr.nextStreamID = newNextStreamID
+			mgr.lock(createdIndexes)
+			mgr.addedStreamsDuringTaggingJob.Or(addedStreams)
+			mgr.updatedStreamsDuringTaggingJob.Or(updatedStreams)
+			mgr.invalidateTags(updatedStreams, addedStreams)
 		}
 		// remove finished job from queue
 		mgr.importJobs = mgr.importJobs[processedFiles:]
 		// start new import job if there are more queued
 		if len(mgr.importJobs) >= 1 {
-			idxs, rel := mgr.getIndexesCopy(0, len(mgr.indexes))
-			go mgr.importPcapJob(mgr.importJobs[:len(mgr.importJobs)], idxs, rel)
+			idxs, rel := mgr.getIndexesCopy(0)
+			go mgr.importPcapJob(mgr.importJobs[:], mgr.nextStreamID, idxs, rel)
 		}
 		mgr.startTaggingJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
@@ -300,7 +414,7 @@ func (mgr *Manager) startMergeJobIfNeeded() {
 	}
 	// only merge if all tags are on the newest version, prioritize updating tags
 	for _, t := range mgr.tags {
-		if t.version != mgr.currentVersion {
+		if !t.Uncertain.IsZero() {
 			return
 		}
 	}
@@ -310,8 +424,8 @@ func (mgr *Manager) startMergeJobIfNeeded() {
 		nStreams -= c
 		if i >= mgr.nUnmergeableIndexes && c < nStreams {
 			mgr.mergeJobRunning = true
-			indexes, indexesReleaser := mgr.getIndexesCopy(i, len(mgr.indexes))
-			go mgr.mergeIndexesJob(i, mgr.currentVersion, indexes, indexesReleaser)
+			indexes, indexesReleaser := mgr.getIndexesCopy(i)
+			go mgr.mergeIndexesJob(i, indexes, indexesReleaser)
 			return
 		}
 	}
@@ -323,34 +437,29 @@ func (mgr *Manager) startTaggingJobIfNeeded() {
 	}
 outer:
 	for n, t := range mgr.tags {
-		if t.version == mgr.currentVersion {
+		if t.Uncertain.IsZero() {
 			continue
 		}
-		for _, tn := range t.referencedTags {
-			if mgr.tags[tn].version != mgr.currentVersion {
+		for _, tn := range t.referencedTags() {
+			if !mgr.tags[tn].Uncertain.IsZero() {
 				continue outer
 			}
 		}
-		referencedTags := make(map[string]bitmask.LongBitmask, len(t.referencedTags))
-		for _, tn := range t.referencedTags {
-			referencedTags[tn] = mgr.tags[tn].matchingStreams
+		tagDetails := make(map[string]query.TagDetails)
+		for _, tn := range t.referencedTags() {
+			tagDetails[tn] = mgr.tags[tn].TagDetails
 		}
-		startIndex := 0
-		for i, v := range mgr.indexesVersion {
-			if v >= t.version {
-				startIndex = i
-				break
-			}
-		}
+		mgr.updatedStreamsDuringTaggingJob = bitmask.LongBitmask{}
+		mgr.addedStreamsDuringTaggingJob = bitmask.LongBitmask{}
 		mgr.taggingJobRunning = true
-		indexes, releaser := mgr.getIndexesCopy(0, len(mgr.indexes))
-		go mgr.updateTagJob(n, *t, mgr.currentVersion, referencedTags, indexes, startIndex, releaser)
+		indexes, releaser := mgr.getIndexesCopy(0)
+		go mgr.updateTagJob(n, *t, tagDetails, indexes, releaser)
 		return
 	}
 }
 
-func (mgr *Manager) mergeIndexesJob(offset int, maxVersion uint, indexes []*index.Reader, releaser IndexReleaser) {
-	idxs, err := index.Merge(mgr.IndexDir, indexes)
+func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, releaser indexReleaser) {
+	mergedIndexes, err := index.Merge(mgr.IndexDir, indexes)
 	if err != nil {
 		indexFilenames := []string{}
 		for _, i := range indexes {
@@ -359,29 +468,24 @@ func (mgr *Manager) mergeIndexesJob(offset int, maxVersion uint, indexes []*inde
 		log.Printf("mergeIndexesJob(%d, [%q]) failed: %s", offset, indexFilenames, err)
 	}
 	streamsDiff, packetsDiff := 0, 0
-	for _, i := range idxs {
-		streamsDiff += i.StreamCount()
-		packetsDiff += i.PacketCount()
+	for _, idx := range mergedIndexes {
+		streamsDiff += idx.StreamCount()
+		packetsDiff += idx.PacketCount()
 	}
-	for _, i := range indexes {
-		streamsDiff -= i.StreamCount()
-		packetsDiff -= i.PacketCount()
-	}
-	newVersions := make([]uint, len(idxs))
-	for i := range newVersions {
-		newVersions[i] = maxVersion
+	for _, idx := range indexes {
+		streamsDiff -= idx.StreamCount()
+		packetsDiff -= idx.PacketCount()
 	}
 	mgr.jobs <- func() {
 		// replace old indexes if successfully created
-		if len(idxs) == 0 || err != nil {
+		if len(mergedIndexes) == 0 || err != nil {
 			mgr.nUnmergeableIndexes++
 		} else {
-			rel := IndexReleaser(mgr.indexes[offset : offset+len(indexes)])
+			rel := indexReleaser(mgr.indexes[offset : offset+len(indexes)])
 			rel.release(mgr)
-			mgr.lock(idxs)
-			mgr.indexes = append(mgr.indexes[:offset], append(idxs, mgr.indexes[offset+len(indexes):]...)...)
-			mgr.indexesVersion = append(mgr.indexesVersion[:offset], append(newVersions, mgr.indexesVersion[offset+len(indexes):]...)...)
-			mgr.nUnmergeableIndexes += len(idxs) - 1
+			mgr.lock(mergedIndexes)
+			mgr.indexes = append(mgr.indexes[:offset], append(mergedIndexes, mgr.indexes[offset+len(indexes):]...)...)
+			mgr.nUnmergeableIndexes += len(mergedIndexes) - 1
 			mgr.nStreams += streamsDiff
 			mgr.nPackets += packetsDiff
 		}
@@ -391,38 +495,35 @@ func (mgr *Manager) mergeIndexesJob(offset int, maxVersion uint, indexes []*inde
 	}
 }
 
-func (mgr *Manager) updateTagJob(name string, t tag, newVersion uint, referencedTags map[string]bitmask.LongBitmask, indexes []*index.Reader, firstNewIndex int, releaser IndexReleaser) {
+func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query.TagDetails, indexes []*index.Reader, releaser indexReleaser) {
 	err := func() error {
 		q, err := query.Parse(t.definition)
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(indexes, firstNewIndex, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, referencedTags)
+		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails)
 		if err != nil {
 			return err
 		}
-		for _, i := range indexes[firstNewIndex:] {
-			for id := range i.StreamIDs() {
-				t.matchingStreams.Unset(uint(id))
-			}
-		}
+		t.Matches = t.Matches.Copy()
+		t.Matches.Sub(t.Uncertain)
 		for _, s := range streams {
-			t.matchingStreams.Set(uint(s.ID()))
+			t.Matches.Set(uint(s.ID()))
 		}
-		t.matchingCount = uint(t.matchingStreams.OnesCount())
 		return nil
 	}()
 	if err != nil {
 		log.Printf("updateTagJob failed: %q", err)
-		t.matchingCount = 0
-		t.matchingStreams = bitmask.LongBitmask{}
+		t.Matches = bitmask.LongBitmask{}
 	}
+	t.Uncertain = bitmask.LongBitmask{}
 	mgr.jobs <- func() {
-		ot, ok := mgr.tags[name]
-		if ok && ot.version == t.version && ot.definition == t.definition {
-			// only touch the live copy of the tag if the tag was not modified while we were updating it
-			t.version = newVersion
+		// don't touch the tag if it was modified
+		if ot, ok := mgr.tags[name]; ok && ot.definition == t.definition {
 			mgr.tags[name] = &t
+			if !(mgr.updatedStreamsDuringTaggingJob.IsZero() && mgr.addedStreamsDuringTaggingJob.IsZero()) {
+				mgr.invalidateTags(mgr.updatedStreamsDuringTaggingJob, mgr.addedStreamsDuringTaggingJob)
+			}
 		}
 		mgr.taggingJobRunning = false
 		mgr.startTaggingJobIfNeeded()
@@ -437,92 +538,15 @@ func (mgr *Manager) ImportPcap(filename string) {
 		mgr.importJobs = append(mgr.importJobs, filename)
 		//start import job when none running
 		if len(mgr.importJobs) == 1 {
-			indexes, releaser := mgr.getIndexesCopy(0, len(mgr.indexes))
-			go mgr.importPcapJob(mgr.importJobs[:1], indexes, releaser)
+			indexes, releaser := mgr.getIndexesCopy(0)
+			go mgr.importPcapJob(mgr.importJobs[:1], mgr.nextStreamID, indexes, releaser)
 		}
 	}
 }
 
-func (mgr *Manager) getIndexesCopy(start, end int) ([]*index.Reader, IndexReleaser) {
-	indexes := append([]*index.Reader(nil), mgr.indexes[start:end]...)
+func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
+	indexes := append([]*index.Reader(nil), mgr.indexes[start:]...)
 	return indexes, mgr.lock(indexes)
-}
-
-func (mgr *Manager) GetIndexes(tags []string) ([]*index.Reader, map[string]bitmask.LongBitmask, IndexReleaser, error) {
-	type res struct {
-		indexes  []*index.Reader
-		releaser IndexReleaser
-		tags     map[string]bitmask.LongBitmask
-		err      error
-	}
-	c := make(chan res)
-	mgr.jobs <- func() {
-		err := func() error {
-			tagMasks := map[string]bitmask.LongBitmask{}
-			minVersion := uint(math.MaxUint64)
-			for _, tn := range tags {
-				t, ok := mgr.tags[tn]
-				if !ok {
-					return fmt.Errorf("tag %q not found", tn)
-				}
-				if t.version == 0 {
-					return fmt.Errorf("tag %q not yet resolved", tn)
-				}
-				tagMasks[tn] = t.matchingStreams
-				// TODO: we should keep old versions of the tags until all are at a common higher version
-				// otherwise, we might produce an inconsistent view
-				if minVersion > t.version {
-					minVersion = t.version
-				}
-			}
-			indexCount := 0
-			for _, v := range mgr.indexesVersion {
-				if v > minVersion {
-					break
-				}
-				indexCount++
-			}
-			indexes, releaser := mgr.getIndexesCopy(0, indexCount)
-			c <- res{indexes, releaser, tagMasks, nil}
-			return nil
-		}()
-		if err != nil {
-			c <- res{err: err}
-		}
-		close(c)
-	}
-	r := <-c
-	return r.indexes, r.tags, r.releaser, r.err
-}
-
-func (mgr *Manager) Stream(streamID uint64) (*index.Stream, []string, IndexReleaser, error) {
-	indexes, _, releaser, err := mgr.GetIndexes(nil)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	defer releaser.Release(mgr)
-	for i := len(indexes) - 1; i >= 0; i-- {
-		idx := indexes[i]
-		stream, err := idx.StreamByID(streamID)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		if stream == nil {
-			continue
-		}
-		version := mgr.indexesVersion[i]
-		tags := []string{}
-		for tn, ti := range mgr.tags {
-			if ti.version < version {
-				continue
-			}
-			if ti.matchingStreams.IsSet(uint(streamID)) {
-				tags = append(tags, tn)
-			}
-		}
-		return stream, tags, releaser.extract(i), nil
-	}
-	return nil, nil, nil, nil
 }
 
 func (mgr *Manager) Status() Statistics {
@@ -542,9 +566,9 @@ func (mgr *Manager) Status() Statistics {
 			MergeJobRunning:   mgr.mergeJobRunning,
 			TaggingJobRunning: mgr.taggingJobRunning,
 		}
+		close(c)
 	}
 	res := <-c
-	close(c)
 	return res
 }
 
@@ -556,9 +580,9 @@ func (mgr *Manager) KnownPcaps() []pcapmetadata.PcapInfo {
 			r = append(r, *p)
 		}
 		c <- r
+		close(c)
 	}
 	res := <-c
-	close(c)
 	return res
 }
 
@@ -568,23 +592,19 @@ func (mgr *Manager) ListTags() []TagInfo {
 		res := []TagInfo{}
 		referencedTag := map[string]struct{}{}
 		for _, t := range mgr.tags {
-			for _, tn := range t.referencedTags {
+			for _, tn := range t.referencedTags() {
 				referencedTag[tn] = struct{}{}
 			}
 		}
 		for name, t := range mgr.tags {
-			indexesPending := uint(0)
-			for _, v := range mgr.indexesVersion {
-				if v > t.version {
-					indexesPending++
-				}
-			}
+			m := t.Matches.Copy()
+			m.Sub(t.Uncertain)
 			_, referenced := referencedTag[name]
 			res = append(res, TagInfo{
 				Name:           name,
 				Definition:     t.definition,
-				MatchingCount:  t.matchingCount,
-				IndexesPending: indexesPending,
+				MatchingCount:  uint(m.OnesCount()),
+				UncertainCount: uint(t.Uncertain.OnesCount()),
 				Referenced:     referenced,
 			})
 		}
@@ -606,24 +626,28 @@ func (mgr *Manager) AddTag(name, queryString string) error {
 	if err != nil {
 		return err
 	}
-	markIDs := []uint64(nil)
-	if isMark {
-		ids := q.Conditions.StreamIDs()
-		if ids == nil {
-			return errors.New("tags of type `mark` have to only contain an `id` filter")
-		}
-		markIDs = ids
-	}
-	if q.Conditions.HasRelativeTimes() {
+	features := q.Conditions.Features()
+	if (features.MainFeatures|features.SubQueryFeatures)&query.FeatureFilterTimeRelative != 0 {
 		return errors.New("relative times not yet supported in tags")
 	}
 	if q.Grouping != nil {
 		return errors.New("grouping not allowed in tags")
 	}
-	referencedTags := q.Conditions.ReferencedTags()
-	for _, tn := range referencedTags {
+	nt := &tag{
+		TagDetails: query.TagDetails{
+			Conditions: q.Conditions,
+		},
+		definition: queryString,
+		features:   features,
+	}
+	for _, tn := range nt.referencedTags() {
 		if tn == name {
 			return errors.New("self reference not allowed in tags")
+		}
+	}
+	if isMark {
+		if _, ok := q.Conditions.StreamIDs(0); !ok {
+			return errors.New("tags of type `mark` have to only contain an `id` filter")
 		}
 	}
 	c := make(chan error)
@@ -633,23 +657,17 @@ func (mgr *Manager) AddTag(name, queryString string) error {
 				return errors.New("tag already exists")
 			}
 			// check if all referenced tags exist
-			for _, t := range referencedTags {
+			for _, t := range nt.referencedTags() {
 				if _, ok := mgr.tags[t]; !ok {
 					return fmt.Errorf("unknown referenced tag %q", t)
 				}
 			}
-			t := &tag{
-				definition:     queryString,
-				referencedTags: referencedTags,
-			}
 			if isMark {
-				t.matchingCount = uint(len(markIDs))
-				for _, i := range markIDs {
-					t.matchingStreams.Set(uint(i))
-				}
-				t.version = mgr.currentVersion
+				nt.Matches, _ = q.Conditions.StreamIDs(mgr.nextStreamID)
+			} else {
+				nt.Uncertain = mgr.allStreams
 			}
-			mgr.tags[name] = t
+			mgr.tags[name] = nt
 			if !isMark {
 				mgr.startTaggingJobIfNeeded()
 			}
@@ -671,7 +689,7 @@ func (mgr *Manager) DelTag(name string) error {
 				return fmt.Errorf("unknown tag %q", name)
 			}
 			for t2name, t2 := range mgr.tags {
-				for _, tn := range t2.referencedTags {
+				for _, tn := range t2.referencedTags() {
 					if tn == name {
 						return fmt.Errorf("tag %q still references the tag to be deleted", t2name)
 					}
@@ -687,13 +705,6 @@ func (mgr *Manager) DelTag(name string) error {
 	}
 	return <-c
 }
-
-type (
-	updateTagOperationInfo struct {
-		markTagAddStreams, markTagDelStreams []uint64
-	}
-	UpdateTagOperation func(*updateTagOperationInfo)
-)
 
 func UpdateTagOperationMarkAddStream(streams []uint64) UpdateTagOperation {
 	s := make([]uint64, 0, len(streams))
@@ -721,12 +732,12 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	}
 	maxUsedStreamID := uint64(0)
 	for _, s := range info.markTagAddStreams {
-		if maxUsedStreamID < s+1 {
+		if maxUsedStreamID <= s {
 			maxUsedStreamID = s + 1
 		}
 	}
 	for _, s := range info.markTagDelStreams {
-		if maxUsedStreamID < s+1 {
+		if maxUsedStreamID <= s {
 			maxUsedStreamID = s + 1
 		}
 	}
@@ -734,46 +745,36 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 		// no operation
 		return nil
 	}
+	maxUsedStreamID--
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
-			if maxUsedStreamID != 0 {
-				maxExistingStreamID := uint64(0)
-				for _, i := range mgr.indexes {
-					if maxExistingStreamID < i.MaxStreamID()+1 {
-						maxExistingStreamID = i.MaxStreamID() + 1
-					}
-				}
-				if maxUsedStreamID > maxExistingStreamID {
-					return fmt.Errorf("unknown stream id %d", maxUsedStreamID-1)
-				}
+			if maxUsedStreamID >= mgr.nextStreamID {
+				return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
 			}
 			t, ok := mgr.tags[name]
 			if !ok {
 				return fmt.Errorf("unknown tag %q", name)
 			}
+			newTag := *t
+			newTag.Matches = t.Matches.Copy()
 			for _, s := range info.markTagAddStreams {
-				if !t.matchingStreams.IsSet(uint(s)) {
-					t.matchingCount++
-					t.matchingStreams.Set(uint(s))
-				}
+				newTag.Matches.Set(uint(s))
+				newTag.Uncertain.Set(uint(s))
 			}
 			for _, s := range info.markTagDelStreams {
-				if t.matchingStreams.IsSet(uint(s)) {
-					t.matchingCount--
-					t.matchingStreams.Unset(uint(s))
-				}
+				newTag.Matches.Unset(uint(s))
+				newTag.Uncertain.Set(uint(s))
 			}
 
 			b := strings.Builder{}
-			if t.matchingCount == 0 {
+			if newTag.Matches.IsZero() {
 				b.WriteString("id:-1")
 			} else {
 				b.WriteString("id:")
 				last := uint(0)
 				for {
-					zeros := t.matchingStreams.TrailingZerosAfter(last)
-					fmt.Printf("lza(%d): %d\n", last, zeros)
+					zeros := newTag.Matches.TrailingZerosFrom(last)
 					if zeros < 0 {
 						break
 					}
@@ -785,34 +786,13 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					last++
 				}
 			}
-			t.definition = b.String()
-			affected := map[string]struct{}{name: {}}
-			for {
-				added := false
-				for tn, t := range mgr.tags {
-					if _, ok := affected[tn]; ok {
-						continue
-					}
-					for _, rt := range t.referencedTags {
-						if _, ok := affected[rt]; ok {
-							affected[tn] = struct{}{}
-							added = true
-							break
-						}
-					}
-				}
-				if !added {
-					break
-				}
+			newTag.definition = b.String()
+			if q, err := query.Parse(newTag.definition); err == nil {
+				newTag.Conditions = q.Conditions
 			}
-			delete(affected, name)
-			//TODO: do not fully invalidate the affected tags, try to be more clever and only invalidate changed streams if possible
-			for tn := range affected {
-				mgr.tags[tn] = &tag{
-					definition:     mgr.tags[tn].definition,
-					referencedTags: mgr.tags[tn].referencedTags,
-				}
-			}
+			mgr.tags[name] = &newTag
+			mgr.inheritTagUncertainty()
+			mgr.tags[name].Uncertain = bitmask.LongBitmask{}
 			mgr.startTaggingJobIfNeeded()
 			return nil
 		}()
@@ -824,28 +804,15 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	return <-c
 }
 
-func (mgr *Manager) lock(indexes []*index.Reader) IndexReleaser {
+func (mgr *Manager) lock(indexes []*index.Reader) indexReleaser {
 	for _, i := range indexes {
 		mgr.usedIndexes[i]++
 	}
-	return IndexReleaser(append([]*index.Reader(nil), indexes...))
-}
-
-func (r *IndexReleaser) extract(i int) IndexReleaser {
-	rel := IndexReleaser{(*r)[i]}
-	*r = append((*r)[:i], (*r)[i+1:]...)
-	return rel
-}
-
-// Release all contained indexes
-func (r *IndexReleaser) Release(mgr *Manager) {
-	mgr.jobs <- func() {
-		r.release(mgr)
-	}
+	return indexReleaser(append([]*index.Reader(nil), indexes...))
 }
 
 // release all contained indexes from within the mgr goroutine
-func (r *IndexReleaser) release(mgr *Manager) {
+func (r *indexReleaser) release(mgr *Manager) {
 	for _, i := range *r {
 		mgr.usedIndexes[i]--
 		if mgr.usedIndexes[i] == 0 {
@@ -854,4 +821,204 @@ func (r *IndexReleaser) release(mgr *Manager) {
 			os.Remove(i.Filename())
 		}
 	}
+}
+
+func (mgr *Manager) GetView() View {
+	return View{mgr: mgr}
+}
+
+func (v *View) fetch() error {
+	if len(v.indexes) != 0 {
+		return nil
+	}
+	v.tagDetails = make(map[string]query.TagDetails)
+	c := make(chan error)
+	v.mgr.jobs <- func() {
+		v.indexes, v.releaser = v.mgr.getIndexesCopy(0)
+		for tn, ti := range v.mgr.tags {
+			v.tagDetails[tn] = ti.TagDetails
+		}
+		c <- nil
+		close(c)
+	}
+	return <-c
+}
+
+func (v *View) Release() {
+	if len(v.releaser) != 0 {
+		v.mgr.jobs <- func() {
+			v.releaser.release(v.mgr)
+		}
+	}
+}
+
+func PrefetchTags(tags []string) StreamsOption {
+	return func(o *streamsOptions) {
+		o.prefetchTags = append(o.prefetchTags, tags...)
+	}
+}
+
+func PrefetchAllTags() StreamsOption {
+	return func(o *streamsOptions) {
+		o.prefetchAllTags = true
+	}
+}
+
+func Limit(defaultLimit, page uint) StreamsOption {
+	return func(o *streamsOptions) {
+		o.defaultLimit = defaultLimit
+		o.page = page
+	}
+}
+
+func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption) error {
+	opts := streamsOptions{}
+	for _, o := range options {
+		o(&opts)
+	}
+	if opts.defaultLimit != 0 || opts.page != 0 {
+		return errors.New("Limit not supported for AllStreams")
+	}
+	if err := v.fetch(); err != nil {
+		return err
+	}
+	if opts.prefetchAllTags {
+		for tn := range v.tagDetails {
+			opts.prefetchTags = append(opts.prefetchTags, tn)
+		}
+	}
+	requestedTags := map[string]struct{}{}
+	for _, tn := range opts.prefetchTags {
+		ti, ok := v.tagDetails[tn]
+		if !ok {
+			return fmt.Errorf("tag %q not defined", tn)
+		}
+		if ti.Uncertain.IsZero() {
+			continue
+		}
+		requestedTags[tn] = struct{}{}
+	}
+	//TODO: precalculate the requested tags
+	for i := len(v.indexes); i > 0; i-- {
+		idx := v.indexes[i-1]
+		if err := idx.AllStreams(func(s *index.Stream) error {
+			for _, idx2 := range v.indexes[i:] {
+				if _, ok := idx2.StreamIDs()[s.ID()]; ok {
+					return nil
+				}
+			}
+			return f(StreamContext{
+				s: s,
+				v: v,
+			})
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, error) {
+	opts := streamsOptions{}
+	for _, o := range options {
+		o(&opts)
+	}
+	if err := v.fetch(); err != nil {
+		return false, err
+	}
+	if opts.prefetchAllTags {
+		for tn := range v.tagDetails {
+			opts.prefetchTags = append(opts.prefetchTags, tn)
+		}
+	}
+	requestedTags := map[string]struct{}{}
+	for _, tn := range opts.prefetchTags {
+		ti, ok := v.tagDetails[tn]
+		if !ok {
+			return false, fmt.Errorf("tag %q not defined", tn)
+		}
+		if ti.Uncertain.IsZero() {
+			continue
+		}
+		requestedTags[tn] = struct{}{}
+	}
+	limit := opts.defaultLimit
+	if filter.Limit != nil {
+		limit = *filter.Limit
+	}
+	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, opts.page*limit, v.tagDetails)
+	if err != nil {
+		return false, err
+	}
+	//TODO: calculate tags that will be requested later
+	for _, s := range res {
+		if err := f(StreamContext{
+			s: s,
+			v: v,
+		}); err != nil {
+			return false, err
+		}
+	}
+	return hasMore, nil
+}
+
+func (v *View) ReferenceTime() (time.Time, error) {
+	if err := v.fetch(); err != nil {
+		return time.Time{}, err
+	}
+	referenceTime := time.Time{}
+	for _, idx := range v.indexes {
+		if referenceTime.IsZero() || referenceTime.After(idx.ReferenceTime) {
+			referenceTime = idx.ReferenceTime
+		}
+	}
+	return referenceTime, nil
+}
+
+func (v *View) Stream(streamID uint64) (StreamContext, error) {
+	if err := v.fetch(); err != nil {
+		return StreamContext{}, err
+	}
+	for i := len(v.indexes) - 1; i >= 0; i-- {
+		idx := v.indexes[i]
+		stream, err := idx.StreamByID(streamID)
+		if err != nil {
+			return StreamContext{}, err
+		}
+		if stream == nil {
+			continue
+		}
+		return StreamContext{
+			s: stream,
+			v: v,
+		}, nil
+	}
+	return StreamContext{}, nil
+}
+
+func (c StreamContext) Stream() *index.Stream {
+	return c.s
+}
+
+func (c StreamContext) HasTag(name string) (bool, error) {
+	td := c.v.tagDetails[name]
+	if !td.Uncertain.IsSet(uint(c.s.ID())) {
+		return td.Matches.IsSet(uint(c.s.ID())), nil
+	}
+	//TODO: figure out if the uncertain tag matches
+	return false, nil
+}
+
+func (c StreamContext) AllTags() ([]string, error) {
+	tags := []string{}
+	for tn, td := range c.v.tagDetails {
+		if !td.Uncertain.IsSet(uint(c.s.ID())) {
+			if td.Matches.IsSet(uint(c.s.ID())) {
+				tags = append(tags, tn)
+			}
+			continue
+		}
+		//TODO: figure out if the uncertain tag matches
+	}
+	return tags, nil
 }

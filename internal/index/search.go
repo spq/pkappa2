@@ -86,9 +86,16 @@ func (sqs *subQuerySelection) empty() bool {
 	return len(sqs.remaining) == 0
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, tags map[string]bitmask.LongBitmask) (queryPart, error) {
+func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, limitIDs *bitmask.LongBitmask, tagDetails map[string]query.TagDetails) (queryPart, error) {
 	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
+
+	// filter to caller requested ids
+	if limitIDs != nil {
+		filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+			return limitIDs.IsSet(uint(s.StreamID)), nil
+		})
+	}
 
 	// filter out streams superseeded by newer indexes
 	if len(superseedingIndexes) != 0 {
@@ -132,14 +139,49 @@ conditions:
 			if cc.SubQuery != subQuery {
 				continue
 			}
-			bv := tags[cc.TagName]
-			if !cc.Invert {
-				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
-					return bv.IsSet(uint(s.StreamID)), nil
+			td := tagDetails[cc.TagName]
+			switch cc.Accept {
+			case 0:
+				// accept never
+				filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
+					return false, nil
 				})
-			} else {
+			case query.TagConditionAcceptUncertainMatching | query.TagConditionAcceptUncertainFailing | query.TagConditionAcceptMatching | query.TagConditionAcceptFailing:
+				// accept always
+			case query.TagConditionAcceptUncertainMatching | query.TagConditionAcceptUncertainFailing:
+				// accept if uncertain
 				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
-					return !bv.IsSet(uint(s.StreamID)), nil
+					return td.Uncertain.IsSet(uint(s.StreamID)), nil
+				})
+			case query.TagConditionAcceptMatching | query.TagConditionAcceptFailing:
+				// accept if certain
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+					return !td.Uncertain.IsSet(uint(s.StreamID)), nil
+				})
+			case query.TagConditionAcceptMatching | query.TagConditionAcceptUncertainMatching:
+				// accept if matching
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+					return td.Matches.IsSet(uint(s.StreamID)), nil
+				})
+			case query.TagConditionAcceptFailing | query.TagConditionAcceptUncertainFailing:
+				// accept if failing
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+					return !td.Matches.IsSet(uint(s.StreamID)), nil
+				})
+			default:
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+					a := cc.Accept
+					if td.Uncertain.IsSet(uint(s.StreamID)) {
+						a &= query.TagConditionAcceptUncertainMatching | query.TagConditionAcceptUncertainFailing
+					} else {
+						a &= query.TagConditionAcceptMatching | query.TagConditionAcceptFailing
+					}
+					if td.Matches.IsSet(uint(s.StreamID)) {
+						a &= query.TagConditionAcceptMatching | query.TagConditionAcceptUncertainMatching
+					} else {
+						a &= query.TagConditionAcceptFailing | query.TagConditionAcceptUncertainFailing
+					}
+					return a != 0, nil
 				})
 			}
 		case *query.FlagCondition:
@@ -1519,10 +1561,12 @@ var (
 	}
 )
 
-func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tags map[string]bitmask.LongBitmask) ([]*Stream, bool, error) {
+func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
+	qs = qs.InlineTagFilters(tagDetails)
+
 	var sortingLess func(a, b *Stream) bool
 	switch len(sorting) {
 	case 0:
@@ -1673,46 +1717,21 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 		}
 	}
 
-	requiredResultCount := map[string]int{}
 	allResults := map[string]resultData{}
-	subQueries := qs.SubQueries()
-	for _, subQuery := range subQueries {
+	for _, subQuery := range qs.SubQueries() {
 		results := resultData{
 			matchingQueryPart: make([]bitmask.ConnectedBitmask, len(qs)),
 		}
 		sorter := sortingLess
 		resultLimit := limit + skip
+		limitIDs := limitIDs
 		if subQuery != "" {
 			sorter = nil
 			resultLimit = 0
+			limitIDs = nil
 		}
 
-		firstAllowedIndex := 0
-		if len(subQueries) == 1 {
-			firstAllowedIndex = firstRequiredIndex
-		}
-		for idxIdx := len(indexes) - 1; idxIdx >= firstAllowedIndex; idxIdx-- {
-			if idxIdx+1 == firstRequiredIndex && len(subQueries) == 2 {
-				// this is the first non-required index
-				if subQuery != "" {
-					// save the result length for later reducing to this position
-					requiredResultCount[subQuery] = len(results.streams)
-				} else {
-					// filter the sub query results to those from one of the required indexes
-					for sq := range allResults {
-						rrc := requiredResultCount[sq]
-						for qID := range qs {
-							m := &allResults[sq].matchingQueryPart[qID]
-							if rrc == 0 {
-								*m = bitmask.ConnectedBitmask{}
-							} else {
-								*m = m.And(bitmask.MakeConnectedBitmask(0, uint(rrc-1)))
-							}
-						}
-					}
-				}
-			}
-
+		for idxIdx := len(indexes) - 1; idxIdx >= 0; idxIdx-- {
 			idx := indexes[idxIdx]
 
 			sortingLookup := (func() ([]uint32, error))(nil)
@@ -1740,7 +1759,7 @@ func SearchStreams(indexes []*Reader, firstRequiredIndex int, refTime time.Time,
 			queryParts := make([]queryPart, 0, len(qs))
 			for qID := range qs {
 				//build search structures
-				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], tags)
+				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails)
 				if err != nil {
 					return nil, false, err
 				}

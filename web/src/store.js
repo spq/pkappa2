@@ -113,7 +113,7 @@ const store = new Vuex.Store({
         },
         getStream({ commit, state }, streamIndex) {
             commit('resetStreamIndex', streamIndex);
-            var streamId = state.searchResponse.Results[streamIndex].ID;
+            var streamId = state.searchResponse.Results[streamIndex].Stream.ID;
             APIClient.getStream(streamId).then((data) => {
                 commit('resetStreamData', data);
             })

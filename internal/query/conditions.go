@@ -10,12 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 	"rsc.io/binaryregexp"
 )
 
 type (
 	NumberConditionSummandType uint8
 	HostConditionSourceType    bool
+	TagConditionAccept         uint8
 )
 
 const (
@@ -24,12 +26,10 @@ const (
 	NumberConditionSummandTypeServerBytes NumberConditionSummandType = iota
 	NumberConditionSummandTypeClientPort  NumberConditionSummandType = iota
 	NumberConditionSummandTypeServerPort  NumberConditionSummandType = iota
-)
-const (
+
 	HostConditionSourceTypeClient HostConditionSourceType = false
 	HostConditionSourceTypeServer HostConditionSourceType = true
-)
-const (
+
 	DataRequirementSequenceFlagsDirection               = 0b1
 	DataRequirementSequenceFlagsDirectionClientToServer = 0b0
 	DataRequirementSequenceFlagsDirectionServerToClient = 0b1
@@ -38,6 +38,11 @@ const (
 	FlagsHostConditionSource       = 0b10
 	FlagsHostConditionSourceClient = 0b00
 	FlagsHostConditionSourceServer = 0b10
+
+	TagConditionAcceptMatching          TagConditionAccept = 0b0001
+	TagConditionAcceptFailing           TagConditionAccept = 0b0010
+	TagConditionAcceptUncertainMatching TagConditionAccept = 0b0100
+	TagConditionAcceptUncertainFailing  TagConditionAccept = 0b1000
 )
 
 type (
@@ -56,7 +61,7 @@ type (
 		// this is fulfilled, when
 		SubQuery string
 		TagName  string
-		Invert   bool
+		Accept   TagConditionAccept
 	}
 	FlagCondition struct {
 		// this is fulfilled, when (xored(i.Flags for i in SubQueries) ^ Value) & Mask != 0
@@ -128,7 +133,20 @@ func (c *TagCondition) String() string {
 	if len(tagNameSplitted) != 2 {
 		tagNameSplitted = []string{"invalid_tag", c.TagName}
 	}
-	return fmt.Sprintf("%s%s%s%s:%s", map[bool]string{false: "", true: "-"}[c.Invert], c.SubQuery, map[bool]string{false: ":", true: ""}[c.SubQuery == ""], tagNameSplitted[0], tagNameSplitted[1])
+	prefix := ""
+	switch c.Accept {
+	case TagConditionAcceptUncertainMatching | TagConditionAcceptMatching:
+		prefix = ""
+	case TagConditionAcceptUncertainFailing | TagConditionAcceptFailing:
+		prefix = "-"
+	case TagConditionAcceptUncertainFailing | TagConditionAcceptUncertainMatching:
+		prefix = "?"
+	case TagConditionAcceptFailing | TagConditionAcceptMatching:
+		prefix = "-?"
+	default:
+		prefix = fmt.Sprintf("[%d]", c.Accept)
+	}
+	return fmt.Sprintf("%s%s%s%s:%s", prefix, c.SubQuery, map[bool]string{false: "@", true: ""}[c.SubQuery == ""], tagNameSplitted[0], tagNameSplitted[1])
 }
 
 func (c *FlagCondition) String() string {
@@ -323,7 +341,7 @@ func (c *ImpossibleCondition) impossible() bool {
 
 func (c *TagCondition) equal(d Condition) bool {
 	o, ok := d.(*TagCondition)
-	return ok && c.Invert == o.Invert && c.SubQuery == o.SubQuery && c.TagName == o.TagName
+	return ok && c.Accept == o.Accept && c.SubQuery == o.SubQuery && c.TagName == o.TagName
 }
 
 func (c *FlagCondition) equal(d Condition) bool {
@@ -416,7 +434,7 @@ func (c *TagCondition) invert() ConditionsSet {
 			&TagCondition{
 				SubQuery: c.SubQuery,
 				TagName:  c.TagName,
-				Invert:   !c.Invert,
+				Accept:   c.Accept ^ (TagConditionAcceptFailing | TagConditionAcceptMatching | TagConditionAcceptUncertainFailing | TagConditionAcceptUncertainMatching),
 			},
 		},
 	}
@@ -516,6 +534,7 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 				&TagCondition{
 					SubQuery: t.SubQuery,
 					TagName:  fmt.Sprintf("%s/%s", t.Key, strings.TrimSpace(v)),
+					Accept:   TagConditionAcceptMatching | TagConditionAcceptUncertainMatching,
 				},
 			})
 		}
@@ -1021,20 +1040,29 @@ func cleanTagConditions(lcs *[]TagCondition) bool {
 		return true
 	}
 	type key struct{ s, t string }
-	m := map[key]bool{}
+	m := map[key]TagConditionAccept{}
 	for _, lc := range *lcs {
-		k := key{s: lc.SubQuery, t: lc.TagName}
-		if inv, ok := m[k]; ok && inv != lc.Invert {
+		if lc.Accept == 0 {
 			return false
 		}
-		m[k] = lc.Invert
+		k := key{s: lc.SubQuery, t: lc.TagName}
+		a, ok := m[k]
+		if !ok {
+			m[k] = lc.Accept
+			continue
+		}
+		a &= lc.Accept
+		if a == 0 {
+			return false
+		}
+		m[k] = a
 	}
 	*lcs = nil
-	for k, inv := range m {
+	for k, a := range m {
 		*lcs = append(*lcs, TagCondition{
 			SubQuery: k.s,
 			TagName:  k.t,
-			Invert:   inv,
+			Accept:   a,
 		})
 	}
 	sort.Slice(*lcs, func(i, j int) bool {
@@ -1739,24 +1767,6 @@ func (c *Conditions) String() string {
 	return fmt.Sprintf("(%s)", strings.Join(res, ") & ("))
 }
 
-func (cs *ConditionsSet) ReferencedTags() []string {
-	referencedTagsMap := map[string]struct{}{}
-	referencedTags := []string(nil)
-	for _, c := range *cs {
-		for _, cc := range c {
-			if tc, ok := cc.(*TagCondition); ok {
-				if _, ok := referencedTagsMap[tc.TagName]; !ok {
-					referencedTagsMap[tc.TagName] = struct{}{}
-					referencedTags = append(referencedTags, tc.TagName)
-				}
-
-			}
-		}
-	}
-	sort.Strings(referencedTags)
-	return referencedTags
-}
-
 func (cs *ConditionsSet) SubQueries() []string {
 	subQueryDependencies := func(cc Condition) []string {
 		res := []string(nil)
@@ -1851,46 +1861,23 @@ func (cs *ConditionsSet) SubQueries() []string {
 	return res
 }
 
-func (cs *ConditionsSet) HasRelativeTimes() bool {
-	for _, ccs := range *cs {
-		for _, cc := range ccs {
-			c, ok := cc.(*TimeCondition)
-			if !ok {
-				continue
-			}
-			nowFactors := c.ReferenceTimeFactor
-			for _, s := range c.Summands {
-				nowFactors += s.FTimeFactor
-				nowFactors += s.LTimeFactor
-			}
-			if nowFactors < 0 {
-				nowFactors = -nowFactors
-			}
-			if nowFactors%2 == 1 {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // returns a list of stream id's that match the query, returns nil if other conditions exist
-func (cs *ConditionsSet) StreamIDs() []uint64 {
+func (cs *ConditionsSet) StreamIDs(nextStreamID uint64) (bitmask.LongBitmask, bool) {
 	if cs.impossible() {
-		return []uint64{}
+		return bitmask.LongBitmask{}, true
 	}
-	ids := map[int]struct{}{}
+	res := bitmask.LongBitmask{}
 	for _, ccs := range *cs {
-		min, max := 0, math.MaxInt64
+		min, max := 0, int(nextStreamID)
 		for _, cc := range ccs {
 			// Number + X >= 0
 			c, ok := cc.(*NumberCondition)
 			if !ok || len(c.Summands) != 1 {
-				return nil
+				return bitmask.LongBitmask{}, false
 			}
 			s := c.Summands[0]
 			if s.SubQuery != "" || s.Type != NumberConditionSummandTypeID {
-				return nil
+				return bitmask.LongBitmask{}, false
 			}
 			switch s.Factor {
 			case 1:
@@ -1900,22 +1887,18 @@ func (cs *ConditionsSet) StreamIDs() []uint64 {
 				}
 			case -1:
 				// ID <= Number
-				if max > c.Number {
-					max = c.Number
+				if max > c.Number+1 {
+					max = c.Number + 1
 				}
 			default:
-				return nil
+				return bitmask.LongBitmask{}, false
 			}
 		}
-		for i := min; i <= max; i++ {
-			ids[i] = struct{}{}
+		for i := min; i < max; i++ {
+			res.Set(uint(i))
 		}
 	}
-	res := make([]uint64, 0, len(ids))
-	for i := range ids {
-		res = append(res, uint64(i))
-	}
-	return res
+	return res, true
 }
 
 func (cs *ConditionsSet) UpdateReferenceTime(oldReferenceTime, newReferenceTime time.Time) {
@@ -1932,4 +1915,186 @@ func (cs *ConditionsSet) UpdateReferenceTime(oldReferenceTime, newReferenceTime 
 			}
 		}
 	}
+}
+
+type (
+	Feature    uint8
+	FeatureSet struct {
+		MainFeatures, SubQueryFeatures Feature
+		MainTags, SubQueryTags         []string
+	}
+)
+
+const (
+	FeatureFilterID Feature = 1 << iota
+	FeatureFilterProtocol
+	FeatureFilterPort
+	FeatureFilterHost
+	FeatureFilterTimeAbsolute
+	FeatureFilterTimeRelative
+	FeatureFilterTags
+	FeatureFilterData
+)
+
+func (cs *ConditionsSet) Features() FeatureSet {
+	fs := FeatureSet{}
+	mainTags := map[string]struct{}{}
+	subQueryTags := map[string]struct{}{}
+	for _, ccs := range *cs {
+		for _, cc := range ccs {
+			mq, sq := false, false
+			f := Feature(0)
+			switch ccc := cc.(type) {
+			case *ImpossibleCondition:
+			case *TagCondition:
+				mq = ccc.SubQuery == ""
+				sq = ccc.SubQuery != ""
+				f = FeatureFilterTags
+				if _, ok := mainTags[ccc.TagName]; mq && !ok {
+					mainTags[ccc.TagName] = struct{}{}
+					fs.MainTags = append(fs.MainTags, ccc.TagName)
+				}
+				if _, ok := subQueryTags[ccc.TagName]; mq && !ok {
+					subQueryTags[ccc.TagName] = struct{}{}
+					fs.SubQueryTags = append(fs.SubQueryTags, ccc.TagName)
+				}
+			case *FlagCondition:
+				for _, s := range ccc.SubQueries {
+					if s == "" {
+						mq = true
+					} else {
+						sq = true
+					}
+				}
+				if ccc.Mask&flagsStreamProtocol != 0 {
+					f = FeatureFilterProtocol
+				}
+			case *HostCondition:
+				f = FeatureFilterHost
+				for _, s := range ccc.HostConditionSources {
+					if s.SubQuery == "" {
+						mq = true
+					} else {
+						sq = true
+					}
+				}
+			case *NumberCondition:
+				for _, s := range ccc.Summands {
+					if s.SubQuery == "" {
+						mq = true
+					} else {
+						sq = true
+					}
+					switch s.Type {
+					case NumberConditionSummandTypeID:
+						f |= FeatureFilterID
+					case NumberConditionSummandTypeClientPort, NumberConditionSummandTypeServerPort:
+						f |= FeatureFilterPort
+					case NumberConditionSummandTypeClientBytes, NumberConditionSummandTypeServerBytes:
+						f |= FeatureFilterData
+					}
+				}
+			case *TimeCondition:
+				nowFactors := ccc.ReferenceTimeFactor
+				for _, s := range ccc.Summands {
+					if s.SubQuery == "" {
+						mq = true
+					} else {
+						sq = true
+					}
+					nowFactors += s.FTimeFactor
+					nowFactors += s.LTimeFactor
+				}
+				if nowFactors < 0 {
+					nowFactors = -nowFactors
+				}
+				if isRel := nowFactors%2 == 1; isRel {
+					f = FeatureFilterTimeRelative
+				} else {
+					f = FeatureFilterTimeAbsolute
+				}
+			case *DataCondition:
+				for _, e := range ccc.Elements {
+					if e.SubQuery == "" {
+						mq = true
+					} else {
+						sq = true
+					}
+				}
+				f = FeatureFilterData
+			}
+			if mq {
+				fs.MainFeatures |= f
+			}
+			if sq {
+				fs.SubQueryFeatures |= f
+			}
+		}
+	}
+	return fs
+}
+
+type (
+	TagDetails struct {
+		Matches, Uncertain bitmask.LongBitmask
+		Conditions         ConditionsSet
+	}
+)
+
+func (cs Conditions) inlineTagFilter(tags map[string]TagDetails) ConditionsSet {
+	const (
+		uncertain = TagConditionAcceptUncertainFailing | TagConditionAcceptUncertainMatching
+		certain   = TagConditionAcceptFailing | TagConditionAcceptMatching
+		matching  = TagConditionAcceptUncertainMatching | TagConditionAcceptMatching
+		failing   = TagConditionAcceptUncertainFailing | TagConditionAcceptFailing
+	)
+	csNew := ConditionsSet{{}}
+	for _, cc := range cs {
+		c, ok := cc.(*TagCondition)
+		if !ok || c.Accept&uncertain == 0 || ^c.Accept&uncertain == 0 {
+			for i := range csNew {
+				csNew[i] = append(csNew[i], cc)
+			}
+			continue
+		}
+		td, ok := tags[c.TagName]
+		if !ok || td.Uncertain.IsZero() {
+			for i := range csNew {
+				csNew[i] = append(csNew[i], cc)
+			}
+			continue
+		}
+		tagConditionsSet := td.Conditions.InlineTagFilters(tags)
+		//TODO: rename subqueries in tagConditionsSet to not collide with the normal query
+		if c.Accept&uncertain == TagConditionAcceptUncertainFailing {
+			tagConditionsSet = tagConditionsSet.invert()
+		}
+		origLen := len(csNew)
+		for range tagConditionsSet {
+			csNew = append(csNew, csNew[:origLen]...)
+		}
+		a := c.Accept & certain
+		for i := range csNew {
+			if i == origLen {
+				a = uncertain
+			}
+			csNew[i] = append(csNew[i], &TagCondition{
+				SubQuery: c.SubQuery,
+				TagName:  c.TagName,
+				Accept:   a,
+			})
+			if i >= origLen {
+				csNew[i] = append(csNew[i], tagConditionsSet[(i/origLen)-1]...)
+			}
+		}
+	}
+	return csNew
+}
+
+func (cs ConditionsSet) InlineTagFilters(tags map[string]TagDetails) ConditionsSet {
+	csNew := ConditionsSet{}
+	for _, c := range cs {
+		csNew = append(csNew, c.inlineTagFilter(tags)...)
+	}
+	return csNew.clean()
 }

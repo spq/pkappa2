@@ -465,6 +465,10 @@ func (s *Stream) LastPacket() time.Time {
 	return s.r.ReferenceTime.Add(time.Duration(s.LastPacketTimeNS) * time.Nanosecond).Local()
 }
 
+func (s *Stream) Reader() *Reader {
+	return s.r
+}
+
 func (s *Stream) MarshalJSON() ([]byte, error) {
 	type SideInfo struct {
 		Host  string

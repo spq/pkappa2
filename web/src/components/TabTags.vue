@@ -25,8 +25,8 @@
             <td>{{ tag.Definition }}</td>
             <td>
               Matching {{ tag.MatchingCount }} Streams<span
-                v-if="tag.IndexesPending != 0"
-                >, {{ tag.IndexesPending }} Indexes pending</span
+                v-if="tag.UncertainCount != 0"
+                >, {{ tag.UncertainCount }} pending</span
               ><span v-if="tag.Referenced">, Referenced by another tag</span>
             </td>
             <td align="right">
@@ -58,7 +58,9 @@ export default {
   methods: {
     ...mapActions(["delTag"]),
     searchStreamsForTag(tag) {
-      this.$emit("searchStreams", "tag:" + tag.Name, 0);
+      const typ = tag.Name.split("/", 1)[0];
+      const query = typ + ":\"" + tag.Name.substr(typ.length+1) + "\"";
+      this.$emit("searchStreams", query, 0);
     },
   },
 };

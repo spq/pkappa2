@@ -22,15 +22,15 @@
           <tbody>
             <tr
               v-for="(stream, index) in searchResponse.Results"
-              :key="stream.ID"
+              :key="stream.Stream.ID"
               @click="getStream(index)"
             >
-              <td>{{ stream.ID }}</td>
-              <td>{{ stream.FirstPacket }}</td>
-              <td>{{ stream.Client.Host }}:{{ stream.Client.Port }}</td>
-              <td>{{ stream.Client.Bytes }}</td>
-              <td>{{ stream.Server.Host }}:{{ stream.Server.Port }}</td>
-              <td>{{ stream.Server.Bytes }}</td>
+              <td>{{ stream.Stream.ID }}</td>
+              <td>{{ stream.Stream.FirstPacket }}</td>
+              <td>{{ stream.Stream.Client.Host }}:{{ stream.Stream.Client.Port }}</td>
+              <td>{{ stream.Stream.Client.Bytes }}</td>
+              <td>{{ stream.Stream.Server.Host }}:{{ stream.Stream.Server.Port }}</td>
+              <td>{{ stream.Stream.Server.Bytes }}</td>
             </tr>
           </tbody>
         </template>
