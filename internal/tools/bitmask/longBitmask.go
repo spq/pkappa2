@@ -8,6 +8,12 @@ type (
 	}
 )
 
+func (bm LongBitmask) Copy() LongBitmask {
+	return LongBitmask{
+		mask: append([]uint64(nil), bm.mask...),
+	}
+}
+
 func (bm LongBitmask) IsSet(bit uint) bool {
 	idx, lbit := bit/64, bit%64
 	if idx < uint(len(bm.mask)) {
@@ -52,7 +58,7 @@ func (bm LongBitmask) LeadingZeros() int {
 	return -1
 }
 
-func (bm LongBitmask) TrailingZerosAfter(bit uint) int {
+func (bm LongBitmask) TrailingZerosFrom(bit uint) int {
 	startIdx, lbit := bit/64, bit%64
 	if startIdx >= uint(len(bm.mask)) {
 		return -1
