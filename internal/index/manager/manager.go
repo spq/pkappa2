@@ -871,6 +871,82 @@ func Limit(defaultLimit, page uint) StreamsOption {
 	}
 }
 
+func (v *View) prefetchTags(tags []string, bm bitmask.LongBitmask) error {
+	if len(tags) == 0 {
+		return nil
+	}
+	uncertainTags := map[string]bitmask.LongBitmask{}
+	addTag := (func(string, bitmask.LongBitmask))(nil)
+	addTag = func(tn string, streams bitmask.LongBitmask) {
+		ti := v.tagDetails[tn]
+		if ti.Uncertain.IsZero() {
+			return
+		}
+		uncertain := ti.Uncertain
+		if !streams.IsZero() {
+			uncertain = uncertain.Copy()
+			uncertain.And(streams)
+			if uncertain.IsZero() {
+				return
+			}
+		}
+		if u, ok := uncertainTags[tn]; ok {
+			tmp := uncertain.Copy()
+			tmp.Sub(u)
+			if tmp.IsZero() {
+				return
+			}
+			tmp.Or(u)
+			uncertain = tmp
+		}
+		uncertainTags[tn] = uncertain
+		f := ti.Conditions.Features()
+		for _, tn := range f.SubQueryTags {
+			addTag(tn, bitmask.LongBitmask{})
+		}
+		for _, tn := range f.MainTags {
+			addTag(tn, uncertain)
+		}
+	}
+	for _, tn := range tags {
+		if _, ok := v.tagDetails[tn]; !ok {
+			return fmt.Errorf("tag %q not defined", tn)
+		}
+		addTag(tn, bm)
+	}
+	for len(uncertainTags) != 0 {
+	outer:
+		for tn, uncertain := range uncertainTags {
+			ti := v.tagDetails[tn]
+			f := ti.Conditions.Features()
+			for _, rtn := range f.MainTags {
+				if _, ok := uncertainTags[rtn]; ok {
+					continue outer
+				}
+			}
+			for _, rtn := range f.SubQueryTags {
+				if _, ok := uncertainTags[rtn]; ok {
+					continue outer
+				}
+			}
+			matches, _, err := index.SearchStreams(v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails)
+			if err != nil {
+				return err
+			}
+			ti.Uncertain = ti.Uncertain.Copy()
+			ti.Uncertain.Sub(uncertain)
+			ti.Matches = ti.Matches.Copy()
+			ti.Matches.Sub(uncertain)
+			for _, s := range matches {
+				ti.Matches.Set(uint(s.StreamID))
+			}
+			v.tagDetails[tn] = ti
+			delete(uncertainTags, tn)
+		}
+	}
+	return nil
+}
+
 func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption) error {
 	opts := streamsOptions{}
 	for _, o := range options {
@@ -887,18 +963,7 @@ func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption)
 			opts.prefetchTags = append(opts.prefetchTags, tn)
 		}
 	}
-	requestedTags := map[string]struct{}{}
-	for _, tn := range opts.prefetchTags {
-		ti, ok := v.tagDetails[tn]
-		if !ok {
-			return fmt.Errorf("tag %q not defined", tn)
-		}
-		if ti.Uncertain.IsZero() {
-			continue
-		}
-		requestedTags[tn] = struct{}{}
-	}
-	//TODO: precalculate the requested tags
+	v.prefetchTags(opts.prefetchTags, bitmask.LongBitmask{})
 	for i := len(v.indexes); i > 0; i-- {
 		idx := v.indexes[i-1]
 		if err := idx.AllStreams(func(s *index.Stream) error {
@@ -931,17 +996,6 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 			opts.prefetchTags = append(opts.prefetchTags, tn)
 		}
 	}
-	requestedTags := map[string]struct{}{}
-	for _, tn := range opts.prefetchTags {
-		ti, ok := v.tagDetails[tn]
-		if !ok {
-			return false, fmt.Errorf("tag %q not defined", tn)
-		}
-		if ti.Uncertain.IsZero() {
-			continue
-		}
-		requestedTags[tn] = struct{}{}
-	}
 	limit := opts.defaultLimit
 	if filter.Limit != nil {
 		limit = *filter.Limit
@@ -950,7 +1004,18 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 	if err != nil {
 		return false, err
 	}
-	//TODO: calculate tags that will be requested later
+	if len(res) == 0 {
+		return hasMore, nil
+	}
+	if len(opts.prefetchTags) != 0 {
+		searchedStreams := bitmask.LongBitmask{}
+		for _, s := range res {
+			searchedStreams.Set(uint(s.StreamID))
+		}
+		if err := v.prefetchTags(opts.prefetchTags, searchedStreams); err != nil {
+			return false, err
+		}
+	}
 	for _, s := range res {
 		if err := f(StreamContext{
 			s: s,
