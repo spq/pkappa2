@@ -14,8 +14,6 @@ server:
 
 both:
 - add tag color
-- show matching tags, marks and identified service in result and stream view
-- support adding/removing marks to/from streams in result view
 - add a search history
 - add pcap listing
 - support showing alternatives for groups
@@ -27,7 +25,5 @@ both:
 - add documentation
 
 ui:
-- add keyboard handlers (escape, prev/next stream)
 - marking something (e.g. when you want to copy it) in the results view moves you to the stream, it should not
 - marking something in stream view and pressing a key could add a data filter
-- deep links & back button

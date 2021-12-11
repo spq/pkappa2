@@ -358,6 +358,7 @@ func main() {
 				Stream *index.Stream
 				Tags   []string
 			}
+			Offset      uint
 			MoreResults bool
 		}{
 			Debug: qq.Debug,
@@ -368,7 +369,7 @@ func main() {
 		}
 		v := mgr.GetView()
 		defer v.Release()
-		hasMore, err := v.SearchStreams(qq, func(c manager.StreamContext) error {
+		hasMore, offset, err := v.SearchStreams(qq, func(c manager.StreamContext) error {
 			tags, err := c.AllTags()
 			if err != nil {
 				return err
@@ -387,6 +388,7 @@ func main() {
 			return
 		}
 		response.MoreResults = hasMore
+		response.Offset = offset
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
@@ -598,7 +600,7 @@ func main() {
 		}
 
 		if filter != nil {
-			_, err := v.SearchStreams(filter, handleStream, manager.PrefetchTags(groupingTags))
+			_, _, err := v.SearchStreams(filter, handleStream, manager.PrefetchTags(groupingTags))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 				return

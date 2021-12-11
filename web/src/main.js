@@ -12,6 +12,17 @@ Vue.use(VueApexCharts)
 
 Vue.component('apexchart', VueApexCharts)
 
+Vue.filter('capitalize', function (value) {
+  if (!value) return ''
+  value = value.toString()
+  return value.charAt(0).toUpperCase() + value.slice(1)
+})
+Vue.filter('tagify', function (id, what) {
+  const type = id.split("/", 1)[0];
+  const name = id.substr(type.length + 1);
+  return { id, type, name }[what];
+})
+
 new Vue({
   vuetify: new Vuetify(),
   store,

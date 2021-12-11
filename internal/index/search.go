@@ -139,7 +139,10 @@ conditions:
 			if cc.SubQuery != subQuery {
 				continue
 			}
-			td := tagDetails[cc.TagName]
+			td, ok := tagDetails[cc.TagName]
+			if !ok {
+				return queryPart{}, fmt.Errorf("tag %q does not exist", cc.TagName)
+			}
 			switch cc.Accept {
 			case 0:
 				// accept never

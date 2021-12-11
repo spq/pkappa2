@@ -230,7 +230,7 @@ export default {
     ...mapActions(["markTagNew", "markTagAdd", "markTagDel", "updateTags"]),
     newMark: function () {
       this.markTagNew({
-        name: this.newMarkName,
+        name: `mark/${this.newMarkName}`,
         streams: [this.streamData.Stream.ID],
       });
       this.updateTags();

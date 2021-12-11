@@ -40,7 +40,7 @@ const APIClient = {
     },
     markTagNew(name, streams) {
         if (streams.length == 0) streams = [-1];
-        return this.addTag(`mark/${name}`, `id:${streams.join(',')}`)
+        return this.addTag(name, `id:${streams.join(',')}`)
     },
     markTagAdd(name, streams) {
         const params = new URLSearchParams();

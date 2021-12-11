@@ -620,7 +620,10 @@ func (mgr *Manager) ListTags() []TagInfo {
 func (mgr *Manager) AddTag(name, queryString string) error {
 	isMark := strings.HasPrefix(name, "mark/")
 	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/") || isMark) {
-		return errors.New("invalid tag name (need a tag/ or service/ prefix)")
+		return errors.New("invalid tag name (need a 'tag/', 'service/' or 'mark/' prefix)")
+	}
+	if sub := strings.SplitN(name, "/", 2)[1]; sub == "" {
+		return errors.New("invalid tag name (prefix only not allowed)")
 	}
 	q, err := query.Parse(queryString)
 	if err != nil {
@@ -983,13 +986,13 @@ func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption)
 	return nil
 }
 
-func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, error) {
+func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, uint, error) {
 	opts := streamsOptions{}
 	for _, o := range options {
 		o(&opts)
 	}
 	if err := v.fetch(); err != nil {
-		return false, err
+		return false, 0, err
 	}
 	if opts.prefetchAllTags {
 		for tn := range v.tagDetails {
@@ -1000,12 +1003,13 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 	if filter.Limit != nil {
 		limit = *filter.Limit
 	}
-	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, opts.page*limit, v.tagDetails)
+	offset := opts.page * limit
+	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	if len(res) == 0 {
-		return hasMore, nil
+		return hasMore, offset, nil
 	}
 	if len(opts.prefetchTags) != 0 {
 		searchedStreams := bitmask.LongBitmask{}
@@ -1013,7 +1017,7 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 			searchedStreams.Set(uint(s.StreamID))
 		}
 		if err := v.prefetchTags(opts.prefetchTags, searchedStreams); err != nil {
-			return false, err
+			return false, 0, err
 		}
 	}
 	for _, s := range res {
@@ -1021,10 +1025,10 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 			s: s,
 			v: v,
 		}); err != nil {
-			return false, err
+			return false, 0, err
 		}
 	}
-	return hasMore, nil
+	return hasMore, offset, nil
 }
 
 func (v *View) ReferenceTime() (time.Time, error) {

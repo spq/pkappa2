@@ -25,8 +25,64 @@ const store = new Vuex.Store({
         graphData: null,
 
         markTagNewStatus: null,
+        markTagUpdateStatus: null,
+
+        streams: {
+            query: null,
+            page: null,
+            running: false,
+            error: null,
+            result: null,
+        },
+        stream: {
+            id: null,
+            running: false,
+            error: null,
+            stream: null,
+        },
+        graph: {
+            type: null,
+            delta: null,
+            aspects: null,
+            tags: null,
+            query: null,
+            running: false,
+            error: null,
+            graph: null,
+        },
     },
     mutations: {
+        setStreams(state, obj) {
+            state.streams = obj;
+        },
+        setStream(state, obj) {
+            state.stream = obj;
+        },
+        setGraph(state, obj) {
+            state.graph = obj;
+        },
+        updateMark(state, { name, streams, value }) {
+            if (state.stream.stream != null && (streams == undefined || streams.includes(state.stream.stream.Stream.ID))) {
+                const s = state.stream.stream;
+                const current = s.Tags.includes(name);
+                if (value && !current) {
+                    s.Tags.push(name);
+                } else if (current && !value) {
+                    s.Tags = s.Tags.filter((t) => t != name)
+                }
+            }
+            if (state.streams.result != null) {
+                for (const s of state.streams.result.Results) {
+                    if (streams != undefined && !streams.includes(s.Stream.ID)) continue;
+                    const current = s.Tags.includes(name);
+                    if (value && !current) {
+                        s.Tags.push(name);
+                    } else if (current && !value) {
+                        s.Tags = s.Tags.filter((t) => t != name)
+                    }
+                }
+            }
+        },
         searchStarted(state, obj) {
             state.streamData = null;
             state.streamIndex = null;
@@ -70,7 +126,10 @@ const store = new Vuex.Store({
         },
         resetMarkTagNewStatus(state, status) {
             state.markTagNewStatus = status
-        }
+        },
+        resetMarkTagUpdateStatus(state, status) {
+            state.markTagUpdateStatus = status
+        },
     },
     getters: {
         prevSearchPage(state) {
@@ -93,8 +152,52 @@ const store = new Vuex.Store({
                 return null;
             return state.streamIndex + 1;
         },
+        groupedTags(state) {
+            let res = {
+                tag: [],
+                service: [],
+                mark: [],
+            };
+            if (state.tags != null) {
+                for (const tag of state.tags) {
+                    const type = tag.Name.split("/", 1)[0];
+                    if (type in res)
+                        res[type].push(tag);
+                    else
+                        console.log(`Tag ${tag.Name} has unsupported type`)
+                }
+            }
+            return res;
+        },
     },
     actions: {
+        searchStreamsNew({ commit }, { query, page }) {
+            if (!page) page = 0;
+            commit('setStreams', { query, page, running: true, error: null, result: null });
+            APIClient.searchStreams(query, page).then((data) => {
+                if (!data.Error)
+                    commit('setStreams', { query, page, running: false, error: null, result: data });
+                else commit('setStreams', { query, page, running: false, error: data.Error, result: null });
+            }).catch((err) => {
+                commit('setStreams', { query, page, running: false, error: err.response.data, result: null });
+            })
+        },
+        fetchStreamNew({ commit }, { id }) {
+            commit('setStream', { id, running: true, error: null, stream: null });
+            APIClient.getStream(id).then((data) => {
+                commit('setStream', { id, running: false, error: null, stream: data });
+            }).catch((err) => {
+                commit('setStream', { id, running: false, error: err.response.data, stream: null });
+            })
+        },
+        fetchGraphNew({ commit }, { delta, aspects, tags, query, type }) {
+            commit('setGraph', { delta, aspects, tags, query, type, running: true, error: null, graph: null });
+            APIClient.getGraph(delta, aspects, tags, query).then((data) => {
+                commit('setGraph', { delta, aspects, tags, query, type, running: false, error: null, graph: data });
+            }).catch((err) => {
+                commit('setGraph', { delta, aspects, tags, query, type, running: false, error: err.response.data, graph: null });
+            })
+        },
         switchSearchPage({ dispatch, state }, page) {
             dispatch('searchStreamsObject', { query: state.searchQuery, page: page - 1 });
         },
@@ -128,22 +231,25 @@ const store = new Vuex.Store({
                 commit('resetTags', data);
             })
         },
-        addTag({ commit, dispatch }, { name, query }) {
+        async addTag({ commit, dispatch }, { name, query }) {
             commit('resetTagAddStatus', { inProgress: true })
-            APIClient.addTag(name, query).then(() => {
+            return APIClient.addTag(name, query).then(() => {
                 commit('resetTagAddStatus', { inProgress: false })
                 dispatch('updateTags');
-            }).catch((data) => {
-                commit('resetTagAddStatus', { error: data, inProgress: false })
+            }).catch((err) => {
+                commit('resetTagAddStatus', { error: err, inProgress: false })
+                throw err.response.data;
             })
         },
-        delTag({ commit, dispatch }, name) {
+        async delTag({ commit, dispatch }, name) {
             commit('resetTagDelStatus', { inProgress: true })
-            APIClient.delTag(name).then(() => {
+            return APIClient.delTag(name).then(() => {
                 commit('resetTagDelStatus', { inProgress: false })
+                commit('updateMark', { name, value: false })
                 dispatch('updateTags');
-            }).catch((data) => {
-                commit('resetTagDelStatus', { error: data, inProgress: false })
+            }).catch((err) => {
+                commit('resetTagDelStatus', { error: err, inProgress: false })
+                throw err.response.data;
             })
         },
         updateGraph({ commit }, { delta, aspects, tags, query }) {
@@ -151,28 +257,37 @@ const store = new Vuex.Store({
                 commit('resetGraphData', data);
             })
         },
-        markTagNew({ dispatch, commit }, { name, streams }) {
-            APIClient.markTagNew(name, streams).then(() => {
-                commit('resetMarkTagNewStatus', { inProgress: false });
+        async markTagNew({ dispatch, commit }, { name, streams }) {
+            commit('resetMarkTagNewStatus', { inProgress: true, error: null });
+            return APIClient.markTagNew(name, streams).catch((err) => {
+                commit('resetMarkTagNewStatus', { inProgress: false, error: err.response.data });
+                throw err.response.data;
+            }).then(() => {
+                commit('resetMarkTagNewStatus', { inProgress: false, error: null });
+                commit('updateMark', { name, streams, value: true })
                 dispatch('updateTags');
-            }).catch((data) => {
-                commit('resetMarkTagNewStatus', { error: data, inProgress: false });
             });
         },
-        markTagAdd({ dispatch, commit }, { name, streams }) {
-            APIClient.markTagAdd(name, streams).then(() => {
-                commit('resetMarkTagUpdateStatus', { inProgress: false });
+        async markTagAdd({ dispatch, commit }, { name, streams }) {
+            commit('resetMarkTagUpdateStatus', { inProgress: true, error: null });
+            return APIClient.markTagAdd(name, streams).catch((err) => {
+                commit('resetMarkTagUpdateStatus', { inProgress: false, error: err.response.data });
+                throw err.response.data;
+            }).then(() => {
+                commit('resetMarkTagUpdateStatus', { inProgress: false, error: null });
+                commit('updateMark', { name, streams, value: true })
                 dispatch('updateTags');
-            }).catch((data) => {
-                commit('resetMarkTagUpdateStatus', { error: data, inProgress: false });
             });
         },
-        markTagDel({ dispatch, commit }, { name, streams }) {
-            APIClient.markTagDel(name, streams).then(() => {
-                commit('resetMarkTagUpdateStatus', { inProgress: false });
+        async markTagDel({ dispatch, commit }, { name, streams }) {
+            commit('resetMarkTagUpdateStatus', { inProgress: true, error: null });
+            return APIClient.markTagDel(name, streams).catch((err) => {
+                commit('resetMarkTagUpdateStatus', { inProgress: false, error: err.response.data });
+                throw err.response.data;
+            }).then(() => {
+                commit('resetMarkTagUpdateStatus', { inProgress: false, error: null });
+                commit('updateMark', { name, streams, value: false })
                 dispatch('updateTags');
-            }).catch((data) => {
-                commit('resetMarkTagUpdateStatus', { error: data, inProgress: false });
             });
         },
     }
