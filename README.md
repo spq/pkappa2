@@ -10,7 +10,9 @@ See docs/TODO.txt for missing features.
 
 ## Running
 
-- install required dependencies (TODO: which?)
+- install required dependencies
+    - vue-cli (e.g. `yarn add @vue/cli`)
+    - libpcap (e.g. `apt install libpcap-dev`)
 - run `yarn build` in `/web`
 - run `go run cmd/pkappa2/main.go` in `/`
 - visit `localhost:8080` in your web browser
