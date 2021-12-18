@@ -1,16 +1,6 @@
 <template>
   <div>
-    <v-toolbar
-      dense
-      flat
-      id="toolbarReal"
-      :style="{
-        position: 'fixed',
-        width: `${toolbarWidth}px`,
-        zIndex: 5,
-        borderBottom: '1px solid #eee !important',
-      }"
-    >
+    <ToolBar>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
           <v-btn
@@ -160,14 +150,7 @@
           <span>Next Page</span>
         </v-tooltip>
       </div>
-    </v-toolbar>
-    <div
-      id="toolbarDummy"
-      :style="{
-        visibility: 'hidden',
-        height: `${toolbarHeight}px`,
-      }"
-    />
+    </ToolBar>
     <v-skeleton-loader
       type="table-thead, table-tbody"
       v-if="streams.running || (!streams.result && !streams.error)"
@@ -249,22 +232,19 @@
 <script>
 import { EventBus } from "./EventBus";
 import { mapActions, mapGetters, mapState } from "vuex";
+import ToolBar from "./ToolBar.vue";
 
 export default {
   name: "Results",
+  components: {
+    ToolBar,
+  },
   data() {
     return {
       selected: [],
-      toolbarWidth: 0,
-      toolbarHeight: 0,
-      toolbarResizeObserver: null,
     };
   },
   mounted() {
-    this.toolbarResizeObserver = new ResizeObserver(this.onToolbarResize);
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarReal"));
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarDummy"));
-    this.onToolbarResize();
     this.fetchStreams();
 
     const handle = (e, pageOffset) => {
@@ -334,12 +314,6 @@ export default {
   },
   methods: {
     ...mapActions(["searchStreamsNew", "markTagAdd", "markTagDel"]),
-    onToolbarResize() {
-      const tbd = document.getElementById("toolbarDummy");
-      if (tbd) this.toolbarWidth = tbd.offsetWidth;
-      const tbr = document.getElementById("toolbarReal");
-      if (tbr) this.toolbarHeight = tbr.offsetHeight;
-    },
     checkboxAction() {
       let tmp = [];
       const v = this.noneSelected;

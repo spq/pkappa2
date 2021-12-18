@@ -1,16 +1,6 @@
 <template>
   <div>
-    <v-toolbar
-      dense
-      flat
-      id="toolbarReal"
-      :style="{
-        position: 'fixed',
-        width: `${toolbarWidth}px`,
-        zIndex: 5,
-        borderBottom: '1px solid #eee !important',
-      }"
-    >
+    <ToolBar>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
           <v-btn
@@ -173,14 +163,7 @@
           <span>Next Stream</span>
         </v-tooltip>
       </div>
-    </v-toolbar>
-    <div
-      id="toolbarDummy"
-      :style="{
-        visibility: 'hidden',
-        height: `${toolbarHeight}px`,
-      }"
-    />
+    </ToolBar>
     <v-skeleton-loader
       type="table-thead, table-tbody"
       v-if="stream.running || !(stream.stream || stream.error)"
@@ -259,19 +242,17 @@ import { EventBus } from "./EventBus";
 import StreamData from "./StreamData.vue";
 
 import { mapActions, mapGetters, mapState } from "vuex";
+import ToolBar from './ToolBar.vue';
 
 export default {
   name: "Stream",
-  components: { StreamData },
+  components: { StreamData, ToolBar },
   data() {
     let p = "ascii";
     if (localStorage.streamPresentation) {
       p = localStorage.streamPresentation;
     }
     return {
-      toolbarWidth: 0,
-      toolbarHeight: 0,
-      toolbarResizeObserver: null,
       presentation: p,
     };
   },
@@ -317,10 +298,6 @@ export default {
     },
   },
   mounted() {
-    this.toolbarResizeObserver = new ResizeObserver(this.onToolbarResize);
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarReal"));
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarDummy"));
-    this.onToolbarResize();
     this.fetchStream();
 
     const handle = (e, streamId) => {
@@ -355,12 +332,6 @@ export default {
 
   methods: {
     ...mapActions(["fetchStreamNew", "markTagAdd", "markTagDel"]),
-    onToolbarResize() {
-      const tbd = document.getElementById("toolbarDummy");
-      if (tbd) this.toolbarWidth = tbd.offsetWidth;
-      const tbr = document.getElementById("toolbarReal");
-      if (tbr) this.toolbarHeight = tbr.offsetHeight;
-    },
     fetchStream() {
       if (this.streamId != null) this.fetchStreamNew({ id: this.streamId });
     },

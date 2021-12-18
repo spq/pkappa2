@@ -1,16 +1,6 @@
 <template>
   <div>
-    <v-toolbar
-      dense
-      flat
-      id="toolbarReal"
-      :style="{
-        position: 'fixed',
-        width: `${toolbarWidth}px`,
-        zIndex: 5,
-        borderBottom: '1px solid #eee !important',
-      }"
-    >
+    <ToolBar>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
           <v-btn v-bind="attrs" v-on="on" icon @click="fetchGraph">
@@ -68,14 +58,7 @@
           </template>
         </v-select>
       </v-toolbar-items>
-    </v-toolbar>
-    <div
-      id="toolbarDummy"
-      :style="{
-        visibility: 'hidden',
-        height: `${toolbarHeight}px`,
-      }"
-    />
+    </ToolBar>
     <v-skeleton-loader type="image" v-if="graph.running"></v-skeleton-loader>
     <v-alert type="error" dense v-else-if="graph.error">{{
       graph.error
@@ -94,14 +77,13 @@
 
 <script>
 import { mapActions, mapState } from "vuex";
+import ToolBar from './ToolBar.vue';
 
 export default {
+  components: { ToolBar },
   name: "Graph",
   data() {
     return {
-      toolbarWidth: 0,
-      toolbarHeight: 0,
-      toolbarResizeObserver: null,
       chartOptions: null,
       chartData: null,
       chartTimeFilter: "",
@@ -440,10 +422,6 @@ export default {
     };
   },
   mounted() {
-    this.toolbarResizeObserver = new ResizeObserver(this.onToolbarResize);
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarReal"));
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarDummy"));
-    this.onToolbarResize();
     this.fetchGraph();
   },
   computed: {
@@ -507,12 +485,6 @@ export default {
   },
   methods: {
     ...mapActions(["fetchGraphNew"]),
-    onToolbarResize() {
-      const tbd = document.getElementById("toolbarDummy");
-      if (tbd) this.toolbarWidth = tbd.offsetWidth;
-      const tbr = document.getElementById("toolbarReal");
-      if (tbr) this.toolbarHeight = tbr.offsetHeight;
-    },
     setChartTagOptions(typ, active) {
       this.$nextTick(() => {
         const sel = this.chartTags;
