@@ -25,5 +25,4 @@ both:
 - add documentation
 
 ui:
-- marking something (e.g. when you want to copy it) in the results view moves you to the stream, it should not
 - marking something in stream view and pressing a key could add a data filter

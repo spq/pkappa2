@@ -189,7 +189,7 @@
             style="cursor: pointer"
             :class="{ blue: selected[index], 'lighten-5': selected[index] }"
           >
-            <tr @click="navigate" @keypress.enter="navigate" role="link">
+            <tr @click="isTextSelected() || navigate($event)" @keypress.enter="navigate" role="link">
               <td style="width: 0" class="pr-0">
                 <v-simple-checkbox
                   v-model="selected[index]"
@@ -350,6 +350,9 @@ export default {
         this.markTagDel({ name: tagId, streams: ids }).catch((err) => {
           EventBus.$emit("showError", { message: err });
         });
+    },
+    isTextSelected() {
+      return window.getSelection().type == "Range";
     },
   },
   watch: {
