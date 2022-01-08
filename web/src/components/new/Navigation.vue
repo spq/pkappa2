@@ -213,7 +213,7 @@ export default {
           key: "mark",
         },
       ],
-      moreOpen: false,
+      moreOpen: ["status", "tags", "pcaps"].includes(this.$route.name),
     };
   },
   computed: {
