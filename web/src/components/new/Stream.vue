@@ -183,7 +183,7 @@
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
           <v-col cols="3" class="text-body-2">{{
-            stream.stream.Stream.FirstPacket
+            stream.stream.Stream.FirstPacket | formatDate
           }}</v-col>
           <v-col cols="1" class="text-subtitle-2"
             >{{ tags.service.length == 0 ? "Protocol" : "Service" }}:</v-col
@@ -205,7 +205,7 @@
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
           <v-col cols="3" class="text-body-2">{{
-            stream.stream.Stream.LastPacket
+            stream.stream.Stream.LastPacket | formatDate
           }}</v-col>
           <v-col cols="1" class="text-body-2"
             ><span v-if="tags.service.length == 0">{{
@@ -242,7 +242,7 @@ import { EventBus } from "./EventBus";
 import StreamData from "./StreamData.vue";
 
 import { mapActions, mapGetters, mapState } from "vuex";
-import ToolBar from './ToolBar.vue';
+import ToolBar from "./ToolBar.vue";
 
 export default {
   name: "Stream",

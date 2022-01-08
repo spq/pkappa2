@@ -189,7 +189,11 @@
             style="cursor: pointer"
             :class="{ blue: selected[index], 'lighten-5': selected[index] }"
           >
-            <tr @click="isTextSelected() || navigate($event)" @keypress.enter="navigate" role="link">
+            <tr
+              @click="isTextSelected() || navigate($event)"
+              @keypress.enter="navigate"
+              role="link"
+            >
               <td style="width: 0" class="pr-0">
                 <v-simple-checkbox
                   v-model="selected[index]"
@@ -217,7 +221,9 @@
                 {{ stream.Stream.Server.Host }}:{{ stream.Stream.Server.Port }}
               </td>
               <td>{{ stream.Stream.Server.Bytes }}</td>
-              <td class="text-right">{{ stream.Stream.FirstPacket }}</td>
+              <td class="text-right">
+                {{ stream.Stream.FirstPacket | formatDate }}
+              </td>
             </tr>
           </router-link>
         </tbody>
