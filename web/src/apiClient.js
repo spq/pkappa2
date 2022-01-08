@@ -15,6 +15,9 @@ const APIClient = {
     getStatus() {
         return this.perform('get', `/status.json`);
     },
+    getPcaps() {
+        return this.perform('get', `/pcaps.json`);
+    },
     getTags() {
         return this.perform('get', `/tags`);
     },

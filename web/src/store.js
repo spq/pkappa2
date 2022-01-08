@@ -17,6 +17,7 @@ const store = new Vuex.Store({
         streamIndex: null,
 
         status: null,
+        pcaps: null,
 
         tags: null,
         tagAddStatus: null,
@@ -114,6 +115,9 @@ const store = new Vuex.Store({
         },
         resetTags(state, tags) {
             state.tags = tags;
+        },
+        resetPcaps(state, pcaps) {
+            state.pcaps = pcaps;
         },
         resetTagAddStatus(state, status) {
             state.tagAddStatus = status
@@ -229,6 +233,11 @@ const store = new Vuex.Store({
         updateTags({ commit }) {
             APIClient.getTags().then((data) => {
                 commit('resetTags', data);
+            })
+        },
+        updatePcaps({ commit }) {
+            APIClient.getPcaps().then((data) => {
+                commit('resetPcaps', data);
             })
         },
         async addTag({ commit, dispatch }, { name, query }) {

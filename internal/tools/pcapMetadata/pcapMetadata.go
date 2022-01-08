@@ -12,6 +12,8 @@ type (
 		Filesize           uint64
 		PacketTimestampMin time.Time
 		PacketTimestampMax time.Time
+		ParseTime          time.Time
+		PacketCount        uint
 	}
 
 	PcapMetadata struct {

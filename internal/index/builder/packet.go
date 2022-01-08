@@ -39,16 +39,11 @@ func (p *Packet) CaptureInfo() *gopacket.CaptureInfo {
 }
 
 func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pcapmetadata.PcapInfo, []Packet, error) {
-	handle, err := pcap.OpenOffline(filepath.Join(pcapDir, pcapFilename))
-	if err != nil {
-		return nil, nil, err
-	}
-	defer handle.Close()
-	packets := []Packet(nil)
 	updateInfo := info == nil
 	if updateInfo {
 		info = &pcapmetadata.PcapInfo{
-			Filename: pcapFilename,
+			Filename:  pcapFilename,
+			ParseTime: time.Now(),
 		}
 		if s, err := os.Stat(filepath.Join(pcapDir, pcapFilename)); err != nil {
 			return nil, nil, err
@@ -56,6 +51,12 @@ func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pc
 			info.Filesize = uint64(s.Size())
 		}
 	}
+	handle, err := pcap.OpenOffline(filepath.Join(pcapDir, pcapFilename))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer handle.Close()
+	packets := []Packet(nil)
 	decoder := handle.LinkType()
 	for packetIndex := uint64(0); ; packetIndex++ {
 		data, ci, err := handle.ReadPacketData()
@@ -74,6 +75,7 @@ func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pc
 			if info.PacketTimestampMax.Before(ts) {
 				info.PacketTimestampMax = ts
 			}
+			info.PacketCount++
 		}
 		pcapmetadata.AddPcapMetadata(&ci, info, packetIndex)
 		packets = append(packets, Packet{

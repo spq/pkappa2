@@ -139,6 +139,18 @@
         dense
         exact
         :to="{
+          name: 'pcaps',
+        }"
+      >
+        <v-list-item-content>
+          <v-list-item-title>PCAPs</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+      <v-list-item
+        link
+        dense
+        exact
+        :to="{
           name: 'tags',
         }"
       >

@@ -5,6 +5,7 @@ import HomeOld from './components/Home';
 import Base from './components/new/Base';
 import Home from './components/new/Home';
 import Status from './components/new/Status';
+import Pcaps from './components/new/Pcaps';
 import Tags from './components/new/Tags';
 import Graph from './components/new/Graph';
 import Results from './components/new/Results';
@@ -29,6 +30,11 @@ export default new VueRouter({
                     path: 'status',
                     name: 'status',
                     component: Status,
+                },
+                {
+                    path: 'pcaps',
+                    name: 'pcaps',
+                    component: Pcaps,
                 },
                 {
                     path: 'tags',
