@@ -14,10 +14,11 @@
           'PacketTimestampMin',
           'PacketTimestampMax',
         ]"
-        v-slot:[`item.${field}`]="{ value }"
+        v-slot:[`item.${field}`]="{ index, value }"
+        ><span :title="value | formatDateLong" :key="`${field}/${index}`">{{
+          value | formatDate
+        }}</span></template
       >
-        {{ value | formatDate }}
-      </template>
     </v-data-table>
   </div>
 </template>

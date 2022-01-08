@@ -182,9 +182,12 @@
             ({{ stream.stream.Stream.Client.Bytes }} Bytes)</v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
-          <v-col cols="3" class="text-body-2">{{
-            stream.stream.Stream.FirstPacket | formatDate
-          }}</v-col>
+          <v-col
+            cols="3"
+            class="text-body-2"
+            :title="stream.stream.Stream.FirstPacket | formatDateLong"
+            >{{ stream.stream.Stream.FirstPacket | formatDate }}</v-col
+          >
           <v-col cols="1" class="text-subtitle-2"
             >{{ tags.service.length == 0 ? "Protocol" : "Service" }}:</v-col
           >
@@ -204,9 +207,12 @@
             ({{ stream.stream.Stream.Server.Bytes }} Bytes)</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
-          <v-col cols="3" class="text-body-2">{{
-            stream.stream.Stream.LastPacket | formatDate
-          }}</v-col>
+          <v-col
+            cols="3"
+            class="text-body-2"
+            :title="stream.stream.Stream.LastPacket | formatDateLong"
+            >{{ stream.stream.Stream.LastPacket | formatDate }}</v-col
+          >
           <v-col cols="1" class="text-body-2"
             ><span v-if="tags.service.length == 0">{{
               stream.stream.Stream.Protocol

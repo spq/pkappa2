@@ -221,7 +221,10 @@
                 {{ stream.Stream.Server.Host }}:{{ stream.Stream.Server.Port }}
               </td>
               <td>{{ stream.Stream.Server.Bytes }}</td>
-              <td class="text-right">
+              <td
+                class="text-right"
+                :title="stream.Stream.FirstPacket | formatDateLong"
+              >
                 {{ stream.Stream.FirstPacket | formatDate }}
               </td>
             </tr>
