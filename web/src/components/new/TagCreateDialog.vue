@@ -7,11 +7,9 @@
         </v-card-title>
         <v-card-text>
           <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
-        </v-card-text>
-        <v-card-text>
-          <v-text-field v-model="tagColor" hide-details>
+          <v-text-field v-model="tagColor" label="Color" hide-details>
             <template v-slot:append>
-              <v-menu v-model="tagColorPickerOpen" top nudge-bottom="165" nudge-left="16" :close-on-content-click="false">
+              <v-menu v-model="tagColorPickerOpen" top nudge-bottom="270" nudge-left="32" :close-on-content-click="false">
                 <template v-slot:activator="{ on }">
                   <div :style="swatchStyle" v-on="on" />
                 </template>
