@@ -23,10 +23,12 @@ type (
 		query.TagDetails
 		definition string
 		features   query.FeatureSet
+		color      string
 	}
 	TagInfo struct {
 		Name           string
 		Definition     string
+		Color          string
 		MatchingCount  uint
 		UncertainCount uint
 		Referenced     bool
@@ -76,6 +78,7 @@ type (
 		Tags  []struct {
 			Name       string
 			Definition string
+			Color      string
 		}
 		Pcaps []*pcapmetadata.PcapInfo
 	}
@@ -183,6 +186,7 @@ nextStateFile:
 				},
 				definition: t.Definition,
 				features:   q.Conditions.Features(),
+				color:      t.Color,
 			}
 			if strings.HasPrefix(t.Name, "mark/") {
 				ids, ok := q.Conditions.StreamIDs(mgr.nextStreamID)
@@ -268,9 +272,11 @@ func (mgr *Manager) saveState() error {
 		j.Tags = append(j.Tags, struct {
 			Name       string
 			Definition string
+			Color      string
 		}{
 			Name:       n,
 			Definition: t.definition,
+			Color:      t.color,
 		})
 	}
 	fn := tools.MakeFilename(mgr.StateDir, "state.json")
@@ -603,6 +609,7 @@ func (mgr *Manager) ListTags() []TagInfo {
 			res = append(res, TagInfo{
 				Name:           name,
 				Definition:     t.definition,
+				Color:          t.color,
 				MatchingCount:  uint(m.OnesCount()),
 				UncertainCount: uint(t.Uncertain.OnesCount()),
 				Referenced:     referenced,
@@ -617,7 +624,7 @@ func (mgr *Manager) ListTags() []TagInfo {
 	return <-c
 }
 
-func (mgr *Manager) AddTag(name, queryString string) error {
+func (mgr *Manager) AddTag(name, color, queryString string) error {
 	isMark := strings.HasPrefix(name, "mark/")
 	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/") || isMark) {
 		return errors.New("invalid tag name (need a 'tag/', 'service/' or 'mark/' prefix)")
@@ -642,6 +649,7 @@ func (mgr *Manager) AddTag(name, queryString string) error {
 		},
 		definition: queryString,
 		features:   features,
+		color:      color,
 	}
 	for _, tn := range nt.referencedTags() {
 		if tn == name {

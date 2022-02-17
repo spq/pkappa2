@@ -21,7 +21,7 @@
         </tr>
         <template v-for="tag in tags">
           <tr v-if="tag.Name.startsWith(typ + '/')" :key="typ + '/' + tag.Name">
-            <td><v-icon>mdi-circle-small</v-icon>{{ tag.Name.substring(1 + typ.length) }}</td>
+            <td><v-icon>mdi-circle-small</v-icon><v-chip :color="tag.Color">{{ tag.Name.substring(1 + typ.length) }}</v-chip></td>
             <td>{{ tag.Definition }}</td>
             <td>
               Matching {{ tag.MatchingCount }} Streams<span

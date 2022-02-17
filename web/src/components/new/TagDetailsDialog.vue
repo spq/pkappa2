@@ -7,7 +7,7 @@
         >
       </v-card-title>
       <v-card-text v-if="tag != null">
-        <!--{ "Name": "asd", "Definition": "id:3", "MatchingCount": 1, "UncertainCount": 0, "Referenced": false }-->
+        <!--{ "Name": "asd", "Definition": "id:3", "Color": "#FFFFFF", "MatchingCount": 1, "UncertainCount": 0, "Referenced": false }-->
         <v-container>
           <v-row no-gutters>
             <v-col class="text-caption">Matching Streams:</v-col>
@@ -18,6 +18,14 @@
             <v-col>{{ tag.MatchingCount }}</v-col>
             <v-col>{{ tag.UncertainCount }}</v-col>
             <v-col>{{ tag.Referenced ? "Yes" : "No" }}</v-col>
+          </v-row>
+          <v-row>
+            <v-col class="text-caption">Color:</v-col>
+          </v-row>
+          <v-row no-gutters>
+            <v-col
+              ><v-chip :color="tag.Color">{{ tag.Color }}</v-chip></v-col
+            >
           </v-row>
           <v-row>
             <v-col class="text-caption">Definition:</v-col>
@@ -66,7 +74,6 @@ export default {
   },
   methods: {
     openDialog({ tagId }) {
-      console.log("asd", tagId);
       this.tagId = tagId;
       this.tagType = tagId.split("/", 1)[0];
       this.tagName = this.tagId.substr(this.tagType.length + 1);

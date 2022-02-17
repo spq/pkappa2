@@ -202,7 +202,7 @@
               <td class="pl-0">
                 <template v-for="tag in stream.Tags"
                   ><v-hover v-slot="{ hover }" :key="tag"
-                    ><v-chip small
+                    ><v-chip small :color="tags.filter((e) => e.Name == tag)[0].Color"
                       ><template v-if="hover"
                         >{{ tag | tagify("type") | capitalize }}
                         {{ tag | tagify("name") }}</template
@@ -288,7 +288,7 @@ export default {
     window.removeEventListener("keydown", this._keyListener);
   },
   computed: {
-    ...mapState(["streams"]),
+    ...mapState(["streams", "tags"]),
     ...mapGetters(["groupedTags"]),
     selectedCount() {
       return this.selected.filter((i) => i === true).length;

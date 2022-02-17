@@ -18,7 +18,7 @@
         <tr v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
           <td>
             <v-icon>mdi-circle-small</v-icon
-            >{{ tag.Name.substring(1 + tagType.key.length) }}
+            ><v-chip :color="tag.Color">{{ tag.Name.substring(1 + tagType.key.length) }}</v-chip>
           </td>
           <td>{{ tag.Definition }}</td>
           <td>

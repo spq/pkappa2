@@ -145,13 +145,14 @@ func main() {
 		}
 	})
 	rUser.Put("/api/tags", func(w http.ResponseWriter, r *http.Request) {
-		s := r.URL.Query()["name"]
-		if len(s) != 1 {
-			http.Error(w, "`name` parameter missing", http.StatusBadRequest)
+		n := r.URL.Query()["name"]
+		if len(n) != 1 || len(n[0]) < 1 {
+			http.Error(w, "`name` parameter missing or empty", http.StatusBadRequest)
 			return
 		}
-		if len(s[0]) < 1 {
-			http.Error(w, "`name` parameter empty", http.StatusBadRequest)
+		c := r.URL.Query()["color"]
+		if len(c) != 1 || len(c[0]) < 1 {
+			http.Error(w, "`color` parameter missing or empty", http.StatusBadRequest)
 			return
 		}
 		body, err := ioutil.ReadAll(r.Body)
@@ -159,7 +160,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := mgr.AddTag(s[0], string(body)); err != nil {
+		if err := mgr.AddTag(n[0], c[0], string(body)); err != nil {
 			http.Error(w, fmt.Sprintf("add failed: %v", err), http.StatusBadRequest)
 			return
 		}

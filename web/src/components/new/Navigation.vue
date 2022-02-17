@@ -51,9 +51,11 @@
             }"
           >
             <v-list-item-content>
-              <v-list-item-title>{{
-                tag.Name.substr(tagType.key.length + 1)
-              }}</v-list-item-title>
+              <v-list-item-title>
+                <v-chip :color="tag.Color">{{
+                  tag.Name.substr(tagType.key.length + 1)
+                }}</v-chip>
+              </v-list-item-title>
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">

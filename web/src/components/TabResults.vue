@@ -42,7 +42,7 @@
             hint="Save query as tag(default) or service"
             dense
             @keyup.enter="
-              addTag({ name: 'tag/' + newTagName, query: searchQuery })
+              addTag({ name: 'tag/' + newTagName, query: searchQuery, color: '#ffffff' })
             "
             ><template #append>
               <v-btn
@@ -51,7 +51,7 @@
                 icon
                 :loading="tagAddStatus != null && tagAddStatus.inProgress"
                 @click="
-                  addTag({ name: 'tag/' + newTagName, query: searchQuery })
+                  addTag({ name: 'tag/' + newTagName, query: searchQuery, color: '#ffffff' })
                 "
               >
                 <v-icon>mdi-tag</v-icon>
@@ -62,7 +62,7 @@
                 icon
                 :loading="tagAddStatus != null && tagAddStatus.inProgress"
                 @click="
-                  addTag({ name: 'service/' + newTagName, query: searchQuery })
+                  addTag({ name: 'service/' + newTagName, query: searchQuery, color: '#ffffff' })
                 "
               >
                 <v-icon>mdi-anchor</v-icon>

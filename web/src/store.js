@@ -240,9 +240,9 @@ const store = new Vuex.Store({
                 commit('resetPcaps', data);
             })
         },
-        async addTag({ commit, dispatch }, { name, query }) {
+        async addTag({ commit, dispatch }, { name, query, color }) {
             commit('resetTagAddStatus', { inProgress: true })
-            return APIClient.addTag(name, query).then(() => {
+            return APIClient.addTag(name, query, color).then(() => {
                 commit('resetTagAddStatus', { inProgress: false })
                 dispatch('updateTags');
             }).catch((err) => {
@@ -266,9 +266,9 @@ const store = new Vuex.Store({
                 commit('resetGraphData', data);
             })
         },
-        async markTagNew({ dispatch, commit }, { name, streams }) {
+        async markTagNew({ dispatch, commit }, { name, streams , color }) {
             commit('resetMarkTagNewStatus', { inProgress: true, error: null });
-            return APIClient.markTagNew(name, streams).catch((err) => {
+            return APIClient.markTagNew(name, streams, color).catch((err) => {
                 commit('resetMarkTagNewStatus', { inProgress: false, error: err.response.data });
                 throw err.response.data;
             }).then(() => {

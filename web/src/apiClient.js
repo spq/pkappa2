@@ -21,8 +21,8 @@ const APIClient = {
     getTags() {
         return this.perform('get', `/tags`);
     },
-    addTag(name, query) {
-        return this.perform('put', `/tags`, query, { name });
+    addTag(name, query, color) {
+        return this.perform('put', `/tags`, query, { name, color });
     },
     delTag(name) {
         return this.perform('delete', `/tags`, null, { name });
@@ -41,9 +41,9 @@ const APIClient = {
         }
         return this.perform('get', '/graph.json', null, params);
     },
-    markTagNew(name, streams) {
+    markTagNew(name, streams, color) {
         if (streams.length == 0) streams = [-1];
-        return this.addTag(name, `id:${streams.join(',')}`)
+        return this.addTag(name, `id:${streams.join(',')}`, color)
     },
     markTagAdd(name, streams) {
         const params = new URLSearchParams();

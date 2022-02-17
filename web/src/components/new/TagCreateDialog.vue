@@ -8,6 +8,22 @@
         <v-card-text>
           <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
         </v-card-text>
+        <v-card-text>
+          <v-text-field v-model="tagColor" hide-details>
+            <template v-slot:append>
+              <v-menu v-model="tagColorPickerOpen" top nudge-bottom="165" nudge-left="16" :close-on-content-click="false">
+                <template v-slot:activator="{ on }">
+                  <div :style="swatchStyle" v-on="on" />
+                </template>
+                <v-card>
+                  <v-card-text>
+                    <v-color-picker v-model="tagColor" mode="hexa" hide-mode-switch show-swatches flat />
+                  </v-card-text>
+                </v-card>
+              </v-menu>
+            </template>
+          </v-text-field>
+        </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn text @click="visible = false">Cancel</v-btn>
@@ -41,10 +57,26 @@ export default {
       tagStreams: [],
       tagType: "",
       tagName: "",
+      tagColor: "",
+      tagColorPickerOpen: false,
     };
   },
   created() {
     EventBus.$on("showCreateTagDialog", this.openDialog);
+  },
+  computed: {
+    // https://codepen.io/JamieCurnow/pen/KKPjraK
+    swatchStyle() {
+      const { tagColor, tagColorPickerOpen } = this
+      return {
+        backgroundColor: tagColor,
+        cursor: 'pointer',
+        height: '30px',
+        width: '30px',
+        borderRadius: tagColorPickerOpen ? '50%' : '4px',
+        transition: 'border-radius 200ms ease-in-out'
+      }
+    }
   },
   methods: {
     ...mapActions(["addTag","markTagNew"]),
@@ -53,6 +85,8 @@ export default {
       this.tagQuery = tagQuery;
       this.tagStreams = tagStreams;
       this.tagName = "";
+      this.tagColor = "#81D4FA";
+      this.tagColorPickerOpen = false;
       this.visible = true;
       this.loading = false;
       this.error = false;
@@ -64,10 +98,12 @@ export default {
         ? this.markTagNew({
             name: `${this.tagType}/${this.tagName}`,
             streams: this.tagStreams,
+            color: this.tagColor,
           })
         : this.addTag({
             name: `${this.tagType}/${this.tagName}`,
             query: this.tagQuery,
+            color: this.tagColor,
           })
       )
         .then(() => {
