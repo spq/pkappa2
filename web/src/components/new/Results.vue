@@ -202,7 +202,7 @@
               <td class="pl-0">
                 <template v-for="tag in stream.Tags"
                   ><v-hover v-slot="{ hover }" :key="tag"
-                    ><v-chip small :color="tags.filter((e) => e.Name == tag)[0].Color"
+                    ><v-chip small :color="tagColors[tag]"
                       ><template v-if="hover"
                         >{{ tag | tagify("type") | capitalize }}
                         {{ tag | tagify("name") }}</template
@@ -319,6 +319,11 @@ export default {
         res[k] = v == this.selectedStreams.length;
       }
       return res;
+    },
+    tagColors() {
+      const colors = {};
+      this.tags.forEach((t) => colors[t.Name] = t.Color);
+      return colors;
     },
   },
   methods: {

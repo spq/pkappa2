@@ -146,12 +146,12 @@ func main() {
 	})
 	rUser.Put("/api/tags", func(w http.ResponseWriter, r *http.Request) {
 		n := r.URL.Query()["name"]
-		if len(n) != 1 || len(n[0]) < 1 {
+		if len(n) != 1 || n[0] == "" {
 			http.Error(w, "`name` parameter missing or empty", http.StatusBadRequest)
 			return
 		}
 		c := r.URL.Query()["color"]
-		if len(c) != 1 || len(c[0]) < 1 {
+		if len(c) != 1 || c[0] == "" {
 			http.Error(w, "`color` parameter missing or empty", http.StatusBadRequest)
 			return
 		}

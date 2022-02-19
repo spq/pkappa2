@@ -38,7 +38,10 @@
         </v-list-item-content>
       </template>
       <template v-for="tag in groupedTags[tagType.key]">
-        <v-hover #default="{ hover }" :key="tag.Name">
+        <v-hover 
+        #default="{ hover }"
+        :key="tag.Name"
+        :style="{ backgroundColor: tag.Color }">
           <v-list-item
             link
             dense
@@ -51,11 +54,9 @@
             }"
           >
             <v-list-item-content>
-              <v-list-item-title>
-                <v-chip :color="tag.Color">{{
+              <v-list-item-title>{{
                   tag.Name.substr(tagType.key.length + 1)
-                }}</v-chip>
-              </v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
