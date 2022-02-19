@@ -42,5 +42,14 @@ Vue.filter('formatDateLong', function (time) {
   time = vue.$moment(time).local();
   return time.format('YYYY-MM-DD hh:mm:ss.SSS ZZ');
 })
+Vue.filter('tagForURI', function (tagId) {
+  const type = tagId.split("/", 1)[0];
+  let name = tagId.substr(type.length + 1);
+  if (name.includes('"'))
+    name = name.replaceAll('"', '""');
+  if (/[ "]/.test(name))
+    name = `"${name}"`;
+  return `${type}:${name}`;
+})
 
 vue.$mount('#app')
