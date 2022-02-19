@@ -14,7 +14,7 @@ server:
 
 both:
 - add tag color
-- add a search history
+- add search history overlay for recent searches
 - support showing alternatives for groups
 - support showing sub query results
 - add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
