@@ -99,6 +99,12 @@
                   </v-list-item-icon>
                   <v-list-item-title>Use Query</v-list-item-title>
                 </v-list-item>
+                <v-list-item link @click="showTagColorChangeDialog(tag.Name)">
+                  <v-list-item-icon>
+                    <v-icon>mdi-palette</v-icon>
+                  </v-list-item-icon>
+                  <v-list-item-title>Change Color</v-list-item-title>
+                </v-list-item>
                 <v-list-item
                   link
                   :disabled="tag.Referenced"
@@ -232,6 +238,9 @@ export default {
     },
     setQuery(query) {
       EventBus.$emit("setSearchTerm", { searchTerm: query });
+    },
+    showTagColorChangeDialog(tagId) {
+      EventBus.$emit("showTagColorChangeDialog", { tagId });
     },
   },
   mounted() {

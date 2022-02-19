@@ -261,6 +261,13 @@ const store = new Vuex.Store({
                 throw err.response.data;
             })
         },
+        async changeTagColor({ dispatch }, { name, color }) {
+            return APIClient.changeTagColor(name, color).catch((err) => {
+                throw err.response.data;
+            }).then(() => {
+                dispatch('updateTags');
+            });
+        },
         updateGraph({ commit }, { delta, aspects, tags, query }) {
             APIClient.getGraph(delta, aspects, tags, query).then((data) => {
                 commit('resetGraphData', data);

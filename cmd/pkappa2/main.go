@@ -176,6 +176,20 @@ func main() {
 			http.Error(w, "`method` parameter missing or empty", http.StatusBadRequest)
 			return
 		}
+
+		if m[0] == "change_color" {
+			c := r.URL.Query()["color"]
+			if len(c) != 1 || c[0] == "" {
+				http.Error(w, "`color` parameter missing or empty", http.StatusBadRequest)
+				return
+			}
+			if err := mgr.UpdateTagColor(n[0], c[0]); err != nil {
+				http.Error(w, fmt.Sprintf("update failed: %v", err), http.StatusBadRequest)
+				return
+			}
+			return
+		}
+
 		var method func([]uint64) manager.UpdateTagOperation
 		switch m[0] {
 		case "mark_add":

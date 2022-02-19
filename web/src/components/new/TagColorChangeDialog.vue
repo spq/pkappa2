@@ -1,15 +1,14 @@
 <template>
-  <v-dialog v-model="visible" width="500" @keydown.enter="createTag">
+  <v-dialog v-model="visible" width="500" @keydown.enter="updateColor">
     <v-form>
       <v-card>
         <v-card-title>
-          <span class="text-h5">Create {{ tagType | capitalize }}</span>
+          <span class="text-h5">Change Color of {{ tagType | capitalize }} <v-chip :color="tagColor">{{ tagName }}</v-chip></span>
         </v-card-title>
         <v-card-text>
-          <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
           <v-text-field v-model="tagColor" label="Color" hide-details>
             <template v-slot:append>
-              <v-menu v-model="tagColorPickerOpen" top nudge-bottom="270" nudge-left="32" :close-on-content-click="false">
+              <v-menu v-model="tagColorPickerOpen" top nudge-bottom="265" nudge-left="32" :close-on-content-click="false">
                 <template v-slot:activator="{ on }">
                   <div :style="swatchStyle" v-on="on" />
                 </template>
@@ -27,12 +26,12 @@
           <v-btn text @click="visible = false">Cancel</v-btn>
           <v-btn
             text
-            @click="createTag"
-            :disabled="tagName == '' || loading"
+            @click="updateColor"
+            :disabled="tagColor == '' || loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
             type="submit"
-            >Create</v-btn
+            >Save</v-btn
           >
         </v-card-actions>
       </v-card>
@@ -41,18 +40,16 @@
 </template>
 
 <script>
+import { mapActions, mapState } from "vuex";
 import { EventBus } from "./EventBus";
-import { mapActions } from "vuex";
 
 export default {
-  name: "TagCreateDialog",
+  name: "TagColorChangeDialog",
   data() {
     return {
       visible: false,
       loading: false,
       error: false,
-      tagQuery: "",
-      tagStreams: [],
       tagType: "",
       tagName: "",
       tagColor: "",
@@ -60,9 +57,10 @@ export default {
     };
   },
   created() {
-    EventBus.$on("showCreateTagDialog", this.openDialog);
+    EventBus.$on("showTagColorChangeDialog", this.openDialog);
   },
   computed: {
+    ...mapState(["tags"]),
     // https://codepen.io/JamieCurnow/pen/KKPjraK
     swatchStyle() {
       const { tagColor, tagColorPickerOpen } = this
@@ -77,33 +75,21 @@ export default {
     }
   },
   methods: {
-    ...mapActions(["addTag","markTagNew"]),
-    openDialog({ tagType, tagQuery, tagStreams }) {
-      this.tagType = tagType;
-      this.tagQuery = tagQuery;
-      this.tagStreams = tagStreams;
-      this.tagName = "";
-      this.tagColor = "#81D4FA";
+    ...mapActions(["changeTagColor"]),
+    openDialog({ tagId }) {
+      this.tagId = tagId;
+      this.tagType = tagId.split("/", 1)[0];
+      this.tagName = tagId.substr(this.tagType.length + 1);
+      this.tagColor = this.tags.filter((e) => e.Name == tagId)[0].Color;
       this.tagColorPickerOpen = false;
       this.visible = true;
       this.loading = false;
       this.error = false;
     },
-    createTag() {
+    updateColor() {
       this.loading = true;
       this.error = false;
-      (this.tagType == "mark"
-        ? this.markTagNew({
-            name: `${this.tagType}/${this.tagName}`,
-            streams: this.tagStreams,
-            color: this.tagColor,
-          })
-        : this.addTag({
-            name: `${this.tagType}/${this.tagName}`,
-            query: this.tagQuery,
-            color: this.tagColor,
-          })
-      )
+      this.changeTagColor({ name: this.tagId,  color: this.tagColor })
         .then(() => {
           this.visible = false;
         })

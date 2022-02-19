@@ -27,6 +27,13 @@ const APIClient = {
     delTag(name) {
         return this.perform('delete', `/tags`, null, { name });
     },
+    changeTagColor(name, color) {
+        const params = new URLSearchParams();
+        params.append("name", name);
+        params.append("method", "change_color");
+        params.append("color", color);
+        return this.perform('patch', `/tags`, null, params);
+    },
     getGraph(delta, aspects, tags, query) {
         const params = new URLSearchParams();
         params.append("delta", delta);

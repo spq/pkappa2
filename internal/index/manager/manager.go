@@ -717,6 +717,25 @@ func (mgr *Manager) DelTag(name string) error {
 	return <-c
 }
 
+func (mgr *Manager) UpdateTagColor(name string, color string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		err := func() error {
+			t, ok := mgr.tags[name]
+			if !ok {
+				return fmt.Errorf("unknown tag %q", name)
+			}
+			t.color = color
+			return nil
+		}()
+		c <- err
+		close(c)
+		//nolint:errcheck
+		mgr.saveState()
+	}
+	return <-c
+}
+
 func UpdateTagOperationMarkAddStream(streams []uint64) UpdateTagOperation {
 	s := make([]uint64, 0, len(streams))
 	s = append(s, streams...)

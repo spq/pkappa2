@@ -65,6 +65,18 @@
                 <v-btn
                   v-bind="attrs"
                   v-on="on"
+                  icon
+                  @click="showTagColorChangeDialog(tag.Name)"
+                  ><v-icon>mdi-palette</v-icon></v-btn
+                >
+              </template>
+              <span>Change Color</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+              <template #activator="{ on, attrs }">
+                <v-btn
+                  v-bind="attrs"
+                  v-on="on"
                   :disabled="tag.Referenced"
                   icon
                   @click="confirmTagDeletion(tag.Name)"
@@ -121,6 +133,9 @@ export default {
     },
     setQuery(query) {
       EventBus.$emit("setSearchTerm", { searchTerm: query });
+    },
+    showTagColorChangeDialog(tagId) {
+      EventBus.$emit("showTagColorChangeDialog", { tagId });
     },
   },
 };
