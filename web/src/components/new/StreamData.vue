@@ -4,14 +4,22 @@
         <div v-if="presentation == 'ascii'">
           <span
             v-for="(chunk, index) in data"
+            :data-chunk-idx="index"
             :key="index"
             :style="
               chunk.Direction != 0
                 ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
                 : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
             "
-            v-html="$options.filters.inlineAscii(chunk.Content)"
-          />
+          >
+            <span 
+              v-for="({str, offset}, index) in $options.filters.inlineAscii(chunk.Content)"
+              :key="index"
+              :data-offset="offset"
+              v-html="str"
+            >
+            </span>
+          </span>
         </div>
         <div v-else-if="presentation == 'hexdump'">
           <pre
@@ -53,19 +61,24 @@ export default {
           .split("")
           .map((char) => char.charCodeAt(0))
       );
-      var str = [].slice
+      return [].slice
         .call(ui8)
         .map(function (i, idx, arr) {
-          if (i == 0x0d && idx + 1 < arr.length && arr[idx + 1] == 0x0a)
-            return "";
-          if (i == 0x0a) return "<br/>";
-          if (/[ -~]/.test(String.fromCharCode(i))) {
-            return "&#x" + ("00" + i.toString(16)).substr(-2) + ";";
+          const result = {
+            str: '.',
+            offset: idx,
+          };
+          if (i == 0x0d && idx + 1 < arr.length && arr[idx + 1] == 0x0a) {
+            result.str = '';
+          } else if (i == 0x0a) {
+            result.str = "<br/>";
+          } else if (/[ -~]/.test(String.fromCharCode(i))) {
+            result.str = "&#x" + ("00" + i.toString(16)).substr(-2) + ";";
           }
-          return ".";
+
+          return result;
         })
-        .join("");
-      return str;
+        .filter(obj => obj.str !== '');
     },
     inlineHex(b64) {
       const ui8 = Uint8Array.from(
