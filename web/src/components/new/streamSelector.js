@@ -47,31 +47,28 @@ function chunkToQueryPart(chunk, start, length = undefined) {
 function onSelectionChange() {
     const selection = document.getSelection();
     const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
-    if (selection.rangeCount !== 1 || streamDataNode == null) {
+    const { startContainer, endContainer } = selection.getRangeAt(0);
+    if (selection.rangeCount !== 1 || streamDataNode == null || !streamDataNode.contains(startContainer) || !streamDataNode.contains(endContainer)) {
         return;
     }
-    const { startContainer, endContainer } = selection.getRangeAt(0);
-    if (streamDataNode.contains(startContainer) && this.$refs.streamData.$el.contains(endContainer)) {
-        const startChunkIdx = parseInt(getFromDataSet(streamDataNode, startContainer, 'chunkIdx'));
-        const startOffset = parseInt(getFromDataSet(streamDataNode, startContainer, 'offset'));
-        const endChunkIdx = parseInt(getFromDataSet(streamDataNode, endContainer, 'chunkIdx'));
-        const endOffset = parseInt(getFromDataSet(streamDataNode, endContainer, 'offset'));
-        const chunks = this.stream.stream.Data;
+    const startChunkIdx = parseInt(getFromDataSet(streamDataNode, startContainer, 'chunkIdx'));
+    const startOffset = parseInt(getFromDataSet(streamDataNode, startContainer, 'offset'));
+    const endChunkIdx = parseInt(getFromDataSet(streamDataNode, endContainer, 'chunkIdx'));
+    const endOffset = parseInt(getFromDataSet(streamDataNode, endContainer, 'offset'));
+    const chunks = this.stream.stream.Data;
 
-        if (startChunkIdx >= chunks.length) {
-            return;
-        }
-
-        let queryParts = [];
-        for (let currentChunkIdx = startChunkIdx; currentChunkIdx <= endChunkIdx; currentChunkIdx++) {
-            const from = currentChunkIdx === startChunkIdx ? startOffset : 0;
-            console.log(currentChunkIdx, startChunkIdx, endChunkIdx, from, currentChunkIdx === endChunkIdx ? endOffset - from : undefined);
-            queryParts.push(chunkToQueryPart(
-                chunks[currentChunkIdx], 
-                from,
-                currentChunkIdx === endChunkIdx ? endOffset - from : undefined
-            ));
-        }
-        this.selectionQuery = queryParts.join(' then ');
+    if (startChunkIdx >= chunks.length) {
+        return;
     }
+
+    let queryParts = [];
+    for (let currentChunkIdx = startChunkIdx; currentChunkIdx <= endChunkIdx; currentChunkIdx++) {
+        const from = currentChunkIdx === startChunkIdx ? startOffset : 0;
+        queryParts.push(chunkToQueryPart(
+            chunks[currentChunkIdx], 
+            from,
+            currentChunkIdx === endChunkIdx ? endOffset : undefined
+        ));
+    }
+    this.selectionQuery = queryParts.join(' then ');
 }
