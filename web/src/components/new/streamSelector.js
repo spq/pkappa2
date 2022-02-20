@@ -35,7 +35,7 @@ function getFromDataSet(outerBound, container, data) {
 function escape(text) {
     return (text
         // eslint-disable-next-line no-control-regex
-        .replaceAll(/[\x00-\x1F\x80-\xFF"{}@[\]]/g, (match) => '\\x' + match.charCodeAt(0).toString(16).padStart('2', '0'))
+        .replaceAll(/[\x00-\x1F\x80-\xFF"{}@[\]*]/g, (match) => '\\x' + match.charCodeAt(0).toString(16).padStart('2', '0'))
         .replaceAll('"', '""')
     );
 }
