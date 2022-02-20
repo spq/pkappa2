@@ -1,7 +1,7 @@
 <template>
   <v-card>
     <v-card-text>
-        <div v-if="presentation == 'ascii'">
+        <template v-if="presentation == 'ascii'">
           <span
             v-for="(chunk, index) in data"
             :data-chunk-idx="index"
@@ -20,8 +20,8 @@
             >
             </span>
           </span>
-        </div>
-        <div v-else-if="presentation == 'hexdump'">
+        </template>
+        <template v-else-if="presentation == 'hexdump'">
           <pre
             v-for="(chunk, index) in data"
             :key="index"
@@ -32,8 +32,8 @@
             "
             >{{ chunk.Content | hexdump }}</pre
           >
-        </div>
-        <div v-else>
+        </template>
+        <template v-else>
           <span
             v-for="(chunk, index) in data"
             :key="index"
@@ -45,7 +45,7 @@
           >
             {{ chunk.Content | inlineHex }}<br
           /></span>
-        </div>
+        </template>
     </v-card-text>
   </v-card>
 </template>

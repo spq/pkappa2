@@ -20,22 +20,22 @@ function base64ToAscii(b64) {
     return new TextDecoder().decode(ui8);
 }
 
-function getFromDataSet(outerBound, container, data) {
+function getFromDataSet(outerBound, container, data, fallback = null) {
     let currentNode = container;
     while (currentNode?.dataset?.[data] == null) {
         if (!outerBound.contains(currentNode) || currentNode == null) {
-            return false;
+            return fallback;
         }
         currentNode = currentNode.parentNode;
     }
 
-    return currentNode.dataset[data];
+    return currentNode.dataset[data] ?? fallback;
 }
 
 function escape(text) {
     return (text
         // eslint-disable-next-line no-control-regex
-        .replaceAll(/[\x00-\x1F\x80-\xFF"{}@[\]*]/g, (match) => '\\x' + match.charCodeAt(0).toString(16).padStart('2', '0'))
+        .replaceAll(/[\x00-\x1F\x80-\xFF"{}@[\]*?]/g, (match) => '\\x' + match.charCodeAt(0).toString(16).padStart('2', '0'))
         .replaceAll('"', '""')
     );
 }
@@ -48,14 +48,15 @@ function onSelectionChange() {
     const selection = document.getSelection();
     const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
     const { startContainer, endContainer } = selection.getRangeAt(0);
+    console.log(startContainer, endContainer);
     if (selection.rangeCount !== 1 || streamDataNode == null || !streamDataNode.contains(startContainer) || !streamDataNode.contains(endContainer)) {
         return;
     }
-    const startChunkIdx = parseInt(getFromDataSet(streamDataNode, startContainer, 'chunkIdx'));
-    const startOffset = parseInt(getFromDataSet(streamDataNode, startContainer, 'offset'));
-    const endChunkIdx = parseInt(getFromDataSet(streamDataNode, endContainer, 'chunkIdx'));
-    const endOffset = parseInt(getFromDataSet(streamDataNode, endContainer, 'offset'));
     const chunks = this.stream.stream.Data;
+    const startChunkIdx = parseInt(getFromDataSet(streamDataNode, startContainer, 'chunkIdx', 0));
+    const startOffset = parseInt(getFromDataSet(streamDataNode, startContainer, 'offset', 0));
+    const endChunkIdx = parseInt(getFromDataSet(streamDataNode, endContainer, 'chunkIdx', chunks.length - 1));
+    const endOffset = parseInt(getFromDataSet(streamDataNode, endContainer, 'offset', chunks[chunks.length - 1].Content.length));
 
     if (startChunkIdx >= chunks.length) {
         return;
@@ -70,5 +71,7 @@ function onSelectionChange() {
             currentChunkIdx === endChunkIdx ? endOffset : undefined
         ));
     }
-    this.selectionQuery = queryParts.join(' then ');
+    /** @TODO: Change back to `then` behaviour when bug is fixed */
+    //this.selectionQuery = queryParts.join(' then ');
+    this.selectionQuery = queryParts.join(' ');
 }
