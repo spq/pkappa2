@@ -10,14 +10,16 @@ export function destroySelectionListener() {
     listenerBag.clear();
 }
 
-function base64ToAscii(b64) {
-    const ui8 = Uint8Array.from(
-        atob(b64)
-            .split("")
-            .map((char) => char.charCodeAt(0))
-    );
+// function base64ToAscii(b64) {
+//     const ui8 = Uint8Array.from(
+//         new TextEncoder().encode(atob(b64))
+//     );
 
-    return new TextDecoder().decode(ui8);
+//     return new TextDecoder('ascii').decode(ui8);
+// }
+
+function base64ToAscii(b64) {
+    return atob(b64);
 }
 
 function getFromDataSet(outerBound, container, data, fallback = null) {
@@ -33,11 +35,15 @@ function getFromDataSet(outerBound, container, data, fallback = null) {
 }
 
 function escape(text) {
-    return (text
-        // eslint-disable-next-line no-control-regex
-        .replaceAll(/[\x00-\x1F\x80-\xFF"{}@[\]*?]/g, (match) => '\\x' + match.charCodeAt(0).toString(16).padStart('2', '0'))
-        .replaceAll('"', '""')
-    );
+    return text
+        .split("")
+        .map(char => String.fromCharCode(char.charCodeAt(0))
+            .replace(
+                /\W/,
+                (match) => '\\x{' + match.charCodeAt(0).toString(16).toUpperCase().padStart('2', '0') + '}'
+            )
+        )
+        .join('');
 }
 
 function chunkToQueryPart(chunk, start, length = undefined) {
@@ -47,9 +53,11 @@ function chunkToQueryPart(chunk, start, length = undefined) {
 function onSelectionChange() {
     const selection = document.getSelection();
     const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
+    if (selection.rangeCount !== 1 || streamDataNode == null) {
+        return;
+    }
     const { startContainer, endContainer } = selection.getRangeAt(0);
-    console.log(startContainer, endContainer);
-    if (selection.rangeCount !== 1 || streamDataNode == null || !streamDataNode.contains(startContainer) || !streamDataNode.contains(endContainer)) {
+    if (!streamDataNode.contains(startContainer) || !streamDataNode.contains(endContainer)) {
         return;
     }
     const chunks = this.stream.stream.Data;
