@@ -28,6 +28,7 @@
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
           <v-btn
+            :disabled="selectionQuery == ''"
             link
             exact
             v-bind="attrs"

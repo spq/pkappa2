@@ -54,10 +54,12 @@ function onSelectionChange() {
     const selection = document.getSelection();
     const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
     if (selection.rangeCount !== 1 || streamDataNode == null) {
+        this.selectionQuery = '';
         return;
     }
     const { startContainer, endContainer } = selection.getRangeAt(0);
     if (!streamDataNode.contains(startContainer) || !streamDataNode.contains(endContainer)) {
+        this.selectionQuery = '';
         return;
     }
     const chunks = this.stream.stream.Data;
@@ -67,6 +69,7 @@ function onSelectionChange() {
     const endOffset = parseInt(getFromDataSet(streamDataNode, endContainer, 'offset', chunks[chunks.length - 1].Content.length));
 
     if (startChunkIdx >= chunks.length) {
+        this.selectionQuery = '';
         return;
     }
 
