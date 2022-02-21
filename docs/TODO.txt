@@ -45,5 +45,3 @@ Die folgende Suche ist ein Match:
 cdata:"\x22321\x22}" sdata:"HTTP"
 ```
 Soll: Suche (1) ist ein Match
-
-Reproduktion mit `/docs/reproduction/6200.pcap`
