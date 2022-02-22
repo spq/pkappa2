@@ -11,6 +11,8 @@
     "apexcharts": "^3.29.0",
     "axios": "^0.21.2",
     "core-js": "^3.6.5",
+    "moo": "^0.5.1",
+    "nearley": "^2.20.1",
     "vue": "^2.6.11",
     "vue-apexcharts": "^1.6.2",
     "vue-moment": "^4.1.0",

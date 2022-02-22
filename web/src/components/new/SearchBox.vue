@@ -1,14 +1,18 @@
 <template>
-  <v-text-field
+  <v-combobox
     autofocus
     hide-details
     flat
+    no-filter
+    hide-no-data
     prepend-inner-icon="mdi-magnify"
     v-model="searchBox"
     @keyup.enter="search(null)"
     @keydown.up.prevent="historyUp"
     @keydown.down.prevent="historyDown"
     ref="searchBox"
+    :search-input.sync="autocompleteValue"
+    :items="autocompleteItems"
   >
     <template #append>
       <v-menu offset-y right bottom>
@@ -41,12 +45,14 @@
         </v-list>
       </v-menu>
     </template>
-  </v-text-field>
+  </v-combobox>
 </template>
 
 <script>
 import { EventBus } from "./EventBus";
 import {addSearch, getTermAt} from './searchHistory';
+import { mapGetters } from "vuex";
+import suggest from '../../parser/suggest'
 
 export default {
   name: "SearchBox",
@@ -55,14 +61,30 @@ export default {
       searchBox: this.$route.query.q,
       historyIndex: -1,
       pendingSearch: '',
+      typingDelay: null,
+      autocompleteItems: [],
+      autocompleteValue: null,
     };
   },
   created() {
     EventBus.$on("setSearchTerm", this.setSearchTerm);
   },
+  computed: {
+    ...mapGetters(["groupedTags"]),
+  },
   watch: {
     "$route.query.q": function (term) {
       this.searchBox = term;
+    },
+    autocompleteValue(val) {
+      if (this.typingDelay) {
+        clearTimeout(this.typingDelay);
+        this.typingDelay = null;
+      }
+      this.typingDelay = setTimeout(() => {
+        const cursorPosition = this.$refs.searchBox.$refs.input.selectionStart;
+        this.autocompleteItems = suggest(val, cursorPosition, this.groupedTags);
+      }, 200);
     },
   },
   mounted() {
