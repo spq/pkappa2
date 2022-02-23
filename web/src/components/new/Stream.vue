@@ -189,13 +189,17 @@
             >{{ stream.stream.Stream.FirstPacket | formatDate }}</v-col
           >
           <v-col cols="1" class="text-subtitle-2"
-            >{{ tags.service.length == 0 ? "Protocol" : "Service" }}:</v-col
+            >{{ streamTags.service.length == 0 ? "Protocol" : "Service" }}:</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Tags:</v-col>
           <v-col cols="3" class="text-body-2"
-            ><v-chip small v-for="name in tags.tag" :key="`tag/${name}`">{{
-              name
-            }}</v-chip></v-col
+            ><v-chip
+              small
+              v-for="tag in streamTags.tag"
+              :key="`tag/${tag.name}`"
+              :color="tag.color"
+              >{{tag.name}}</v-chip
+            ></v-col
           >
         </v-row>
         <v-row>
@@ -214,24 +218,29 @@
             >{{ stream.stream.Stream.LastPacket | formatDate }}</v-col
           >
           <v-col cols="1" class="text-body-2"
-            ><span v-if="tags.service.length == 0">{{
+            ><span v-if="streamTags.service.length == 0">{{
               stream.stream.Stream.Protocol
             }}</span
             ><span v-else
               ><v-chip
                 small
-                v-for="name in tags.service"
-                :key="`service/${name}`"
-                >{{ name }}</v-chip
+                v-for="service in streamTags.service"
+                :key="`service/${service.name}`"
+                :color="service.color"
+                >{{ service.name }}</v-chip
               >
               ({{ stream.stream.Stream.Protocol }})</span
             ></v-col
           >
           <v-col cols="1" class="text-subtitle-2">Marks:</v-col>
           <v-col cols="3" class="text-body-2"
-            ><v-chip small v-for="name in tags.mark" :key="`mark/${name}`">{{
-              name
-            }}</v-chip></v-col
+            ><v-chip 
+              small
+              v-for="mark in streamTags.mark"
+              :key="`mark/${mark.name}`"
+              :color="mark.color"
+              >{{mark.name}}</v-chip
+            ></v-col
           >
         </v-row>
       </v-container>
@@ -263,9 +272,9 @@ export default {
     };
   },
   computed: {
-    ...mapState(["stream", "streams"]),
+    ...mapState(["stream", "streams", "tags"]),
     ...mapGetters(["groupedTags"]),
-    tags() {
+    streamTags() {
       let res = {
         service: [],
         tag: [],
@@ -274,7 +283,7 @@ export default {
       for (const tag of this.stream.stream.Tags) {
         const type = tag.split("/", 1)[0];
         const name = tag.substr(type.length + 1);
-        res[type].push(name);
+        res[type].push({'name': name, 'color': this.tags.filter((e) => e.Name == tag)[0].Color});
       }
       return res;
     },

@@ -13,7 +13,6 @@ server:
 - improve import speed by ignoring timedout packages instead of having to flush them before processing a new package
 
 both:
-- add tag color
 - add search history overlay for recent searches
 - support showing alternatives for groups
 - support showing sub query results

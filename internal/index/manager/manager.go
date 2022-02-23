@@ -23,10 +23,12 @@ type (
 		query.TagDetails
 		definition string
 		features   query.FeatureSet
+		color      string
 	}
 	TagInfo struct {
 		Name           string
 		Definition     string
+		Color          string
 		MatchingCount  uint
 		UncertainCount uint
 		Referenced     bool
@@ -76,12 +78,14 @@ type (
 		Tags  []struct {
 			Name       string
 			Definition string
+			Color      string
 		}
 		Pcaps []*pcapmetadata.PcapInfo
 	}
 
 	updateTagOperationInfo struct {
 		markTagAddStreams, markTagDelStreams []uint64
+		color                                string
 	}
 	UpdateTagOperation func(*updateTagOperationInfo)
 
@@ -183,6 +187,7 @@ nextStateFile:
 				},
 				definition: t.Definition,
 				features:   q.Conditions.Features(),
+				color:      t.Color,
 			}
 			if strings.HasPrefix(t.Name, "mark/") {
 				ids, ok := q.Conditions.StreamIDs(mgr.nextStreamID)
@@ -268,9 +273,11 @@ func (mgr *Manager) saveState() error {
 		j.Tags = append(j.Tags, struct {
 			Name       string
 			Definition string
+			Color      string
 		}{
 			Name:       n,
 			Definition: t.definition,
+			Color:      t.color,
 		})
 	}
 	fn := tools.MakeFilename(mgr.StateDir, "state.json")
@@ -603,6 +610,7 @@ func (mgr *Manager) ListTags() []TagInfo {
 			res = append(res, TagInfo{
 				Name:           name,
 				Definition:     t.definition,
+				Color:          t.color,
 				MatchingCount:  uint(m.OnesCount()),
 				UncertainCount: uint(t.Uncertain.OnesCount()),
 				Referenced:     referenced,
@@ -617,7 +625,7 @@ func (mgr *Manager) ListTags() []TagInfo {
 	return <-c
 }
 
-func (mgr *Manager) AddTag(name, queryString string) error {
+func (mgr *Manager) AddTag(name, color, queryString string) error {
 	isMark := strings.HasPrefix(name, "mark/")
 	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/") || isMark) {
 		return errors.New("invalid tag name (need a 'tag/', 'service/' or 'mark/' prefix)")
@@ -642,6 +650,7 @@ func (mgr *Manager) AddTag(name, queryString string) error {
 		},
 		definition: queryString,
 		features:   features,
+		color:      color,
 	}
 	for _, tn := range nt.referencedTags() {
 		if tn == name {
@@ -725,78 +734,89 @@ func UpdateTagOperationMarkDelStream(streams []uint64) UpdateTagOperation {
 	}
 }
 
+func UpdateTagOperationUpdateColor(color string) UpdateTagOperation {
+	return func(i *updateTagOperationInfo) {
+		i.color = color
+	}
+}
+
 func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	info := updateTagOperationInfo{}
 	operation(&info)
+	maxUsedStreamID := uint64(0)
 	if len(info.markTagAddStreams) != 0 || len(info.markTagDelStreams) != 0 {
 		if !strings.HasPrefix(name, "mark/") {
 			return fmt.Errorf("tag %q is not of type mark", name)
 		}
-	}
-	maxUsedStreamID := uint64(0)
-	for _, s := range info.markTagAddStreams {
-		if maxUsedStreamID <= s {
-			maxUsedStreamID = s + 1
+		for _, s := range info.markTagAddStreams {
+			if maxUsedStreamID <= s {
+				maxUsedStreamID = s + 1
+			}
 		}
-	}
-	for _, s := range info.markTagDelStreams {
-		if maxUsedStreamID <= s {
-			maxUsedStreamID = s + 1
+		for _, s := range info.markTagDelStreams {
+			if maxUsedStreamID <= s {
+				maxUsedStreamID = s + 1
+			}
 		}
+		if maxUsedStreamID == 0 {
+			// no operation
+			return nil
+		}
+		maxUsedStreamID--
 	}
-	if maxUsedStreamID == 0 {
-		// no operation
-		return nil
-	}
-	maxUsedStreamID--
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
-			if maxUsedStreamID >= mgr.nextStreamID {
-				return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
-			}
 			t, ok := mgr.tags[name]
 			if !ok {
 				return fmt.Errorf("unknown tag %q", name)
 			}
-			newTag := *t
-			newTag.Matches = t.Matches.Copy()
-			for _, s := range info.markTagAddStreams {
-				newTag.Matches.Set(uint(s))
-				newTag.Uncertain.Set(uint(s))
+			if info.color != "" {
+				t.color = info.color
 			}
-			for _, s := range info.markTagDelStreams {
-				newTag.Matches.Unset(uint(s))
-				newTag.Uncertain.Set(uint(s))
-			}
-
-			b := strings.Builder{}
-			if newTag.Matches.IsZero() {
-				b.WriteString("id:-1")
-			} else {
-				b.WriteString("id:")
-				last := uint(0)
-				for {
-					zeros := newTag.Matches.TrailingZerosFrom(last)
-					if zeros < 0 {
-						break
-					}
-					if last != 0 {
-						b.WriteByte(',')
-					}
-					last += uint(zeros)
-					b.WriteString(fmt.Sprintf("%d", last))
-					last++
+			if maxUsedStreamID != 0 {
+				if maxUsedStreamID >= mgr.nextStreamID {
+					return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
 				}
+				newTag := *t
+				newTag.Matches = t.Matches.Copy()
+				for _, s := range info.markTagAddStreams {
+					newTag.Matches.Set(uint(s))
+					newTag.Uncertain.Set(uint(s))
+				}
+				for _, s := range info.markTagDelStreams {
+					newTag.Matches.Unset(uint(s))
+					newTag.Uncertain.Set(uint(s))
+				}
+
+				b := strings.Builder{}
+				if newTag.Matches.IsZero() {
+					b.WriteString("id:-1")
+				} else {
+					b.WriteString("id:")
+					last := uint(0)
+					for {
+						zeros := newTag.Matches.TrailingZerosFrom(last)
+						if zeros < 0 {
+							break
+						}
+						if last != 0 {
+							b.WriteByte(',')
+						}
+						last += uint(zeros)
+						b.WriteString(fmt.Sprintf("%d", last))
+						last++
+					}
+				}
+				newTag.definition = b.String()
+				if q, err := query.Parse(newTag.definition); err == nil {
+					newTag.Conditions = q.Conditions
+				}
+				mgr.tags[name] = &newTag
+				mgr.inheritTagUncertainty()
+				mgr.tags[name].Uncertain = bitmask.LongBitmask{}
+				mgr.startTaggingJobIfNeeded()
 			}
-			newTag.definition = b.String()
-			if q, err := query.Parse(newTag.definition); err == nil {
-				newTag.Conditions = q.Conditions
-			}
-			mgr.tags[name] = &newTag
-			mgr.inheritTagUncertainty()
-			mgr.tags[name].Uncertain = bitmask.LongBitmask{}
-			mgr.startTaggingJobIfNeeded()
 			return nil
 		}()
 		c <- err

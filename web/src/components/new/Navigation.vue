@@ -38,7 +38,10 @@
         </v-list-item-content>
       </template>
       <template v-for="tag in groupedTags[tagType.key]">
-        <v-hover #default="{ hover }" :key="tag.Name">
+        <v-hover 
+        #default="{ hover }"
+        :key="tag.Name"
+        :style="{ backgroundColor: tag.Color }">
           <v-list-item
             link
             dense
@@ -52,8 +55,8 @@
           >
             <v-list-item-content>
               <v-list-item-title>{{
-                tag.Name.substr(tagType.key.length + 1)
-              }}</v-list-item-title>
+                  tag.Name.substr(tagType.key.length + 1)
+                }}</v-list-item-title>
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
@@ -94,6 +97,12 @@
                     <v-icon>mdi-form-textbox</v-icon>
                   </v-list-item-icon>
                   <v-list-item-title>Use Query</v-list-item-title>
+                </v-list-item>
+                <v-list-item link @click="showTagColorChangeDialog(tag.Name)">
+                  <v-list-item-icon>
+                    <v-icon>mdi-palette</v-icon>
+                  </v-list-item-icon>
+                  <v-list-item-title>Change Color</v-list-item-title>
                 </v-list-item>
                 <v-list-item
                   link
@@ -228,6 +237,9 @@ export default {
     },
     setQuery(query) {
       EventBus.$emit("setSearchTerm", { searchTerm: query });
+    },
+    showTagColorChangeDialog(tagId) {
+      EventBus.$emit("showTagColorChangeDialog", { tagId });
     },
   },
   mounted() {

@@ -21,11 +21,18 @@ const APIClient = {
     getTags() {
         return this.perform('get', `/tags`);
     },
-    addTag(name, query) {
-        return this.perform('put', `/tags`, query, { name });
+    addTag(name, query, color) {
+        return this.perform('put', `/tags`, query, { name, color });
     },
     delTag(name) {
         return this.perform('delete', `/tags`, null, { name });
+    },
+    changeTagColor(name, color) {
+        const params = new URLSearchParams();
+        params.append("name", name);
+        params.append("method", "change_color");
+        params.append("color", color);
+        return this.perform('patch', `/tags`, null, params);
     },
     getGraph(delta, aspects, tags, query) {
         const params = new URLSearchParams();
@@ -41,9 +48,9 @@ const APIClient = {
         }
         return this.perform('get', '/graph.json', null, params);
     },
-    markTagNew(name, streams) {
+    markTagNew(name, streams, color) {
         if (streams.length == 0) streams = [-1];
-        return this.addTag(name, `id:${streams.join(',')}`)
+        return this.addTag(name, `id:${streams.join(',')}`, color)
     },
     markTagAdd(name, streams) {
         const params = new URLSearchParams();

@@ -23,6 +23,7 @@
     <TagDeleteDialog />
     <TagCreateDialog />
     <TagDetailsDialog />
+    <TagColorChangeDialog />
     <ErrorBanner />
   </v-app>
 </template>
@@ -33,6 +34,7 @@ import SearchBox from "./SearchBox.vue";
 import TagDeleteDialog from "./TagDeleteDialog.vue";
 import TagCreateDialog from "./TagCreateDialog.vue";
 import TagDetailsDialog from "./TagDetailsDialog.vue";
+import TagColorChangeDialog from "./TagColorChangeDialog.vue";
 import ErrorBanner from "./ErrorBanner.vue";
 
 export default {
@@ -43,6 +45,7 @@ export default {
     TagDeleteDialog,
     TagCreateDialog,
     TagDetailsDialog,
+    TagColorChangeDialog,
     ErrorBanner,
   },
   data() {
