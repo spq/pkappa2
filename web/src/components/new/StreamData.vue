@@ -1,51 +1,53 @@
 <template>
   <v-card>
     <v-card-text>
-        <template v-if="presentation == 'ascii'">
+      <template v-if="presentation == 'ascii'">
+        <span
+          v-for="(chunk, index) in data"
+          :data-chunk-idx="index"
+          :key="index"
+          :style="
+            chunk.Direction != 0
+              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
+              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
+          "
+        >
           <span
-            v-for="(chunk, index) in data"
-            :data-chunk-idx="index"
+            v-for="({ str, offset }, index) in $options.filters.inlineAscii(
+              chunk.Content
+            )"
             :key="index"
-            :style="
-              chunk.Direction != 0
-                ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-                : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-            "
+            :data-offset="offset"
+            v-html="str"
           >
-            <span 
-              v-for="({str, offset}, index) in $options.filters.inlineAscii(chunk.Content)"
-              :key="index"
-              :data-offset="offset"
-              v-html="str"
-            >
-            </span>
           </span>
-        </template>
-        <template v-else-if="presentation == 'hexdump'">
-          <pre
-            v-for="(chunk, index) in data"
-            :key="index"
-            :style="
-              chunk.Direction != 0
-                ? 'margin-left: 2em; color: #000080; background-color: #eeedfc;'
-                : 'color: #800000; background-color: #faeeed;'
-            "
-            >{{ chunk.Content | hexdump }}</pre
-          >
-        </template>
-        <template v-else>
-          <span
-            v-for="(chunk, index) in data"
-            :key="index"
-            :style="
-              chunk.Direction != 0
-                ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-                : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-            "
-          >
-            {{ chunk.Content | inlineHex }}<br
-          /></span>
-        </template>
+        </span>
+      </template>
+      <template v-else-if="presentation == 'hexdump'">
+        <pre
+          v-for="(chunk, index) in data"
+          :key="index"
+          :style="
+            chunk.Direction != 0
+              ? 'margin-left: 2em; color: #000080; background-color: #eeedfc;'
+              : 'color: #800000; background-color: #faeeed;'
+          "
+          >{{ chunk.Content | hexdump }}</pre
+        >
+      </template>
+      <template v-else>
+        <span
+          v-for="(chunk, index) in data"
+          :key="index"
+          :style="
+            chunk.Direction != 0
+              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
+              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
+          "
+        >
+          {{ chunk.Content | inlineHex }}<br
+        /></span>
+      </template>
     </v-card-text>
   </v-card>
 </template>
@@ -65,11 +67,11 @@ export default {
         .call(ui8)
         .map(function (i, idx, arr) {
           const result = {
-            str: '.',
+            str: ".",
             offset: idx,
           };
           if (i == 0x0d && idx + 1 < arr.length && arr[idx + 1] == 0x0a) {
-            result.str = '';
+            result.str = "";
           } else if (i == 0x0a) {
             result.str = "<br/>";
           } else if (/[ -~]/.test(String.fromCharCode(i))) {
@@ -78,7 +80,7 @@ export default {
 
           return result;
         })
-        .filter(obj => obj.str !== '');
+        .filter((obj) => obj.str !== "");
     },
     inlineHex(b64) {
       const ui8 = Uint8Array.from(

@@ -77,7 +77,7 @@ function onSelectionChange() {
     for (let currentChunkIdx = startChunkIdx; currentChunkIdx <= endChunkIdx; currentChunkIdx++) {
         const from = currentChunkIdx === startChunkIdx ? startOffset : 0;
         queryParts.push(chunkToQueryPart(
-            chunks[currentChunkIdx], 
+            chunks[currentChunkIdx],
             from,
             currentChunkIdx === endChunkIdx ? endOffset : undefined
         ));

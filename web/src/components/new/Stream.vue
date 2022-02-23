@@ -37,8 +37,8 @@
             :to="{
               name: 'search',
               query: {
-                q: selectionQuery
-              }
+                q: selectionQuery,
+              },
             }"
             ><v-icon>mdi-selection-search</v-icon></v-btn
           >
@@ -267,7 +267,10 @@
 <script>
 import { EventBus } from "./EventBus";
 import StreamData from "./StreamData.vue";
-import {registerSelectionListener, destroySelectionListener} from './streamSelector';
+import {
+  registerSelectionListener,
+  destroySelectionListener,
+} from "./streamSelector";
 
 import { mapActions, mapGetters, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
@@ -282,7 +285,7 @@ export default {
     }
     return {
       presentation: p,
-      selectionQuery: '',
+      selectionQuery: "",
     };
   },
   computed: {
@@ -361,7 +364,7 @@ export default {
     destroySelectionListener();
   },
   methods: {
-    ...mapActions(["fetchStreamNew", "markTagAdd", "markTagDel", "searchStreamsNew"]),
+    ...mapActions(["fetchStreamNew", "markTagAdd", "markTagDel"]),
     fetchStream() {
       if (this.streamId != null) this.fetchStreamNew({ id: this.streamId });
     },
