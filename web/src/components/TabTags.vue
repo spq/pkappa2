@@ -58,9 +58,7 @@ export default {
   methods: {
     ...mapActions(["delTag"]),
     searchStreamsForTag(tag) {
-      const typ = tag.Name.split("/", 1)[0];
-      const query = typ + ":\"" + tag.Name.substr(typ.length+1) + "\"";
-      this.$emit("searchStreams", query, 0);
+      this.$emit("searchStreams", this.$options.filters.tagForURI(tag.Name), 0);
     },
   },
 };

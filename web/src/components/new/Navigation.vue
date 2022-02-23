@@ -49,7 +49,7 @@
             :to="{
               name: 'search',
               query: {
-                q: `${tagType.key}:${tag.Name.substr(tagType.key.length + 1)}`,
+                q: $options.filters.tagForURI(tag.Name),
               },
             }"
           >
@@ -77,9 +77,7 @@
                   :to="{
                     name: 'search',
                     query: {
-                      q: `${tagType.key}:${tag.Name.substr(
-                        tagType.key.length + 1
-                      )}`,
+                      q: $options.filters.tagForURI(tag.Name),
                     },
                   }"
                 >

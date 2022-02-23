@@ -6,6 +6,8 @@
     prepend-inner-icon="mdi-magnify"
     v-model="searchBox"
     @keyup.enter="search(null)"
+    @keydown.up.prevent="historyUp"
+    @keydown.down.prevent="historyDown"
     ref="searchBox"
   >
     <template #append>
@@ -44,12 +46,15 @@
 
 <script>
 import { EventBus } from "./EventBus";
+import {addSearch, getTermAt} from './searchHistory';
 
 export default {
   name: "SearchBox",
   data() {
     return {
       searchBox: this.$route.query.q,
+      historyIndex: -1,
+      pendingSearch: '',
     };
   },
   created() {
@@ -75,6 +80,25 @@ export default {
     document.body.removeEventListener("keydown", this._keyListener);
   },
   methods: {
+    historyUp() {
+      if (this.historyIndex === -1) {
+        this.pendingSearch = this.searchBox;
+      }
+      this.historyIndex++;
+      let term = getTermAt(this.historyIndex);
+      if (this.pendingSearch === term) {
+        this.historyIndex++;
+        term = getTermAt(this.historyIndex);
+      }
+      this.searchBox = term;
+    },
+    historyDown() {
+      if (this.historyIndex === -1) {
+        return;
+      }
+      this.historyIndex--;
+      this.searchBox = this.historyIndex === -1 ? this.pendingSearch : getTermAt(this.historyIndex);
+    },
     search(type) {
       let q = {};
       if (!type) {
@@ -82,6 +106,8 @@ export default {
         if (type == "graph") q = JSON.parse(JSON.stringify(this.$route.query));
       }
       q.q = this.searchBox;
+      addSearch(this.searchBox);
+      this.historyIndex = -1;
       this.$router.push({
         name: type,
         query: q,
