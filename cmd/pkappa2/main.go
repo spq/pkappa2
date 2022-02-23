@@ -177,44 +177,40 @@ func main() {
 			return
 		}
 
-		if m[0] == "change_color" {
+		operation := manager.UpdateTagOperation(nil)
+		streamMarkMethod := manager.UpdateTagOperationMarkAddStream
+		switch m[0] {
+		case "mark_del":
+			streamMarkMethod = manager.UpdateTagOperationMarkDelStream
+			fallthrough
+		case "mark_add":
+			s := r.URL.Query()["stream"]
+			if len(s) == 0 {
+				http.Error(w, "`stream` parameter missing", http.StatusBadRequest)
+				return
+			}
+			streams := make([]uint64, 0, len(s))
+			for _, n := range s {
+				v, err := strconv.ParseUint(n, 10, 64)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("invalid value for `stream` parameter: %q", n), http.StatusBadRequest)
+					return
+				}
+				streams = append(streams, v)
+			}
+			operation = streamMarkMethod(streams)
+		case "change_color":
 			c := r.URL.Query()["color"]
 			if len(c) != 1 || c[0] == "" {
 				http.Error(w, "`color` parameter missing or empty", http.StatusBadRequest)
 				return
 			}
-			if err := mgr.UpdateTagColor(n[0], c[0]); err != nil {
-				http.Error(w, fmt.Sprintf("update failed: %v", err), http.StatusBadRequest)
-				return
-			}
-			return
-		}
-
-		var method func([]uint64) manager.UpdateTagOperation
-		switch m[0] {
-		case "mark_add":
-			method = manager.UpdateTagOperationMarkAddStream
-		case "mark_del":
-			method = manager.UpdateTagOperationMarkDelStream
+			operation = manager.UpdateTagOperationUpdateColor(c[0])
 		default:
 			http.Error(w, fmt.Sprintf("unknown `method`: %q", m[0]), http.StatusBadRequest)
 			return
 		}
-		s := r.URL.Query()["stream"]
-		if len(s) == 0 {
-			http.Error(w, "`stream` parameter missing", http.StatusBadRequest)
-			return
-		}
-		streams := make([]uint64, 0, len(s))
-		for _, n := range s {
-			v, err := strconv.ParseUint(n, 10, 64)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid value for `stream` parameter: %q", n), http.StatusBadRequest)
-				return
-			}
-			streams = append(streams, v)
-		}
-		if err := mgr.UpdateTag(n[0], method(streams)); err != nil {
+		if err := mgr.UpdateTag(n[0], operation); err != nil {
 			http.Error(w, fmt.Sprintf("update failed: %v", err), http.StatusBadRequest)
 			return
 		}
