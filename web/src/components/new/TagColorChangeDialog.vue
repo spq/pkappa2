@@ -3,18 +3,35 @@
     <v-form>
       <v-card>
         <v-card-title>
-          <span class="text-h5">Change Color of {{ tagType | capitalize }} <v-chip :color="tagColor">{{ tagName }}</v-chip></span>
+          <span class="text-h5"
+            >Change Color of {{ tagType | capitalize }}
+            <v-chip :color="tagColor">{{ tagName }}</v-chip></span
+          >
         </v-card-title>
         <v-card-text>
           <v-text-field v-model="tagColor" label="Color" hide-details>
             <template v-slot:append>
-              <v-menu v-model="tagColorPickerOpen" top nudge-bottom="265" nudge-left="32" :close-on-content-click="false">
+              <v-menu
+                v-model="colorPickerOpen"
+                top
+                nudge-bottom="182"
+                nudge-left="32"
+                :close-on-content-click="false"
+              >
                 <template v-slot:activator="{ on }">
                   <div :style="swatchStyle" v-on="on" />
                 </template>
                 <v-card>
                   <v-card-text>
-                    <v-color-picker v-model="tagColor" mode="hexa" hide-mode-switch hide-inputs show-swatches flat />
+                    <v-color-picker
+                      v-model="colorPickerValue"
+                      @update:color="colorPickerValueUpdate"
+                      mode="hexa"
+                      hide-mode-switch
+                      hide-inputs
+                      show-swatches
+                      flat
+                    />
                   </v-card-text>
                 </v-card>
               </v-menu>
@@ -27,7 +44,7 @@
           <v-btn
             text
             @click="updateColor"
-            :disabled="tagColor == '' || loading"
+            :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
             type="submit"
@@ -53,7 +70,8 @@ export default {
       tagType: "",
       tagName: "",
       tagColor: "",
-      tagColorPickerOpen: false,
+      colorPickerOpen: false,
+      colorPickerValue: "",
     };
   },
   created() {
@@ -63,16 +81,16 @@ export default {
     ...mapState(["tags"]),
     // https://codepen.io/JamieCurnow/pen/KKPjraK
     swatchStyle() {
-      const { tagColor, tagColorPickerOpen } = this
+      const { tagColor, tagColorPickerOpen } = this;
       return {
         backgroundColor: tagColor,
-        cursor: 'pointer',
-        height: '30px',
-        width: '30px',
-        borderRadius: tagColorPickerOpen ? '50%' : '4px',
-        transition: 'border-radius 200ms ease-in-out'
-      }
-    }
+        cursor: "pointer",
+        height: "30px",
+        width: "30px",
+        borderRadius: tagColorPickerOpen ? "50%" : "4px",
+        transition: "border-radius 200ms ease-in-out",
+      };
+    },
   },
   methods: {
     ...mapActions(["changeTagColor"]),
@@ -81,15 +99,18 @@ export default {
       this.tagType = tagId.split("/", 1)[0];
       this.tagName = tagId.substr(this.tagType.length + 1);
       this.tagColor = this.tags.filter((e) => e.Name == tagId)[0].Color;
-      this.tagColorPickerOpen = false;
+      this.colorPickerOpen = false;
       this.visible = true;
       this.loading = false;
       this.error = false;
     },
+    colorPickerValueUpdate(color) {
+      if (this.colorPickerOpen) this.tagColor = color.hex;
+    },
     updateColor() {
       this.loading = true;
       this.error = false;
-      this.changeTagColor({ name: this.tagId,  color: this.tagColor })
+      this.changeTagColor({ name: this.tagId, color: this.tagColor })
         .then(() => {
           this.visible = false;
         })
@@ -98,6 +119,11 @@ export default {
           this.loading = false;
           EventBus.$emit("showError", { message: err });
         });
+    },
+  },
+  watch: {
+    colorPickerOpen(val, old) {
+      if (val && !old) this.colorPickerValue = this.tagColor;
     },
   },
 };

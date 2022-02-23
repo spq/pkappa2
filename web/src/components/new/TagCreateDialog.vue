@@ -9,13 +9,27 @@
           <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
           <v-text-field v-model="tagColor" label="Color" hide-details>
             <template v-slot:append>
-              <v-menu v-model="tagColorPickerOpen" top nudge-bottom="270" nudge-left="32" :close-on-content-click="false">
+              <v-menu
+                v-model="colorPickerOpen"
+                top
+                nudge-bottom="182"
+                nudge-left="32"
+                :close-on-content-click="false"
+              >
                 <template v-slot:activator="{ on }">
                   <div :style="swatchStyle" v-on="on" />
                 </template>
                 <v-card>
                   <v-card-text>
-                    <v-color-picker v-model="tagColor" mode="hexa" hide-mode-switch hide-inputs show-swatches flat />
+                    <v-color-picker
+                      v-model="colorPickerValue"
+                      @update:color="colorPickerValueUpdate"
+                      mode="hexa"
+                      hide-mode-switch
+                      hide-inputs
+                      show-swatches
+                      flat
+                    />
                   </v-card-text>
                 </v-card>
               </v-menu>
@@ -56,7 +70,8 @@ export default {
       tagType: "",
       tagName: "",
       tagColor: "",
-      tagColorPickerOpen: false,
+      colorPickerOpen: false,
+      colorPickerValue: "",
     };
   },
   created() {
@@ -65,29 +80,32 @@ export default {
   computed: {
     // https://codepen.io/JamieCurnow/pen/KKPjraK
     swatchStyle() {
-      const { tagColor, tagColorPickerOpen } = this
+      const { tagColor, colorPickerOpen } = this;
       return {
         backgroundColor: tagColor,
-        cursor: 'pointer',
-        height: '30px',
-        width: '30px',
-        borderRadius: tagColorPickerOpen ? '50%' : '4px',
-        transition: 'border-radius 200ms ease-in-out'
-      }
-    }
+        cursor: "pointer",
+        height: "30px",
+        width: "30px",
+        borderRadius: colorPickerOpen ? "50%" : "4px",
+        transition: "border-radius 200ms ease-in-out",
+      };
+    },
   },
   methods: {
-    ...mapActions(["addTag","markTagNew"]),
+    ...mapActions(["addTag", "markTagNew"]),
     openDialog({ tagType, tagQuery, tagStreams }) {
       this.tagType = tagType;
       this.tagQuery = tagQuery;
       this.tagStreams = tagStreams;
       this.tagName = "";
       this.tagColor = this.randomColor();
-      this.tagColorPickerOpen = false;
+      this.colorPickerOpen = false;
       this.visible = true;
       this.loading = false;
       this.error = false;
+    },
+    colorPickerValueUpdate(color) {
+      if (this.colorPickerOpen) this.tagColor = color.hex;
     },
     createTag() {
       this.loading = true;
@@ -115,7 +133,9 @@ export default {
     },
     // https://stackoverflow.com/a/17243070
     randomColor() {
-      const h = Math.random(), s = 0.6, v = 1.0;
+      const h = Math.random(),
+        s = 0.6,
+        v = 1.0;
       var r, g, b, i, f, p, q, t;
       i = Math.floor(h * 6);
       f = h * 6 - i;
@@ -123,15 +143,35 @@ export default {
       q = v * (1 - f * s);
       t = v * (1 - (1 - f) * s);
       switch (i % 6) {
-          case 0: r = v, g = t, b = p; break;
-          case 1: r = q, g = v, b = p; break;
-          case 2: r = p, g = v, b = t; break;
-          case 3: r = p, g = q, b = v; break;
-          case 4: r = t, g = p, b = v; break;
-          case 5: r = v, g = p, b = q; break;
+        case 0:
+          (r = v), (g = t), (b = p);
+          break;
+        case 1:
+          (r = q), (g = v), (b = p);
+          break;
+        case 2:
+          (r = p), (g = v), (b = t);
+          break;
+        case 3:
+          (r = p), (g = q), (b = v);
+          break;
+        case 4:
+          (r = t), (g = p), (b = v);
+          break;
+        case 5:
+          (r = v), (g = p), (b = q);
+          break;
       }
-      const toHex = (i) => Math.round(i * 255).toString(16).padStart(2, '0');
-      return '#' + toHex(r) + toHex(g) + toHex(b);
+      const toHex = (i) =>
+        Math.round(i * 255)
+          .toString(16)
+          .padStart(2, "0");
+      return "#" + toHex(r) + toHex(g) + toHex(b);
+    },
+  },
+  watch: {
+    colorPickerOpen(val, old) {
+      if (val && !old) this.colorPickerValue = this.tagColor;
     },
   },
 };
