@@ -11,8 +11,6 @@ server:
 - add tests
 - make query language simpler (less @'s)
 - improve import speed by ignoring timedout packages instead of having to flush them before processing a new package
-- Fix quote escaping in data search `cdata:"""}"`
-- Fix `then` in alternating senders. More details below (*)
 
 both:
 - add tag color
@@ -24,24 +22,3 @@ both:
 - support decoders in data for search and display
 - calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
 - add documentation
-
-ui:
-
-
-====================
-
-(*)
-Bei einem Stream, der so aussieht:
-```
-[Client:] ...  "report": "321"}
-[Server:] HTTP/1.1 200 OK
-```
-Ist: Die folgende Suche (1) ist kein Match:
-```
-cdata:"\x22321\x22}" then sdata:"HTTP"
-```
-Die folgende Suche ist ein Match:
-```
-cdata:"\x22321\x22}" sdata:"HTTP"
-```
-Soll: Suche (1) ist ein Match
