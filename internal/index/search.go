@@ -1433,15 +1433,17 @@ conditions:
 								p.variables[varName] = string(buffer[res[i]:res[i+1]])
 							}
 
-							// update stream offsets: a follow up regex for the same direction
-							// may consume the byte following the match, a regex for the other
-							// direction may start reading from the next received packet,
-							// so everything read before is out-of reach.
-							p.streamOffset[dir] += res[1]
-							for i := len(bufferLengths) - 1; ; i-- {
-								if bufferLengths[i-1][dir] <= p.streamOffset[dir] {
-									p.streamOffset[(C2S^S2C)-dir] = bufferLengths[i][(C2S^S2C)-dir]
-									break
+							if res[1] != 0 {
+								// update stream offsets: a follow up regex for the same direction
+								// may consume the byte following the match, a regex for the other
+								// direction may start reading from the next received packet,
+								// so everything read before is out-of reach.
+								p.streamOffset[dir] += res[1]
+								for i := len(bufferLengths) - 1; ; i-- {
+									if bufferLengths[i-1][dir] < p.streamOffset[dir] {
+										p.streamOffset[(C2S^S2C)-dir] = bufferLengths[i][(C2S^S2C)-dir]
+										break
+									}
 								}
 							}
 						}
