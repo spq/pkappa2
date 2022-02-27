@@ -10,18 +10,6 @@ export function destroySelectionListener() {
     listenerBag.clear();
 }
 
-// function base64ToAscii(b64) {
-//     const ui8 = Uint8Array.from(
-//         new TextEncoder().encode(atob(b64))
-//     );
-
-//     return new TextDecoder('ascii').decode(ui8);
-// }
-
-function base64ToAscii(b64) {
-    return atob(b64);
-}
-
 function getFromDataSet(outerBound, container, data, fallback = null) {
     let currentNode = container;
     while (currentNode?.dataset?.[data] == null) {
@@ -37,21 +25,24 @@ function getFromDataSet(outerBound, container, data, fallback = null) {
 function escape(text) {
     return text
         .split("")
-        .map(char => String.fromCharCode(char.charCodeAt(0))
-            .replace(
-                /\W/,
-                (match) => '\\x{' + match.charCodeAt(0).toString(16).toUpperCase().padStart('2', '0') + '}'
-            )
+        .map(char => char.replace(
+            /\W/,
+            (match) => `\\x{${match.charCodeAt(0).toString(16).toUpperCase().padStart('2', '0')}}`
         )
-        .join('');
+        )
+        .join("");
 }
 
 function chunkToQueryPart(chunk, start, length = undefined) {
-    return (chunk.Direction === 0 ? 'cdata' : 'sdata') + ':"' + escape(base64ToAscii(chunk.Content).substring(start, length)) + '"';
+    return `${"cs"[chunk.Direction]}data:"${escape(atob(chunk.Content).substring(start, length))}"`;
 }
 
 function onSelectionChange() {
     const selection = document.getSelection();
+    if (selection.type !== "Range" || selection.isCollapsed) {
+        this.selectionQuery = '';
+        return;
+    }
     const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
     if (selection.rangeCount !== 1 || streamDataNode == null) {
         this.selectionQuery = '';
@@ -63,10 +54,14 @@ function onSelectionChange() {
         return;
     }
     const chunks = this.stream.stream.Data;
-    const startChunkIdx = parseInt(getFromDataSet(streamDataNode, startContainer, 'chunkIdx', 0));
-    const startOffset = parseInt(getFromDataSet(streamDataNode, startContainer, 'offset', 0));
-    const endChunkIdx = parseInt(getFromDataSet(streamDataNode, endContainer, 'chunkIdx', chunks.length - 1));
-    const endOffset = parseInt(getFromDataSet(streamDataNode, endContainer, 'offset', chunks[chunks.length - 1].Content.length));
+    const startChunkIdx = parseInt(getFromDataSet(streamDataNode, startContainer, 'chunkIdx'));
+    const startOffset = parseInt(getFromDataSet(streamDataNode, startContainer, 'offset'));
+    const endChunkIdx = parseInt(getFromDataSet(streamDataNode, endContainer, 'chunkIdx'));
+    const endOffset = parseInt(getFromDataSet(streamDataNode, endContainer, 'offset'));
+    if ([startChunkIdx, startOffset, endChunkIdx, endOffset].some((i) => i === null)) {
+        this.selectionQuery = '';
+        return;
+    }
 
     if (startChunkIdx >= chunks.length) {
         this.selectionQuery = '';
@@ -75,14 +70,11 @@ function onSelectionChange() {
 
     let queryParts = [];
     for (let currentChunkIdx = startChunkIdx; currentChunkIdx <= endChunkIdx; currentChunkIdx++) {
-        const from = currentChunkIdx === startChunkIdx ? startOffset : 0;
         queryParts.push(chunkToQueryPart(
             chunks[currentChunkIdx],
-            from,
-            currentChunkIdx === endChunkIdx ? endOffset : undefined
+            currentChunkIdx === startChunkIdx ? startOffset : 0,
+            currentChunkIdx === endChunkIdx ? endOffset + 1 : undefined
         ));
     }
-    /** @TODO: Change back to `then` behaviour when bug is fixed */
-    //this.selectionQuery = queryParts.join(' then ');
-    this.selectionQuery = queryParts.join(' ');
+    this.selectionQuery = queryParts.join(' then ');
 }

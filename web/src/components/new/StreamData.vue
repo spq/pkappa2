@@ -53,34 +53,29 @@
 </template>
 
 <script>
+const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
+  if (i == 0x0a) return "<br/>";
+  if (i == 0x20) return "&nbsp;";
+  if (i >= 0x21 && i <= 0x7e) return `&#x${i.toString(16).padStart("2", "0")};`;
+  return ".";
+});
 export default {
   name: "StreamData",
   props: ["presentation", "data"],
   filters: {
     inlineAscii(b64) {
-      const ui8 = Uint8Array.from(
-        atob(b64)
-          .split("")
-          .map((char) => char.charCodeAt(0))
-      );
-      return [].slice
-        .call(ui8)
-        .map(function (i, idx, arr) {
-          const result = {
-            str: ".",
-            offset: idx,
-          };
-          if (i == 0x0d && idx + 1 < arr.length && arr[idx + 1] == 0x0a) {
-            result.str = "";
-          } else if (i == 0x0a) {
-            result.str = "<br/>";
-          } else if (/[ -~]/.test(String.fromCharCode(i))) {
-            result.str = "&#x" + ("00" + i.toString(16)).substr(-2) + ";";
-          }
-
-          return result;
-        })
-        .filter((obj) => obj.str !== "");
+      return atob(b64)
+        .split("")
+        .flatMap((c, idx, arr) =>
+          c == "\r" && idx + 1 < arr.length && arr[idx + 1] == "\n"
+            ? []
+            : [
+                {
+                  str: asciiMap[c.charCodeAt(0)],
+                  offset: idx,
+                },
+              ]
+        );
     },
     inlineHex(b64) {
       const ui8 = Uint8Array.from(
@@ -90,13 +85,7 @@ export default {
       );
       var str = [].slice
         .call(ui8)
-        .map(function (i) {
-          var h = i.toString(16);
-          if (h.length < 2) {
-            h = "0" + h;
-          }
-          return h;
-        })
+        .map((i) => i.toString(16).padStart("2", "0"))
         .join("");
       return str;
     },
@@ -108,13 +97,7 @@ export default {
       );
       var str = [].slice
         .call(ui8)
-        .map(function (i) {
-          var h = i.toString(16);
-          if (h.length < 2) {
-            h = "0" + h;
-          }
-          return h;
-        })
+        .map((i) => i.toString(16).padStart("2", "0"))
         .join("")
         .match(/.{1,2}/g)
         .join(" ")
