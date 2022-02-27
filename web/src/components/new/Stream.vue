@@ -366,7 +366,10 @@ export default {
   methods: {
     ...mapActions(["fetchStreamNew", "markTagAdd", "markTagDel"]),
     fetchStream() {
-      if (this.streamId != null) this.fetchStreamNew({ id: this.streamId });
+      if (this.streamId != null) {
+        this.fetchStreamNew({ id: this.streamId });
+        document.getSelection().empty();
+      }
     },
     createMark() {
       EventBus.$emit("showCreateTagDialog", {
@@ -393,6 +396,7 @@ export default {
     $route: "fetchStream",
     presentation(v) {
       localStorage.streamPresentation = v;
+      document.getSelection().empty();
     },
   },
 };
