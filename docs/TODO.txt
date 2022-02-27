@@ -21,6 +21,3 @@ both:
 - support decoders in data for search and display
 - calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
 - add documentation
-
-ui:
-- marking something in stream view and pressing a key could add a data filter

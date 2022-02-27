@@ -1,71 +1,81 @@
 <template>
   <v-card>
     <v-card-text>
-        <div v-if="presentation == 'ascii'">
+      <template v-if="presentation == 'ascii'">
+        <span
+          v-for="(chunk, index) in data"
+          :data-chunk-idx="index"
+          :key="index"
+          :style="
+            chunk.Direction != 0
+              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
+              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
+          "
+        >
           <span
-            v-for="(chunk, index) in data"
+            v-for="({ str, offset }, index) in $options.filters.inlineAscii(
+              chunk.Content
+            )"
             :key="index"
-            :style="
-              chunk.Direction != 0
-                ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-                : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-            "
-            v-html="$options.filters.inlineAscii(chunk.Content)"
-          />
-        </div>
-        <div v-else-if="presentation == 'hexdump'">
-          <pre
-            v-for="(chunk, index) in data"
-            :key="index"
-            :style="
-              chunk.Direction != 0
-                ? 'margin-left: 2em; color: #000080; background-color: #eeedfc;'
-                : 'color: #800000; background-color: #faeeed;'
-            "
-            >{{ chunk.Content | hexdump }}</pre
+            :data-offset="offset"
+            v-html="str"
           >
-        </div>
-        <div v-else>
-          <span
-            v-for="(chunk, index) in data"
-            :key="index"
-            :style="
-              chunk.Direction != 0
-                ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-                : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-            "
-          >
-            {{ chunk.Content | inlineHex }}<br
-          /></span>
-        </div>
+          </span>
+        </span>
+      </template>
+      <template v-else-if="presentation == 'hexdump'">
+        <pre
+          v-for="(chunk, index) in data"
+          :key="index"
+          :style="
+            chunk.Direction != 0
+              ? 'margin-left: 2em; color: #000080; background-color: #eeedfc;'
+              : 'color: #800000; background-color: #faeeed;'
+          "
+          >{{ chunk.Content | hexdump }}</pre
+        >
+      </template>
+      <template v-else>
+        <span
+          v-for="(chunk, index) in data"
+          :key="index"
+          :style="
+            chunk.Direction != 0
+              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
+              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
+          "
+        >
+          {{ chunk.Content | inlineHex }}<br
+        /></span>
+      </template>
     </v-card-text>
   </v-card>
 </template>
 
 <script>
+const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
+  if (i == 0x0a) return "<br/>";
+  if (i == 0x20) return "&nbsp;";
+  if (i >= 0x21 && i <= 0x7e) return `&#x${i.toString(16).padStart("2", "0")};`;
+  return ".";
+});
 export default {
   name: "StreamData",
   props: ["presentation", "data"],
   filters: {
     inlineAscii(b64) {
-      const ui8 = Uint8Array.from(
-        atob(b64)
-          .split("")
-          .map((char) => char.charCodeAt(0))
-      );
-      var str = [].slice
-        .call(ui8)
-        .map(function (i, idx, arr) {
-          if (i == 0x0d && idx + 1 < arr.length && arr[idx + 1] == 0x0a)
-            return "";
-          if (i == 0x0a) return "<br/>";
-          if (/[ -~]/.test(String.fromCharCode(i))) {
-            return "&#x" + ("00" + i.toString(16)).substr(-2) + ";";
-          }
-          return ".";
-        })
-        .join("");
-      return str;
+      return atob(b64)
+        .split("")
+        .flatMap((c, idx, arr) =>
+          c == "\r" && idx + 1 < arr.length && arr[idx + 1] == "\n"
+            ? []
+            : [
+                {
+                  str: asciiMap[c.charCodeAt(0)],
+                  offset: idx,
+                },
+              ]
+        );
     },
     inlineHex(b64) {
       const ui8 = Uint8Array.from(
@@ -75,13 +85,7 @@ export default {
       );
       var str = [].slice
         .call(ui8)
-        .map(function (i) {
-          var h = i.toString(16);
-          if (h.length < 2) {
-            h = "0" + h;
-          }
-          return h;
-        })
+        .map((i) => i.toString(16).padStart("2", "0"))
         .join("");
       return str;
     },
@@ -93,13 +97,7 @@ export default {
       );
       var str = [].slice
         .call(ui8)
-        .map(function (i) {
-          var h = i.toString(16);
-          if (h.length < 2) {
-            h = "0" + h;
-          }
-          return h;
-        })
+        .map((i) => i.toString(16).padStart("2", "0"))
         .join("")
         .match(/.{1,2}/g)
         .join(" ")

@@ -25,6 +25,26 @@
         </template>
         <span>Refresh</span>
       </v-tooltip>
+      <v-tooltip bottom>
+        <template #activator="{ on, attrs }">
+          <v-btn
+            :disabled="selectionQuery == ''"
+            link
+            exact
+            v-bind="attrs"
+            v-on="on"
+            icon
+            :to="{
+              name: 'search',
+              query: {
+                q: selectionQuery,
+              },
+            }"
+            ><v-icon>mdi-selection-search</v-icon></v-btn
+          >
+        </template>
+        <span>Search Selection</span>
+      </v-tooltip>
       <v-menu offset-y right bottom
         ><template #activator="{ on: onMenu, attrs }">
           <v-tooltip bottom>
@@ -247,6 +267,7 @@
       <StreamData
         :data="stream.stream.Data"
         :presentation="presentation"
+        ref="streamData"
       ></StreamData>
     </div>
   </div>
@@ -255,6 +276,10 @@
 <script>
 import { EventBus } from "./EventBus";
 import StreamData from "./StreamData.vue";
+import {
+  registerSelectionListener,
+  destroySelectionListener,
+} from "./streamSelector";
 
 import { mapActions, mapGetters, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
@@ -269,6 +294,7 @@ export default {
     }
     return {
       presentation: p,
+      selectionQuery: "",
     };
   },
   computed: {
@@ -314,6 +340,7 @@ export default {
   },
   mounted() {
     this.fetchStream();
+    registerSelectionListener(this);
 
     const handle = (e, streamId) => {
       if (streamId == null) return;
@@ -343,12 +370,15 @@ export default {
   },
   beforeDestroy() {
     window.removeEventListener("keydown", this._keyListener);
+    destroySelectionListener();
   },
-
   methods: {
     ...mapActions(["fetchStreamNew", "markTagAdd", "markTagDel"]),
     fetchStream() {
-      if (this.streamId != null) this.fetchStreamNew({ id: this.streamId });
+      if (this.streamId != null) {
+        this.fetchStreamNew({ id: this.streamId });
+        document.getSelection().empty();
+      }
     },
     createMark() {
       EventBus.$emit("showCreateTagDialog", {
@@ -375,6 +405,7 @@ export default {
     $route: "fetchStream",
     presentation(v) {
       localStorage.streamPresentation = v;
+      document.getSelection().empty();
     },
   },
 };
