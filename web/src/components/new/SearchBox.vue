@@ -1,51 +1,65 @@
 <template>
-  <v-combobox
-    autofocus
-    hide-details
-    flat
-    no-filter
-    hide-no-data
-    prepend-inner-icon="mdi-magnify"
-    v-model="searchBox"
-    @keyup.enter="search(null)"
-    @keydown.up.prevent="historyUp"
-    @keydown.down.prevent="historyDown"
-    ref="searchBox"
-    :search-input.sync="autocompleteValue"
-    :items="autocompleteItems"
-  >
-    <template #append>
-      <v-menu offset-y right bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn small icon v-on="on" v-bind="attrs"
-            ><v-icon>mdi-dots-vertical</v-icon></v-btn
-          >
-        </template>
-        <v-list dense>
-          <v-list-item link @click="search('search')">
-            <v-list-item-icon><v-icon>mdi-magnify</v-icon></v-list-item-icon>
-            <v-list-item-title>Search</v-list-item-title>
-          </v-list-item>
-          <v-list-item link @click="search('graph')">
-            <v-list-item-icon><v-icon>mdi-finance</v-icon></v-list-item-icon>
-            <v-list-item-title>Graph</v-list-item-title>
-          </v-list-item>
-          <v-list-item link @click="createTag('service', searchBox)">
-            <v-list-item-icon
-              ><v-icon>mdi-cloud-outline</v-icon></v-list-item-icon
+  <div>
+    <v-text-field
+      autofocus
+      hide-details
+      flat
+      prepend-inner-icon="mdi-magnify"
+      v-model="searchBox"
+      @click.stop
+      @keyup.enter="search(null)"
+      @keydown.up.prevent="historyUp"
+      @keydown.down.prevent="historyDown"
+      ref="searchBox"
+    >
+      <template #append>
+        <v-menu offset-y right bottom>
+          <template #activator="{ on, attrs }">
+            <v-btn small icon v-on="on" v-bind="attrs"
+              ><v-icon>mdi-dots-vertical</v-icon></v-btn
             >
-            <v-list-item-title>Save as Service</v-list-item-title>
-          </v-list-item>
-          <v-list-item link @click="createTag('tag', searchBox)">
-            <v-list-item-icon
-              ><v-icon>mdi-tag-multiple-outline</v-icon></v-list-item-icon
-            >
-            <v-list-item-title>Save as Tag</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-menu>
-    </template>
-  </v-combobox>
+          </template>
+          <v-list dense>
+            <v-list-item link @click="search('search')">
+              <v-list-item-icon><v-icon>mdi-magnify</v-icon></v-list-item-icon>
+              <v-list-item-title>Search</v-list-item-title>
+            </v-list-item>
+            <v-list-item link @click="search('graph')">
+              <v-list-item-icon><v-icon>mdi-finance</v-icon></v-list-item-icon>
+              <v-list-item-title>Graph</v-list-item-title>
+            </v-list-item>
+            <v-list-item link @click="createTag('service', searchBox)">
+              <v-list-item-icon
+                ><v-icon>mdi-cloud-outline</v-icon></v-list-item-icon
+              >
+              <v-list-item-title>Save as Service</v-list-item-title>
+            </v-list-item>
+            <v-list-item link @click="createTag('tag', searchBox)">
+              <v-list-item-icon
+                ><v-icon>mdi-tag-multiple-outline</v-icon></v-list-item-icon
+              >
+              <v-list-item-title>Save as Tag</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </template>
+    </v-text-field>
+    <v-menu
+      offset-y 
+      bottom
+      ref="suggestionMenu"
+      v-model="menuOpen"
+    >
+      <v-list>
+        <v-list-item
+          v-for="(item, index) in autocompleteItems"
+          :key="index"
+        >
+          <v-list-item-title>{{ item }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+  </div>
 </template>
 
 <script>
@@ -63,11 +77,10 @@ export default {
       pendingSearch: '',
       typingDelay: null,
       autocompleteItems: [],
-      autocompleteValue: null,
+      menuOpen: false,
+      menuPosX: 0,
+      menuPosY: 0,
     };
-  },
-  created() {
-    EventBus.$on("setSearchTerm", this.setSearchTerm);
   },
   computed: {
     ...mapGetters(["groupedTags"]),
@@ -76,16 +89,25 @@ export default {
     "$route.query.q": function (term) {
       this.searchBox = term;
     },
-    autocompleteValue(val) {
+    searchBox(val) {
       if (this.typingDelay) {
         clearTimeout(this.typingDelay);
+        this.autocompleteItems = [];
         this.typingDelay = null;
       }
       this.typingDelay = setTimeout(() => {
         const cursorPosition = this.$refs.searchBox.$refs.input.selectionStart;
         this.autocompleteItems = suggest(val, cursorPosition, this.groupedTags);
+
+        console.log(this.autocompleteItems, val, cursorPosition, this.groupedTags);
       }, 200);
     },
+    autocompleteItems() {
+      this.menuOpen = this.autocompleteItems.length > 0;
+    }
+  },
+  created() {
+    EventBus.$on("setSearchTerm", this.setSearchTerm);
   },
   mounted() {
     this._keyListener = function (e) {
