@@ -3,27 +3,36 @@ import grammar from './query'
 
 const queryGrammar = nearley.Grammar.fromCompiled(grammar);
 
-export default function suggest(text, cursorOffset, groupedTags) {
+export default function suggest(query, cursorOffset, groupedTags) {
     const parser = new nearley.Parser(queryGrammar);
     try {
-        parser.feed(text);
+        parser.feed(query);
     } catch (parseError) {
         console.log("Error at character " + parseError.offset); // "Error at character 9"
-        return [];
+        return {suggestions: []};
     }
-    // console.log(JSON.stringify(parser.results), cursorOffset);
+    console.log(JSON.stringify(parser.results), cursorOffset);
 
     // Find element at cursor
     const targetElem = _findElementAtCursor(parser.results, cursorOffset);
     if (!targetElem)
-        return [];
+        return {suggestions: []};
     
     const keyword = targetElem['keyword']['value'];
     const value = targetElem['value']['value'];
+    const text = targetElem['value']['text'];
     if (['service', 'tag', 'mark'].includes(keyword)) {
-        return groupedTags[keyword].map((t) => t.Name.split('/')[1]).filter((t) => !value || t.startsWith(value));
+        const start = targetElem['value']['col']; 
+        const end = start + (text?.length ?? 0);
+        const tagsInGroup = groupedTags[keyword].map((t) => t.Name.split('/')[1]);
+        const suggestions = tagsInGroup.filter((t) => null == value || (t.startsWith(value) && t !== value));
+        return {
+            suggestions,
+            start,
+            end,
+        };
     }
-    return [];
+    return {suggestions: []};
 }
 
 function _findElementAtCursor(results, cursorOffset) {
@@ -35,8 +44,8 @@ function _findElementAtCursor(results, cursorOffset) {
                 continue;
             
             const valueStartOffset = elem['value']['col'];
-            const valueEndOffset = elem['value']['value'] ? valueStartOffset + elem['value']['value'].length : valueStartOffset;
-            if (cursorOffset >= valueStartOffset && cursorOffset <= valueEndOffset)
+            const valueEndOffset = valueStartOffset + (elem['value']['text']?.length ?? 0);
+            if (cursorOffset >= valueStartOffset && cursorOffset < valueEndOffset)
                 return elem;
         }
         else if (elem['type'] === 'logic') {

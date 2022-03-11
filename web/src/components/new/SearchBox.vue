@@ -5,11 +5,14 @@
       hide-details
       flat
       prepend-inner-icon="mdi-magnify"
-      v-model="searchBox"
+      :value="searchBox"
+      @input="onInput"
       @click.stop
-      @keyup.enter="search(null)"
-      @keydown.up.prevent="historyUp"
-      @keydown.down.prevent="historyDown"
+      @keyup.enter="onEnter"
+      @keydown.up.prevent="arrowUp"
+      @keydown.down.prevent="arrowDown"
+      @keydown.tab.exact.prevent.stop="onTab"
+      @keydown.esc.exact="menuOpen = false"
       ref="searchBox"
     >
       <template #append>
@@ -45,18 +48,27 @@
       </template>
     </v-text-field>
     <v-menu
-      offset-y 
-      bottom
+      :position-x="menuPosX"
+      :position-y="menuPosY"
       ref="suggestionMenu"
       v-model="menuOpen"
+      absolute
+      dense
     >
       <v-list>
-        <v-list-item
-          v-for="(item, index) in autocompleteItems"
-          :key="index"
+        <v-list-item-group
+          :value="selectedAutocompleteIndex"
+          color="primary"
+          mandatory
         >
-          <v-list-item-title>{{ item }}</v-list-item-title>
-        </v-list-item>
+          <v-list-item
+            v-for="(item, index) in autocompleteItems"
+            :key="index"
+            @click="applyAutocomplete(index)"
+          >
+            <v-list-item-title>{{ item }}</v-list-item-title>
+          </v-list-item>
+        </v-list-item-group>
       </v-list>
     </v-menu>
   </div>
@@ -77,9 +89,12 @@ export default {
       pendingSearch: '',
       typingDelay: null,
       autocompleteItems: [],
+      suggestionStart: 0,
+      suggestionEnd: 0,
       menuOpen: false,
       menuPosX: 0,
       menuPosY: 0,
+      selectedAutocompleteIndex: 0,
     };
   },
   computed: {
@@ -87,30 +102,23 @@ export default {
   },
   watch: {
     "$route.query.q": function (term) {
-      this.searchBox = term;
-    },
-    searchBox(val) {
-      if (this.typingDelay) {
-        clearTimeout(this.typingDelay);
-        this.autocompleteItems = [];
-        this.typingDelay = null;
-      }
-      this.typingDelay = setTimeout(() => {
-        const cursorPosition = this.$refs.searchBox.$refs.input.selectionStart;
-        this.autocompleteItems = suggest(val, cursorPosition, this.groupedTags);
-
-        console.log(this.autocompleteItems, val, cursorPosition, this.groupedTags);
-      }, 200);
+      this.setSearchBox(term);
     },
     autocompleteItems() {
       this.menuOpen = this.autocompleteItems.length > 0;
-    }
+      if (this.menuOpen) {
+        this.selectedAutocompleteIndex = 0;
+        const cursorIndex = this.$refs.searchBox.$refs.input.selectionStart;
+        const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
+        this.menuPosX = cursorIndex * fontWidth + this.$refs.searchBox.$el.getBoundingClientRect().left;
+      }
+    },
   },
   created() {
     EventBus.$on("setSearchTerm", this.setSearchTerm);
   },
   mounted() {
-    this._keyListener = function (e) {
+    this._keyListener = (e) => {
       if (["input", "textarea"].includes(e.target.tagName.toLowerCase()))
         return;
       if (e.key != "/") return;
@@ -119,11 +127,79 @@ export default {
       this.$refs.searchBox.focus();
     };
     document.body.addEventListener("keydown", this._keyListener.bind(this));
+    this.menuPosY = this.$refs.searchBox.$el.getBoundingClientRect().bottom;
   },
   beforeDestroy() {
     document.body.removeEventListener("keydown", this._keyListener);
   },
   methods: {
+    onTab() {
+      if (this.menuOpen) {
+        this.applyAutocomplete();
+      } else {
+        this.startAutocompleteSearch();
+      }
+    },
+    onInput(updatedText) {
+      this.setSearchBox(updatedText);
+      this.startAutocompleteSearch();
+    },
+    onEnter() {
+      if (this.menuOpen) {
+        this.applyAutocomplete();
+      } else {
+        this.search(null);
+      }
+    },
+    applyAutocomplete(index = null) {
+      let replace = this.autocompleteItems[index ?? this.selectedAutocompleteIndex];
+      if (null == replace) {
+        return;
+      }
+      replace = this.$options.filters.tagNameForURI(replace);
+      this.searchBox = this.searchBox.substring(0, this.suggestionStart) + replace + this.searchBox.substring(this.suggestionEnd);
+      this.menuOpen = false;
+    },
+    startAutocompleteSearch() {
+      const val = this.searchBox;
+      this.typingDelay = setTimeout(() => {
+        const cursorPosition = this.$refs.searchBox.$refs.input.selectionStart;
+        const suggestionResult = suggest(val, cursorPosition, this.groupedTags);
+        this.autocompleteItems = suggestionResult.suggestions;
+        this.suggestionStart = suggestionResult.start;
+        this.suggestionEnd = suggestionResult.end;
+      }, 200);
+    },
+    abortAutocompleteSearch() {
+      if (this.typingDelay) {
+        clearTimeout(this.typingDelay);
+        this.autocompleteItems = [];
+        this.typingDelay = null;
+      }
+    },
+    arrowUp() {
+      if (this.menuOpen) {
+        this.menuUp();
+      } else {
+        this.historyUp();
+      }
+    },
+    arrowDown() {
+      if (this.menuOpen) {
+        this.menuDown();
+      } else {
+        this.historyDown();
+      }
+    },
+    menuDown() {
+      this.selectAutocompleteIndex(this.selectedAutocompleteIndex + 1);
+    },
+    menuUp() {
+      this.selectAutocompleteIndex(this.selectedAutocompleteIndex - 1);
+    },
+    selectAutocompleteIndex(index) {
+      this.selectedAutocompleteIndex = Math.min(Math.max(index, 0), this.autocompleteItems.length - 1);
+    },
     historyUp() {
       if (this.historyIndex === -1) {
         this.pendingSearch = this.searchBox;
@@ -134,14 +210,14 @@ export default {
         this.historyIndex++;
         term = getTermAt(this.historyIndex);
       }
-      this.searchBox = term;
+      this.setSearchBox(term);
     },
     historyDown() {
       if (this.historyIndex === -1) {
         return;
       }
       this.historyIndex--;
-      this.searchBox = this.historyIndex === -1 ? this.pendingSearch : getTermAt(this.historyIndex);
+      this.setSearchBox(this.historyIndex === -1 ? this.pendingSearch : getTermAt(this.historyIndex));
     },
     search(type) {
       let q = {};
@@ -157,8 +233,12 @@ export default {
         query: q,
       });
     },
+    setSearchBox(value) {
+      this.searchBox = value;
+      this.abortAutocompleteSearch();
+    },
     setSearchTerm({ searchTerm }) {
-      this.searchBox = searchTerm;
+      this.setSearchBox(searchTerm);
     },
     createTag(tagType, tagQuery) {
       EventBus.$emit("showCreateTagDialog", { tagType, tagQuery });

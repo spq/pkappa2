@@ -309,7 +309,8 @@ export default {
       for (const tag of this.stream.stream.Tags) {
         const type = tag.split("/", 1)[0];
         const name = tag.substr(type.length + 1);
-        res[type].push({'name': name, 'color': this.tags.filter((e) => e.Name == tag)[0].Color});
+        const color = this.tags.filter((e) => e.Name == tag)[0]?.Color;
+        res[type].push({ name, color });
       }
       return res;
     },

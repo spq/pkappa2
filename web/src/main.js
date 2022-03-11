@@ -44,12 +44,19 @@ Vue.filter('formatDateLong', function (time) {
 })
 Vue.filter('tagForURI', function (tagId) {
   const type = tagId.split("/", 1)[0];
-  let name = tagId.substr(type.length + 1);
-  if (name.includes('"'))
-    name = name.replaceAll('"', '""');
-  if (/[ "]/.test(name))
-    name = `"${name}"`;
+  const name = this.tagNameForURI(tagId.substr(type.length + 1));
+
   return `${type}:${name}`;
+})
+Vue.filter('tagNameForURI', function (tagName) {
+  if (tagName.includes('"')) {
+    tagName = tagName.replaceAll('"', '""');
+  }
+  if (/[ "]/.test(tagName)) {
+    tagName = `"${tagName}"`;
+  }
+
+  return tagName;
 })
 
 vue.$mount('#app')

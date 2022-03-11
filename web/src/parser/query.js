@@ -10,6 +10,7 @@ const lexer = moo.compile({
     ws: {match: /[ \t\n\r]+/, lineBreaks: true},
     value: [
         {match: /[:=]"(?:[^"]*|"")*"/, value: x => x.slice(2, -1)},
+        {match: /[:=]"(?:[^"]*|"")*/, value: x => x.slice(2)},
         {match: /[:=](?:(?:[^"\\ \t\n\r]|\\.)(?:[^\\ \t\n\r]|\\.)*)?(?:[^)\\ \t\n\r]|\\.)/, value: x => x.slice(1)},
         {match: /[:=]/, value: () => null},
     ],
