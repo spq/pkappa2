@@ -322,7 +322,7 @@ export default {
     },
     tagColors() {
       const colors = {};
-      this.tags.forEach((t) => colors[t.Name] = t.Color);
+      this.tags?.forEach((t) => colors[t.Name] = t.Color);
       return colors;
     },
   },
