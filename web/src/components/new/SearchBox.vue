@@ -65,6 +65,8 @@
             v-for="(item, index) in suggestionItems"
             :key="index"
             @click="applySuggestion(index)"
+            active-class="font-white"
+            :style="{ backgroundColor: tagColors[suggestionType][item] }"
           >
             <v-list-item-title>{{ item }}</v-list-item-title>
           </v-list-item>
@@ -77,7 +79,7 @@
 <script>
 import { EventBus } from "./EventBus";
 import {addSearch, getTermAt} from './searchHistory';
-import { mapGetters } from "vuex";
+import { mapGetters, mapState } from "vuex";
 import suggest from '../../parser/suggest'
 
 export default {
@@ -99,7 +101,21 @@ export default {
     };
   },
   computed: {
+    ...mapState(['tags']),
     ...mapGetters(["groupedTags"]),
+    tagColors() {
+      const tags = {};
+      this.tags.forEach(tag => {
+        const type = tag.Name.split("/", 1)[0];
+        const name = tag.Name.substr(type.length + 1);
+        if (!(type in tags)) {
+          tags[type] = {};
+        }
+        tags[type][name] = tag.Color;
+      });
+
+      return tags;
+    }
   },
   watch: {
     "$route.query.q": function (term) {
@@ -169,6 +185,7 @@ export default {
         this.suggestionItems = suggestionResult.suggestions;
         this.suggestionStart = suggestionResult.start;
         this.suggestionEnd = suggestionResult.end;
+        this.suggestionType = suggestionResult.type;
       }, 200);
     },
     abortSuggestionSearch() {
@@ -247,3 +264,9 @@ export default {
   },
 };
 </script>
+<style scoped>
+.font-white {
+  color: black;
+  font-weight: bold;
+}
+</style>

@@ -30,6 +30,7 @@ export default function suggest(query, cursorOffset, groupedTags) {
             suggestions,
             start,
             end,
+            type: keyword,
         };
     }
     return {suggestions: []};
