@@ -31,7 +31,7 @@ export function addSearch(term) {
 export function getTermAt(index) {
     const searches = getMostRecentSearchTerms();
 
-    return searches[index % searches.length];
+    return searches[index];
 }
 
 export function getLastTerms(num = 10) {

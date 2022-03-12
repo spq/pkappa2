@@ -158,6 +158,7 @@ export default {
       }
     },
     onInput(updatedText) {
+      this.historyIndex = -1;
       this.setSearchBox(updatedText);
       this.startSuggestionSearch();
     },
@@ -222,11 +223,14 @@ export default {
       if (this.historyIndex === -1) {
         this.pendingSearch = this.searchBox;
       }
+      let term = getTermAt(this.historyIndex + 1);
+      if (term == null) {
+        return;
+      }
       this.historyIndex++;
-      let term = getTermAt(this.historyIndex);
       if (this.pendingSearch === term) {
-        this.historyIndex++;
-        term = getTermAt(this.historyIndex);
+        this.historyUp();
+        return;
       }
       this.setSearchBox(term);
     },
