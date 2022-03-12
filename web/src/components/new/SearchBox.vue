@@ -4,7 +4,8 @@
     hide-details
     flat
     prepend-inner-icon="mdi-magnify"
-    v-model="searchBox"
+    :value="searchBox"
+    @input="onInput"
     @keyup.enter="search(null)"
     @keydown.up.prevent="historyUp"
     @keydown.down.prevent="historyDown"
@@ -80,15 +81,22 @@ export default {
     document.body.removeEventListener("keydown", this._keyListener);
   },
   methods: {
+    onInput(updatedText) {
+      this.historyIndex = -1;
+      this.searchBox = updatedText;
+    },
     historyUp() {
       if (this.historyIndex === -1) {
         this.pendingSearch = this.searchBox;
       }
+      let term = getTermAt(this.historyIndex + 1);
+      if (term == null) {
+        return;
+      }
       this.historyIndex++;
-      let term = getTermAt(this.historyIndex);
       if (this.pendingSearch === term) {
-        this.historyIndex++;
-        term = getTermAt(this.historyIndex);
+        this.historyUp();
+        return;
       }
       this.searchBox = term;
     },
