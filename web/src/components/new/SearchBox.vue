@@ -12,7 +12,7 @@
       @keydown.up.prevent="arrowUp"
       @keydown.down.prevent="arrowDown"
       @keydown.tab.exact.prevent.stop="onTab"
-      @keydown.esc.exact="menuOpen = false"
+      @keydown.esc.exact="suggestionMenuOpen = false"
       ref="searchBox"
     >
       <template #append>
@@ -48,23 +48,23 @@
       </template>
     </v-text-field>
     <v-menu
-      :position-x="menuPosX"
-      :position-y="menuPosY"
+      :position-x="suggestionMenuPosX"
+      :position-y="suggestionMenuPosY"
       ref="suggestionMenu"
-      v-model="menuOpen"
+      v-model="suggestionMenuOpen"
       absolute
       dense
     >
       <v-list>
         <v-list-item-group
-          :value="selectedAutocompleteIndex"
+          :value="suggestionSelectedIndex"
           color="primary"
           mandatory
         >
           <v-list-item
-            v-for="(item, index) in autocompleteItems"
+            v-for="(item, index) in suggestionItems"
             :key="index"
-            @click="applyAutocomplete(index)"
+            @click="applySuggestion(index)"
           >
             <v-list-item-title>{{ item }}</v-list-item-title>
           </v-list-item>
@@ -88,13 +88,14 @@ export default {
       historyIndex: -1,
       pendingSearch: '',
       typingDelay: null,
-      autocompleteItems: [],
+      suggestionItems: [],
       suggestionStart: 0,
       suggestionEnd: 0,
-      menuOpen: false,
-      menuPosX: 0,
-      menuPosY: 0,
-      selectedAutocompleteIndex: 0,
+      suggestionType: 'tag',
+      suggestionSelectedIndex: 0,
+      suggestionMenuOpen: false, 
+      suggestionMenuPosX: 0,
+      suggestionMenuPosY: 0,
     };
   },
   computed: {
@@ -104,13 +105,13 @@ export default {
     "$route.query.q": function (term) {
       this.setSearchBox(term);
     },
-    autocompleteItems() {
-      this.menuOpen = this.autocompleteItems.length > 0;
-      if (this.menuOpen) {
-        this.selectedAutocompleteIndex = 0;
+    suggestionItems() {
+      this.suggestionMenuOpen = this.suggestionItems.length > 0;
+      if (this.suggestionMenuOpen) {
+        this.suggestionSelectedIndex = 0;
         const cursorIndex = this.$refs.searchBox.$refs.input.selectionStart;
         const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
-        this.menuPosX = cursorIndex * fontWidth + this.$refs.searchBox.$el.getBoundingClientRect().left;
+        this.suggestionMenuPosX = cursorIndex * fontWidth + this.$refs.searchBox.$el.getBoundingClientRect().left;
       }
     },
   },
@@ -127,78 +128,78 @@ export default {
       this.$refs.searchBox.focus();
     };
     document.body.addEventListener("keydown", this._keyListener.bind(this));
-    this.menuPosY = this.$refs.searchBox.$el.getBoundingClientRect().bottom;
+    this.suggestionMenuPosY = this.$refs.searchBox.$el.getBoundingClientRect().bottom;
   },
   beforeDestroy() {
     document.body.removeEventListener("keydown", this._keyListener);
   },
   methods: {
     onTab() {
-      if (this.menuOpen) {
-        this.applyAutocomplete();
+      if (this.suggestionMenuOpen) {
+        this.applySuggestion();
       } else {
-        this.startAutocompleteSearch();
+        this.startSuggestionSearch();
       }
     },
     onInput(updatedText) {
       this.setSearchBox(updatedText);
-      this.startAutocompleteSearch();
+      this.startSuggestionSearch();
     },
     onEnter() {
-      if (this.menuOpen) {
-        this.applyAutocomplete();
+      if (this.suggestionMenuOpen) {
+        this.applySuggestion();
       } else {
         this.search(null);
       }
     },
-    applyAutocomplete(index = null) {
-      let replace = this.autocompleteItems[index ?? this.selectedAutocompleteIndex];
+    applySuggestion(index = null) {
+      let replace = this.suggestionItems[index ?? this.suggestionSelectedIndex];
       if (null == replace) {
         return;
       }
       replace = this.$options.filters.tagNameForURI(replace);
       this.searchBox = this.searchBox.substring(0, this.suggestionStart) + replace + this.searchBox.substring(this.suggestionEnd);
-      this.menuOpen = false;
+      this.suggestionMenuOpen = false;
     },
-    startAutocompleteSearch() {
+    startSuggestionSearch() {
       const val = this.searchBox;
       this.typingDelay = setTimeout(() => {
         const cursorPosition = this.$refs.searchBox.$refs.input.selectionStart;
         const suggestionResult = suggest(val, cursorPosition, this.groupedTags);
-        this.autocompleteItems = suggestionResult.suggestions;
+        this.suggestionItems = suggestionResult.suggestions;
         this.suggestionStart = suggestionResult.start;
         this.suggestionEnd = suggestionResult.end;
       }, 200);
     },
-    abortAutocompleteSearch() {
+    abortSuggestionSearch() {
       if (this.typingDelay) {
         clearTimeout(this.typingDelay);
-        this.autocompleteItems = [];
+        this.suggestionItems = [];
         this.typingDelay = null;
       }
     },
     arrowUp() {
-      if (this.menuOpen) {
+      if (this.suggestionMenuOpen) {
         this.menuUp();
       } else {
         this.historyUp();
       }
     },
     arrowDown() {
-      if (this.menuOpen) {
+      if (this.suggestionMenuOpen) {
         this.menuDown();
       } else {
         this.historyDown();
       }
     },
     menuDown() {
-      this.selectAutocompleteIndex(this.selectedAutocompleteIndex + 1);
+      this.selectSuggestionIndex(this.suggestionSelectedIndex + 1);
     },
     menuUp() {
-      this.selectAutocompleteIndex(this.selectedAutocompleteIndex - 1);
+      this.selectSuggestionIndex(this.suggestionSelectedIndex - 1);
     },
-    selectAutocompleteIndex(index) {
-      this.selectedAutocompleteIndex = Math.min(Math.max(index, 0), this.autocompleteItems.length - 1);
+    selectSuggestionIndex(index) {
+      this.suggestionSelectedIndex = Math.min(Math.max(index, 0), this.suggestionItems.length - 1);
     },
     historyUp() {
       if (this.historyIndex === -1) {
@@ -235,7 +236,7 @@ export default {
     },
     setSearchBox(value) {
       this.searchBox = value;
-      this.abortAutocompleteSearch();
+      this.abortSuggestionSearch();
     },
     setSearchTerm({ searchTerm }) {
       this.setSearchBox(searchTerm);
