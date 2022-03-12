@@ -11,7 +11,7 @@ export default function suggest(query, cursorOffset, groupedTags) {
         console.log("Error at character " + parseError.offset); // "Error at character 9"
         return {suggestions: []};
     }
-    console.log(JSON.stringify(parser.results), cursorOffset);
+    // console.log(JSON.stringify(parser.results), cursorOffset);
 
     // Find element at cursor
     const targetElem = _findElementAtCursor(parser.results, cursorOffset);
