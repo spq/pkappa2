@@ -178,10 +178,9 @@ export default {
         return;
       }
       replace = this.$options.filters.tagNameForURI(replace);
-      this.searchBox =
-        this.searchBox.substring(0, this.suggestionStart) +
-        replace +
-        this.searchBox.substring(this.suggestionEnd);
+      const prefix = this.searchBox.substring(0, this.suggestionStart);
+      const suffix = this.searchBox.substring(this.suggestionEnd);
+      this.searchBox = prefix + replace + suffix;
       this.suggestionMenuOpen = false;
     },
     startSuggestionSearch() {

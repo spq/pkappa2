@@ -8,10 +8,9 @@ export default function suggest(query, cursorOffset, groupedTags) {
     try {
         parser.feed(query);
     } catch (parseError) {
-        console.log("Error at character " + parseError.offset); // "Error at character 9"
+        console.log("Error at character " + parseError.offset);
         return { suggestions: [] };
     }
-    // console.log(JSON.stringify(parser.results), cursorOffset);
 
     // Find element at cursor
     const targetElem = _findElementAtCursor(parser.results, cursorOffset);
@@ -23,7 +22,7 @@ export default function suggest(query, cursorOffset, groupedTags) {
     const text = targetElem['value']['text'];
     if (['service', 'tag', 'mark'].includes(keyword)) {
         const start = targetElem['value']['col'];
-        const end = start + (text?.length ?? 0);
+        const end = start + (text?.length ?? 0) - 1;
         const tagsInGroup = groupedTags[keyword].map((t) => t.Name.split('/')[1]);
         const suggestions = tagsInGroup.filter((t) => null == value || (t.startsWith(value) && t !== value));
         return {
