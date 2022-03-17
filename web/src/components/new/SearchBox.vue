@@ -78,9 +78,9 @@
 
 <script>
 import { EventBus } from "./EventBus";
-import {addSearch, getTermAt} from './searchHistory';
+import { addSearch, getTermAt } from "./searchHistory";
 import { mapGetters, mapState } from "vuex";
-import suggest from '../../parser/suggest'
+import suggest from "../../parser/suggest";
 
 export default {
   name: "SearchBox",
@@ -88,24 +88,24 @@ export default {
     return {
       searchBox: this.$route.query.q,
       historyIndex: -1,
-      pendingSearch: '',
+      pendingSearch: "",
       typingDelay: null,
       suggestionItems: [],
       suggestionStart: 0,
       suggestionEnd: 0,
-      suggestionType: 'tag',
+      suggestionType: "tag",
       suggestionSelectedIndex: 0,
-      suggestionMenuOpen: false, 
+      suggestionMenuOpen: false,
       suggestionMenuPosX: 0,
       suggestionMenuPosY: 0,
     };
   },
   computed: {
-    ...mapState(['tags']),
+    ...mapState(["tags"]),
     ...mapGetters(["groupedTags"]),
     tagColors() {
       const tags = {};
-      this.tags.forEach(tag => {
+      this.tags.forEach((tag) => {
         const type = tag.Name.split("/", 1)[0];
         const name = tag.Name.substr(type.length + 1);
         if (!(type in tags)) {
@@ -115,7 +115,7 @@ export default {
       });
 
       return tags;
-    }
+    },
   },
   watch: {
     "$route.query.q": function (term) {
@@ -127,7 +127,9 @@ export default {
         this.suggestionSelectedIndex = 0;
         const cursorIndex = this.$refs.searchBox.$refs.input.selectionStart;
         const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
-        this.suggestionMenuPosX = cursorIndex * fontWidth + this.$refs.searchBox.$el.getBoundingClientRect().left;
+        this.suggestionMenuPosX =
+          cursorIndex * fontWidth +
+          this.$refs.searchBox.$el.getBoundingClientRect().left;
       }
     },
   },
@@ -144,7 +146,8 @@ export default {
       this.$refs.searchBox.focus();
     };
     document.body.addEventListener("keydown", this._keyListener.bind(this));
-    this.suggestionMenuPosY = this.$refs.searchBox.$el.getBoundingClientRect().bottom;
+    this.suggestionMenuPosY =
+      this.$refs.searchBox.$el.getBoundingClientRect().bottom;
   },
   beforeDestroy() {
     document.body.removeEventListener("keydown", this._keyListener);
@@ -175,7 +178,10 @@ export default {
         return;
       }
       replace = this.$options.filters.tagNameForURI(replace);
-      this.searchBox = this.searchBox.substring(0, this.suggestionStart) + replace + this.searchBox.substring(this.suggestionEnd);
+      this.searchBox =
+        this.searchBox.substring(0, this.suggestionStart) +
+        replace +
+        this.searchBox.substring(this.suggestionEnd);
       this.suggestionMenuOpen = false;
     },
     startSuggestionSearch() {
@@ -217,7 +223,10 @@ export default {
       this.selectSuggestionIndex(this.suggestionSelectedIndex - 1);
     },
     selectSuggestionIndex(index) {
-      this.suggestionSelectedIndex = Math.min(Math.max(index, 0), this.suggestionItems.length - 1);
+      this.suggestionSelectedIndex = Math.min(
+        Math.max(index, 0),
+        this.suggestionItems.length - 1
+      );
     },
     historyUp() {
       if (this.historyIndex === -1) {
@@ -239,7 +248,11 @@ export default {
         return;
       }
       this.historyIndex--;
-      this.setSearchBox(this.historyIndex === -1 ? this.pendingSearch : getTermAt(this.historyIndex));
+      this.setSearchBox(
+        this.historyIndex === -1
+          ? this.pendingSearch
+          : getTermAt(this.historyIndex)
+      );
     },
     search(type) {
       let q = {};
