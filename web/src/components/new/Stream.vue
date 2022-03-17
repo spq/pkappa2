@@ -209,7 +209,9 @@
             >{{ stream.stream.Stream.FirstPacket | formatDate }}</v-col
           >
           <v-col cols="1" class="text-subtitle-2"
-            >{{ streamTags.service.length == 0 ? "Protocol" : "Service" }}:</v-col
+            >{{
+              streamTags.service.length == 0 ? "Protocol" : "Service"
+            }}:</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Tags:</v-col>
           <v-col cols="3" class="text-body-2"
@@ -218,7 +220,7 @@
               v-for="tag in streamTags.tag"
               :key="`tag/${tag.name}`"
               :color="tag.color"
-              >{{tag.name}}</v-chip
+              >{{ tag.name }}</v-chip
             ></v-col
           >
         </v-row>
@@ -254,12 +256,12 @@
           >
           <v-col cols="1" class="text-subtitle-2">Marks:</v-col>
           <v-col cols="3" class="text-body-2"
-            ><v-chip 
+            ><v-chip
               small
               v-for="mark in streamTags.mark"
               :key="`mark/${mark.name}`"
               :color="mark.color"
-              >{{mark.name}}</v-chip
+              >{{ mark.name }}</v-chip
             ></v-col
           >
         </v-row>
@@ -309,7 +311,8 @@ export default {
       for (const tag of this.stream.stream.Tags) {
         const type = tag.split("/", 1)[0];
         const name = tag.substr(type.length + 1);
-        res[type].push({'name': name, 'color': this.tags.filter((e) => e.Name == tag)[0].Color});
+        const color = this.tags.filter((e) => e.Name == tag)[0]?.Color;
+        res[type].push({ name, color });
       }
       return res;
     },
