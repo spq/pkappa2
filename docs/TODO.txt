@@ -18,9 +18,36 @@ both:
 - support showing sub query results
 - add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
 - optional search result snippets
-- support decoders in data for search and display
+- support filters for search and display, see below for how
 - calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
 - add documentation
 
 web:
 - history reverse search with strg+r
+
+the filter feature will be implemented like this:
+- filters are executed serverside
+  - each executable file in filters/ is considered a filter
+  - an example is b64decode.py which decodes every received chunk using b64
+  - the protocol uses stdin/stdout, one json object per line or an empty line
+  - pkappa sends the following lines to the filter:
+    - first: general stream information json
+    - one line per data chunk containing a json with the dir(ection) and data(encoded in base64)
+    - one empty line terminating the chunks
+  - the filter responds with the following lines:
+    - one line per output data chunk formatted identical to the ones coming from pkappa
+    - one empty line terminating the chunks
+    - one general stream information json
+- tags, marks and services can be triggers for a collection of filters if they have a low complexity
+  - they must not match on filtered-data for now, also indirectly via other tags/marks/services
+- whenever pkappa becomes aware of a stream matching a tag/mark/service that triggers a filter but the output of that filter for this stream is not yet cached, it will queue up a filtering processing
+- whenever pkappa becomes aware of a stream no longer matching any tag/mark/service that triggers a filter but there exists a cache for the output of the given filter for the stream, that cached info is invalidated
+- the stream request api will get a parameter for selecting the filter to apply, it will support auto, none, filter:<name>
+- the mode auto is the default and will return the original stream data or the single cached filtered stream (if there is exactly one)
+- there will be one cache file per active filter with this format:
+  - [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
+  - when the stream id is ~0, this is an unused slot
+- the search will be modified this way:
+  - [cs]data filters will search in all currently available filtered outputs as well as the unmodified stream content
+  - there will be modifiers for these [cs]data filters that allow to specify which if the filtered outputs are searched, or to specify exactly one output that is used
+- when a filter was evaluated tags and services might be re-evaluated when they contain [cs]data filters, thats why those tags/services may not be used as triggers
