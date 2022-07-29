@@ -33,14 +33,14 @@ Vue.filter('tagify', function (id, what) {
 Vue.filter('formatDate', function (time) {
   if (time === null) return null;
   time = vue.$moment(time).local();
-  let format = "hh:mm:ss.SSS";
+  let format = "HH:mm:ss.SSS";
   if (!time.isSame(vue.$moment(), "day")) format = `YYYY-MM-DD ${format}`;
   return time.format(format);
 })
 Vue.filter('formatDateLong', function (time) {
   if (time === null) return null;
   time = vue.$moment(time).local();
-  return time.format('YYYY-MM-DD hh:mm:ss.SSS ZZ');
+  return time.format('YYYY-MM-DD HH:mm:ss.SSS ZZ');
 })
 Vue.filter('tagForURI', function (tagId) {
   const type = tagId.split("/", 1)[0];
