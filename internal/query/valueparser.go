@@ -221,7 +221,10 @@ func (p *durationParser) Capture(s []string) error {
 func (p *hostParser) Capture(s []string) error {
 	p.Host = net.ParseIP(s[0])
 	if p.Host == nil {
-		return fmt.Errorf("bad ip address %s", net.IP(p.Host).String())
+		return fmt.Errorf("bad ip address %s", s[0])
+	}
+	if p.Host.To4() != nil {
+		p.Host = p.Host.To4()
 	}
 	return nil
 }
