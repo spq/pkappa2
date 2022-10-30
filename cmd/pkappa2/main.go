@@ -22,6 +22,7 @@ import (
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/manager"
 	"github.com/spq/pkappa2/internal/query"
+	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/web"
 )
 
@@ -40,6 +41,8 @@ var (
 
 func main() {
 	flag.Parse()
+
+	tools.AssertFolderRWXPermissions("base_dir", *baseDir)
 
 	mgr, err := manager.New(
 		filepath.Join(*baseDir, *pcapDir),
@@ -89,6 +92,7 @@ func main() {
 			http.Error(w, "Invalid filename", http.StatusBadRequest)
 			return
 		}
+		tools.AssertFolderRWXPermissions("pcap_dir", filepath.Join(*baseDir, *pcapDir))
 		fullFilename := filepath.Join(*baseDir, *pcapDir, filename)
 
 		dst, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, 0666)

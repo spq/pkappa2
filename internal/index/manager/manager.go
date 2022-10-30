@@ -122,6 +122,11 @@ func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
 		tags:        make(map[string]*tag),
 	}
 
+	tools.AssertFolderRWXPermissions("pcap_dir", pcapDir)
+	tools.AssertFolderRWXPermissions("index_dir", indexDir)
+	tools.AssertFolderRWXPermissions("snapshot_dir", snapshotDir)
+	tools.AssertFolderRWXPermissions("state_dir", stateDir)
+
 	// read all existing indexes and load them
 	indexFileNames, err := tools.ListFiles(indexDir, "idx")
 	if err != nil {
