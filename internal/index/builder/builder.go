@@ -52,7 +52,8 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 		if info == nil || info.Filesize != uint64(p.Size()) {
 			info, _, err = readPackets(pcapDir, p.Name(), nil)
 			if err != nil {
-				return nil, err
+				log.Printf("error reading pcap %s: %v", p.Name(), err)
+				continue
 			}
 		}
 		b.knownPcaps = append(b.knownPcaps, info)
@@ -102,7 +103,9 @@ func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndex
 		}
 		pcapInfo, pcapPackages, err := readPackets(pcapDir, pcapFilename, knownPcapInfo)
 		if err != nil {
-			return 0, nil, err
+			log.Printf("readPackets(%q) failed. Skipping pcap: %v", pcapFilename, err)
+			nProcessedPcaps++
+			continue
 		}
 		log.Printf("Loaded %d packets from pcap file %q\n", len(pcapPackages), pcapFilename)
 		nProcessedPcaps++
@@ -119,7 +122,7 @@ func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndex
 		}
 	}
 	if len(newPackets) == 0 {
-		return 0, nil, nil
+		return nProcessedPcaps, nil, nil
 	}
 
 	// find last snapshot with ts < oldest new package
@@ -208,7 +211,7 @@ outer:
 			var err error
 			_, packets, err = readPackets(pcapDir, pcap.Filename, pcap)
 			if err != nil {
-				return 0, nil, err
+				return nProcessedPcaps, nil, err
 			}
 			if bestSnapshot.timestamp.After(pcap.PacketTimestampMin) {
 				packetIndexes := bestSnapshot.referencedPackets[pcap.Filename]
@@ -492,7 +495,7 @@ outer:
 			ib.Close()
 			os.Remove(ib.Filename())
 		}
-		return 0, nil, err
+		return nProcessedPcaps, nil, err
 	}
 
 	indexes := []*index.Reader{}
@@ -507,7 +510,7 @@ outer:
 				ib.Close()
 				os.Remove(ib.Filename())
 			}
-			return 0, nil, err
+			return nProcessedPcaps, nil, err
 		}
 		indexes = append(indexes, i)
 	}
