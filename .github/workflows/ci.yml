@@ -32,7 +32,6 @@ jobs:
     - name: Build frontend
       working-directory: ./web
       run: |
-        yarn global add @vue/cli
         yarn install --frozen-lockfile
         yarn build
 
@@ -43,7 +42,7 @@ jobs:
         cache: true
     
     - name: Install dependencies
-      run: apt-get install libpcap-dev
+      run: sudo apt-get install -y libpcap-dev
 
     - name: Build
       run: go build -v ./cmd/pkappa2/main.go
