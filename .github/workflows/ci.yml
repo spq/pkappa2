@@ -17,6 +17,7 @@ jobs:
       with:
         node-version: 18.x
         cache: 'yarn'
+        cache-dependency-path: 'web/yarn.lock'
 
     - name: Build frontend
       working-directory: ./web
