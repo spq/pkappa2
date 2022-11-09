@@ -8,6 +8,11 @@ Streams matching the query are displayed and their content can be viewed in mult
 The tool is under development and might not work!
 See docs/TODO.txt for missing features.
 
+Add pcaps using a POST to `/upload/filename.pcap`:
+```
+curl --data-binary @some-file.pcap http://localhost:8080/upload/some-file.pcap
+```
+
 ## Running
 
 - install required dependencies
@@ -18,6 +23,11 @@ See docs/TODO.txt for missing features.
 - visit `localhost:8080` in your web browser
 
 You likely want to add some arguments to the `go run` command, check `-help`
+
+### Docker
+- copy `.env.example` to `.env` and change the configuration
+- run `docker compose up -d`
+- visit `localhost:8080` in your web browser
 
 ## UI Development
 
