@@ -9,29 +9,40 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ '1.19', '1.18' ]
+        node: [ 19, 18 ]
+        exclude:
+          - go: 1.19
+            node: 18
+          - go: 1.18
+            node: 19
+    name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
     - uses: actions/checkout@v3
 
-    - name: Use Node.js 18.x
+    - name: Use Node.js ${{ matrix.node }}
       uses: actions/setup-node@v3
       with:
-        node-version: 18.x
+        node-version: ${{ matrix.node }}
         cache: 'yarn'
+        cache-dependency-path: 'web/yarn.lock'
 
     - name: Build frontend
       working-directory: ./web
       run: |
-        yarn global add @vue/cli
         yarn install --frozen-lockfile
         yarn build
 
-    - name: Set up Go
+    - name: Set up Go ${{ matrix.go }}
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: ${{ matrix.go }}
+        cache: true
     
     - name: Install dependencies
-      run: apt-get install libpcap-dev
+      run: sudo apt-get install -y libpcap-dev
 
     - name: Build
       run: go build -v ./cmd/pkappa2/main.go
