@@ -56,9 +56,9 @@ function onSelectionChange() {
     }
     let { startContainer, startOffset, endContainer, endOffset } = selection.getRangeAt(0);
     if (startOffset != 0)
-        startContainer = getDataSetContainer(streamDataNode, startContainer, 'offset').nextSibling;
+        startContainer = getDataSetContainer(streamDataNode, startContainer, 'offset')?.nextSibling;
     if (endOffset != 1)
-        endContainer = getDataSetContainer(streamDataNode, endContainer, 'offset').previousSibling;
+        endContainer = getDataSetContainer(streamDataNode, endContainer, 'offset')?.previousSibling;
     if (!streamDataNode.contains(startContainer) || !streamDataNode.contains(endContainer)) {
         this.selectionQuery = '';
         return;
