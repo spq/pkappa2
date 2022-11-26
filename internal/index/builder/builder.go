@@ -52,7 +52,8 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 		if info == nil || info.Filesize != uint64(p.Size()) {
 			info, _, err = readPackets(pcapDir, p.Name(), nil)
 			if err != nil {
-				return nil, err
+				log.Printf("error reading pcap %s: %v", p.Name(), err)
+				continue
 			}
 		}
 		b.knownPcaps = append(b.knownPcaps, info)
@@ -100,17 +101,25 @@ func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndex
 				break
 			}
 		}
-		pcapInfo, pcapPackages, err := readPackets(pcapDir, pcapFilename, knownPcapInfo)
+		pcapInfo, pcapPackets, err := readPackets(pcapDir, pcapFilename, knownPcapInfo)
 		if err != nil {
-			return 0, nil, err
+			log.Printf("readPackets(%q) failed: %v", pcapFilename, err)
+			if nProcessedPcaps == 0 {
+				// report that we failed to process a single pcap,
+				// the caller can then decide what to do...
+				return 1, nil, err
+			}
+			// process the other pcaps that we already loaded and
+			// let the next run deal with the problematic pcap...
+			break
 		}
-		log.Printf("Loaded %d packets from pcap file %q\n", len(pcapPackages), pcapFilename)
+		log.Printf("Loaded %d packets from pcap file %q\n", len(pcapPackets), pcapFilename)
 		nProcessedPcaps++
-		if len(pcapPackages) == 0 {
+		if len(pcapPackets) == 0 {
 			continue
 		}
 		newPcapInfos = append(newPcapInfos, pcapInfo)
-		newPackets = append(newPackets, pcapPackages...)
+		newPackets = append(newPackets, pcapPackets...)
 		if oldestTs.IsZero() || oldestTs.After(pcapInfo.PacketTimestampMin) {
 			oldestTs = pcapInfo.PacketTimestampMin
 		}
@@ -119,7 +128,7 @@ func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndex
 		}
 	}
 	if len(newPackets) == 0 {
-		return 0, nil, nil
+		return nProcessedPcaps, nil, nil
 	}
 
 	// find last snapshot with ts < oldest new package
@@ -208,6 +217,8 @@ outer:
 			var err error
 			_, packets, err = readPackets(pcapDir, pcap.Filename, pcap)
 			if err != nil {
+				// we couldn't load an old pcap that contains packets that we
+				// have to re-evaluate, if we just continue here, we lose data.
 				return 0, nil, err
 			}
 			if bestSnapshot.timestamp.After(pcap.PacketTimestampMin) {
