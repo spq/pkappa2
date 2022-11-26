@@ -430,7 +430,7 @@ export default {
     ...mapState(["tags", "graphData"]),
     chartTagOptions: function () {
       const options = [];
-      const types = ["tag", "service", "mark"];
+      const types = ["tag", "service", "mark", "generated"];
       for (const typ of types) {
         let first = true;
         for (const t of this.tags) {

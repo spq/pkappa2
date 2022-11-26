@@ -8,12 +8,12 @@
       </tr>
     </thead>
     <tbody>
-      <template v-for="typ in ['tag', 'service', 'mark']">
+      <template v-for="typ in ['tag', 'service', 'mark', 'generated']">
         <tr :key="typ">
           <th colspan="4">
             <v-icon
               >mdi-{{
-                { service: "anchor", tag: "tag", mark: "bookmark" }[typ]
+                { service: "anchor", tag: "tag", mark: "bookmark", generated: "robot" }[typ]
               }}</v-icon
             >
             {{ typ.charAt(0).toUpperCase() + typ.substring(1) }}s

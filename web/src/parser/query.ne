@@ -16,7 +16,7 @@ const lexer = moo.compile({
     subquery: {match: /@[a-z0-9]+:/, value: x => x.slice(1, -1)},
     negation: /[!-]/,
     keyword_or_error: {match: /[a-zA-Z]+/, error: true, type: moo.keywords({
-        kw: ['id', 'tag', 'service', 'mark', 'protocol', 'ftime', 'ltime', 'time', 'cdata', 'sdata', 'data', 'cport', 'sport', 'port', 'chost', 'shost', 'host', 'cbytes', 'sbytes', 'bytes', 'sort', 'limit', 'group'],
+        kw: ['id', 'tag', 'service', 'mark', 'generated', 'protocol', 'ftime', 'ltime', 'time', 'cdata', 'sdata', 'data', 'cport', 'sport', 'port', 'chost', 'shost', 'host', 'cbytes', 'sbytes', 'bytes', 'sort', 'limit', 'group'],
         'kw_or': 'or',
         'kw_and': 'and',
         'kw_then': 'then',

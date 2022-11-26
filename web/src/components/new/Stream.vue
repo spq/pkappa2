@@ -307,6 +307,7 @@ export default {
         service: [],
         tag: [],
         mark: [],
+        generated: [],
       };
       for (const tag of this.stream.stream.Tags) {
         const type = tag.split("/", 1)[0];

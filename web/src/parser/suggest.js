@@ -20,7 +20,7 @@ export default function suggest(query, cursorOffset, groupedTags) {
     const keyword = targetElem['keyword']['value'];
     const value = targetElem['value']['value'];
     const text = targetElem['value']['text'];
-    if (['service', 'tag', 'mark'].includes(keyword)) {
+    if (['service', 'tag', 'mark', 'generated'].includes(keyword)) {
         const start = targetElem['value']['col'];
         const end = start + (text?.length ?? 0) - 1;
         const tagsInGroup = groupedTags[keyword].map((t) => t.Name.split('/')[1]);

@@ -114,6 +114,11 @@ export default {
           icon: "checkbox-multiple-outline",
           key: "mark",
         },
+        {
+          title: "Generated",
+          icon: "robot-outline",
+          key: "generated",
+        },
       ],
     };
   },

@@ -161,6 +161,7 @@ const store = new Vuex.Store({
                 tag: [],
                 service: [],
                 mark: [],
+                generated: [],
             };
             if (state.tags != null) {
                 for (const tag of state.tags) {
@@ -273,7 +274,7 @@ const store = new Vuex.Store({
                 commit('resetGraphData', data);
             })
         },
-        async markTagNew({ dispatch, commit }, { name, streams , color }) {
+        async markTagNew({ dispatch, commit }, { name, streams, color }) {
             commit('resetMarkTagNewStatus', { inProgress: true, error: null });
             return APIClient.markTagNew(name, streams, color).catch((err) => {
                 commit('resetMarkTagNewStatus', { inProgress: false, error: err.response.data });

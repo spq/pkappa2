@@ -194,10 +194,10 @@ nextStateFile:
 				features:   q.Conditions.Features(),
 				color:      t.Color,
 			}
-			if strings.HasPrefix(t.Name, "mark/") {
+			if strings.HasPrefix(t.Name, "mark/") || strings.HasPrefix(t.Name, "generated/") {
 				ids, ok := q.Conditions.StreamIDs(mgr.nextStreamID)
 				if !ok {
-					log.Printf("Invalid tag %q in statefile %q: mark tag is malformed", t.Name, fn)
+					log.Printf("Invalid tag %q in statefile %q: 'mark' or 'generated' tag is malformed", t.Name, fn)
 					continue nextStateFile
 				}
 				nt.Matches = ids
@@ -632,9 +632,9 @@ func (mgr *Manager) ListTags() []TagInfo {
 }
 
 func (mgr *Manager) AddTag(name, color, queryString string) error {
-	isMark := strings.HasPrefix(name, "mark/")
+	isMark := strings.HasPrefix(name, "mark/") || strings.HasPrefix(name, "generated/")
 	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/") || isMark) {
-		return errors.New("invalid tag name (need a 'tag/', 'service/' or 'mark/' prefix)")
+		return errors.New("invalid tag name (need a 'tag/', 'service/', 'mark/' or 'generated/' prefix)")
 	}
 	if sub := strings.SplitN(name, "/", 2)[1]; sub == "" {
 		return errors.New("invalid tag name (prefix only not allowed)")
@@ -751,8 +751,8 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	operation(&info)
 	maxUsedStreamID := uint64(0)
 	if len(info.markTagAddStreams) != 0 || len(info.markTagDelStreams) != 0 {
-		if !strings.HasPrefix(name, "mark/") {
-			return fmt.Errorf("tag %q is not of type mark", name)
+		if !(strings.HasPrefix(name, "mark/") || strings.HasPrefix(name, "generated/")) {
+			return fmt.Errorf("tag %q is not of type 'mark' or 'enerated'", name)
 		}
 		for _, s := range info.markTagAddStreams {
 			if maxUsedStreamID <= s {

@@ -440,9 +440,9 @@ func (c *TagCondition) invert() ConditionsSet {
 	}
 }
 
-//tcp -> !udp & !sctp & !other
-//!!udp -> udp -> !tcp & !sctp & !other
-//!tcp -> !tcp & !sctp & !other
+// tcp -> !udp & !sctp & !other
+// !!udp -> udp -> !tcp & !sctp & !other
+// !tcp -> !tcp & !sctp & !other
 func (c *FlagCondition) invert() ConditionsSet {
 	cond := Conditions(nil)
 	for v := c.Value & c.Mask; ; {
@@ -528,7 +528,7 @@ func (c *ImpossibleCondition) invert() ConditionsSet {
 func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 	conds := ConditionsSet(nil)
 	switch t.Key {
-	case "tag", "service", "mark":
+	case "tag", "service", "mark", "generated":
 		for _, v := range strings.Split(t.Value, ",") {
 			conds = append(conds, Conditions{
 				&TagCondition{
