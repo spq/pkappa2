@@ -386,14 +386,15 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 			}
 		}
 	}
-	mgr.allStreams = bitmask.LongBitmask{}
+	allStreams := bitmask.LongBitmask{}
 	if newNextStreamID != 0 {
-		mgr.allStreams.Set(uint(newNextStreamID - 1))
+		allStreams.Set(uint(newNextStreamID - 1))
 		for i := uint64(0); i < newNextStreamID; i++ {
-			mgr.allStreams.Set(uint(i))
+			allStreams.Set(uint(i))
 		}
 	}
 	mgr.jobs <- func() {
+		mgr.allStreams = allStreams
 		existingIndexesReleaser.release(mgr)
 		// add new indexes if some were created
 		if len(createdIndexes) > 0 {
