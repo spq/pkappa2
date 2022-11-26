@@ -1115,5 +1115,6 @@ func (c StreamContext) AllTags() ([]string, error) {
 		}
 		//TODO: figure out if the uncertain tag matches
 	}
+	sort.Strings(tags)
 	return tags, nil
 }
