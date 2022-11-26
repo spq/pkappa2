@@ -48,35 +48,34 @@
             </v-tooltip>
           </template>
           <v-list dense>
-            <template v-for="tag of groupedTags.mark">
-              <v-list-item
-                :key="tag.Name"
-                link
-                @click="
-                  markSelectedStreams(
-                    tag.Name,
-                    tagStatusForSelection[tag.Name] !== true
-                  )
-                "
-              >
-                <v-list-item-action>
-                  <v-icon
-                    >mdi-{{
-                      tagStatusForSelection[tag.Name] === true
-                        ? "checkbox-outline"
-                        : tagStatusForSelection[tag.Name] === false
-                        ? "minus-box"
-                        : "checkbox-blank-outline"
-                    }}</v-icon
-                  >
-                </v-list-item-action>
-                <v-list-item-content>
-                  <v-list-item-title>{{
-                    tag.Name | tagify("name")
-                  }}</v-list-item-title>
-                </v-list-item-content>
-              </v-list-item>
-            </template>
+            <v-list-item
+              v-for="tag of groupedTags.mark"
+              :key="tag.Name"
+              link
+              @click="
+                markSelectedStreams(
+                  tag.Name,
+                  tagStatusForSelection[tag.Name] !== true
+                )
+              "
+            >
+              <v-list-item-action>
+                <v-icon
+                  >mdi-{{
+                    tagStatusForSelection[tag.Name] === true
+                      ? "checkbox-outline"
+                      : tagStatusForSelection[tag.Name] === false
+                      ? "minus-box"
+                      : "checkbox-blank-outline"
+                  }}</v-icon
+                >
+              </v-list-item-action>
+              <v-list-item-content>
+                <v-list-item-title>{{
+                  tag.Name | tagify("name")
+                }}</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
             <v-divider />
             <v-list-item link @click="createMarkFromSelection">
               <v-list-item-action />
@@ -155,9 +154,31 @@
       type="table-thead, table-tbody"
       v-if="streams.running || (!streams.result && !streams.error)"
     ></v-skeleton-loader>
-    <v-alert type="error" dense v-else-if="streams.error">{{
-      streams.error
-    }}</v-alert>
+    <div v-else-if="streams.error">
+      <v-alert type="error" border="left">{{ streams.error }}</v-alert>
+      <v-alert type="info" border="left"
+        ><v-row>
+          <v-col class="grow"
+            >did you mean to search for the text directly?</v-col
+          >
+          <v-col class="shrink">
+            <v-btn
+              @click="
+                $router.push({
+                  name: 'search',
+                  query: {
+                    q: `data:\x22${$options.filters.regexEscape(
+                      $route.query.q
+                    )}\x22`,
+                  },
+                })
+              "
+              >Search for the input</v-btn
+            >
+          </v-col></v-row
+        ></v-alert
+      >
+    </div>
     <center v-else-if="streams.result.Results.length == 0">
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
@@ -200,17 +221,18 @@
                 ></v-simple-checkbox>
               </td>
               <td class="pl-0">
-                <template v-for="tag in stream.Tags"
-                  ><v-hover v-slot="{ hover }" :key="tag"
-                    ><v-chip small :color="tagColors[tag]"
-                      ><template v-if="hover"
-                        >{{ tag | tagify("type") | capitalize }}
-                        {{ tag | tagify("name") }}</template
-                      ><template v-else>{{
-                        tag | tagify("name")
-                      }}</template></v-chip
-                    ></v-hover
-                  ></template
+                <v-hover
+                  v-for="tag in stream.Tags"
+                  v-slot="{ hover }"
+                  :key="tag"
+                  ><v-chip small :color="tagColors[tag]"
+                    ><template v-if="hover"
+                      >{{ tag | tagify("type") | capitalize }}
+                      {{ tag | tagify("name") }}</template
+                    ><template v-else>{{
+                      tag | tagify("name")
+                    }}</template></v-chip
+                  ></v-hover
                 >
               </td>
               <td>

@@ -58,5 +58,16 @@ Vue.filter('tagNameForURI', function (tagName) {
 
   return tagName;
 })
+Vue.filter('regexEscape', function (text) {
+  return text
+    .split("")
+    .map(char => char.replace(
+      /[^ !#$%&',-/0123456789:;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz~]/,
+      (match) => `\\x{${match.charCodeAt(0).toString(16).toUpperCase().padStart('2', '0')}}`
+    )
+    )
+    .join("");
+})
+
 
 vue.$mount('#app')
