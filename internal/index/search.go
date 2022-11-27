@@ -143,48 +143,63 @@ conditions:
 			if !ok {
 				return queryPart{}, fmt.Errorf("tag %q does not exist", cc.TagName)
 			}
+			var f func(uint64) bool
 			switch cc.Accept {
 			case 0:
 				// accept never
-				filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
-					return false, nil
-				})
+				f = func(id uint64) bool {
+					return false
+				}
 			case query.TagConditionAcceptUncertainMatching | query.TagConditionAcceptUncertainFailing | query.TagConditionAcceptMatching | query.TagConditionAcceptFailing:
 				// accept always
 			case query.TagConditionAcceptUncertainMatching | query.TagConditionAcceptUncertainFailing:
 				// accept if uncertain
-				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
-					return td.Uncertain.IsSet(uint(s.StreamID)), nil
-				})
+				f = func(id uint64) bool {
+					return td.Uncertain.IsSet(uint(id))
+				}
 			case query.TagConditionAcceptMatching | query.TagConditionAcceptFailing:
 				// accept if certain
-				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
-					return !td.Uncertain.IsSet(uint(s.StreamID)), nil
-				})
+				f = func(id uint64) bool {
+					return !td.Uncertain.IsSet(uint(id))
+				}
 			case query.TagConditionAcceptMatching | query.TagConditionAcceptUncertainMatching:
 				// accept if matching
-				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
-					return td.Matches.IsSet(uint(s.StreamID)), nil
-				})
+				f = func(id uint64) bool {
+					return td.Matches.IsSet(uint(id))
+				}
 			case query.TagConditionAcceptFailing | query.TagConditionAcceptUncertainFailing:
 				// accept if failing
-				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
-					return !td.Matches.IsSet(uint(s.StreamID)), nil
-				})
+				f = func(id uint64) bool {
+					return !td.Matches.IsSet(uint(id))
+				}
 			default:
-				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+				f = func(id uint64) bool {
 					a := cc.Accept
-					if td.Uncertain.IsSet(uint(s.StreamID)) {
+					if td.Uncertain.IsSet(uint(id)) {
 						a &= query.TagConditionAcceptUncertainMatching | query.TagConditionAcceptUncertainFailing
 					} else {
 						a &= query.TagConditionAcceptMatching | query.TagConditionAcceptFailing
 					}
-					if td.Matches.IsSet(uint(s.StreamID)) {
+					if td.Matches.IsSet(uint(id)) {
 						a &= query.TagConditionAcceptMatching | query.TagConditionAcceptUncertainMatching
 					} else {
 						a &= query.TagConditionAcceptFailing | query.TagConditionAcceptUncertainFailing
 					}
-					return a != 0, nil
+					return a != 0
+				}
+			}
+			if f != nil {
+				filters = append(filters, func(_ *searchContext, s *stream) (bool, error) {
+					return f(s.StreamID), nil
+				})
+				lookups = append(lookups, func() ([]uint32, error) {
+					lookup := []uint32(nil)
+					for id, index := range r.containedStreamIds {
+						if f(id) {
+							lookup = append(lookup, index)
+						}
+					}
+					return lookup, nil
 				})
 			}
 		case *query.FlagCondition:
@@ -789,6 +804,16 @@ conditions:
 		}
 		lookups = append(lookups, func() ([]uint32, error) {
 			return []uint32{idx}, nil
+		})
+	} else {
+		lookups = append(lookups, func() ([]uint32, error) {
+			lookup := []uint32(nil)
+			for id, index := range r.containedStreamIds {
+				if id >= minIDFilter && id <= maxIDFilter {
+					lookup = append(lookup, index)
+				}
+			}
+			return lookup, nil
 		})
 	}
 	if hostConditionBitmaps != nil {
