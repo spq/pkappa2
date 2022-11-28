@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/gopacket/pcap"
@@ -32,6 +33,7 @@ var (
 	indexDir    = flag.String("index_dir", "", "Path where indexes will be stored")
 	snapshotDir = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
 	stateDir    = flag.String("state_dir", "", "Path where state files will be stored")
+	filterDir   = flag.String("filter_dir", "./filters", "Path where filter executables are searched")
 
 	userPassword = flag.String("user_password", "", "HTTP auth password for users")
 	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
@@ -49,10 +51,19 @@ func main() {
 		filepath.Join(*baseDir, *indexDir),
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
+		*filterDir,
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)
 	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+	mgr.StartMonitoringFilters(watcher)
+
 	var server *http.Server
 
 	r := chi.NewRouter()
@@ -183,6 +194,7 @@ func main() {
 
 		operation := manager.UpdateTagOperation(nil)
 		streamMarkMethod := manager.UpdateTagOperationMarkAddStream
+		filterModifyMethod := manager.UpdateTagOperationAddFilter
 		switch m[0] {
 		case "mark_del":
 			streamMarkMethod = manager.UpdateTagOperationMarkDelStream
@@ -210,6 +222,16 @@ func main() {
 				return
 			}
 			operation = manager.UpdateTagOperationUpdateColor(c[0])
+		case "filter_del":
+			filterModifyMethod = manager.UpdateTagOperationDeleteFilter
+			fallthrough
+		case "filter_add":
+			f := r.URL.Query()["filters"]
+			if len(f) == 0 {
+				http.Error(w, "`filters` parameter missing", http.StatusBadRequest)
+				return
+			}
+			operation = filterModifyMethod(f)
 		default:
 			http.Error(w, fmt.Sprintf("unknown `method`: %q", m[0]), http.StatusBadRequest)
 			return
@@ -217,6 +239,13 @@ func main() {
 		if err := mgr.UpdateTag(n[0], operation); err != nil {
 			http.Error(w, fmt.Sprintf("update failed: %v", err), http.StatusBadRequest)
 			return
+		}
+	})
+	rUser.Get("/api/filters", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(mgr.ListFilters()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
 	rUser.Get(`/api/download/{stream:\d+}.pcap`, func(w http.ResponseWriter, r *http.Request) {

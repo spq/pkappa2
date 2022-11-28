@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
 	"github.com/spq/pkappa2/internal/query"
@@ -19,6 +22,11 @@ import (
 )
 
 type (
+	filter struct {
+		path    string
+		name    string
+		streams chan index.Stream
+	}
 	tag struct {
 		query.TagDetails
 		definition string
@@ -38,6 +46,7 @@ type (
 		PcapDir     string
 		IndexDir    string
 		SnapshotDir string
+		FilterDir   string
 
 		jobs              chan func()
 		mergeJobRunning   bool
@@ -55,7 +64,8 @@ type (
 		updatedStreamsDuringTaggingJob bitmask.LongBitmask
 		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
-		tags map[string]*tag
+		tags    map[string]*tag
+		filters map[string]*filter
 
 		usedIndexes map[*index.Reader]uint
 	}
@@ -86,6 +96,7 @@ type (
 	updateTagOperationInfo struct {
 		markTagAddStreams, markTagDelStreams []uint64
 		color                                string
+		addFilterName, delFilterName         []string
 	}
 	UpdateTagOperation func(*updateTagOperationInfo)
 
@@ -111,15 +122,29 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, filterDir string) (*Manager, error) {
 	mgr := Manager{
 		PcapDir:     pcapDir,
 		IndexDir:    indexDir,
 		SnapshotDir: snapshotDir,
 		StateDir:    stateDir,
+		FilterDir:   filterDir,
 
 		usedIndexes: make(map[*index.Reader]uint),
 		tags:        make(map[string]*tag),
+		filters:     make(map[string]*filter),
+	}
+
+	// Lookup all available filter binaries
+	files, err := ioutil.ReadDir(mgr.FilterDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		mgr.addFilter(filepath.Join(mgr.FilterDir, f.Name()))
 	}
 
 	tools.AssertFolderRWXPermissions("pcap_dir", pcapDir)
@@ -599,6 +624,20 @@ func (mgr *Manager) KnownPcaps() []pcapmetadata.PcapInfo {
 	return res
 }
 
+func (mgr *Manager) ListFilters() []string {
+	c := make(chan []string)
+	mgr.jobs <- func() {
+		r := []string{}
+		for _, f := range mgr.filters {
+			r = append(r, f.name)
+		}
+		c <- r
+		close(c)
+	}
+	res := <-c
+	return res
+}
+
 func (mgr *Manager) ListTags() []TagInfo {
 	c := make(chan []TagInfo)
 	mgr.jobs <- func() {
@@ -746,6 +785,18 @@ func UpdateTagOperationUpdateColor(color string) UpdateTagOperation {
 	}
 }
 
+func UpdateTagOperationAddFilter(filter_name []string) UpdateTagOperation {
+	return func(i *updateTagOperationInfo) {
+		i.addFilterName = filter_name
+	}
+}
+
+func UpdateTagOperationDeleteFilter(filter_name []string) UpdateTagOperation {
+	return func(i *updateTagOperationInfo) {
+		i.delFilterName = filter_name
+	}
+}
+
 func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	info := updateTagOperationInfo{}
 	operation(&info)
@@ -850,6 +901,57 @@ func (r *indexReleaser) release(mgr *Manager) {
 			os.Remove(i.Filename())
 		}
 	}
+}
+
+func (mgr *Manager) StartMonitoringFilters(watcher *fsnotify.Watcher) {
+
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				log.Println("event:", event)
+				if event.Has(fsnotify.Create) {
+					mgr.addFilter(event.Name)
+				}
+				if event.Has(fsnotify.Remove) {
+					mgr.removeFilter(event.Name)
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("error:", err)
+			}
+		}
+	}()
+
+	err := watcher.Add(mgr.FilterDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (mgr *Manager) addFilter(path string) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		log.Println("error:", err)
+		return
+	}
+	if fi.Mode().Perm()&0o110 != 0o110 {
+		log.Printf("error: filter %s is not executable", path)
+		return
+	}
+
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	mgr.filters[name] = &filter{path, name, nil}
+}
+
+func (mgr *Manager) removeFilter(path string) {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	delete(mgr.filters, name)
 }
 
 func (mgr *Manager) GetView() View {
