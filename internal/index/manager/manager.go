@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spq/pkappa2/internal/index"
@@ -32,6 +33,7 @@ type (
 		definition string
 		features   query.FeatureSet
 		color      string
+		filters    []*filter
 	}
 	TagInfo struct {
 		Name           string
@@ -136,15 +138,15 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, filterDir string) (*Manager, 
 	}
 
 	// Lookup all available filter binaries
-	files, err := ioutil.ReadDir(mgr.FilterDir)
+	entries, err := os.ReadDir(mgr.FilterDir)
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, f := range files {
-		if f.IsDir() {
+	for _, entry := range entries {
+		if entry.IsDir() {
 			continue
 		}
-		mgr.addFilter(filepath.Join(mgr.FilterDir, f.Name()))
+		mgr.addFilter(filepath.Join(mgr.FilterDir, entry.Name()))
 	}
 
 	tools.AssertFolderRWXPermissions("pcap_dir", pcapDir)
@@ -831,6 +833,24 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 			if info.color != "" {
 				t.color = info.color
 			}
+			if len(info.addFilterName) != 0 {
+				for _, filter_name := range info.addFilterName {
+					if filter, ok := mgr.filters[filter_name]; !ok {
+						return fmt.Errorf("unknown filter %q", filter_name)
+					} else {
+						mgr.attachFilterToTag(t, filter)
+					}
+				}
+			}
+			if len(info.delFilterName) != 0 {
+				for _, filter_name := range info.delFilterName {
+					if filter, ok := mgr.filters[filter_name]; !ok {
+						return fmt.Errorf("unknown filter %q", filter_name)
+					} else {
+						mgr.detachFilterFromTag(t, filter)
+					}
+				}
+			}
 			if maxUsedStreamID != 0 {
 				if maxUsedStreamID >= mgr.nextStreamID {
 					return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
@@ -904,7 +924,6 @@ func (r *indexReleaser) release(mgr *Manager) {
 }
 
 func (mgr *Manager) StartMonitoringFilters(watcher *fsnotify.Watcher) {
-
 	go func() {
 		for {
 			select {
@@ -935,12 +954,8 @@ func (mgr *Manager) StartMonitoringFilters(watcher *fsnotify.Watcher) {
 }
 
 func (mgr *Manager) addFilter(path string) {
-	fi, err := os.Lstat(path)
+	err := unix.Access(path, unix.X_OK)
 	if err != nil {
-		log.Println("error:", err)
-		return
-	}
-	if fi.Mode().Perm()&0o110 != 0o110 {
 		log.Printf("error: filter %s is not executable", path)
 		return
 	}
@@ -951,7 +966,41 @@ func (mgr *Manager) addFilter(path string) {
 
 func (mgr *Manager) removeFilter(path string) {
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	if filter, ok := mgr.filters[name]; !ok {
+		log.Printf("error: filter %s does not exist", name)
+		return
+	} else {
+		// remove filter from all tags
+		for _, t := range mgr.tags {
+			mgr.detachFilterFromTag(t, filter)
+		}
+	}
+
 	delete(mgr.filters, name)
+}
+
+func (mgr *Manager) attachFilterToTag(tag *tag, filter *filter) {
+	// check if filter already exists
+	for _, f := range tag.filters {
+		if f == filter {
+			return
+		}
+	}
+
+	tag.filters = append(tag.filters, filter)
+
+	// TODO: run filter for all matching streams now
+}
+
+func (mgr *Manager) detachFilterFromTag(tag *tag, filter *filter) {
+	for i, f := range tag.filters {
+		if f == filter {
+			tag.filters = append(tag.filters[:i], tag.filters[i+1:]...)
+			break
+		}
+	}
+
+	// TODO: delete filter results for all matching streams now
 }
 
 func (mgr *Manager) GetView() View {
