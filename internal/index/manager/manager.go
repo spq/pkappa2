@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,11 +24,6 @@ import (
 )
 
 type (
-	filter struct {
-		path    string
-		name    string
-		streams chan index.Stream
-	}
 	tag struct {
 		query.TagDetails
 		definition string
@@ -73,14 +69,15 @@ type (
 	}
 
 	Statistics struct {
-		ImportJobCount    int
-		IndexCount        int
-		IndexLockCount    uint
-		PcapCount         int
-		StreamCount       int
-		PacketCount       int
-		MergeJobRunning   bool
-		TaggingJobRunning bool
+		ImportJobCount         int
+		IndexCount             int
+		IndexLockCount         uint
+		PcapCount              int
+		StreamCount            int
+		PacketCount            int
+		MergeJobRunning        bool
+		TaggingJobRunning      bool
+		FilterProcessesRunning map[string]bool
 	}
 
 	indexReleaser []*index.Reader
@@ -549,6 +546,10 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		t.Matches.Sub(t.Uncertain)
 		for _, s := range streams {
 			t.Matches.Set(uint(s.ID()))
+			// TODO: run filters for this stream if any are attached to this tag
+			// for _, filter := range t.filters {
+			// 	filter.streams <- s
+			// }
 		}
 		return nil
 	}()
@@ -596,15 +597,20 @@ func (mgr *Manager) Status() Statistics {
 		for _, n := range mgr.usedIndexes {
 			locks += n
 		}
+		filterProcessesRunning := make(map[string]bool)
+		for name, filter := range mgr.filters {
+			filterProcessesRunning[name] = filter.cmd.Process != nil && filter.cmd.ProcessState == nil
+		}
 		c <- Statistics{
-			IndexCount:        len(mgr.indexes),
-			IndexLockCount:    locks,
-			PcapCount:         len(mgr.builder.KnownPcaps()),
-			ImportJobCount:    len(mgr.importJobs),
-			StreamCount:       mgr.nStreams,
-			PacketCount:       mgr.nPackets,
-			MergeJobRunning:   mgr.mergeJobRunning,
-			TaggingJobRunning: mgr.taggingJobRunning,
+			IndexCount:             len(mgr.indexes),
+			IndexLockCount:         locks,
+			PcapCount:              len(mgr.builder.KnownPcaps()),
+			ImportJobCount:         len(mgr.importJobs),
+			StreamCount:            mgr.nStreams,
+			PacketCount:            mgr.nPackets,
+			MergeJobRunning:        mgr.mergeJobRunning,
+			TaggingJobRunning:      mgr.taggingJobRunning,
+			FilterProcessesRunning: filterProcessesRunning,
 		}
 		close(c)
 	}
@@ -787,15 +793,15 @@ func UpdateTagOperationUpdateColor(color string) UpdateTagOperation {
 	}
 }
 
-func UpdateTagOperationAddFilter(filter_name []string) UpdateTagOperation {
+func UpdateTagOperationAddFilter(filterName []string) UpdateTagOperation {
 	return func(i *updateTagOperationInfo) {
-		i.addFilterName = filter_name
+		i.addFilterName = filterName
 	}
 }
 
-func UpdateTagOperationDeleteFilter(filter_name []string) UpdateTagOperation {
+func UpdateTagOperationDeleteFilter(filterName []string) UpdateTagOperation {
 	return func(i *updateTagOperationInfo) {
-		i.delFilterName = filter_name
+		i.delFilterName = filterName
 	}
 }
 
@@ -834,20 +840,20 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				t.color = info.color
 			}
 			if len(info.addFilterName) != 0 {
-				for _, filter_name := range info.addFilterName {
-					if filter, ok := mgr.filters[filter_name]; !ok {
-						return fmt.Errorf("unknown filter %q", filter_name)
+				for _, filterName := range info.addFilterName {
+					if filter, ok := mgr.filters[filterName]; !ok {
+						return fmt.Errorf("unknown filter %q", filterName)
 					} else {
-						mgr.attachFilterToTag(t, filter)
+						mgr.attachFilterToTag(t, name, filter)
 					}
 				}
 			}
 			if len(info.delFilterName) != 0 {
-				for _, filter_name := range info.delFilterName {
-					if filter, ok := mgr.filters[filter_name]; !ok {
-						return fmt.Errorf("unknown filter %q", filter_name)
+				for _, filterName := range info.delFilterName {
+					if filter, ok := mgr.filters[filterName]; !ok {
+						return fmt.Errorf("unknown filter %q", filterName)
 					} else {
-						mgr.detachFilterFromTag(t, filter)
+						mgr.detachFilterFromTag(t, name, filter)
 					}
 				}
 			}
@@ -938,6 +944,9 @@ func (mgr *Manager) StartMonitoringFilters(watcher *fsnotify.Watcher) {
 				if event.Has(fsnotify.Remove) {
 					mgr.removeFilter(event.Name)
 				}
+				if event.Has(fsnotify.Write) {
+					mgr.restartFilterProcess(event.Name)
+				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -953,33 +962,69 @@ func (mgr *Manager) StartMonitoringFilters(watcher *fsnotify.Watcher) {
 	}
 }
 
-func (mgr *Manager) addFilter(path string) {
+func (mgr *Manager) addFilter(path string) error {
 	err := unix.Access(path, unix.X_OK)
 	if err != nil {
-		log.Printf("error: filter %s is not executable", path)
-		return
+		return fmt.Errorf("error: filter %s is not executable", path)
 	}
 
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	mgr.filters[name] = &filter{path, name, nil}
+	ch := make(chan *index.Stream, 100)
+	cmd := exec.Command(path)
+	mgr.filters[name] = &filter{path, name, ch, cmd, nil}
+	return nil
 }
 
-func (mgr *Manager) removeFilter(path string) {
+func (mgr *Manager) removeFilter(path string) error {
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	if filter, ok := mgr.filters[name]; !ok {
-		log.Printf("error: filter %s does not exist", name)
-		return
-	} else {
-		// remove filter from all tags
-		for _, t := range mgr.tags {
-			mgr.detachFilterFromTag(t, filter)
-		}
+	filter, ok := mgr.filters[name]
+	if !ok {
+		return fmt.Errorf("error: filter %s does not exist", name)
 	}
+
+	// remove filter from all tags
+	for _, t := range mgr.tags {
+		mgr.detachFilterFromTag(t, name, filter)
+	}
+
+	// Stop the process if it is running
+	if filter.cmd.Process != nil {
+		if err := filter.cmd.Process.Kill(); err != nil {
+			return fmt.Errorf("error: could not kill filter %s: %q", name, err)
+		}
+		filter.cmd.Process.Wait()
+	}
+	close(filter.streams)
 
 	delete(mgr.filters, name)
+	return nil
 }
 
-func (mgr *Manager) attachFilterToTag(tag *tag, filter *filter) {
+func (mgr *Manager) restartFilterProcess(path string) error {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	filter, ok := mgr.filters[name]
+	if !ok {
+		return fmt.Errorf("error: filter %s does not exist, cannot restart", name)
+	}
+	// Stop the process if it is running
+	if filter.cmd.Process != nil {
+		if err := filter.cmd.Process.Kill(); err != nil {
+			return fmt.Errorf("error: could not kill filter %s: %q", name, err)
+		}
+		filter.cmd.Process.Wait()
+	}
+	close(filter.streams)
+
+	// FIXME: Delay restart to avoid "text file busy" error
+	filter.streams = make(chan *index.Stream, 100)
+	filter.cmd = exec.Command(path)
+
+	// Start the process
+	filter.startFilterIfNeeded()
+	return nil
+}
+
+func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filter) {
 	// check if filter already exists
 	for _, f := range tag.filters {
 		if f == filter {
@@ -987,15 +1032,69 @@ func (mgr *Manager) attachFilterToTag(tag *tag, filter *filter) {
 		}
 	}
 
-	tag.filters = append(tag.filters, filter)
+	// FIXME assert low complexity of this tag's query
 
-	// TODO: run filter for all matching streams now
+	tag.filters = append(tag.filters, filter)
+	filter.attachedTags = append(filter.attachedTags, tagName)
+	filter.startFilterIfNeeded()
+
+	// FIXME: This streamID iteration is wrong.
+	var streamIDs []uint64
+	streamID := uint(0)
+	for {
+		zeros := tag.Matches.TrailingZerosFrom(streamID)
+		if zeros < 0 {
+			break
+		}
+		streamID += uint(zeros)
+		// stream, err := v.Stream(uint64(streamID))
+		// if err != nil {
+		// 	log.Printf("Filter (%s): could not get stream %d: %q", filter.name, streamID, err)
+		// 	continue
+		// }
+		// log.Printf("running filter %s for stream %d", filter.name, streamID)
+		// filter.streams <- stream.Stream()
+		streamIDs = append(streamIDs, uint64(streamID))
+		streamID++
+	}
+	go mgr.DelegateStreamsToFilter(filter, streamIDs, nil)
 }
 
-func (mgr *Manager) detachFilterFromTag(tag *tag, filter *filter) {
+func (mgr *Manager) DelegateStreamsToFilter(filter *filter, streamIDs []uint64, view *View) {
+	if view == nil {
+		v := mgr.GetView()
+		view = &v
+	}
+
+	func() {
+		streamID := streamIDs[0]
+		stream, err := view.Stream(uint64(streamID))
+		if err != nil {
+			log.Printf("Filter (%s): could not get stream %d: %q", filter.name, streamID, err)
+			return
+		}
+		log.Printf("running filter %s for stream %d", filter.name, streamID)
+		// FIXME: this panics if the filter is closed while we are sending
+		filter.streams <- stream.Stream()
+	}()
+	streamIDs = streamIDs[1:]
+	if len(streamIDs) > 0 {
+		go mgr.DelegateStreamsToFilter(filter, streamIDs, view)
+	} else {
+		defer view.Release()
+	}
+}
+
+func (mgr *Manager) detachFilterFromTag(tag *tag, tagName string, filter *filter) {
 	for i, f := range tag.filters {
 		if f == filter {
 			tag.filters = append(tag.filters[:i], tag.filters[i+1:]...)
+			break
+		}
+	}
+	for i, t := range filter.attachedTags {
+		if t == tagName {
+			filter.attachedTags = append(filter.attachedTags[:i], filter.attachedTags[i+1:]...)
 			break
 		}
 	}
