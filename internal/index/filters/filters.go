@@ -22,7 +22,7 @@ type (
 )
 
 func (fltr *Filter) startFilterIfNeeded() {
-	if fltr.cmd.Process != nil {
+	if fltr.IsRunning() {
 		return
 	}
 

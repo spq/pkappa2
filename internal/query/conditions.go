@@ -102,8 +102,9 @@ type (
 		Flags     uint8
 	}
 	DataCondition struct {
-		Elements []DataConditionElement
-		Inverted bool
+		Elements   []DataConditionElement
+		Inverted   bool
+		FilterName string
 	}
 	ImpossibleCondition struct{}
 	Condition           interface {
@@ -292,6 +293,10 @@ func (c *NumberCondition) String() string {
 
 func (c *DataCondition) String() string {
 	res := []string(nil)
+	fltr := c.FilterName
+	if fltr != "" {
+		fltr = "." + fltr
+	}
 	for i, e := range c.Elements {
 		inv := map[bool]string{false: "", true: "-"}[c.Inverted && (i == len(c.Elements)-1)]
 		who := map[uint8]string{
@@ -302,7 +307,8 @@ func (c *DataCondition) String() string {
 		if sq != "" {
 			sq += ":"
 		}
-		res = append(res, fmt.Sprintf("%s%s%s:%q", inv, sq, who, e.Regex))
+
+		res = append(res, fmt.Sprintf("%s%s%s%s:%q", inv, sq, who, fltr, e.Regex))
 	}
 	return strings.Join(res, " > ")
 }
@@ -406,7 +412,7 @@ func (c *NumberCondition) equal(d Condition) bool {
 
 func (c *DataCondition) equal(d Condition) bool {
 	o, ok := d.(*DataCondition)
-	if !(ok && c.Inverted == o.Inverted && len(c.Elements) == len(o.Elements)) {
+	if !(ok && c.Inverted == o.Inverted && c.FilterName == o.FilterName && len(c.Elements) == len(o.Elements)) {
 		return false
 	}
 	for i := 0; i < len(c.Elements); i++ {
@@ -526,6 +532,10 @@ func (c *ImpossibleCondition) invert() ConditionsSet {
 }
 
 func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
+	if t.FilterName != "" && t.Key != "data" && t.Key != "cdata" && t.Key != "sdata" {
+		return nil, fmt.Errorf("filter %q not allowed for %q", t.FilterName, t.Key)
+	}
+
 	conds := ConditionsSet(nil)
 	switch t.Key {
 	case "tag", "service", "mark", "generated":
@@ -874,6 +884,7 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 							Flags:     f,
 						},
 					},
+					FilterName: t.FilterName,
 				},
 			})
 		}
@@ -931,8 +942,9 @@ func (a Conditions) then(b Conditions) Conditions {
 		for _, bcc := range bdcs {
 			bdc := bcc.(*DataCondition)
 			res = append(res, &DataCondition{
-				Inverted: bdc.Inverted,
-				Elements: append(append([]DataConditionElement(nil), adc.Elements[:l]...), bdc.Elements...),
+				Inverted:   bdc.Inverted,
+				Elements:   append(append([]DataConditionElement(nil), adc.Elements[:l]...), bdc.Elements...),
+				FilterName: bdc.FilterName,
 			})
 		}
 	}
