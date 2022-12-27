@@ -82,12 +82,14 @@ type (
 
 	indexReleaser []*index.Reader
 
+	// TODO: Maybe save md5 of filters to detect changes
 	stateFile struct {
 		Saved time.Time
 		Tags  []struct {
 			Name       string
 			Definition string
 			Color      string
+			Filters    []string
 		}
 		Pcaps []*pcapmetadata.PcapInfo
 	}
@@ -227,6 +229,15 @@ nextStateFile:
 				nt.Matches = ids
 				nt.Uncertain = bitmask.LongBitmask{}
 			}
+			for _, filterName := range t.Filters {
+				filter, ok := mgr.filters[filterName]
+				if !ok {
+					// TODO: just remove the cache file if any?
+					log.Printf("Invalid tag %q in statefile %q: references non-existing filter %q", t.Name, fn, filterName)
+					continue nextStateFile
+				}
+				mgr.attachFilterToTag(nt, t.Name, filter)
+			}
 			newTags[t.Name] = nt
 		}
 		cyclingTags := map[string]struct{}{}
@@ -293,6 +304,14 @@ func (t tag) referencedTags() []string {
 	return append(append([]string(nil), t.features.MainTags...), t.features.SubQueryTags...)
 }
 
+func (t tag) filterNames() []string {
+	filterNames := make([]string, len(t.filters))
+	for _, filter := range t.filters {
+		filterNames = append(filterNames, filter.Name())
+	}
+	return filterNames
+}
+
 func (mgr *Manager) saveState() error {
 	j := stateFile{
 		Saved: time.Now(),
@@ -303,10 +322,12 @@ func (mgr *Manager) saveState() error {
 			Name       string
 			Definition string
 			Color      string
+			Filters    []string
 		}{
 			Name:       n,
 			Definition: t.definition,
 			Color:      t.color,
+			Filters:    t.filterNames(),
 		})
 	}
 	fn := tools.MakeFilename(mgr.StateDir, "state.json")
@@ -850,6 +871,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						return fmt.Errorf("unknown filter %q", filterName)
 					} else {
 						mgr.attachFilterToTag(t, name, filter)
+						mgr.saveState()
 					}
 				}
 			}
@@ -859,6 +881,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						return fmt.Errorf("unknown filter %q", filterName)
 					} else {
 						mgr.detachFilterFromTag(t, name, filter)
+						mgr.saveState()
 					}
 				}
 			}
