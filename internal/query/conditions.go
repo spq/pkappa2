@@ -535,6 +535,7 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 	if t.FilterName != "" && t.Key != "data" && t.Key != "cdata" && t.Key != "sdata" {
 		return nil, fmt.Errorf("filter %q not allowed for %q", t.FilterName, t.Key)
 	}
+	// TODO: check if there exists a filter with this name
 
 	conds := ConditionsSet(nil)
 	switch t.Key {

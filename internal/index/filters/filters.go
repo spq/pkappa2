@@ -5,29 +5,34 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"unsafe"
 
 	"github.com/spq/pkappa2/internal/index"
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 )
 
 type (
 	Filter struct {
-		path         string
-		name         string
-		streams      chan *index.Stream
-		cmd          *exec.Cmd
-		attachedTags []string
+		executablePath   string
+		name             string
+		streams          chan *index.Stream
+		cmd              *exec.Cmd
+		attachedTags     []string
+		cachePath        string
+		availableStreams bitmask.LongBitmask
 	}
-	filteredData struct {
-		Data      []byte
-		Direction index.Direction
-	}
+)
+
+const (
+	InvalidStreamID = ^uint64(0)
 )
 
 func (fltr *Filter) startFilterIfNeeded() {
@@ -57,29 +62,45 @@ type (
 	}
 )
 
-func NewFilter(path string, name string) *Filter {
-	return &Filter{
-		path:    path,
-		name:    name,
-		streams: make(chan *index.Stream, 100),
-		cmd:     exec.Command(path),
+func NewFilter(executablePath string, name string, cachePath string) (*Filter, error) {
+	filter := Filter{
+		executablePath: executablePath,
+		name:           name,
+		streams:        make(chan *index.Stream, 100),
+		cmd:            exec.Command(executablePath),
+		cachePath:      cachePath,
 	}
+
+	if _, err := os.Stat(filter.CachePath()); err == nil {
+		reader, err := NewReader(filter.CachePath())
+		if err != nil {
+			return nil, err
+		}
+		defer reader.Close()
+		for _, streamID := range reader.Streams() {
+			filter.availableStreams.Set(uint(streamID))
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	return &filter, nil
 }
 
-func (fltr *Filter) startFilter() {
-	stdin, err := fltr.cmd.StdinPipe()
+func (filter *Filter) startFilter() {
+	stdin, err := filter.cmd.StdinPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stdin pipe: %q", fltr.name, err)
+		log.Printf("Filter (%s): Failed to create stdin pipe: %q", filter.name, err)
 		return
 	}
-	stdout, err := fltr.cmd.StdoutPipe()
+	stdout, err := filter.cmd.StdoutPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stdout pipe: %q", fltr.name, err)
+		log.Printf("Filter (%s): Failed to create stdout pipe: %q", filter.name, err)
 		return
 	}
-	stderr, err := fltr.cmd.StderrPipe()
+	stderr, err := filter.cmd.StderrPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stderr pipe: %q", fltr.name, err)
+		log.Printf("Filter (%s): Failed to create stderr pipe: %q", filter.name, err)
 		return
 	}
 
@@ -87,17 +108,17 @@ func (fltr *Filter) startFilter() {
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			log.Printf("Filter (%s): %s", fltr.name, scanner.Text())
+			log.Printf("Filter (%s): %s", filter.name, scanner.Text())
 		}
 	}()
 
-	err = fltr.cmd.Start()
+	err = filter.cmd.Start()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to start process: %q", fltr.name, err)
+		log.Printf("Filter (%s): Failed to start process: %q", filter.name, err)
 		return
 	}
-	defer fltr.cmd.Process.Kill()
-	defer fltr.cmd.Wait()
+	defer filter.cmd.Process.Kill()
+	defer filter.cmd.Wait()
 
 	directionsToString := map[index.Direction]string{
 		index.DirectionClientToServer: "client-to-server",
@@ -112,11 +133,14 @@ func (fltr *Filter) startFilter() {
 	stdinJson := json.NewEncoder(stdin)
 	stdoutScanner := bufio.NewScanner(stdout)
 outer:
-	for stream := range fltr.streams {
+	for stream := range filter.streams {
 		if invalidState {
 			continue
 		}
-		log.Printf("running filter %s for stream %d", fltr.Name(), stream.StreamID)
+		if filter.HasStream(stream.StreamID) {
+			continue
+		}
+		log.Printf("running filter %s for stream %d", filter.Name(), stream.StreamID)
 		metadata := FilterStreamMetadata{
 			ClientHost: stream.ClientHostIP(),
 			ClientPort: stream.ClientPort,
@@ -128,12 +152,12 @@ outer:
 		// TODO: Start a timeout here, so that we don't wait forever for the filter to respond
 		packets, err := stream.Data()
 		if err != nil {
-			log.Printf("Filter (%s): Failed to get packets: %q", fltr.name, err)
+			log.Printf("Filter (%s): Failed to get packets: %q", filter.name, err)
 			invalidState = true
 			break
 		}
 		if err = stdinJson.Encode(metadata); err != nil {
-			log.Printf("Filter (%s): Failed to send stream metadata: %q", fltr.name, err)
+			log.Printf("Filter (%s): Failed to send stream metadata: %q", filter.name, err)
 			invalidState = true
 			break
 		}
@@ -145,19 +169,19 @@ outer:
 			}
 			if err = stdinJson.Encode(jsonPacket); err != nil {
 				// FIXME: Should we notify the filter about this somehow?
-				log.Printf("Filter (%s): Failed to send packet: %q", fltr.name, err)
+				log.Printf("Filter (%s): Failed to send packet: %q", filter.name, err)
 				invalidState = true
 				break outer
 			}
 		}
 
 		if _, err := stdin.Write([]byte("\n")); err != nil {
-			log.Printf("Filter (%s): Failed to send newline: %q", fltr.name, err)
+			log.Printf("Filter (%s): Failed to send newline: %q", filter.name, err)
 			invalidState = true
 			break
 		}
 
-		var filteredPackets []filteredData
+		var filteredPackets []index.Data
 		var filteredMetadata FilterStreamMetadata
 		for stdoutScanner.Scan() {
 			filterLine := stdoutScanner.Text()
@@ -167,45 +191,46 @@ outer:
 
 			var filteredPacket FilterStreamData
 			if err := json.Unmarshal([]byte(filterLine), &filteredPacket); err != nil {
-				log.Printf("Filter (%s): Failed to read filtered packet: %q", fltr.name, err)
+				log.Printf("Filter (%s): Failed to read filtered packet: %q", filter.name, err)
 				invalidState = true
 				break outer
 			}
 			decodedData, err := base64.StdEncoding.DecodeString(filteredPacket.Data)
 			if err != nil {
-				log.Printf("Filter (%s): Failed to decode filtered packet data: %q", fltr.name, err)
+				log.Printf("Filter (%s): Failed to decode filtered packet data: %q", filter.name, err)
 				invalidState = true
 				break outer
 			}
 
 			direction, ok := directionsToInt[filteredPacket.Direction]
 			if !ok {
-				log.Printf("Filter (%s): Invalid direction: %q", fltr.name, filteredPacket.Direction)
+				log.Printf("Filter (%s): Invalid direction: %q", filter.name, filteredPacket.Direction)
 				invalidState = true
 				break outer
 			}
-			filteredPackets = append(filteredPackets, filteredData{Data: decodedData, Direction: direction})
+			filteredPackets = append(filteredPackets, index.Data{Content: decodedData, Direction: direction})
 		}
 
 		if !stdoutScanner.Scan() {
-			log.Printf("Filter (%s): Failed to read filtered stream metadata: %q", fltr.name, err)
+			log.Printf("Filter (%s): Failed to read filtered stream metadata: %q", filter.name, err)
 			invalidState = true
 			break
 		}
 		filterLine := stdoutScanner.Text()
 		if err := json.Unmarshal([]byte(filterLine), &filteredMetadata); err != nil {
-			log.Printf("Filter (%s): Failed to read filtered stream metadata: %q", fltr.name, err)
+			log.Printf("Filter (%s): Failed to read filtered stream metadata: %q", filter.name, err)
 			invalidState = true
 			break
 		}
 
-		log.Printf("Filter (%s): Filtered stream: %q", fltr.name, filteredMetadata)
-		for _, filteredPacket := range filteredPackets {
-			log.Printf("Filter (%s): Filtered packet: %q", fltr.name, filteredPacket)
-		}
+		// log.Printf("Filter (%s): Filtered stream: %q", filter.name, filteredMetadata)
+		// for _, filteredPacket := range filteredPackets {
+		// 	log.Printf("Filter (%s): Filtered packet: %q", filter.name, filteredPacket)
+		// }
 
 		// TODO: Add processed results to the stream for use in queries
-		// TODO: Persist processed results to disk
+		// Persist processed results to disk
+		filter.appendStream(stream, filteredPackets)
 	}
 }
 
@@ -242,6 +267,27 @@ func (filter *Filter) Name() string {
 	return filter.name
 }
 
+func (filter *Filter) CachePath() string {
+	filename := fmt.Sprintf("filterindex-%s.fidx", filter.name)
+	return filepath.Join(filter.cachePath, filename)
+}
+
+func (filter *Filter) appendStream(stream *index.Stream, filteredPackets []index.Data) error {
+	writer, err := NewWriter(filter.CachePath())
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
+	if filter.HasStream(stream.StreamID) {
+		writer.InvalidateStream(stream)
+	}
+	if err := writer.AppendStream(stream, filteredPackets); err != nil {
+		return err
+	}
+	filter.availableStreams.Set(uint(stream.StreamID))
+	return nil
+}
+
 func (filter *Filter) KillProcess() error {
 	if filter.cmd.Process != nil {
 		if err := filter.cmd.Process.Kill(); err != nil {
@@ -260,11 +306,24 @@ func (filter *Filter) RestartProcess() error {
 
 	// FIXME: Delay restart to avoid "text file busy" error
 	filter.streams = make(chan *index.Stream, 100)
-	filter.cmd = exec.Command(filter.path)
+	filter.cmd = exec.Command(filter.executablePath)
 
 	// Start the process
 	filter.startFilterIfNeeded()
 	return nil
+}
+
+func (filter *Filter) Data(stream *index.Stream) ([]index.Data, error) {
+	reader, err := NewReader(filter.CachePath())
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	return reader.ReadStream(stream.StreamID)
+}
+
+func (filter *Filter) HasStream(streamID uint64) bool {
+	return filter.availableStreams.IsSet(uint(streamID))
 }
 
 // File format
@@ -288,7 +347,7 @@ type (
 )
 
 func NewWriter(filename string) (*Writer, error) {
-	file, err := os.Create(filename)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -307,11 +366,18 @@ func (writer *Writer) write(what interface{}) error {
 	return err
 }
 
-func (writer *Writer) WriteStream(stream *index.Stream, filteredPackets []filteredData) error {
+func (w *Writer) Close() error {
+	if err := w.buffer.Flush(); err != nil {
+		return err
+	}
+	return w.file.Close()
+}
+
+func (writer *Writer) AppendStream(stream *index.Stream, filteredPackets []index.Data) error {
 	// [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
 	dataSize := uint64(0)
 	for _, filteredPacket := range filteredPackets {
-		dataSize += uint64(len(filteredPacket.Data))
+		dataSize += uint64(len(filteredPacket.Content))
 	}
 
 	segmentation := []byte(nil)
@@ -319,7 +385,7 @@ func (writer *Writer) WriteStream(stream *index.Stream, filteredPackets []filter
 	for pIndex, wantDir := 0, index.DirectionClientToServer; pIndex < len(filteredPackets); {
 		// TODO: Merge packets with the same direction. Do we even want to allow filters to change the direction?
 		filteredPacket := filteredPackets[pIndex]
-		sz := len(filteredPacket.Data)
+		sz := len(filteredPacket.Content)
 		dir := filteredPacket.Direction
 		// Write a length of 0 if the server sent the first packet.
 		if dir != wantDir {
@@ -339,9 +405,10 @@ func (writer *Writer) WriteStream(stream *index.Stream, filteredPackets []filter
 		}
 		segmentation = append(segmentation, buf[pos:]...)
 		wantDir = wantDir.Reverse()
+		pIndex++
 	}
-	// Append a length of 0 to indicate the end of the chunk sizes
-	segmentation = append(segmentation, 0)
+	// Append two lengths of 0 to indicate the end of the chunk sizes
+	segmentation = append(segmentation, 0, 0)
 
 	// Write stream section
 	streamSection := filterStreamSection{
@@ -360,12 +427,17 @@ func (writer *Writer) WriteStream(stream *index.Stream, filteredPackets []filter
 			if filteredPacket.Direction != direction {
 				continue
 			}
-			if _, err := writer.buffer.Write(filteredPacket.Data); err != nil {
+			if _, err := writer.buffer.Write(filteredPacket.Content); err != nil {
 				return err
 			}
 		}
 	}
 
+	return nil
+}
+
+func (writer *Writer) InvalidateStream(stream *index.Stream) error {
+	// TODO: Find stream in file and replace streamid with InvalidStreamID
 	return nil
 }
 
@@ -391,27 +463,48 @@ func NewReader(filename string) (*Reader, error) {
 			}
 			return nil, err
 		}
-		reader.containedStreamIds[streamSection.StreamID] = pos
+		pos += uint64(unsafe.Sizeof(streamSection))
+		if streamSection.StreamID != InvalidStreamID {
+			reader.containedStreamIds[streamSection.StreamID] = pos
+		}
 		if _, err := buffer.Discard(int(streamSection.DataSize)); err != nil {
 			return nil, err
 		}
-		pos += streamSection.DataSize + uint64(unsafe.Sizeof(streamSection))
+		pos += streamSection.DataSize
 	}
 	return reader, nil
 }
 
-func (reader *Reader) ReadStream(streamID uint64) ([]filteredData, error) {
+func (r *Reader) Close() error {
+	return r.file.Close()
+}
+
+func (r *Reader) HasStream(streamID uint64) bool {
+	_, ok := r.containedStreamIds[streamID]
+	return ok
+}
+
+func (r *Reader) Streams() []uint64 {
+	keys := make([]uint64, len(r.containedStreamIds))
+	i := 0
+	for k := range r.containedStreamIds {
+		keys[i] = k
+	}
+	return keys
+}
+
+func (reader *Reader) ReadStream(streamID uint64) ([]index.Data, error) {
 	// [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
 	pos, ok := reader.containedStreamIds[streamID]
 	if !ok {
-		return nil, nil
+		return nil, fmt.Errorf("stream %d not found in %s", streamID, reader.filename)
 	}
 	if _, err := reader.file.Seek(int64(pos), io.SeekStart); err != nil {
 		return nil, err
 	}
 
 	buffer := bufio.NewReader(reader.file)
-	data := []filteredData{}
+	data := []index.Data{}
 
 	type sizeAndDirection struct {
 		Size      uint64
@@ -472,9 +565,9 @@ func (reader *Reader) ReadStream(streamID uint64) ([]filteredData, error) {
 			bytes = serverData[:ds.Size]
 			serverData = serverData[ds.Size:]
 		}
-		data = append(data, filteredData{
+		data = append(data, index.Data{
 			Direction: ds.Direction,
-			Data:      bytes,
+			Content:   bytes,
 		})
 	}
 	return data, nil

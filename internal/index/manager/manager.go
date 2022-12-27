@@ -568,6 +568,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		for _, s := range streams {
 			t.Matches.Set(uint(s.ID()))
 			// TODO: run filters for this stream if any are attached to this tag
+			// don't run filters multiple times if multiple matching tags are attached to the filter
 			// for _, filter := range t.filters {
 			// 	filter.streams <- s
 			// }
@@ -997,7 +998,11 @@ func (mgr *Manager) addFilter(path string) error {
 	}
 
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	mgr.filters[name] = filters.NewFilter(path, name)
+	filter, err := filters.NewFilter(path, name, mgr.IndexDir)
+	if err != nil {
+		return err
+	}
+	mgr.filters[name] = filter
 	return nil
 }
 
@@ -1057,13 +1062,6 @@ func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filters.
 			break
 		}
 		streamID += uint(zeros)
-		// stream, err := v.Stream(uint64(streamID))
-		// if err != nil {
-		// 	log.Printf("Filter (%s): could not get stream %d: %q", filter.name, streamID, err)
-		// 	continue
-		// }
-		// log.Printf("running filter %s for stream %d", filter.name, streamID)
-		// filter.streams <- stream.Stream()
 		streamIDs = append(streamIDs, uint64(streamID))
 		streamID++
 	}
@@ -1351,6 +1349,31 @@ func (c StreamContext) Stream() *index.Stream {
 	return c.s
 }
 
+func (c StreamContext) Data(filterName string) ([]index.Data, error) {
+	if c.Stream() == nil {
+		return nil, fmt.Errorf("stream not found")
+	}
+	if filterName == "" {
+		return c.Stream().Data()
+	}
+	for tn := range c.v.tagDetails {
+		ok, err := c.HasTag(tn)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		tag := c.v.mgr.tags[tn]
+		for _, filter := range tag.filters {
+			if filter.Name() == filterName {
+				return filter.Data(c.Stream())
+			}
+		}
+	}
+	return nil, fmt.Errorf("filter %q not found", filterName)
+}
+
 func (c StreamContext) HasTag(name string) (bool, error) {
 	td := c.v.tagDetails[name]
 	if !td.Uncertain.IsSet(uint(c.s.ID())) {
@@ -1373,4 +1396,23 @@ func (c StreamContext) AllTags() ([]string, error) {
 	}
 	sort.Strings(tags)
 	return tags, nil
+}
+
+func (c StreamContext) AllFilters() ([]string, error) {
+	filters := []string{}
+	for tn := range c.v.tagDetails {
+		ok, err := c.HasTag(tn)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		tag := c.v.mgr.tags[tn]
+		for _, filter := range tag.filters {
+			filters = append(filters, filter.Name())
+		}
+	}
+	sort.Strings(filters)
+	return filters, nil
 }

@@ -346,9 +346,13 @@ func main() {
 			http.Error(w, fmt.Sprintf("stream %d not found", streamID), http.StatusNotFound)
 			return
 		}
-		data, err := streamContext.Stream().Data()
+		filter := ""
+		if f := r.URL.Query()["filter"]; len(f) == 1 {
+			filter = f[0]
+		}
+		data, err := streamContext.Data(filter)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Stream(%d).Data() failed: %v", streamID, err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Data(%q) failed: %v", filter, err), http.StatusInternalServerError)
 			return
 		}
 		tags, err := streamContext.AllTags()
@@ -356,14 +360,23 @@ func main() {
 			http.Error(w, fmt.Sprintf("AllTags() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+		filters, err := streamContext.AllFilters()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("AllFilters() failed: %v", err), http.StatusInternalServerError)
+			return
+		}
 		response := struct {
-			Stream *index.Stream
-			Data   []index.Data
-			Tags   []string
+			Stream       *index.Stream
+			Data         []index.Data
+			Tags         []string
+			Filters      []string
+			ActiveFilter string
 		}{
-			Stream: streamContext.Stream(),
-			Data:   data,
-			Tags:   tags,
+			Stream:       streamContext.Stream(),
+			Data:         data,
+			Tags:         tags,
+			Filters:      filters,
+			ActiveFilter: filter,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
