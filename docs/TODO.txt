@@ -50,7 +50,8 @@ the filter feature will be implemented like this:
   - when the stream id is ~0, this is an unused slot
 - the search will be modified this way:
   - [cs]data filters will search in all currently available filtered outputs as well as the unmodified stream content
-  - there will be modifiers for these [cs]data filters that allow to specify which if the filtered outputs are searched, or to specify exactly one output that is used
+  - there will be modifiers for these [cs]data/bytes filters that allow to specify which of the filtered outputs are searched, or to specify exactly one output that is used
 - when a filter was evaluated tags and services might be re-evaluated when they contain [cs]data filters, thats why those tags/services may not be used as triggers
 - show stderr of filters in UI
 - use states in filter json protocol and display which state we're currently in in UI for debugging filter scripts
+- name filters transformations?
