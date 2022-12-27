@@ -3,10 +3,15 @@ package filters
 import (
 	"bufio"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"os/exec"
+	"runtime/debug"
+	"unsafe"
 
 	"github.com/spq/pkappa2/internal/index"
 )
@@ -18,6 +23,10 @@ type (
 		streams      chan *index.Stream
 		cmd          *exec.Cmd
 		attachedTags []string
+	}
+	filteredData struct {
+		Data      []byte
+		Direction index.Direction
 	}
 )
 
@@ -90,9 +99,13 @@ func (fltr *Filter) startFilter() {
 	defer fltr.cmd.Process.Kill()
 	defer fltr.cmd.Wait()
 
-	directions := map[index.Direction]string{
+	directionsToString := map[index.Direction]string{
 		index.DirectionClientToServer: "client-to-server",
 		index.DirectionServerToClient: "server-to-client",
+	}
+	directionsToInt := map[string]index.Direction{
+		"client-to-server": index.DirectionClientToServer,
+		"server-to-client": index.DirectionServerToClient,
 	}
 
 	invalidState := false
@@ -127,7 +140,7 @@ outer:
 
 		for _, packet := range packets {
 			jsonPacket := FilterStreamData{
-				Direction: directions[packet.Direction],
+				Direction: directionsToString[packet.Direction],
 				Data:      base64.StdEncoding.EncodeToString(packet.Content),
 			}
 			if err = stdinJson.Encode(jsonPacket); err != nil {
@@ -144,7 +157,7 @@ outer:
 			break
 		}
 
-		var filteredPackets []FilterStreamData
+		var filteredPackets []filteredData
 		var filteredMetadata FilterStreamMetadata
 		for stdoutScanner.Scan() {
 			filterLine := stdoutScanner.Text()
@@ -158,7 +171,20 @@ outer:
 				invalidState = true
 				break outer
 			}
-			filteredPackets = append(filteredPackets, filteredPacket)
+			decodedData, err := base64.StdEncoding.DecodeString(filteredPacket.Data)
+			if err != nil {
+				log.Printf("Filter (%s): Failed to decode filtered packet data: %q", fltr.name, err)
+				invalidState = true
+				break outer
+			}
+
+			direction, ok := directionsToInt[filteredPacket.Direction]
+			if !ok {
+				log.Printf("Filter (%s): Invalid direction: %q", fltr.name, filteredPacket.Direction)
+				invalidState = true
+				break outer
+			}
+			filteredPackets = append(filteredPackets, filteredData{Data: decodedData, Direction: direction})
 		}
 
 		if !stdoutScanner.Scan() {
@@ -239,4 +265,217 @@ func (filter *Filter) RestartProcess() error {
 	// Start the process
 	filter.startFilterIfNeeded()
 	return nil
+}
+
+// File format
+type (
+	filterStreamSection struct {
+		StreamID uint64
+		DataSize uint64
+	}
+
+	Writer struct {
+		filename string
+		file     *os.File
+		buffer   *bufio.Writer
+	}
+
+	Reader struct {
+		filename           string
+		file               *os.File
+		containedStreamIds map[uint64]uint64
+	}
+)
+
+func NewWriter(filename string) (*Writer, error) {
+	file, err := os.Create(filename)
+	if err != nil {
+		return nil, err
+	}
+	return &Writer{
+		filename: filename,
+		file:     file,
+		buffer:   bufio.NewWriter(file),
+	}, nil
+}
+
+func (writer *Writer) write(what interface{}) error {
+	err := binary.Write(writer.buffer, binary.LittleEndian, what)
+	if err != nil {
+		debug.PrintStack()
+	}
+	return err
+}
+
+func (writer *Writer) WriteStream(stream *index.Stream, filteredPackets []filteredData) error {
+	// [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
+	dataSize := uint64(0)
+	for _, filteredPacket := range filteredPackets {
+		dataSize += uint64(len(filteredPacket.Data))
+	}
+
+	segmentation := []byte(nil)
+	buf := [10]byte{}
+	for pIndex, wantDir := 0, index.DirectionClientToServer; pIndex < len(filteredPackets); {
+		// TODO: Merge packets with the same direction. Do we even want to allow filters to change the direction?
+		filteredPacket := filteredPackets[pIndex]
+		sz := len(filteredPacket.Data)
+		dir := filteredPacket.Direction
+		// Write a length of 0 if the server sent the first packet.
+		if dir != wantDir {
+			segmentation = append(segmentation, 0)
+			wantDir = wantDir.Reverse()
+		}
+		pos := len(buf)
+		flag := byte(0)
+		for {
+			pos--
+			buf[pos] = byte(sz&0x7f) | flag
+			flag = 0x80
+			sz >>= 7
+			if sz == 0 {
+				break
+			}
+		}
+		segmentation = append(segmentation, buf[pos:]...)
+		wantDir = wantDir.Reverse()
+	}
+	// Append a length of 0 to indicate the end of the chunk sizes
+	segmentation = append(segmentation, 0)
+
+	// Write stream section
+	streamSection := filterStreamSection{
+		StreamID: stream.ID(),
+		DataSize: dataSize + uint64(len(segmentation)),
+	}
+	if err := writer.write(streamSection); err != nil {
+		return err
+	}
+	if err := writer.write(segmentation); err != nil {
+		return err
+	}
+
+	for _, direction := range []index.Direction{index.DirectionClientToServer, index.DirectionServerToClient} {
+		for _, filteredPacket := range filteredPackets {
+			if filteredPacket.Direction != direction {
+				continue
+			}
+			if _, err := writer.buffer.Write(filteredPacket.Data); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func NewReader(filename string) (*Reader, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	reader := &Reader{
+		filename:           filename,
+		file:               file,
+		containedStreamIds: make(map[uint64]uint64),
+	}
+
+	buffer := bufio.NewReader(file)
+	// Read all stream ids
+	pos := uint64(0)
+	for {
+		streamSection := filterStreamSection{}
+		if err := binary.Read(buffer, binary.LittleEndian, &streamSection); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		reader.containedStreamIds[streamSection.StreamID] = pos
+		if _, err := buffer.Discard(int(streamSection.DataSize)); err != nil {
+			return nil, err
+		}
+		pos += streamSection.DataSize + uint64(unsafe.Sizeof(streamSection))
+	}
+	return reader, nil
+}
+
+func (reader *Reader) ReadStream(streamID uint64) ([]filteredData, error) {
+	// [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
+	pos, ok := reader.containedStreamIds[streamID]
+	if !ok {
+		return nil, nil
+	}
+	if _, err := reader.file.Seek(int64(pos), io.SeekStart); err != nil {
+		return nil, err
+	}
+
+	buffer := bufio.NewReader(reader.file)
+	data := []filteredData{}
+
+	type sizeAndDirection struct {
+		Size      uint64
+		Direction index.Direction
+	}
+	// Read chunk sizes
+	dataSizes := []sizeAndDirection{}
+	prevWasZero := false
+	direction := index.DirectionClientToServer
+	clientBytes := uint64(0)
+	serverBytes := uint64(0)
+	for {
+		sz := uint64(0)
+		for {
+			b, err := buffer.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			sz <<= 7
+			sz |= uint64(b & 0x7f)
+			if b < 0x80 {
+				break
+			}
+		}
+		if sz == 0 && prevWasZero {
+			break
+		}
+		dataSizes = append(dataSizes, sizeAndDirection{Direction: direction, Size: sz})
+		prevWasZero = sz == 0
+		if direction == index.DirectionClientToServer {
+			clientBytes += sz
+		} else {
+			serverBytes += sz
+		}
+		direction = direction.Reverse()
+	}
+
+	// Read data
+	clientData := make([]byte, clientBytes)
+	if _, err := io.ReadFull(buffer, clientData); err != nil {
+		return nil, err
+	}
+	serverData := make([]byte, serverBytes)
+	if _, err := io.ReadFull(buffer, serverData); err != nil {
+		return nil, err
+	}
+
+	// Split data into chunks
+	for _, ds := range dataSizes {
+		if ds.Size == 0 {
+			continue
+		}
+		var bytes []byte
+		if ds.Direction == index.DirectionClientToServer {
+			bytes = clientData[:ds.Size]
+			clientData = clientData[ds.Size:]
+		} else {
+			bytes = serverData[:ds.Size]
+			serverData = serverData[ds.Size:]
+		}
+		data = append(data, filteredData{
+			Direction: ds.Direction,
+			Data:      bytes,
+		})
+	}
+	return data, nil
 }

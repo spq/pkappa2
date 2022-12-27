@@ -49,7 +49,7 @@ type (
 		r     *Reader
 		index uint32
 	}
-	Direction = int
+	Direction int
 	Packet    struct {
 		Timestamp    time.Time
 		PcapFilename string
@@ -66,6 +66,13 @@ const (
 	DirectionClientToServer Direction = 0
 	DirectionServerToClient Direction = 1
 )
+
+func (dir Direction) Reverse() Direction {
+	if dir == DirectionClientToServer {
+		return DirectionServerToClient
+	}
+	return DirectionClientToServer
+}
 
 func (hg *readerHostGroup) get(id uint16) net.IP {
 	return net.IP(hg.hosts[hg.hostSize*int(id):][:hg.hostSize])
