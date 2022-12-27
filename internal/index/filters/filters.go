@@ -138,9 +138,10 @@ outer:
 			continue
 		}
 		if filter.HasStream(stream.StreamID) {
+			log.Printf("Filter (%s): Stream %d already processed", filter.name, stream.StreamID)
 			continue
 		}
-		log.Printf("running filter %s for stream %d", filter.Name(), stream.StreamID)
+		log.Printf("Filter (%s): Running for stream %d", filter.name, stream.StreamID)
 		metadata := FilterStreamMetadata{
 			ClientHost: stream.ClientHostIP(),
 			ClientPort: stream.ClientPort,
@@ -235,6 +236,7 @@ outer:
 }
 
 func (filter *Filter) EnqueueStream(stream *index.Stream) {
+	log.Printf("Filter (%s): Enqueuing stream %d", filter.Name(), stream.StreamID)
 	filter.streams <- stream
 }
 

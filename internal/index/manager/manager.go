@@ -296,6 +296,9 @@ nextStateFile:
 	mgr.jobs <- func() {
 		mgr.startTaggingJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
+		for tn, t := range mgr.tags {
+			mgr.delegateTagMatchesToFilters(t, tn)
+		}
 	}
 	return &mgr, nil
 }
@@ -871,7 +874,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					if filter, ok := mgr.filters[filterName]; !ok {
 						return fmt.Errorf("unknown filter %q", filterName)
 					} else {
-						mgr.attachFilterToTag(t, name, filter)
+						mgr.attachAndDelegateFilterToTag(t, name, filter)
 						mgr.saveState()
 					}
 				}
@@ -1041,31 +1044,44 @@ func (mgr *Manager) restartFilterProcess(path string) error {
 	return nil
 }
 
-func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filters.Filter) {
+func (mgr *Manager) attachAndDelegateFilterToTag(tag *tag, tagName string, filter *filters.Filter) {
+	if mgr.attachFilterToTag(tag, tagName, filter) {
+		mgr.delegateTagMatchesToFilters(tag, tagName)
+	}
+}
+
+func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filters.Filter) bool {
 	// check if filter already exists
 	for _, f := range tag.filters {
 		if f == filter {
-			return
+			return false
 		}
 	}
 
 	// FIXME assert low complexity of this tag's query
 
+	log.Printf("attaching filter %s to tag %s", filter.Name(), tagName)
 	tag.filters = append(tag.filters, filter)
 	filter.AttachTag(tagName)
+	return true
+}
 
-	var streamIDs []uint64
-	streamID := uint(0)
-	for {
-		zeros := tag.Matches.TrailingZerosFrom(streamID)
-		if zeros < 0 {
-			break
+func (mgr *Manager) delegateTagMatchesToFilters(tag *tag, tagName string) {
+	for _, filter := range tag.filters {
+		var streamIDs []uint64
+		streamID := uint(0)
+		for {
+			zeros := tag.Matches.TrailingZerosFrom(streamID)
+			if zeros < 0 {
+				break
+			}
+			streamID += uint(zeros)
+			streamIDs = append(streamIDs, uint64(streamID))
+			streamID++
 		}
-		streamID += uint(zeros)
-		streamIDs = append(streamIDs, uint64(streamID))
-		streamID++
+		log.Printf("filter %s: delegating %d streams to filter", filter.Name(), len(streamIDs))
+		go mgr.DelegateStreamsToFilter(filter, streamIDs, nil)
 	}
-	go mgr.DelegateStreamsToFilter(filter, streamIDs, nil)
 }
 
 func (mgr *Manager) DelegateStreamsToFilter(filter *filters.Filter, streamIDs []uint64, view *View) {
