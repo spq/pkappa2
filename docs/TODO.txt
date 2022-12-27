@@ -38,6 +38,7 @@ the filter feature will be implemented like this:
     - one line per output data chunk formatted identical to the ones coming from pkappa
     - one empty line terminating the chunks
     - one general stream information json
+- include matching tags/services/marks in general stream information json?
 - tags, marks and services can be triggers for a collection of filters if they have a low complexity
   - they must not match on filtered-data for now, also indirectly via other tags/marks/services
 - whenever pkappa becomes aware of a stream matching a tag/mark/service that triggers a filter but the output of that filter for this stream is not yet cached, it will queue up a filtering processing
@@ -51,3 +52,5 @@ the filter feature will be implemented like this:
   - [cs]data filters will search in all currently available filtered outputs as well as the unmodified stream content
   - there will be modifiers for these [cs]data filters that allow to specify which if the filtered outputs are searched, or to specify exactly one output that is used
 - when a filter was evaluated tags and services might be re-evaluated when they contain [cs]data filters, thats why those tags/services may not be used as triggers
+- show stderr of filters in UI
+- use states in filter json protocol and display which state we're currently in in UI for debugging filter scripts

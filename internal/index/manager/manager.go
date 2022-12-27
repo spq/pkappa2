@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
+	"github.com/spq/pkappa2/internal/index/filters"
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
@@ -29,7 +29,7 @@ type (
 		definition string
 		features   query.FeatureSet
 		color      string
-		filters    []*filter
+		filters    []*filters.Filter
 	}
 	TagInfo struct {
 		Name           string
@@ -63,7 +63,7 @@ type (
 		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
 		tags    map[string]*tag
-		filters map[string]*filter
+		filters map[string]*filters.Filter
 
 		usedIndexes map[*index.Reader]uint
 	}
@@ -131,7 +131,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, filterDir string) (*Manager, 
 
 		usedIndexes: make(map[*index.Reader]uint),
 		tags:        make(map[string]*tag),
-		filters:     make(map[string]*filter),
+		filters:     make(map[string]*filters.Filter),
 	}
 
 	// Lookup all available filter binaries
@@ -599,7 +599,7 @@ func (mgr *Manager) Status() Statistics {
 		}
 		filterProcessesRunning := make(map[string]bool)
 		for name, filter := range mgr.filters {
-			filterProcessesRunning[name] = filter.cmd.Process != nil && filter.cmd.ProcessState == nil
+			filterProcessesRunning[name] = filter.IsRunning()
 		}
 		c <- Statistics{
 			IndexCount:             len(mgr.indexes),
@@ -637,7 +637,7 @@ func (mgr *Manager) ListFilters() []string {
 	mgr.jobs <- func() {
 		r := []string{}
 		for _, f := range mgr.filters {
-			r = append(r, f.name)
+			r = append(r, f.Name())
 		}
 		c <- r
 		close(c)
@@ -750,7 +750,8 @@ func (mgr *Manager) DelTag(name string) error {
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
-			if _, ok := mgr.tags[name]; !ok {
+			tag, ok := mgr.tags[name]
+			if !ok {
 				return fmt.Errorf("unknown tag %q", name)
 			}
 			for t2name, t2 := range mgr.tags {
@@ -759,6 +760,10 @@ func (mgr *Manager) DelTag(name string) error {
 						return fmt.Errorf("tag %q still references the tag to be deleted", t2name)
 					}
 				}
+			}
+			// TODO: remove filter results of attached filters from cache
+			if len(tag.filters) > 0 {
+				return fmt.Errorf("tag %q still has attached filters", name)
 			}
 			delete(mgr.tags, name)
 			return nil
@@ -969,9 +974,7 @@ func (mgr *Manager) addFilter(path string) error {
 	}
 
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	ch := make(chan *index.Stream, 100)
-	cmd := exec.Command(path)
-	mgr.filters[name] = &filter{path, name, ch, cmd, nil}
+	mgr.filters[name] = filters.NewFilter(path, name)
 	return nil
 }
 
@@ -988,13 +991,9 @@ func (mgr *Manager) removeFilter(path string) error {
 	}
 
 	// Stop the process if it is running
-	if filter.cmd.Process != nil {
-		if err := filter.cmd.Process.Kill(); err != nil {
-			return fmt.Errorf("error: could not kill filter %s: %q", name, err)
-		}
-		filter.cmd.Process.Wait()
+	if err := filter.KillProcess(); err != nil {
+		return err
 	}
-	close(filter.streams)
 
 	delete(mgr.filters, name)
 	return nil
@@ -1006,25 +1005,15 @@ func (mgr *Manager) restartFilterProcess(path string) error {
 	if !ok {
 		return fmt.Errorf("error: filter %s does not exist, cannot restart", name)
 	}
-	// Stop the process if it is running
-	if filter.cmd.Process != nil {
-		if err := filter.cmd.Process.Kill(); err != nil {
-			return fmt.Errorf("error: could not kill filter %s: %q", name, err)
-		}
-		filter.cmd.Process.Wait()
+	// Stop the process if it is running and restart it
+	if err := filter.RestartProcess(); err != nil {
+		return err
 	}
-	close(filter.streams)
 
-	// FIXME: Delay restart to avoid "text file busy" error
-	filter.streams = make(chan *index.Stream, 100)
-	filter.cmd = exec.Command(path)
-
-	// Start the process
-	filter.startFilterIfNeeded()
 	return nil
 }
 
-func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filter) {
+func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filters.Filter) {
 	// check if filter already exists
 	for _, f := range tag.filters {
 		if f == filter {
@@ -1035,10 +1024,8 @@ func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filter) 
 	// FIXME assert low complexity of this tag's query
 
 	tag.filters = append(tag.filters, filter)
-	filter.attachedTags = append(filter.attachedTags, tagName)
-	filter.startFilterIfNeeded()
+	filter.AttachTag(tagName)
 
-	// FIXME: This streamID iteration is wrong.
 	var streamIDs []uint64
 	streamID := uint(0)
 	for {
@@ -1060,7 +1047,7 @@ func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filter) 
 	go mgr.DelegateStreamsToFilter(filter, streamIDs, nil)
 }
 
-func (mgr *Manager) DelegateStreamsToFilter(filter *filter, streamIDs []uint64, view *View) {
+func (mgr *Manager) DelegateStreamsToFilter(filter *filters.Filter, streamIDs []uint64, view *View) {
 	if view == nil {
 		v := mgr.GetView()
 		view = &v
@@ -1070,12 +1057,11 @@ func (mgr *Manager) DelegateStreamsToFilter(filter *filter, streamIDs []uint64, 
 		streamID := streamIDs[0]
 		stream, err := view.Stream(uint64(streamID))
 		if err != nil {
-			log.Printf("Filter (%s): could not get stream %d: %q", filter.name, streamID, err)
+			log.Printf("Filter (%s): could not get stream %d: %q", filter.Name(), streamID, err)
 			return
 		}
-		log.Printf("running filter %s for stream %d", filter.name, streamID)
 		// FIXME: this panics if the filter is closed while we are sending
-		filter.streams <- stream.Stream()
+		filter.EnqueueStream(stream.Stream())
 	}()
 	streamIDs = streamIDs[1:]
 	if len(streamIDs) > 0 {
@@ -1085,18 +1071,15 @@ func (mgr *Manager) DelegateStreamsToFilter(filter *filter, streamIDs []uint64, 
 	}
 }
 
-func (mgr *Manager) detachFilterFromTag(tag *tag, tagName string, filter *filter) {
+func (mgr *Manager) detachFilterFromTag(tag *tag, tagName string, filter *filters.Filter) {
 	for i, f := range tag.filters {
 		if f == filter {
 			tag.filters = append(tag.filters[:i], tag.filters[i+1:]...)
 			break
 		}
 	}
-	for i, t := range filter.attachedTags {
-		if t == tagName {
-			filter.attachedTags = append(filter.attachedTags[:i], filter.attachedTags[i+1:]...)
-			break
-		}
+	if err := filter.DetachTag(tagName); err != nil {
+		log.Printf("error: could not detach filter %s from tag %s: %q", filter.Name(), tagName, err)
 	}
 
 	// TODO: delete filter results for all matching streams now

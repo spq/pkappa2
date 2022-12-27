@@ -1,9 +1,10 @@
-package manager
+package filters
 
 import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os/exec"
 
@@ -11,7 +12,7 @@ import (
 )
 
 type (
-	filter struct {
+	Filter struct {
 		path         string
 		name         string
 		streams      chan *index.Stream
@@ -20,7 +21,7 @@ type (
 	}
 )
 
-func (fltr *filter) startFilterIfNeeded() {
+func (fltr *Filter) startFilterIfNeeded() {
 	if fltr.cmd.Process != nil {
 		return
 	}
@@ -47,7 +48,16 @@ type (
 	}
 )
 
-func (fltr *filter) startFilter() {
+func NewFilter(path string, name string) *Filter {
+	return &Filter{
+		path:    path,
+		name:    name,
+		streams: make(chan *index.Stream, 100),
+		cmd:     exec.Command(path),
+	}
+}
+
+func (fltr *Filter) startFilter() {
 	stdin, err := fltr.cmd.StdinPipe()
 	if err != nil {
 		log.Printf("Filter (%s): Failed to create stdin pipe: %q", fltr.name, err)
@@ -93,6 +103,7 @@ outer:
 		if invalidState {
 			continue
 		}
+		log.Printf("running filter %s for stream %d", fltr.Name(), stream.StreamID)
 		metadata := FilterStreamMetadata{
 			ClientHost: stream.ClientHostIP(),
 			ClientPort: stream.ClientPort,
@@ -170,4 +181,62 @@ outer:
 		// TODO: Add processed results to the stream for use in queries
 		// TODO: Persist processed results to disk
 	}
+}
+
+func (filter *Filter) EnqueueStream(stream *index.Stream) {
+	filter.streams <- stream
+}
+
+func (filter *Filter) AttachTag(tag string) {
+	filter.attachedTags = append(filter.attachedTags, tag)
+	filter.startFilterIfNeeded()
+}
+
+func (filter *Filter) DetachTag(tag string) error {
+	for i, t := range filter.attachedTags {
+		if t == tag {
+			filter.attachedTags = append(filter.attachedTags[:i], filter.attachedTags[i+1:]...)
+			break
+		}
+	}
+
+	if len(filter.attachedTags) == 0 {
+		if err := filter.KillProcess(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (filter *Filter) IsRunning() bool {
+	return filter.cmd.Process != nil && filter.cmd.ProcessState == nil
+}
+
+func (filter *Filter) Name() string {
+	return filter.name
+}
+
+func (filter *Filter) KillProcess() error {
+	if filter.cmd.Process != nil {
+		if err := filter.cmd.Process.Kill(); err != nil {
+			return fmt.Errorf("error: could not kill filter %s: %q", filter.name, err)
+		}
+		filter.cmd.Process.Wait()
+	}
+	close(filter.streams)
+	return nil
+}
+
+func (filter *Filter) RestartProcess() error {
+	if err := filter.KillProcess(); err != nil {
+		return err
+	}
+
+	// FIXME: Delay restart to avoid "text file busy" error
+	filter.streams = make(chan *index.Stream, 100)
+	filter.cmd = exec.Command(filter.path)
+
+	// Start the process
+	filter.startFilterIfNeeded()
+	return nil
 }
