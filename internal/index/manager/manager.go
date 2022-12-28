@@ -1060,7 +1060,6 @@ func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filters.
 
 	// FIXME assert low complexity of this tag's query
 
-	log.Printf("attaching filter %s to tag %s", filter.Name(), tagName)
 	tag.filters = append(tag.filters, filter)
 	filter.AttachTag(tagName)
 	return true
@@ -1079,7 +1078,6 @@ func (mgr *Manager) delegateTagMatchesToFilters(tag *tag, tagName string) {
 			streamIDs = append(streamIDs, uint64(streamID))
 			streamID++
 		}
-		log.Printf("filter %s: delegating %d streams to filter", filter.Name(), len(streamIDs))
 		go mgr.DelegateStreamsToFilter(filter, streamIDs, nil)
 	}
 }
@@ -1098,7 +1096,9 @@ func (mgr *Manager) DelegateStreamsToFilter(filter *filters.Filter, streamIDs []
 			return
 		}
 		// FIXME: this panics if the filter is closed while we are sending
-		filter.EnqueueStream(stream.Stream())
+		if !filter.HasStream(streamID) {
+			filter.EnqueueStream(stream.Stream())
+		}
 	}()
 	streamIDs = streamIDs[1:]
 	if len(streamIDs) > 0 {
@@ -1387,7 +1387,7 @@ func (c StreamContext) Data(filterName string) ([]index.Data, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("filter %q not found", filterName)
+	return nil, fmt.Errorf("filter %q not attached to a tag of the stream", filterName)
 }
 
 func (c StreamContext) HasTag(name string) (bool, error) {

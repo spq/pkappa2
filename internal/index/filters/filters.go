@@ -25,6 +25,7 @@ type (
 		name             string
 		streams          chan *index.Stream
 		cmd              *exec.Cmd
+		cmdRunning       bool
 		attachedTags     []string
 		cachePath        string
 		availableStreams bitmask.LongBitmask
@@ -56,9 +57,9 @@ type (
 		ServerPort uint16
 		Protocol   string
 	}
-	FilterStreamData struct {
+	FilterStreamChunk struct {
 		Direction string
-		Data      string
+		Content   string
 	}
 )
 
@@ -68,11 +69,12 @@ func NewFilter(executablePath string, name string, cachePath string) (*Filter, e
 		name:           name,
 		streams:        make(chan *index.Stream, 100),
 		cmd:            exec.Command(executablePath),
+		cmdRunning:     false,
 		cachePath:      cachePath,
 	}
 
 	if _, err := os.Stat(filter.CachePath()); err == nil {
-		reader, err := NewReader(filter.CachePath())
+		reader, err := filter.Reader()
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +110,7 @@ func (filter *Filter) startFilter() {
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			log.Printf("Filter (%s): %s", filter.name, scanner.Text())
+			log.Printf("Filter (%s) stderr: %s", filter.name, scanner.Text())
 		}
 	}()
 
@@ -117,8 +119,10 @@ func (filter *Filter) startFilter() {
 		log.Printf("Filter (%s): Failed to start process: %q", filter.name, err)
 		return
 	}
+	filter.cmdRunning = true
 	defer filter.cmd.Process.Kill()
 	defer filter.cmd.Wait()
+	defer func() { filter.cmdRunning = false }()
 
 	directionsToString := map[index.Direction]string{
 		index.DirectionClientToServer: "client-to-server",
@@ -135,10 +139,6 @@ func (filter *Filter) startFilter() {
 outer:
 	for stream := range filter.streams {
 		if invalidState {
-			continue
-		}
-		if filter.HasStream(stream.StreamID) {
-			log.Printf("Filter (%s): Stream %d already processed", filter.name, stream.StreamID)
 			continue
 		}
 		log.Printf("Filter (%s): Running for stream %d", filter.name, stream.StreamID)
@@ -164,9 +164,9 @@ outer:
 		}
 
 		for _, packet := range packets {
-			jsonPacket := FilterStreamData{
+			jsonPacket := FilterStreamChunk{
 				Direction: directionsToString[packet.Direction],
-				Data:      base64.StdEncoding.EncodeToString(packet.Content),
+				Content:   base64.StdEncoding.EncodeToString(packet.Content),
 			}
 			if err = stdinJson.Encode(jsonPacket); err != nil {
 				// FIXME: Should we notify the filter about this somehow?
@@ -190,13 +190,13 @@ outer:
 				break
 			}
 
-			var filteredPacket FilterStreamData
+			var filteredPacket FilterStreamChunk
 			if err := json.Unmarshal([]byte(filterLine), &filteredPacket); err != nil {
 				log.Printf("Filter (%s): Failed to read filtered packet: %q", filter.name, err)
 				invalidState = true
 				break outer
 			}
-			decodedData, err := base64.StdEncoding.DecodeString(filteredPacket.Data)
+			decodedData, err := base64.StdEncoding.DecodeString(filteredPacket.Content)
 			if err != nil {
 				log.Printf("Filter (%s): Failed to decode filtered packet data: %q", filter.name, err)
 				invalidState = true
@@ -236,7 +236,6 @@ outer:
 }
 
 func (filter *Filter) EnqueueStream(stream *index.Stream) {
-	log.Printf("Filter (%s): Enqueuing stream %d", filter.Name(), stream.StreamID)
 	filter.streams <- stream
 }
 
@@ -257,31 +256,43 @@ func (filter *Filter) DetachTag(tag string) error {
 		if err := filter.KillProcess(); err != nil {
 			return err
 		}
+		if err := filter.purgeCache(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (filter *Filter) IsRunning() bool {
-	return filter.cmd.Process != nil && filter.cmd.ProcessState == nil
+	return filter.cmdRunning
 }
 
 func (filter *Filter) Name() string {
 	return filter.name
 }
 
+func CachePath(cachePath string, filterName string) string {
+	filename := fmt.Sprintf("filterindex-%s.fidx", filterName)
+	return filepath.Join(cachePath, filename)
+}
 func (filter *Filter) CachePath() string {
-	filename := fmt.Sprintf("filterindex-%s.fidx", filter.name)
-	return filepath.Join(filter.cachePath, filename)
+	return CachePath(filter.cachePath, filter.name)
+}
+func (filter *Filter) purgeCache() error {
+	return PurgeFilterCache(filter.cachePath, filter.name)
+}
+func PurgeFilterCache(indexDir string, filterName string) error {
+	return os.Remove(CachePath(indexDir, filterName))
 }
 
 func (filter *Filter) appendStream(stream *index.Stream, filteredPackets []index.Data) error {
-	writer, err := NewWriter(filter.CachePath())
+	writer, err := filter.Writer()
 	if err != nil {
 		return err
 	}
 	defer writer.Close()
 	if filter.HasStream(stream.StreamID) {
-		writer.InvalidateStream(stream)
+		writer.InvalidateStream([]*index.Stream{stream})
 	}
 	if err := writer.AppendStream(stream, filteredPackets); err != nil {
 		return err
@@ -296,6 +307,7 @@ func (filter *Filter) KillProcess() error {
 			return fmt.Errorf("error: could not kill filter %s: %q", filter.name, err)
 		}
 		filter.cmd.Process.Wait()
+		filter.cmdRunning = false
 	}
 	close(filter.streams)
 	return nil
@@ -316,7 +328,7 @@ func (filter *Filter) RestartProcess() error {
 }
 
 func (filter *Filter) Data(stream *index.Stream) ([]index.Data, error) {
-	reader, err := NewReader(filter.CachePath())
+	reader, err := filter.Reader()
 	if err != nil {
 		return nil, err
 	}
@@ -326,6 +338,14 @@ func (filter *Filter) Data(stream *index.Stream) ([]index.Data, error) {
 
 func (filter *Filter) HasStream(streamID uint64) bool {
 	return filter.availableStreams.IsSet(uint(streamID))
+}
+
+func (filter *Filter) Reader() (*Reader, error) {
+	return NewReader(filter.CachePath())
+}
+
+func (filter *Filter) Writer() (*Writer, error) {
+	return NewWriter(filter.CachePath())
 }
 
 // File format
@@ -349,7 +369,7 @@ type (
 )
 
 func NewWriter(filename string) (*Writer, error) {
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -376,6 +396,10 @@ func (w *Writer) Close() error {
 }
 
 func (writer *Writer) AppendStream(stream *index.Stream, filteredPackets []index.Data) error {
+	if _, err := writer.file.Seek(0, io.SeekEnd); err != nil {
+		return err
+	}
+
 	// [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
 	dataSize := uint64(0)
 	for _, filteredPacket := range filteredPackets {
@@ -438,8 +462,40 @@ func (writer *Writer) AppendStream(stream *index.Stream, filteredPackets []index
 	return nil
 }
 
-func (writer *Writer) InvalidateStream(stream *index.Stream) error {
-	// TODO: Find stream in file and replace streamid with InvalidStreamID
+func (writer *Writer) InvalidateStream(stream []*index.Stream) error {
+	if err := writer.buffer.Flush(); err != nil {
+		return err
+	}
+	if _, err := writer.file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	// Find stream in file and replace streamid with InvalidStreamID
+	for {
+		streamSection := filterStreamSection{}
+		if err := binary.Read(writer.file, binary.LittleEndian, &streamSection); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		for i, s := range stream {
+			if s.StreamID == streamSection.StreamID {
+				streamSection.StreamID = InvalidStreamID
+				if _, err := writer.file.Seek(-int64(unsafe.Sizeof(streamSection)), io.SeekCurrent); err != nil {
+					return err
+				}
+				if err := binary.Write(writer.file, binary.LittleEndian, streamSection); err != nil {
+					return err
+				}
+				stream = append(stream[:i], stream[i+1:]...)
+				break
+			}
+		}
+		if _, err := writer.file.Seek(int64(streamSection.DataSize), io.SeekCurrent); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
