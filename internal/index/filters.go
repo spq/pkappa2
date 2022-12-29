@@ -1,4 +1,4 @@
-package filters
+package index
 
 import (
 	"bufio"
@@ -15,7 +15,6 @@ import (
 	"runtime/debug"
 	"unsafe"
 
-	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
 )
 
@@ -23,7 +22,7 @@ type (
 	Filter struct {
 		executablePath   string
 		name             string
-		streams          chan *index.Stream
+		streams          chan *Stream
 		cmd              *exec.Cmd
 		cmdRunning       bool
 		attachedTags     []string
@@ -63,11 +62,11 @@ type (
 	}
 )
 
-func NewFilter(executablePath string, name string, cachePath string) (*Filter, error) {
+func New(executablePath string, name string, cachePath string) (*Filter, error) {
 	filter := Filter{
 		executablePath: executablePath,
 		name:           name,
-		streams:        make(chan *index.Stream, 100),
+		streams:        make(chan *Stream, 100),
 		cmd:            exec.Command(executablePath),
 		cmdRunning:     false,
 		cachePath:      cachePath,
@@ -124,13 +123,13 @@ func (filter *Filter) startFilter() {
 	defer filter.cmd.Wait()
 	defer func() { filter.cmdRunning = false }()
 
-	directionsToString := map[index.Direction]string{
-		index.DirectionClientToServer: "client-to-server",
-		index.DirectionServerToClient: "server-to-client",
+	directionsToString := map[Direction]string{
+		DirectionClientToServer: "client-to-server",
+		DirectionServerToClient: "server-to-client",
 	}
-	directionsToInt := map[string]index.Direction{
-		"client-to-server": index.DirectionClientToServer,
-		"server-to-client": index.DirectionServerToClient,
+	directionsToInt := map[string]Direction{
+		"client-to-server": DirectionClientToServer,
+		"server-to-client": DirectionServerToClient,
 	}
 
 	invalidState := false
@@ -151,7 +150,7 @@ outer:
 		}
 
 		// TODO: Start a timeout here, so that we don't wait forever for the filter to respond
-		packets, err := stream.Data()
+		packets, err := stream.Data() // FIXME: Lock index reader
 		if err != nil {
 			log.Printf("Filter (%s): Failed to get packets: %q", filter.name, err)
 			invalidState = true
@@ -182,7 +181,7 @@ outer:
 			break
 		}
 
-		var filteredPackets []index.Data
+		var filteredPackets []Data
 		var filteredMetadata FilterStreamMetadata
 		for stdoutScanner.Scan() {
 			filterLine := stdoutScanner.Text()
@@ -209,7 +208,7 @@ outer:
 				invalidState = true
 				break outer
 			}
-			filteredPackets = append(filteredPackets, index.Data{Content: decodedData, Direction: direction})
+			filteredPackets = append(filteredPackets, Data{Content: decodedData, Direction: direction})
 		}
 
 		if !stdoutScanner.Scan() {
@@ -235,11 +234,12 @@ outer:
 	}
 }
 
-func (filter *Filter) EnqueueStream(stream *index.Stream) {
+func (filter *Filter) EnqueueStream(stream *Stream) {
 	filter.streams <- stream
 }
 
 func (filter *Filter) AttachTag(tag string) {
+	// TODO: Check if tag is already attached
 	filter.attachedTags = append(filter.attachedTags, tag)
 	filter.startFilterIfNeeded()
 }
@@ -285,14 +285,14 @@ func PurgeFilterCache(indexDir string, filterName string) error {
 	return os.Remove(CachePath(indexDir, filterName))
 }
 
-func (filter *Filter) appendStream(stream *index.Stream, filteredPackets []index.Data) error {
+func (filter *Filter) appendStream(stream *Stream, filteredPackets []Data) error {
 	writer, err := filter.Writer()
 	if err != nil {
 		return err
 	}
 	defer writer.Close()
 	if filter.HasStream(stream.StreamID) {
-		writer.InvalidateStream([]*index.Stream{stream})
+		writer.InvalidateStream([]*Stream{stream})
 	}
 	if err := writer.AppendStream(stream, filteredPackets); err != nil {
 		return err
@@ -313,39 +313,42 @@ func (filter *Filter) KillProcess() error {
 	return nil
 }
 
-func (filter *Filter) RestartProcess() error {
+func (filter *Filter) Reset() error {
 	if err := filter.KillProcess(); err != nil {
 		return err
 	}
 
 	// FIXME: Delay restart to avoid "text file busy" error
-	filter.streams = make(chan *index.Stream, 100)
+	filter.streams = make(chan *Stream, 100)
 	filter.cmd = exec.Command(filter.executablePath)
+	// filter.availableStreams = bitmask.LongBitmask()
+	// filter.purgeCache()
 
 	// Start the process
 	filter.startFilterIfNeeded()
 	return nil
 }
 
-func (filter *Filter) Data(stream *index.Stream) ([]index.Data, error) {
+func (filter *Filter) Data(streamID uint64) ([]Data, uint64, uint64, error) {
 	reader, err := filter.Reader()
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 	defer reader.Close()
-	return reader.ReadStream(stream.StreamID)
+	return reader.ReadStream(streamID)
+}
+
+func (filter *Filter) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error) {
+	reader, err := filter.Reader()
+	if err != nil {
+		return [2][]byte{}, [][2]int{}, 0, 0, err
+	}
+	defer reader.Close()
+	return reader.ReadStreamForSearch(streamID)
 }
 
 func (filter *Filter) HasStream(streamID uint64) bool {
 	return filter.availableStreams.IsSet(uint(streamID))
-}
-
-func (filter *Filter) Reader() (*Reader, error) {
-	return NewReader(filter.CachePath())
-}
-
-func (filter *Filter) Writer() (*Writer, error) {
-	return NewWriter(filter.CachePath())
 }
 
 // File format
@@ -355,32 +358,32 @@ type (
 		DataSize uint64
 	}
 
-	Writer struct {
+	FilterWriter struct {
 		filename string
 		file     *os.File
 		buffer   *bufio.Writer
 	}
 
-	Reader struct {
+	FilterReader struct {
 		filename           string
 		file               *os.File
 		containedStreamIds map[uint64]uint64
 	}
 )
 
-func NewWriter(filename string) (*Writer, error) {
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
+func (filter *Filter) Writer() (*FilterWriter, error) {
+	file, err := os.OpenFile(filter.CachePath(), os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
-	return &Writer{
-		filename: filename,
+	return &FilterWriter{
+		filename: filter.CachePath(),
 		file:     file,
 		buffer:   bufio.NewWriter(file),
 	}, nil
 }
 
-func (writer *Writer) write(what interface{}) error {
+func (writer *FilterWriter) write(what interface{}) error {
 	err := binary.Write(writer.buffer, binary.LittleEndian, what)
 	if err != nil {
 		debug.PrintStack()
@@ -388,14 +391,14 @@ func (writer *Writer) write(what interface{}) error {
 	return err
 }
 
-func (w *Writer) Close() error {
+func (w *FilterWriter) Close() error {
 	if err := w.buffer.Flush(); err != nil {
 		return err
 	}
 	return w.file.Close()
 }
 
-func (writer *Writer) AppendStream(stream *index.Stream, filteredPackets []index.Data) error {
+func (writer *FilterWriter) AppendStream(stream *Stream, filteredPackets []Data) error {
 	if _, err := writer.file.Seek(0, io.SeekEnd); err != nil {
 		return err
 	}
@@ -408,7 +411,7 @@ func (writer *Writer) AppendStream(stream *index.Stream, filteredPackets []index
 
 	segmentation := []byte(nil)
 	buf := [10]byte{}
-	for pIndex, wantDir := 0, index.DirectionClientToServer; pIndex < len(filteredPackets); {
+	for pIndex, wantDir := 0, DirectionClientToServer; pIndex < len(filteredPackets); {
 		// TODO: Merge packets with the same direction. Do we even want to allow filters to change the direction?
 		filteredPacket := filteredPackets[pIndex]
 		sz := len(filteredPacket.Content)
@@ -448,7 +451,7 @@ func (writer *Writer) AppendStream(stream *index.Stream, filteredPackets []index
 		return err
 	}
 
-	for _, direction := range []index.Direction{index.DirectionClientToServer, index.DirectionServerToClient} {
+	for _, direction := range []Direction{DirectionClientToServer, DirectionServerToClient} {
 		for _, filteredPacket := range filteredPackets {
 			if filteredPacket.Direction != direction {
 				continue
@@ -462,7 +465,7 @@ func (writer *Writer) AppendStream(stream *index.Stream, filteredPackets []index
 	return nil
 }
 
-func (writer *Writer) InvalidateStream(stream []*index.Stream) error {
+func (writer *FilterWriter) InvalidateStream(stream []*Stream) error {
 	if err := writer.buffer.Flush(); err != nil {
 		return err
 	}
@@ -499,13 +502,13 @@ func (writer *Writer) InvalidateStream(stream []*index.Stream) error {
 	return nil
 }
 
-func NewReader(filename string) (*Reader, error) {
-	file, err := os.Open(filename)
+func (filter *Filter) Reader() (*FilterReader, error) {
+	file, err := os.Open(filter.CachePath())
 	if err != nil {
 		return nil, err
 	}
-	reader := &Reader{
-		filename:           filename,
+	reader := &FilterReader{
+		filename:           filter.CachePath(),
 		file:               file,
 		containedStreamIds: make(map[uint64]uint64),
 	}
@@ -533,16 +536,16 @@ func NewReader(filename string) (*Reader, error) {
 	return reader, nil
 }
 
-func (r *Reader) Close() error {
+func (r *FilterReader) Close() error {
 	return r.file.Close()
 }
 
-func (r *Reader) HasStream(streamID uint64) bool {
+func (r *FilterReader) HasStream(streamID uint64) bool {
 	_, ok := r.containedStreamIds[streamID]
 	return ok
 }
 
-func (r *Reader) Streams() []uint64 {
+func (r *FilterReader) Streams() []uint64 {
 	keys := make([]uint64, len(r.containedStreamIds))
 	i := 0
 	for k := range r.containedStreamIds {
@@ -551,27 +554,95 @@ func (r *Reader) Streams() []uint64 {
 	return keys
 }
 
-func (reader *Reader) ReadStream(streamID uint64) ([]index.Data, error) {
+func (reader *FilterReader) ReadStreamForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error) {
 	// [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
 	pos, ok := reader.containedStreamIds[streamID]
 	if !ok {
-		return nil, fmt.Errorf("stream %d not found in %s", streamID, reader.filename)
+		return [2][]byte{}, [][2]int{}, 0, 0, fmt.Errorf("stream %d not found in %s", streamID, reader.filename)
 	}
 	if _, err := reader.file.Seek(int64(pos), io.SeekStart); err != nil {
-		return nil, err
+		return [2][]byte{}, [][2]int{}, 0, 0, err
 	}
 
 	buffer := bufio.NewReader(reader.file)
-	data := []index.Data{}
+
+	// Read chunk sizes
+	dataSizes := [][2]int{{}}
+	prevWasZero := false
+	direction := DirectionClientToServer
+	clientBytes := uint64(0)
+	serverBytes := uint64(0)
+	for {
+		last := dataSizes[len(dataSizes)-1]
+		sz := uint64(0)
+		for {
+			b, err := buffer.ReadByte()
+			if err != nil {
+				return [2][]byte{}, [][2]int{}, 0, 0, err
+			}
+			sz <<= 7
+			sz |= uint64(b & 0x7f)
+			if b < 0x80 {
+				break
+			}
+		}
+		if sz == 0 {
+			if prevWasZero {
+				break
+			} else {
+				prevWasZero = true
+				direction = direction.Reverse()
+				continue
+			}
+		}
+		new := [2]int{
+			last[0],
+			last[1],
+		}
+		new[direction] += int(sz)
+		dataSizes = append(dataSizes, new)
+		prevWasZero = false
+		if direction == DirectionClientToServer {
+			clientBytes += sz
+		} else {
+			serverBytes += sz
+		}
+		direction = direction.Reverse()
+	}
+
+	// Read data
+	clientData := make([]byte, clientBytes)
+	if _, err := io.ReadFull(buffer, clientData); err != nil {
+		return [2][]byte{}, [][2]int{}, 0, 0, err
+	}
+	serverData := make([]byte, serverBytes)
+	if _, err := io.ReadFull(buffer, serverData); err != nil {
+		return [2][]byte{}, [][2]int{}, 0, 0, err
+	}
+	return [2][]byte{clientData, serverData}, dataSizes, clientBytes, serverBytes, nil
+}
+
+func (reader *FilterReader) ReadStream(streamID uint64) ([]Data, uint64, uint64, error) {
+	// [u64 stream id] [u64 data size] [u8 varint chunk sizes] [client data] [server data]
+	pos, ok := reader.containedStreamIds[streamID]
+	if !ok {
+		return nil, 0, 0, fmt.Errorf("stream %d not found in %s", streamID, reader.filename)
+	}
+	if _, err := reader.file.Seek(int64(pos), io.SeekStart); err != nil {
+		return nil, 0, 0, err
+	}
+
+	buffer := bufio.NewReader(reader.file)
+	data := []Data{}
 
 	type sizeAndDirection struct {
 		Size      uint64
-		Direction index.Direction
+		Direction Direction
 	}
 	// Read chunk sizes
 	dataSizes := []sizeAndDirection{}
 	prevWasZero := false
-	direction := index.DirectionClientToServer
+	direction := DirectionClientToServer
 	clientBytes := uint64(0)
 	serverBytes := uint64(0)
 	for {
@@ -579,7 +650,7 @@ func (reader *Reader) ReadStream(streamID uint64) ([]index.Data, error) {
 		for {
 			b, err := buffer.ReadByte()
 			if err != nil {
-				return nil, err
+				return nil, 0, 0, err
 			}
 			sz <<= 7
 			sz |= uint64(b & 0x7f)
@@ -592,7 +663,7 @@ func (reader *Reader) ReadStream(streamID uint64) ([]index.Data, error) {
 		}
 		dataSizes = append(dataSizes, sizeAndDirection{Direction: direction, Size: sz})
 		prevWasZero = sz == 0
-		if direction == index.DirectionClientToServer {
+		if direction == DirectionClientToServer {
 			clientBytes += sz
 		} else {
 			serverBytes += sz
@@ -603,11 +674,11 @@ func (reader *Reader) ReadStream(streamID uint64) ([]index.Data, error) {
 	// Read data
 	clientData := make([]byte, clientBytes)
 	if _, err := io.ReadFull(buffer, clientData); err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 	serverData := make([]byte, serverBytes)
 	if _, err := io.ReadFull(buffer, serverData); err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	// Split data into chunks
@@ -616,17 +687,17 @@ func (reader *Reader) ReadStream(streamID uint64) ([]index.Data, error) {
 			continue
 		}
 		var bytes []byte
-		if ds.Direction == index.DirectionClientToServer {
+		if ds.Direction == DirectionClientToServer {
 			bytes = clientData[:ds.Size]
 			clientData = clientData[ds.Size:]
 		} else {
 			bytes = serverData[:ds.Size]
 			serverData = serverData[ds.Size:]
 		}
-		data = append(data, index.Data{
+		data = append(data, Data{
 			Direction: ds.Direction,
 			Content:   bytes,
 		})
 	}
-	return data, nil
+	return data, clientBytes, serverBytes, nil
 }

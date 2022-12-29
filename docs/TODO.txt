@@ -54,4 +54,10 @@ the filter feature will be implemented like this:
 - when a filter was evaluated tags and services might be re-evaluated when they contain [cs]data filters, thats why those tags/services may not be used as triggers
 - show stderr of filters in UI
 - use states in filter json protocol and display which state we're currently in in UI for debugging filter scripts
-- name filters transformations?
+- name filters transformations? converters?
+
+Filter:
+- EnqueueStream
+- Reset
+- Data(streamID)
+  - if not cached yet, prioritized run of the filter for that stream

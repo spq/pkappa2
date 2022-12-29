@@ -16,7 +16,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
-	"github.com/spq/pkappa2/internal/index/filters"
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
@@ -29,7 +28,7 @@ type (
 		definition string
 		features   query.FeatureSet
 		color      string
-		filters    []*filters.Filter
+		filters    []*index.Filter
 	}
 	TagInfo struct {
 		Name           string
@@ -63,7 +62,7 @@ type (
 		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
 		tags    map[string]*tag
-		filters map[string]*filters.Filter
+		filters map[string]*index.Filter
 
 		usedIndexes map[*index.Reader]uint
 	}
@@ -133,7 +132,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, filterDir string) (*Manager, 
 
 		usedIndexes: make(map[*index.Reader]uint),
 		tags:        make(map[string]*tag),
-		filters:     make(map[string]*filters.Filter),
+		filters:     make(map[string]*index.Filter),
 	}
 
 	// Lookup all available filter binaries
@@ -562,7 +561,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails)
+		streams, _, err := index.SearchStreams(indexes, mgr.filters, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails)
 		if err != nil {
 			return err
 		}
@@ -573,7 +572,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 			// TODO: run filters for this stream if any are attached to this tag
 			// don't run filters multiple times if multiple matching tags are attached to the filter
 			// for _, filter := range t.filters {
-			// 	filter.streams <- s
+			// 	filter.EnqueueStream(s)
 			// }
 		}
 		return nil
@@ -969,16 +968,21 @@ func (mgr *Manager) StartMonitoringFilters(watcher *fsnotify.Watcher) {
 				if !ok {
 					return
 				}
-				log.Println("event:", event)
-				if event.Has(fsnotify.Create) {
-					mgr.addFilter(event.Name)
+				ch := make(chan struct{})
+				mgr.jobs <- func() {
+					log.Println("event:", event)
+					if event.Has(fsnotify.Create) {
+						mgr.addFilter(event.Name)
+					}
+					if event.Has(fsnotify.Remove) {
+						mgr.removeFilter(event.Name)
+					}
+					if event.Has(fsnotify.Write) {
+						mgr.restartFilterProcess(event.Name)
+					}
+					close(ch)
 				}
-				if event.Has(fsnotify.Remove) {
-					mgr.removeFilter(event.Name)
-				}
-				if event.Has(fsnotify.Write) {
-					mgr.restartFilterProcess(event.Name)
-				}
+				<-ch
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -1001,7 +1005,7 @@ func (mgr *Manager) addFilter(path string) error {
 	}
 
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	filter, err := filters.NewFilter(path, name, mgr.IndexDir)
+	filter, err := index.New(path, name, mgr.IndexDir)
 	if err != nil {
 		return err
 	}
@@ -1037,20 +1041,20 @@ func (mgr *Manager) restartFilterProcess(path string) error {
 		return fmt.Errorf("error: filter %s does not exist, cannot restart", name)
 	}
 	// Stop the process if it is running and restart it
-	if err := filter.RestartProcess(); err != nil {
+	if err := filter.Reset(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (mgr *Manager) attachAndDelegateFilterToTag(tag *tag, tagName string, filter *filters.Filter) {
+func (mgr *Manager) attachAndDelegateFilterToTag(tag *tag, tagName string, filter *index.Filter) {
 	if mgr.attachFilterToTag(tag, tagName, filter) {
 		mgr.delegateTagMatchesToFilters(tag, tagName)
 	}
 }
 
-func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *filters.Filter) bool {
+func (mgr *Manager) attachFilterToTag(tag *tag, tagName string, filter *index.Filter) bool {
 	// check if filter already exists
 	for _, f := range tag.filters {
 		if f == filter {
@@ -1078,37 +1082,29 @@ func (mgr *Manager) delegateTagMatchesToFilters(tag *tag, tagName string) {
 			streamIDs = append(streamIDs, uint64(streamID))
 			streamID++
 		}
-		go mgr.DelegateStreamsToFilter(filter, streamIDs, nil)
+		go mgr.DelegateStreamsToFilter(filter, streamIDs)
 	}
 }
 
-func (mgr *Manager) DelegateStreamsToFilter(filter *filters.Filter, streamIDs []uint64, view *View) {
-	if view == nil {
-		v := mgr.GetView()
-		view = &v
-	}
+func (mgr *Manager) DelegateStreamsToFilter(filter *index.Filter, streamIDs []uint64) {
+	view := mgr.GetView()
+	defer view.Release()
 
-	func() {
-		streamID := streamIDs[0]
+	// TODO: iterate over all indices and create a slice of all stream objects matching the tag
+	for _, streamID := range streamIDs {
 		stream, err := view.Stream(uint64(streamID))
 		if err != nil {
 			log.Printf("Filter (%s): could not get stream %d: %q", filter.Name(), streamID, err)
-			return
+			continue
 		}
 		// FIXME: this panics if the filter is closed while we are sending
 		if !filter.HasStream(streamID) {
 			filter.EnqueueStream(stream.Stream())
 		}
-	}()
-	streamIDs = streamIDs[1:]
-	if len(streamIDs) > 0 {
-		go mgr.DelegateStreamsToFilter(filter, streamIDs, view)
-	} else {
-		defer view.Release()
 	}
 }
 
-func (mgr *Manager) detachFilterFromTag(tag *tag, tagName string, filter *filters.Filter) {
+func (mgr *Manager) detachFilterFromTag(tag *tag, tagName string, filter *index.Filter) {
 	for i, f := range tag.filters {
 		if f == filter {
 			tag.filters = append(tag.filters[:i], tag.filters[i+1:]...)
@@ -1228,7 +1224,7 @@ func (v *View) prefetchTags(tags []string, bm bitmask.LongBitmask) error {
 					continue outer
 				}
 			}
-			matches, _, err := index.SearchStreams(v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails)
+			matches, _, err := index.SearchStreams(v.indexes, v.mgr.filters, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails)
 			if err != nil {
 				return err
 			}
@@ -1300,7 +1296,7 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 		limit = *filter.Limit
 	}
 	offset := opts.page * limit
-	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails)
+	res, hasMore, err := index.SearchStreams(v.indexes, v.mgr.filters, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails)
 	if err != nil {
 		return false, 0, err
 	}
@@ -1383,7 +1379,8 @@ func (c StreamContext) Data(filterName string) ([]index.Data, error) {
 		tag := c.v.mgr.tags[tn]
 		for _, filter := range tag.filters {
 			if filter.Name() == filterName {
-				return filter.Data(c.Stream())
+				data, _, _, err := filter.Data(c.Stream().StreamID)
+				return data, err
 			}
 		}
 	}

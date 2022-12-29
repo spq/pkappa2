@@ -86,7 +86,7 @@ func (sqs *subQuerySelection) empty() bool {
 	return len(sqs.remaining) == 0
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, limitIDs *bitmask.LongBitmask, tagDetails map[string]query.TagDetails) (queryPart, error) {
+func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, limitIDs *bitmask.LongBitmask, tagDetails map[string]query.TagDetails, converters map[string]*Filter) (queryPart, error) {
 	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
 
@@ -729,7 +729,12 @@ conditions:
 			})
 		case *query.DataCondition:
 			shouldEvaluate, affectsSubquery := false, false
-			for _, e := range cc.Elements {
+			filterName := ""
+			for i, e := range cc.Elements {
+				if i > 0 && e.FilterName != filterName {
+					return queryPart{}, errors.New("all 'data then data' conditions must use the same filter")
+				}
+				filterName = e.FilterName
 				if e.SubQuery == subQuery {
 					for _, v := range e.Variables {
 						if _, ok := previousResults[v.SubQuery]; v.SubQuery != subQuery && !ok {
@@ -748,6 +753,21 @@ conditions:
 			}
 			if affectsSubquery {
 				return queryPart{}, errors.New("SubQueries not yet fully supported")
+			}
+			if filterName != "" {
+				if _, ok := converters[filterName]; !ok {
+					return queryPart{}, errors.New("filter name not found")
+				}
+			}
+			// loop over regexconditions and see if all of them have the same filterName as the curent one
+			// TODO: allow this
+			for _, rc := range regexConditions {
+				dc := (*q)[rc].(*query.DataCondition)
+				for _, e := range dc.Elements {
+					if e.FilterName != filterName {
+						return queryPart{}, errors.New("all data conditions must have the same filter name")
+					}
+				}
 			}
 			regexConditions = append(regexConditions, cIdx)
 		regexElements:
@@ -1110,9 +1130,6 @@ conditions:
 		br := seekbufio.NewSeekableBufferReader(sr)
 		buffers := [2][]byte{}
 		filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
-			if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
-				return false, err
-			}
 			type (
 				progressVariantFlag byte
 				progressVariant     struct {
@@ -1145,62 +1162,88 @@ conditions:
 				progressVariantFlagStatePrecondition        progressVariantFlag = 2
 				progressVariantFlagStatePreconditionMatched progressVariantFlag = 3
 			)
+			const (
+				C2S = query.DataRequirementSequenceFlagsDirectionClientToServer / query.DataRequirementSequenceFlagsDirection
+				S2C = query.DataRequirementSequenceFlagsDirectionServerToClient / query.DataRequirementSequenceFlagsDirection
+			)
 			progressGroups := make([]progressGroup, len(*q))
 			for _, pIdx := range regexConditions {
 				progressGroups[pIdx] = progressGroup{
 					variants: make([]progressVariant, 1),
 				}
 			}
-			const (
-				C2S = query.DataRequirementSequenceFlagsDirectionClientToServer / query.DataRequirementSequenceFlagsDirection
-				S2C = query.DataRequirementSequenceFlagsDirectionServerToClient / query.DataRequirementSequenceFlagsDirection
-			)
-			streamLength := [2]int{}
-			streamLength[C2S] = int(s.ClientBytes)
-			streamLength[S2C] = int(s.ServerBytes)
 
-			// read the data
-			for dir := range [2]int{C2S, S2C} {
-				l := streamLength[dir]
-				if cap(buffers[dir]) < l {
-					buffers[dir] = make([]byte, l)
-				} else {
-					buffers[dir] = buffers[dir][:l]
-				}
-				if err := binary.Read(br, binary.LittleEndian, buffers[dir]); err != nil {
+			o := regexes[0].occurence[0]
+			filterName := (*q)[o.condition].(*query.DataCondition).Elements[o.element].FilterName
+			streamLength := [2]int{}
+			bufferLengths := [][2]int{{}}
+
+			if filterName == "" {
+				streamLength[C2S] = int(s.ClientBytes)
+				streamLength[S2C] = int(s.ServerBytes)
+
+				// read the data
+				if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
 					return false, err
 				}
-			}
-			// read the direction chunk sizes
-			bufferLengths := [][2]int{{}}
-			for dir := C2S; ; dir ^= C2S ^ S2C {
-				last := bufferLengths[len(bufferLengths)-1]
-				if last[C2S] == streamLength[C2S] && last[S2C] == streamLength[S2C] {
-					break
-				}
-				sz := uint64(0)
-				for {
-					b := byte(0)
-					if err := binary.Read(br, binary.LittleEndian, &b); err != nil {
+				for dir := range [2]int{C2S, S2C} {
+					l := streamLength[dir]
+					if cap(buffers[dir]) < l {
+						buffers[dir] = make([]byte, l)
+					} else {
+						buffers[dir] = buffers[dir][:l]
+					}
+					if err := binary.Read(br, binary.LittleEndian, buffers[dir]); err != nil {
 						return false, err
 					}
-					sz <<= 7
-					sz |= uint64(b & 0x7f)
-					if b < 128 {
+				}
+				// read the direction chunk sizes
+				for dir := C2S; ; dir ^= C2S ^ S2C {
+					last := bufferLengths[len(bufferLengths)-1]
+					if last[C2S] == streamLength[C2S] && last[S2C] == streamLength[S2C] {
 						break
 					}
+					sz := uint64(0)
+					for {
+						b := byte(0)
+						if err := binary.Read(br, binary.LittleEndian, &b); err != nil {
+							return false, err
+						}
+						sz <<= 7
+						sz |= uint64(b & 0x7f)
+						if b < 128 {
+							break
+						}
+					}
+					if sz == 0 {
+						continue
+					}
+					new := [2]int{
+						last[0],
+						last[1],
+					}
+					new[dir] += int(sz)
+					bufferLengths = append(bufferLengths, new)
 				}
-				if sz == 0 {
-					continue
+			} else {
+				converter, ok := converters[filterName]
+				if !ok {
+					return false, fmt.Errorf("unknown filter %q", filterName)
 				}
-				new := [2]int{
-					last[0],
-					last[1],
+				if !converter.HasStream(s.StreamID) {
+					return false, nil
 				}
-				new[dir] += int(sz)
-				bufferLengths = append(bufferLengths, new)
-			}
 
+				data, dataSizes, clientBytes, serverBytes, err := converter.DataForSearch(s.StreamID)
+				if err != nil {
+					return false, fmt.Errorf("data for search %w", err)
+				}
+				streamLength[C2S] = int(clientBytes)
+				streamLength[S2C] = int(serverBytes)
+				buffers = data
+				bufferLengths = dataSizes
+			}
+			// sdata.b64decode:hallo AND cdata:hi
 			for {
 				recheckRegexes := false
 				for rIdx := range regexes {
@@ -1591,7 +1634,7 @@ var (
 	}
 )
 
-func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails) ([]*Stream, bool, error) {
+func SearchStreams(indexes []*Reader, filters map[string]*Filter, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
@@ -1789,7 +1832,7 @@ func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime tim
 			queryParts := make([]queryPart, 0, len(qs))
 			for qID := range qs {
 				//build search structures
-				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails)
+				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails, filters)
 				if err != nil {
 					return nil, false, err
 				}
@@ -1798,7 +1841,7 @@ func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime tim
 				}
 				queryParts = append(queryParts, queryPart)
 			}
-			err := idx.searchStreams(&results, allResults, queryParts, groupingData, sorter, resultLimit)
+			err := idx.searchStreams(&results, filters, allResults, queryParts, groupingData, sorter, resultLimit)
 			if err != nil {
 				return nil, false, err
 			}
@@ -1815,7 +1858,7 @@ func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime tim
 	return results.streams[skip:], results.resultDropped != 0, nil
 }
 
-func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
+func (r *Reader) searchStreams(result *resultData, filters map[string]*Filter, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
 	allImpossible := true

@@ -96,15 +96,15 @@ type (
 		Name     string
 	}
 	DataConditionElement struct {
-		SubQuery  string
-		Regex     string
-		Variables []DataConditionElementVariable
-		Flags     uint8
+		SubQuery   string
+		Regex      string
+		Variables  []DataConditionElementVariable
+		Flags      uint8
+		FilterName string
 	}
 	DataCondition struct {
-		Elements   []DataConditionElement
-		Inverted   bool
-		FilterName string
+		Elements []DataConditionElement
+		Inverted bool
 	}
 	ImpossibleCondition struct{}
 	Condition           interface {
@@ -293,10 +293,7 @@ func (c *NumberCondition) String() string {
 
 func (c *DataCondition) String() string {
 	res := []string(nil)
-	fltr := c.FilterName
-	if fltr != "" {
-		fltr = "." + fltr
-	}
+
 	for i, e := range c.Elements {
 		inv := map[bool]string{false: "", true: "-"}[c.Inverted && (i == len(c.Elements)-1)]
 		who := map[uint8]string{
@@ -306,6 +303,10 @@ func (c *DataCondition) String() string {
 		sq := e.SubQuery
 		if sq != "" {
 			sq += ":"
+		}
+		fltr := e.FilterName
+		if fltr != "" {
+			fltr = "." + fltr
 		}
 
 		res = append(res, fmt.Sprintf("%s%s%s%s:%q", inv, sq, who, fltr, e.Regex))
@@ -412,12 +413,12 @@ func (c *NumberCondition) equal(d Condition) bool {
 
 func (c *DataCondition) equal(d Condition) bool {
 	o, ok := d.(*DataCondition)
-	if !(ok && c.Inverted == o.Inverted && c.FilterName == o.FilterName && len(c.Elements) == len(o.Elements)) {
+	if !(ok && c.Inverted == o.Inverted && len(c.Elements) == len(o.Elements)) {
 		return false
 	}
 	for i := 0; i < len(c.Elements); i++ {
 		ce, oe := c.Elements[i], o.Elements[i]
-		if !(ce.Flags == oe.Flags && ce.Regex == oe.Regex && ce.SubQuery == oe.SubQuery && len(ce.Variables) == len(oe.Variables)) {
+		if !(ce.Flags == oe.Flags && ce.FilterName == oe.FilterName && ce.Regex == oe.Regex && ce.SubQuery == oe.SubQuery && len(ce.Variables) == len(oe.Variables)) {
 			return false
 		}
 		for j := 0; j < len(ce.Variables); j++ {
@@ -879,13 +880,13 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 				&DataCondition{
 					Elements: []DataConditionElement{
 						{
-							Regex:     content,
-							Variables: variables,
-							SubQuery:  t.SubQuery,
-							Flags:     f,
+							Regex:      content,
+							Variables:  variables,
+							SubQuery:   t.SubQuery,
+							Flags:      f,
+							FilterName: t.FilterName,
 						},
 					},
-					FilterName: t.FilterName,
 				},
 			})
 		}
@@ -943,9 +944,8 @@ func (a Conditions) then(b Conditions) Conditions {
 		for _, bcc := range bdcs {
 			bdc := bcc.(*DataCondition)
 			res = append(res, &DataCondition{
-				Inverted:   bdc.Inverted,
-				Elements:   append(append([]DataConditionElement(nil), adc.Elements[:l]...), bdc.Elements...),
-				FilterName: bdc.FilterName,
+				Inverted: bdc.Inverted,
+				Elements: append(append([]DataConditionElement(nil), adc.Elements[:l]...), bdc.Elements...),
 			})
 		}
 	}

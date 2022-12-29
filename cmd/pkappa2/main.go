@@ -56,6 +56,7 @@ func main() {
 		log.Fatalf("manager.New failed: %v", err)
 	}
 
+	// TODO: Move into manager.New
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
