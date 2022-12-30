@@ -2,7 +2,7 @@
 from pkappa2lib import *
 
 
-class Base64DecodeFilter(Pkappa2Filter):
+class Base64DecodeConverter(Pkappa2Converter):
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
@@ -16,4 +16,4 @@ class Base64DecodeFilter(Pkappa2Filter):
 
 
 if __name__ == "__main__":
-    Base64DecodeFilter().run()
+    Base64DecodeConverter().run()

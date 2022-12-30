@@ -7,7 +7,7 @@ services:
       - 8080:8080
     volumes:
       - ./docker_data:/data
-      - ./filters:/app/filters
+      - ./converters:/app/converters
     restart: unless-stopped
     environment:
       # Change values in .env file

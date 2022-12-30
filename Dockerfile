@@ -31,7 +31,7 @@ USER pkappa2
 
 EXPOSE 8080
 VOLUME /data
-VOLUME /app/filters
+VOLUME /app/converters
 
 ENV PKAPPA2_USER_PASSWORD ""
 ENV PKAPPA2_PCAP_PASSWORD ""

@@ -96,11 +96,11 @@ type (
 		Name     string
 	}
 	DataConditionElement struct {
-		SubQuery   string
-		Regex      string
-		Variables  []DataConditionElementVariable
-		Flags      uint8
-		FilterName string
+		SubQuery      string
+		Regex         string
+		Variables     []DataConditionElementVariable
+		Flags         uint8
+		ConverterName string
 	}
 	DataCondition struct {
 		Elements []DataConditionElement
@@ -304,7 +304,7 @@ func (c *DataCondition) String() string {
 		if sq != "" {
 			sq += ":"
 		}
-		fltr := e.FilterName
+		fltr := e.ConverterName
 		if fltr != "" {
 			fltr = "." + fltr
 		}
@@ -418,7 +418,7 @@ func (c *DataCondition) equal(d Condition) bool {
 	}
 	for i := 0; i < len(c.Elements); i++ {
 		ce, oe := c.Elements[i], o.Elements[i]
-		if !(ce.Flags == oe.Flags && ce.FilterName == oe.FilterName && ce.Regex == oe.Regex && ce.SubQuery == oe.SubQuery && len(ce.Variables) == len(oe.Variables)) {
+		if !(ce.Flags == oe.Flags && ce.ConverterName == oe.ConverterName && ce.Regex == oe.Regex && ce.SubQuery == oe.SubQuery && len(ce.Variables) == len(oe.Variables)) {
 			return false
 		}
 		for j := 0; j < len(ce.Variables); j++ {
@@ -533,10 +533,9 @@ func (c *ImpossibleCondition) invert() ConditionsSet {
 }
 
 func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
-	if t.FilterName != "" && t.Key != "data" && t.Key != "cdata" && t.Key != "sdata" {
-		return nil, fmt.Errorf("filter %q not allowed for %q", t.FilterName, t.Key)
+	if t.ConverterName != "" && t.Key != "data" && t.Key != "cdata" && t.Key != "sdata" {
+		return nil, fmt.Errorf("converter %q not allowed for %q", t.ConverterName, t.Key)
 	}
-	// TODO: check if there exists a filter with this name
 
 	conds := ConditionsSet(nil)
 	switch t.Key {
@@ -880,11 +879,11 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 				&DataCondition{
 					Elements: []DataConditionElement{
 						{
-							Regex:      content,
-							Variables:  variables,
-							SubQuery:   t.SubQuery,
-							Flags:      f,
-							FilterName: t.FilterName,
+							Regex:         content,
+							Variables:     variables,
+							SubQuery:      t.SubQuery,
+							Flags:         f,
+							ConverterName: t.ConverterName,
 						},
 					},
 				},

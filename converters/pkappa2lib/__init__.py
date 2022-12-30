@@ -29,7 +29,7 @@ class StreamMetadata:
     Protocol: Protocol
 
 
-class FilterDecoder(json.JSONDecoder):
+class ConverterDecoder(json.JSONDecoder):
 
     def __init__(self, *args, **kwargs):
         super().__init__(object_hook=self.object_hook, *args, **kwargs)
@@ -45,7 +45,7 @@ class FilterDecoder(json.JSONDecoder):
         return obj
 
 
-class FilterEncoder(json.JSONEncoder):
+class ConverterEncoder(json.JSONEncoder):
 
     def default(self, obj):
         if isinstance(obj, StreamChunk):
@@ -97,20 +97,20 @@ class Result:
     Chunks: List[StreamChunk]
 
 
-class Pkappa2Filter:
+class Pkappa2Converter:
     """
-    Base class for pkappa2 filters.
+    Base class for pkappa2 converters.
 
-    Filters are expected to be implemented as a class that inherits from this
+    Converters are expected to be implemented as a class that inherits from this
     class and implements the handle_stream method. The handle_stream method
-    is called for each stream that is passed to the filter. The filter is
+    is called for each stream that is passed to the converter. The converter is
     expected to return a Result object that contains the data that should be
     displayed in the UI.
     """
 
     def run(self):
         """
-        Run the filter.
+        Run the converter.
         
         This method goes into an endless loop that parses the input from
         pkappa2 and calls the handle_stream method for each stream. The
@@ -118,19 +118,19 @@ class Pkappa2Filter:
         """
         while True:
             metadata_json = json.loads(sys.stdin.buffer.readline().decode(),
-                                       cls=FilterDecoder)
+                                       cls=ConverterDecoder)
             metadata = StreamMetadata(**metadata_json)
             stream_chunks = []
             while True:
                 line = sys.stdin.buffer.readline().strip()
                 if not line:
                     break
-                chunk = json.loads(line.decode(), cls=FilterDecoder)
+                chunk = json.loads(line.decode(), cls=ConverterDecoder)
                 stream_chunks.append(StreamChunk(**chunk))
             stream = Stream(metadata, stream_chunks)
             result = self.handle_stream(stream)
             for chunk in result.Chunks:
-                json.dump(chunk, sys.stdout, cls=FilterEncoder)
+                json.dump(chunk, sys.stdout, cls=ConverterEncoder)
                 print("")
             print("")
             print("{}", flush=True)
@@ -142,7 +142,7 @@ class Pkappa2Filter:
         chunks of data. Each chunk contains the direction of the data and the
         data itself. The data is a byte array.
 
-        This method is called for each stream that is passed to the filter.
+        This method is called for each stream that is passed to the converter.
 
         Args:
             stream: The stream to transform.

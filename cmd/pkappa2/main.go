@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/gopacket/pcap"
@@ -27,12 +26,12 @@ import (
 )
 
 var (
-	baseDir     = flag.String("base_dir", "/tmp", "All paths are relative to this path")
-	pcapDir     = flag.String("pcap_dir", "", "Path where pcaps will be stored")
-	indexDir    = flag.String("index_dir", "", "Path where indexes will be stored")
-	snapshotDir = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
-	stateDir    = flag.String("state_dir", "", "Path where state files will be stored")
-	filterDir   = flag.String("filter_dir", "./filters", "Path where filter executables are searched")
+	baseDir      = flag.String("base_dir", "/tmp", "All paths are relative to this path")
+	pcapDir      = flag.String("pcap_dir", "", "Path where pcaps will be stored")
+	indexDir     = flag.String("index_dir", "", "Path where indexes will be stored")
+	snapshotDir  = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
+	stateDir     = flag.String("state_dir", "", "Path where state files will be stored")
+	converterDir = flag.String("converter_dir", "./converters", "Path where converter executables are searched")
 
 	userPassword = flag.String("user_password", "", "HTTP auth password for users")
 	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
@@ -50,19 +49,12 @@ func main() {
 		filepath.Join(*baseDir, *indexDir),
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
-		*filterDir,
+		*converterDir,
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)
 	}
-
-	// TODO: Move into manager.New
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer watcher.Close()
-	mgr.StartMonitoringFilters(watcher)
+	defer mgr.Close()
 
 	var server *http.Server
 
@@ -194,7 +186,7 @@ func main() {
 
 		operation := manager.UpdateTagOperation(nil)
 		streamMarkMethod := manager.UpdateTagOperationMarkAddStream
-		filterModifyMethod := manager.UpdateTagOperationAddFilter
+		converterModifyMethod := manager.UpdateTagOperationAddConverter
 		switch m[0] {
 		case "mark_del":
 			streamMarkMethod = manager.UpdateTagOperationMarkDelStream
@@ -222,16 +214,16 @@ func main() {
 				return
 			}
 			operation = manager.UpdateTagOperationUpdateColor(c[0])
-		case "filter_del":
-			filterModifyMethod = manager.UpdateTagOperationDeleteFilter
+		case "converter_del":
+			converterModifyMethod = manager.UpdateTagOperationDeleteConverter
 			fallthrough
-		case "filter_add":
-			f := r.URL.Query()["filters"]
-			if len(f) == 0 {
-				http.Error(w, "`filters` parameter missing", http.StatusBadRequest)
+		case "converter_add":
+			c := r.URL.Query()["converters"]
+			if len(c) == 0 {
+				http.Error(w, "`converters` parameter missing", http.StatusBadRequest)
 				return
 			}
-			operation = filterModifyMethod(f)
+			operation = converterModifyMethod(c)
 		default:
 			http.Error(w, fmt.Sprintf("unknown `method`: %q", m[0]), http.StatusBadRequest)
 			return
@@ -241,10 +233,10 @@ func main() {
 			return
 		}
 	})
-	rUser.Get("/api/filters", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Get("/api/converters", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		if err := json.NewEncoder(w).Encode(mgr.ListFilters()); err != nil {
+		if err := json.NewEncoder(w).Encode(mgr.ListConverters()); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
@@ -347,33 +339,33 @@ func main() {
 			http.Error(w, fmt.Sprintf("stream %d not found", streamID), http.StatusNotFound)
 			return
 		}
-		filter := "auto"
-		if f := r.URL.Query()["filter"]; len(f) == 1 {
-			filter = f[0]
+		converter := "auto"
+		if f := r.URL.Query()["converter"]; len(f) == 1 {
+			converter = f[0]
 		}
-		filters, err := streamContext.AllFilters()
+		converters, err := streamContext.AllConverters()
 		if err != nil {
-			http.Error(w, fmt.Sprintf("AllFilters() failed: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("AllConverters() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
-		if filter == "auto" {
-			if len(filters) == 1 {
-				filter = filters[0]
+		if converter == "auto" {
+			if len(converters) == 1 {
+				converter = converters[0]
 			} else {
-				filter = ""
+				converter = ""
 			}
-		} else if filter == "none" {
-			filter = ""
+		} else if converter == "none" {
+			converter = ""
 		} else {
-			if !strings.HasPrefix(filter, "filter:") {
-				http.Error(w, fmt.Sprintf("invalid filter %q", filter), http.StatusBadRequest)
+			if !strings.HasPrefix(converter, "converter:") {
+				http.Error(w, fmt.Sprintf("invalid converter %q", converter), http.StatusBadRequest)
 				return
 			}
-			filter = filter[len("filter:"):]
+			converter = converter[len("converter:"):]
 		}
-		data, err := streamContext.Data(filter)
+		data, err := streamContext.Data(converter)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Data(%q) failed: %v", filter, err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Data(%q) failed: %v", converter, err), http.StatusInternalServerError)
 			return
 		}
 		tags, err := streamContext.AllTags()
@@ -382,17 +374,17 @@ func main() {
 			return
 		}
 		response := struct {
-			Stream       *index.Stream
-			Data         []index.Data
-			Tags         []string
-			Filters      []string
-			ActiveFilter string
+			Stream          *index.Stream
+			Data            []index.Data
+			Tags            []string
+			Converters      []string
+			ActiveConverter string
 		}{
-			Stream:       streamContext.Stream(),
-			Data:         data,
-			Tags:         tags,
-			Filters:      filters,
-			ActiveFilter: filter,
+			Stream:          streamContext.Stream(),
+			Data:            data,
+			Tags:            tags,
+			Converters:      converters,
+			ActiveConverter: converter,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

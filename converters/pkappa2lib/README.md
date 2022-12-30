@@ -1,12 +1,12 @@
-# Pkappa2 Filter Specification
+# Pkappa2 Converter Specification
 
-Any executable file in the `filters` directory (`-filter_dir` argument) can be attached to a tag. The filename will be used as an identifier to connect the tags with a selected filter. Filters can be used to postprocess stream data and add the results to streams as an alternative view on the data. The results can be searched like the plain stream content.
+Any executable file in the `converters` directory (`-converter_dir` argument) can be attached to a tag. The filename will be used as an identifier to connect the tags with a selected converter. Converters can be used to postprocess stream data and add the results to streams as an alternative view on the data. The results can be searched like the plain stream content.
 
-The filter program is started once and kept running in the background by pkappa2. The program is expected to accept JSON messages from `stdin` and answers on `stdout` in a loop using the following protocol:
+The converter program is started once and kept running in the background by pkappa2. The program is expected to accept JSON messages from `stdin` and answers on `stdout` in a loop using the following protocol:
 
 ## Protocol
 The protocol is text-based exchanging one JSON object per line over `stdin` and `stdout`.
-### 1. Pkappa2 -> Filter: Stream metadata
+### 1. Pkappa2 -> Converter: Stream metadata
 ```json
 {
     "ClientHost": "10.13.0.1",
@@ -19,7 +19,7 @@ The protocol is text-based exchanging one JSON object per line over `stdin` and 
 
 Currently only `"TCP"` and `"UDP"` protocols are supported.
 
-### 2. Pkappa2 -> Filter: Stream chunks
+### 2. Pkappa2 -> Converter: Stream chunks
 ```json
 {
     "Direction": "client-to-server",
@@ -34,7 +34,7 @@ Currently only `"TCP"` and `"UDP"` protocols are supported.
 
 The stream is split up into chunks sent by the server or the client. Every chunk is sent in individual lines while an empty line signales the end of the list. The content is Base64 encoded.
 
-### 3. Filter -> Pkappa2: Modified stream chunks
+### 3. Converter -> Pkappa2: Modified stream chunks
 ```json
 {
     "Direction": "client-to-server",
@@ -49,7 +49,7 @@ The stream is split up into chunks sent by the server or the client. Every chunk
 
 The modified chunks are sent in the same format as previously received.
 
-### 4. Filter -> Pkappa2: Additional stream metadata
+### 4. Converter -> Pkappa2: Additional stream metadata
 ```json
 {}
 ```
