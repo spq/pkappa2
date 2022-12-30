@@ -1,7 +1,6 @@
 import Vue from 'vue';
 import VueRouter from 'vue-router';
 
-import HomeOld from './components/Home';
 import Base from './components/new/Base';
 import Home from './components/new/Home';
 import Status from './components/new/Status';
@@ -16,7 +15,6 @@ Vue.use(VueRouter);
 export default new VueRouter({
     mode: 'hash',
     routes: [
-        { path: '/old', component: HomeOld },
         {
             path: '/',
             component: Base,
