@@ -42,4 +42,4 @@ queryCondition ->
     %negation queryCondition  {% function(d) {return {'type': 'not', 'expression': d[1]};} %}
     | %lparen %ws:? queryOrCondition %ws:? %rparen {% function(d) {return {'type': 'subquery', 'expression': d[2]};} %}
     | %subquery:? %kw %converter:? %value:? {% function(d) {return {'type': 'expression', 'subquery_var':d[0], 'keyword':d[1], 'converter': d[2], 'value': d[3]};} %}
-    | %keyword_or_error %value:? %ws:? {% function(d) {return {'type': 'error', 'expression': d[0]};} %}
+    | %keyword_or_error %converter:? %value:? %ws:? {% function(d) {return {'type': 'error', 'expression': d[0]};} %}

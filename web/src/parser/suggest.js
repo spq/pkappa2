@@ -18,7 +18,7 @@ export default function suggest(query, cursorOffset, groupedTags, converters) {
         return { suggestions: [] };
 
     const keyword = targetElem['keyword']['value'];
-    if (['service', 'tag', 'mark', 'generated'].includes(keyword)) {
+    if (['service', 'tag', 'mark', 'generated'].includes(keyword) && targetElem['value']) {
         const value = targetElem['value']['value'];
         const text = targetElem['value']['text'];
         const start = targetElem['value']['col'];
