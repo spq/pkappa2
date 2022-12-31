@@ -18,6 +18,9 @@ const APIClient = {
     getPcaps() {
         return this.perform('get', `/pcaps.json`);
     },
+    getConverters() {
+        return this.perform('get', `/converters`);
+    },
     getTags() {
         return this.perform('get', `/tags`);
     },

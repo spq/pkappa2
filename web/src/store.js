@@ -23,6 +23,8 @@ const store = new Vuex.Store({
         tagAddStatus: null,
         tagDelStatus: null,
 
+        converters: null,
+
         graphData: null,
 
         markTagNewStatus: null,
@@ -115,6 +117,9 @@ const store = new Vuex.Store({
         },
         resetTags(state, tags) {
             state.tags = tags;
+        },
+        resetConverters(state, converters) {
+            state.converters = converters;
         },
         resetPcaps(state, pcaps) {
             state.pcaps = pcaps;
@@ -234,6 +239,11 @@ const store = new Vuex.Store({
         updateTags({ commit }) {
             APIClient.getTags().then((data) => {
                 commit('resetTags', data);
+            })
+        },
+        updateConverters({ commit }) {
+            APIClient.getConverters().then((data) => {
+                commit('resetConverters', data);
             })
         },
         updatePcaps({ commit }) {
