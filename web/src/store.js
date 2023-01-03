@@ -192,9 +192,9 @@ const store = new Vuex.Store({
                 commit('setStreams', { query, page, running: false, error: err.response.data, result: null });
             })
         },
-        fetchStreamNew({ commit }, { id }) {
+        fetchStreamNew({ commit }, { id, converter }) {
             commit('setStream', { id, running: true, error: null, stream: null });
-            APIClient.getStream(id).then((data) => {
+            APIClient.getStream(id, converter).then((data) => {
                 commit('setStream', { id, running: false, error: null, stream: data });
             }).catch((err) => {
                 commit('setStream', { id, running: false, error: err.response.data, stream: null });
@@ -227,7 +227,7 @@ const store = new Vuex.Store({
         getStream({ commit, state }, streamIndex) {
             commit('resetStreamIndex', streamIndex);
             var streamId = state.searchResponse.Results[streamIndex].Stream.ID;
-            APIClient.getStream(streamId).then((data) => {
+            APIClient.getStream(streamId, 'auto').then((data) => {
                 commit('resetStreamData', data);
             })
         },
@@ -283,6 +283,15 @@ const store = new Vuex.Store({
             APIClient.getGraph(delta, aspects, tags, query).then((data) => {
                 commit('resetGraphData', data);
             })
+        },
+        async setTagConverters({ dispatch, commit }, { name, converters }) {
+            try {
+                await APIClient.converterTagSet(name, converters);
+                dispatch('updateTags');
+            } catch (err) {
+                console.error(err);
+                throw err.response.data;
+            }
         },
         async markTagNew({ dispatch, commit }, { name, streams, color }) {
             commit('resetMarkTagNewStatus', { inProgress: true, error: null });

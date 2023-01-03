@@ -9,8 +9,8 @@ const APIClient = {
     searchStreams(query, page) {
         return this.perform('post', '/search.json', query, { page });
     },
-    getStream(streamId) {
-        return this.perform('get', `/stream/${streamId}.json`);
+    getStream(streamId, converter) {
+        return this.perform('get', `/stream/${streamId}.json`, null, { converter });
     },
     getStatus() {
         return this.perform('get', `/status.json`);
@@ -54,6 +54,15 @@ const APIClient = {
     markTagNew(name, streams, color) {
         if (streams.length == 0) streams = [-1];
         return this.addTag(name, `id:${streams.join(',')}`, color)
+    },
+    converterTagSet(tagName, converters) {
+        const params = new URLSearchParams();
+        params.append("name", tagName)
+        params.append("method", "converter_set")
+        for (const c of converters) {
+            params.append("converters", c)
+        }
+        return this.perform('patch', `/tags`, null, params);
     },
     markTagAdd(name, streams) {
         const params = new URLSearchParams();

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/exp/slices"
 	"golang.org/x/sys/unix"
 
 	"github.com/fsnotify/fsnotify"
@@ -37,6 +38,7 @@ type (
 		MatchingCount  uint
 		UncertainCount uint
 		Referenced     bool
+		Converters     []string
 	}
 	Manager struct {
 		StateDir     string
@@ -97,7 +99,8 @@ type (
 	updateTagOperationInfo struct {
 		markTagAddStreams, markTagDelStreams []uint64
 		color                                string
-		addConverterName, delConverterName   []string
+		setConverterNames                    []string
+		convertersUpdated                    bool
 	}
 	UpdateTagOperation func(*updateTagOperationInfo)
 
@@ -242,7 +245,7 @@ nextStateFile:
 				if !ok {
 					// TODO: just remove the cache file if any?
 					log.Printf("Invalid tag %q in statefile %q: references non-existing converter %q", t.Name, fn, converterName)
-					continue nextStateFile
+					continue
 				}
 				mgr.attachConverterToTag(nt, t.Name, converter)
 			}
@@ -317,8 +320,8 @@ func (t tag) referencedTags() []string {
 
 func (t tag) converterNames() []string {
 	converterNames := make([]string, len(t.converters))
-	for _, converter := range t.converters {
-		converterNames = append(converterNames, converter.Name())
+	for i, converter := range t.converters {
+		converterNames[i] = converter.Name()
 	}
 	return converterNames
 }
@@ -709,6 +712,7 @@ func (mgr *Manager) ListTags() []TagInfo {
 				MatchingCount:  uint(m.OnesCount()),
 				UncertainCount: uint(t.Uncertain.OnesCount()),
 				Referenced:     referenced,
+				Converters:     t.converterNames(),
 			})
 		}
 		sort.Slice(res, func(i, j int) bool {
@@ -844,20 +848,15 @@ func UpdateTagOperationUpdateColor(color string) UpdateTagOperation {
 	}
 }
 
-func UpdateTagOperationAddConverter(converterName []string) UpdateTagOperation {
+func UpdateTagOperationSetConverter(converterNames []string) UpdateTagOperation {
 	return func(i *updateTagOperationInfo) {
-		i.addConverterName = converterName
-	}
-}
-
-func UpdateTagOperationDeleteConverter(converterName []string) UpdateTagOperation {
-	return func(i *updateTagOperationInfo) {
-		i.delConverterName = converterName
+		i.setConverterNames = converterNames
+		i.convertersUpdated = true
 	}
 }
 
 func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
-	info := updateTagOperationInfo{}
+	info := updateTagOperationInfo{convertersUpdated: false}
 	operation(&info)
 	maxUsedStreamID := uint64(0)
 	if len(info.markTagAddStreams) != 0 || len(info.markTagDelStreams) != 0 {
@@ -883,39 +882,43 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
-			t, ok := mgr.tags[name]
+			tag, ok := mgr.tags[name]
 			if !ok {
 				return fmt.Errorf("unknown tag %q", name)
 			}
 			if info.color != "" {
-				t.color = info.color
+				tag.color = info.color
 			}
-			if len(info.addConverterName) != 0 {
-				for _, converterName := range info.addConverterName {
+			if info.convertersUpdated {
+				// detach deselected converters from tag
+				for _, converter := range tag.converters {
+					if slices.Contains(info.setConverterNames, converter.Name()) {
+						continue
+					}
+					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
+						return err
+					}
+				}
+				// attach new converters to tag
+				converterNames := tag.converterNames()
+				for _, converterName := range info.setConverterNames {
+					if slices.Contains(converterNames, converterName) {
+						continue
+					}
 					if converter, ok := mgr.converters[converterName]; !ok {
 						return fmt.Errorf("unknown converter %q", converterName)
 					} else {
-						mgr.attachAndDelegateConverterToTag(t, name, converter)
-						mgr.saveState()
+						mgr.attachAndDelegateConverterToTag(tag, name, converter)
 					}
 				}
-			}
-			if len(info.delConverterName) != 0 {
-				for _, converterName := range info.delConverterName {
-					if converter, ok := mgr.converters[converterName]; !ok {
-						return fmt.Errorf("unknown converter %q", converterName)
-					} else {
-						mgr.detachConverterFromTag(t, name, converter)
-						mgr.saveState()
-					}
-				}
+				mgr.saveState()
 			}
 			if maxUsedStreamID != 0 {
 				if maxUsedStreamID >= mgr.nextStreamID {
 					return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
 				}
-				newTag := *t
-				newTag.Matches = t.Matches.Copy()
+				newTag := *tag
+				newTag.Matches = tag.Matches.Copy()
 				for _, s := range info.markTagAddStreams {
 					newTag.Matches.Set(uint(s))
 					newTag.Uncertain.Set(uint(s))
@@ -1026,6 +1029,8 @@ func (mgr *Manager) addConverter(path string) error {
 		return fmt.Errorf("error: converter %s is not executable", path)
 	}
 
+	// TODO: Check converter name for uniqueness
+
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	converter, err := index.NewConverter(path, name, mgr.IndexDir)
 	if err != nil {
@@ -1078,12 +1083,9 @@ func (mgr *Manager) attachAndDelegateConverterToTag(tag *tag, tagName string, co
 
 func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *index.Converter) bool {
 	// check if converter already exists
-	for _, c := range tag.converters {
-		if c == converter {
-			return false
-		}
+	if slices.Contains(tag.converters, converter) {
+		return false
 	}
-
 	// FIXME assert low complexity of this tag's query
 
 	tag.converters = append(tag.converters, converter)

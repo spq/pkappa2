@@ -4,13 +4,14 @@
       <tr>
         <th class="text-left">Name</th>
         <th class="text-left">Query</th>
-        <th colspan="2" class="text-left">Status</th>
+        <th class="text-left">Status</th>
+        <th colspan="2" class="text-left">Converters</th>
       </tr>
     </thead>
     <tbody>
       <template v-for="tagType in tagTypes">
         <tr :key="tagType.key">
-          <th colspan="4">
+          <th colspan="5">
             <v-icon>mdi-{{ tagType.icon }}</v-icon>
             {{ tagType.title }}
           </th>
@@ -27,7 +28,10 @@
               >, {{ tag.UncertainCount }} uncertain</span
             ><span v-if="tag.Referenced">, Referenced by another tag</span>
           </td>
-          <td align="right">
+          <td>
+            <span>{{ converterList[tag.Name] }}</span>
+          </td>
+          <td style="text-align: right">
             <v-tooltip bottom>
               <template #activator="{ on, attrs }">
                 <v-btn
@@ -69,6 +73,18 @@
                 >
               </template>
               <span>Change Color</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+              <template #activator="{ on, attrs }">
+                <v-btn
+                  v-bind="attrs"
+                  v-on="on"
+                  icon
+                  @click="showTagSetConvertersDialog(tag.Name)"
+                  ><v-icon>mdi-swap-horizontal-bold</v-icon></v-btn
+                >
+              </template>
+              <span>Attach Converter</span>
             </v-tooltip>
             <v-tooltip bottom>
               <template #activator="{ on, attrs }">
@@ -128,9 +144,18 @@ export default {
   computed: {
     ...mapState(["tags"]),
     ...mapGetters(["groupedTags"]),
+    converterList() {
+      return this.tags.reduce((acc, tag) => {
+        acc[tag.Name] = tag.Converters.join(", ");
+        return acc;
+      }, {});
+    }
   },
   methods: {
     ...mapActions(["updateTags"]),
+    showTagSetConvertersDialog(tagId) {
+      EventBus.$emit("showTagSetConvertersDialog", { tagId });
+    },
     confirmTagDeletion(tagId) {
       EventBus.$emit("showTagDeleteDialog", { tagId });
     },

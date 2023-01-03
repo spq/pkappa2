@@ -22,6 +22,7 @@
     </v-main>
     <TagDeleteDialog />
     <TagCreateDialog />
+    <TagSetConverterDialog />
     <TagDetailsDialog />
     <TagColorChangeDialog />
     <ErrorBanner />
@@ -32,6 +33,7 @@
 import Navigation from "./Navigation.vue";
 import SearchBox from "./SearchBox.vue";
 import TagDeleteDialog from "./TagDeleteDialog.vue";
+import TagSetConverterDialog from "./TagSetConverterDialog.vue";
 import TagCreateDialog from "./TagCreateDialog.vue";
 import TagDetailsDialog from "./TagDetailsDialog.vue";
 import TagColorChangeDialog from "./TagColorChangeDialog.vue";
@@ -44,6 +46,7 @@ export default {
     SearchBox,
     TagDeleteDialog,
     TagCreateDialog,
+    TagSetConverterDialog,
     TagDetailsDialog,
     TagColorChangeDialog,
     ErrorBanner,

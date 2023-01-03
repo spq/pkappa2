@@ -186,7 +186,6 @@ func main() {
 
 		operation := manager.UpdateTagOperation(nil)
 		streamMarkMethod := manager.UpdateTagOperationMarkAddStream
-		converterModifyMethod := manager.UpdateTagOperationAddConverter
 		switch m[0] {
 		case "mark_del":
 			streamMarkMethod = manager.UpdateTagOperationMarkDelStream
@@ -214,16 +213,9 @@ func main() {
 				return
 			}
 			operation = manager.UpdateTagOperationUpdateColor(c[0])
-		case "converter_del":
-			converterModifyMethod = manager.UpdateTagOperationDeleteConverter
-			fallthrough
-		case "converter_add":
+		case "converter_set":
 			c := r.URL.Query()["converters"]
-			if len(c) == 0 {
-				http.Error(w, "`converters` parameter missing", http.StatusBadRequest)
-				return
-			}
-			operation = converterModifyMethod(c)
+			operation = manager.UpdateTagOperationSetConverter(c)
 		default:
 			http.Error(w, fmt.Sprintf("unknown `method`: %q", m[0]), http.StatusBadRequest)
 			return

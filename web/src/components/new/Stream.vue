@@ -126,6 +126,18 @@
           <span>RAW</span>
         </v-tooltip>
       </v-btn-toggle>
+      <v-tooltip bottom v-if="stream.stream != null && selectableConverters.length > 1">
+        <template #activator="{ on, attrs }">
+          <v-select
+            v-bind="attrs"
+            v-on="on"
+            :items="selectableConverters"
+            :value="activeConverter"
+            @change="changeConverter"
+          />
+        </template>
+        <span>Select converter view</span>
+      </v-tooltip>
       <v-spacer />
       <div v-if="streamIndex != null">
         <span class="text-caption"
@@ -186,7 +198,7 @@
     </ToolBar>
     <v-skeleton-loader
       type="table-thead, table-tbody"
-      v-if="stream.running || !(stream.stream || stream.error)"
+      v-if="stream.running || !(stream.stream || stream.error) || null == tags"
     ></v-skeleton-loader>
     <v-alert type="error" dense v-else-if="stream.error">{{
       stream.error
@@ -320,6 +332,28 @@ export default {
     streamId() {
       return parseInt(this.$route.params.streamId, 10);
     },
+    converter() {
+      return this.$route.query.converter ?? 'auto';
+    },
+    activeConverter() {
+      if (this.stream.stream.ActiveConverter === '') {
+        return 'none';
+      }
+      return 'converter:' + this.stream.stream.ActiveConverter;
+    },
+    selectableConverters() {
+      return [{
+          text: 'none',
+          value: 'none',
+        },
+        ...this.stream.stream.Converters.map(
+          (converter) => ({
+            text: converter,
+            value: 'converter:' + converter,
+          }),
+        ),
+      ];
+    },
     streamIndex() {
       if (this.streams.result == null) return null;
       const id = this.streamId;
@@ -378,9 +412,14 @@ export default {
   },
   methods: {
     ...mapActions(["fetchStreamNew", "markTagAdd", "markTagDel"]),
+    changeConverter(converter) {
+      this.$router.push({
+        query: { converter },
+      });
+    },
     fetchStream() {
       if (this.streamId != null) {
-        this.fetchStreamNew({ id: this.streamId });
+        this.fetchStreamNew({ id: this.streamId, converter: this.converter});
         document.getSelection().empty();
       }
     },
