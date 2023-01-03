@@ -85,6 +85,20 @@ func (converter *Converter) startProcessIfNeeded() {
 	go converter.startConverter()
 }
 
+func ReadLine(reader *bufio.Reader) ([]byte, error) {
+	result := []byte{}
+	for {
+		line, isPrefix, err := reader.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, line...)
+		if !isPrefix {
+			return result, nil
+		}
+	}
+}
+
 func (converter *Converter) startConverter() {
 	stdin, err := converter.cmd.StdinPipe()
 	if err != nil {
@@ -131,7 +145,7 @@ func (converter *Converter) startConverter() {
 
 	invalidState := false
 	stdinJson := json.NewEncoder(stdin)
-	stdoutScanner := bufio.NewScanner(stdout)
+	stdoutReader := bufio.NewReaderSize(stdout, 65536)
 outer:
 	for stream := range converter.streams {
 		if invalidState {
@@ -180,21 +194,26 @@ outer:
 
 		var convertedPackets []Data
 		var convertedMetadata ConverterStreamMetadata
-		for stdoutScanner.Scan() {
-			converterLine := stdoutScanner.Text()
-			if converterLine == "" {
+		for {
+			converterLine, err := ReadLine(stdoutReader)
+			if err != nil {
+				log.Printf("Converter (%s): Failed to read converted packet: %q", converter.name, err)
+				invalidState = true
+				break outer
+			}
+			if len(converterLine) == 0 {
 				break
 			}
 
 			var convertedPacket ConverterStreamChunk
-			if err := json.Unmarshal([]byte(converterLine), &convertedPacket); err != nil {
-				log.Printf("Converter (%s): Failed to read converted packet: %q", converter.name, err)
+			if err := json.Unmarshal(converterLine, &convertedPacket); err != nil {
+				log.Printf("Converter (%s): Failed to parse converted packet: %q", converter.name, err)
 				invalidState = true
 				break outer
 			}
 			decodedData, err := base64.StdEncoding.DecodeString(convertedPacket.Content)
 			if err != nil {
-				log.Printf("Converter (%s): Failed to decode converted packet data: %q", converter.name, err)
+				log.Printf("Converter (%s): Failed to base64 decode converted packet data: %q", converter.name, err)
 				invalidState = true
 				break outer
 			}
@@ -208,14 +227,14 @@ outer:
 			convertedPackets = append(convertedPackets, Data{Content: decodedData, Direction: direction})
 		}
 
-		if !stdoutScanner.Scan() {
+		converterLine, err := ReadLine(stdoutReader)
+		if err != nil {
 			log.Printf("Converter (%s): Failed to read converted stream metadata: %q", converter.name, err)
 			invalidState = true
 			break
 		}
-		converterLine := stdoutScanner.Text()
-		if err := json.Unmarshal([]byte(converterLine), &convertedMetadata); err != nil {
-			log.Printf("Converter (%s): Failed to read converted stream metadata: %q", converter.name, err)
+		if err := json.Unmarshal(converterLine, &convertedMetadata); err != nil {
+			log.Printf("Converter (%s): Failed to parse converted stream metadata: %q", converter.name, err)
 			invalidState = true
 			break
 		}

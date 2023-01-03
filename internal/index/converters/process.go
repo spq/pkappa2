@@ -52,6 +52,20 @@ func (process *Process) IsRunning() bool {
 	return process.cmd != nil
 }
 
+func ReadLine(reader *bufio.Reader) ([]byte, error) {
+	result := []byte{}
+	for {
+		line, isPrefix, err := reader.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, line...)
+		if !isPrefix {
+			return result, nil
+		}
+	}
+}
+
 func (process *Process) runProcess() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -71,9 +85,13 @@ func (process *Process) runProcess() {
 
 	// Pipe stdout to output channel
 	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			process.output <- scanner.Text()
+		reader := bufio.NewReaderSize(stdout, 65536)
+		for {
+			line, err := ReadLine(reader)
+			if err != nil {
+				break
+			}
+			process.output <- string(line)
 		}
 		close(process.output)
 	}()
