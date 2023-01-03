@@ -484,7 +484,7 @@ export default {
     },
   },
   methods: {
-    ...mapActions(["fetchGraphNew"]),
+    ...mapActions(["fetchGraph"]),
     setChartTagOptions(typ, active) {
       this.$nextTick(() => {
         const sel = this.chartTags;
@@ -512,7 +512,7 @@ export default {
       if (!query) query = null;
 
       this.chartData = null;
-      this.fetchGraphNew({
+      this.fetchGraph({
         delta: "1m",
         aspects: this.chartTypes[type].aspects,
         tags: tags,

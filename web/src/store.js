@@ -68,13 +68,13 @@ const store = new Vuex.Store({
                 }
             }
         },
-        resetStatus(state, status) {
+        setStatus(state, status) {
             state.status = status;
         },
-        resetTags(state, tags) {
+        setTags(state, tags) {
             state.tags = tags;
         },
-        resetPcaps(state, pcaps) {
+        setPcaps(state, pcaps) {
             state.pcaps = pcaps;
         },
     },
@@ -99,7 +99,7 @@ const store = new Vuex.Store({
         },
     },
     actions: {
-        searchStreamsNew({ commit }, { query, page }) {
+        searchStreams({ commit }, { query, page }) {
             if (!page) page = 0;
             commit('setStreams', { query, page, running: true, error: null, result: null });
             APIClient.searchStreams(query, page).then((data) => {
@@ -110,7 +110,7 @@ const store = new Vuex.Store({
                 commit('setStreams', { query, page, running: false, error: err.response.data, result: null });
             })
         },
-        fetchStreamNew({ commit }, { id }) {
+        fetchStream({ commit }, { id }) {
             commit('setStream', { id, running: true, error: null, stream: null });
             APIClient.getStream(id).then((data) => {
                 commit('setStream', { id, running: false, error: null, stream: data });
@@ -118,7 +118,7 @@ const store = new Vuex.Store({
                 commit('setStream', { id, running: false, error: err.response.data, stream: null });
             })
         },
-        fetchGraphNew({ commit }, { delta, aspects, tags, query, type }) {
+        fetchGraph({ commit }, { delta, aspects, tags, query, type }) {
             commit('setGraph', { delta, aspects, tags, query, type, running: true, error: null, graph: null });
             APIClient.getGraph(delta, aspects, tags, query).then((data) => {
                 commit('setGraph', { delta, aspects, tags, query, type, running: false, error: null, graph: data });
@@ -128,17 +128,17 @@ const store = new Vuex.Store({
         },
         updateStatus({ commit }) {
             APIClient.getStatus().then((data) => {
-                commit('resetStatus', data);
+                commit('setStatus', data);
             })
         },
         updateTags({ commit }) {
             APIClient.getTags().then((data) => {
-                commit('resetTags', data);
+                commit('setTags', data);
             })
         },
         updatePcaps({ commit }) {
             APIClient.getPcaps().then((data) => {
-                commit('resetPcaps', data);
+                commit('setPcaps', data);
             })
         },
         async addTag({ dispatch }, { name, query, color }) {
