@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pkappa2lib import *
-
+import base64
 
 class Base64DecodeConverter(Pkappa2Converter):
 
