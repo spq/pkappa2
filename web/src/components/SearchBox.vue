@@ -80,7 +80,7 @@
 import { EventBus } from "./EventBus";
 import { addSearch, getTermAt } from "./searchHistory";
 import { mapGetters, mapState } from "vuex";
-import suggest from "../../parser/suggest";
+import suggest from "../parser/suggest";
 
 export default {
   name: "SearchBox",

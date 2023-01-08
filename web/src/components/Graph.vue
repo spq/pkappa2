@@ -1,74 +1,69 @@
 <template>
-  <v-card>
-    <v-container>
-      <v-row>
-        <v-col cols="8">
-          <v-text-field dense v-model="chartFilter" label="Filter" @keyup.enter="fetchGraph"></v-text-field>
-        </v-col>
-        <v-col cols="2">
-          <v-select
-            :items="chartTagOptions"
-            v-model="chartTagSelection"
-            multiple
-            dense
-            label="Grouping"
-          >
-            <template v-slot:item="{ item, attrs, on }">
-              <v-list-item v-if="item.value.startsWith('header/')" dense>
-                <v-list-item-content>
-                  <v-subheader
-                    >{{ item.text }}
-                    <v-btn
-                      x-small
-                      link
-                      text
-                      @click="setChartTagOptions(item.value.substring(7), true)"
-                      >All</v-btn
-                    >
-                    <v-btn
-                      x-small
-                      link
-                      text
-                      @click="
-                        setChartTagOptions(item.value.substring(7), false)
-                      "
-                      >None</v-btn
-                    ></v-subheader
+  <div>
+    <ToolBar>
+      <v-tooltip bottom>
+        <template #activator="{ on, attrs }">
+          <v-btn v-bind="attrs" v-on="on" icon @click="fetchGraph">
+            <v-icon>mdi-refresh</v-icon>
+          </v-btn>
+        </template>
+        <span>Refresh</span>
+      </v-tooltip>
+      <v-toolbar-items class="pt-1">
+        <v-select
+          :items="Object.keys(chartTypes)"
+          v-model="chartType"
+          flat
+          solo
+          dense
+          label="Type"
+        ></v-select>
+        <v-select
+          :items="chartTagOptions"
+          v-model="chartTags"
+          multiple
+          flat
+          solo
+          dense
+          label="Grouping"
+        >
+          <template #item="{ item, attrs, on }">
+            <v-list-item v-if="item.value.startsWith('header/')" dense>
+              <v-list-item-content>
+                <v-subheader
+                  >{{ item.text }}
+                  <v-btn
+                    x-small
+                    link
+                    text
+                    @click="setChartTagOptions(item.value.substring(7), true)"
+                    >All</v-btn
                   >
-                </v-list-item-content>
-              </v-list-item>
-              <v-list-item
-                v-else
-                v-on="on"
-                v-bind="attrs"
-                #default="{ active }"
-              >
-                <v-list-item-action>
-                  <v-checkbox
-                    :ripple="false"
-                    :input-value="active"
-                  ></v-checkbox>
-                </v-list-item-action>
-                <v-list-item-content>{{ item.text }}</v-list-item-content>
-              </v-list-item>
-            </template>
-          </v-select>
-        </v-col>
-        <v-col cols="2">
-          <v-select
-            :items="Object.keys(chartTypes)"
-            v-model="chartType"
-            dense
-            label="Type"
-          ></v-select>
-        </v-col>
-      </v-row>
-    </v-container>
-    <template v-if="chartType === null"></template>
-    <template v-else-if="chartData === null">
-      <v-progress-linear indeterminate></v-progress-linear>
-    </template>
-    <template v-else>
+                  <v-btn
+                    x-small
+                    link
+                    text
+                    @click="setChartTagOptions(item.value.substring(7), false)"
+                    >None</v-btn
+                  ></v-subheader
+                >
+              </v-list-item-content>
+            </v-list-item>
+            <v-list-item v-else v-on="on" v-bind="attrs" #default="{ active }">
+              <v-list-item-action>
+                <v-checkbox :ripple="false" :input-value="active"></v-checkbox>
+              </v-list-item-action>
+              <v-list-item-content>{{ item.text }}</v-list-item-content>
+            </v-list-item>
+          </template>
+        </v-select>
+      </v-toolbar-items>
+    </ToolBar>
+    <v-skeleton-loader type="image" v-if="graph.running"></v-skeleton-loader>
+    <v-alert type="error" dense v-else-if="graph.error">{{
+      graph.error
+    }}</v-alert>
+    <div v-else-if="chartData != null && chartOptions != null">
       <apexchart
         type="area"
         :options="chartOptions"
@@ -76,22 +71,22 @@
         height="400px"
       ></apexchart>
       <v-text-field disabled v-model="chartTimeFilter"></v-text-field>
-    </template>
-  </v-card>
+    </div>
+  </div>
 </template>
 
 <script>
 import { mapActions, mapState } from "vuex";
+import ToolBar from './ToolBar.vue';
 
 export default {
+  components: { ToolBar },
+  name: "Graph",
   data() {
     return {
       chartOptions: null,
       chartData: null,
-      chartType: null,
       chartTimeFilter: "",
-      chartTagSelection: [],
-      chartFilter: "",
       chartTypes: {
         "Active Connections": {
           aspects: ["connections@first", "connections@last"],
@@ -426,9 +421,45 @@ export default {
       },
     };
   },
+  mounted() {
+    this.fetchGraph();
+  },
   computed: {
-    ...mapState(["tags", "graphData"]),
+    ...mapState(["tags", "graph"]),
+    chartType: {
+      get() {
+        return this.$route.query.t;
+      },
+      set(v) {
+        this.$router.push({
+          name: "graph",
+          query: {
+            t: v,
+            g: this.$route.query.g,
+            q: this.$route.query.q,
+          },
+        });
+      },
+    },
+    chartTags: {
+      get() {
+        let g = this.$route.query.g;
+        if (!g) g = "[]";
+        return JSON.parse(g);
+      },
+      set(v) {
+        this.$router.push({
+          name: "graph",
+          query: {
+            t: this.$route.query.t,
+            g: JSON.stringify(v),
+            q: this.$route.query.q,
+          },
+        });
+      },
+    },
     chartTagOptions: function () {
+      if (this.tags == null) return [];
       const options = [];
       const types = ["tag", "service", "mark", "generated"];
       for (const typ of types) {
@@ -444,7 +475,7 @@ export default {
             }
             options.push({
               text: t.Name,
-              value: `entry/${t.Name}`,
+              value: t.Name,
             });
           }
         }
@@ -453,49 +484,55 @@ export default {
     },
   },
   methods: {
-    ...mapActions(["updateGraph"]),
+    ...mapActions(["fetchGraph"]),
     setChartTagOptions(typ, active) {
       this.$nextTick(() => {
-        const sel = this.chartTagSelection;
+        const sel = this.chartTags;
         for (var i = 0; i < sel.length; i++) {
-          if (sel[i].startsWith(`entry/${typ}/`)) {
+          if (sel[i].startsWith(`${typ}/`)) {
             sel.splice(i--, 1);
           }
         }
         if (active) {
           for (const t of this.chartTagOptions) {
-            if (t.value.startsWith(`entry/${typ}/`)) {
+            if (t.value.startsWith(`${typ}/`)) {
               sel.push(t.value);
             }
           }
         }
-        this.chartTagSelection = sel;
+        this.chartTags = sel;
       });
     },
     fetchGraph() {
-      if (this.chartType === null) return;
-      const tags = [];
-      for (const t of this.chartTagSelection) {
-        tags.push(t.substr(6));
-      }
+      const type = this.chartType;
+      if (!type) return;
+      let tags = this.chartTags;
+      if (!tags) tags = [];
+      let query = this.$route.query.q;
+      if (!query) query = null;
+
       this.chartData = null;
-      this.updateGraph({
+      this.fetchGraph({
         delta: "1m",
-        aspects: this.chartTypes[this.chartType].aspects,
+        aspects: this.chartTypes[type].aspects,
         tags: tags,
-        query: this.chartFilter,
+        query: query,
+        type,
       });
     },
   },
   watch: {
-    chartTagSelection() {
+    $route: function () {
       this.fetchGraph();
     },
-    chartType() {
-      this.fetchGraph();
-    },
-    graphData(val) {
-      const type = this.chartTypes[this.chartType];
+    graph(val) {
+      const type = this.chartTypes[val.type];
+      val = val.graph;
+      if (val == null) {
+        this.chartData = null;
+        this.chartOptions = null;
+        return;
+      }
       const valueIndex = [];
       for (const a of type.aspects) {
         const i = val.Aspects.indexOf(a);
