@@ -1,22 +1,20 @@
 import Vue from 'vue';
 import VueRouter from 'vue-router';
 
-import HomeOld from './components/Home';
-import Base from './components/new/Base';
-import Home from './components/new/Home';
-import Status from './components/new/Status';
-import Pcaps from './components/new/Pcaps';
-import Tags from './components/new/Tags';
-import Graph from './components/new/Graph';
-import Results from './components/new/Results';
-import Stream from './components/new/Stream';
+import Base from './components/Base';
+import Home from './components/Home';
+import Status from './components/Status';
+import Pcaps from './components/Pcaps';
+import Tags from './components/Tags';
+import Graph from './components/Graph';
+import Results from './components/Results';
+import Stream from './components/Stream';
 
 Vue.use(VueRouter);
 
 export default new VueRouter({
     mode: 'hash',
     routes: [
-        { path: '/old', component: HomeOld },
         {
             path: '/',
             component: Base,

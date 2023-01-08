@@ -171,11 +171,6 @@
           <v-list-item-title>Manage Tags</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
-      <v-list-item link dense exact to="/old">
-        <v-list-item-content>
-          <v-list-item-title>Legacy Interface</v-list-item-title>
-        </v-list-item-content>
-      </v-list-item>
     </v-list-group>
   </v-list>
 </template>

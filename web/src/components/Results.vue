@@ -349,7 +349,7 @@ export default {
     },
   },
   methods: {
-    ...mapActions(["searchStreamsNew", "markTagAdd", "markTagDel"]),
+    ...mapActions(["searchStreams", "markTagAdd", "markTagDel"]),
     checkboxAction() {
       let tmp = [];
       const v = this.noneSelected;
@@ -357,7 +357,7 @@ export default {
       this.selected = tmp;
     },
     fetchStreams() {
-      this.searchStreamsNew({
+      this.searchStreams({
         query: this.$route.query.q,
         page: this.$route.query.p | 0,
       });

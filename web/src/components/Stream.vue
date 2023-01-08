@@ -377,7 +377,7 @@ export default {
     },
   },
   mounted() {
-    this.fetchStream();
+    this.fetchStreamForId();
     registerSelectionListener(this);
 
     const handle = (e, streamId) => {
@@ -411,15 +411,15 @@ export default {
     destroySelectionListener();
   },
   methods: {
-    ...mapActions(["fetchStreamNew", "markTagAdd", "markTagDel"]),
+    ...mapActions(["fetchStream", "markTagAdd", "markTagDel"]),
     changeConverter(converter) {
       this.$router.push({
         query: { converter },
       });
     },
-    fetchStream() {
+    fetchStreamForId() {
       if (this.streamId != null) {
-        this.fetchStreamNew({ id: this.streamId, converter: this.converter});
+        this.fetchStream({ id: this.streamId, converter: this.converter});
         document.getSelection().empty();
       }
     },
@@ -445,7 +445,7 @@ export default {
     },
   },
   watch: {
-    $route: "fetchStream",
+    $route: "fetchStreamForId",
     presentation(v) {
       localStorage.streamPresentation = v;
       document.getSelection().empty();
