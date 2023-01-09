@@ -81,7 +81,7 @@
                   v-on="on"
                   icon
                   @click="showTagSetConvertersDialog(tag.Name)"
-                  ><v-icon>mdi-swap-horizontal-bold</v-icon></v-btn
+                  ><v-icon>mdi-file-replace-outline</v-icon></v-btn
                 >
               </template>
               <span>Attach Converter</span>

@@ -106,7 +106,7 @@
                 </v-list-item>
                 <v-list-item link @click="showTagSetConvertersDialog(tag.Name)">
                   <v-list-item-icon>
-                    <v-icon>mdi-swap-horizontal-bold</v-icon>
+                    <v-icon>mdi-file-replace-outline</v-icon>
                   </v-list-item-icon>
                   <v-list-item-title>Attach converter</v-list-item-title>
                 </v-list-item>
