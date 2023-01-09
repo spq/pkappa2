@@ -29,7 +29,7 @@ type (
 		definition string
 		features   query.FeatureSet
 		color      string
-		converters []*index.Converter
+		converters []*index.Converter // TODO: put this into TagDetails too?
 	}
 	TagInfo struct {
 		Name           string

@@ -12,19 +12,19 @@ type (
 		executablePath string
 		cmd            *exec.Cmd
 		input          chan []byte
-		output         chan string
-		status         chan error
+		output         chan []byte
 	}
 )
 
+// To stop the process, close the input channel.
+// The output channel will be closed when the process exits.
 func NewProcess(converterName string, executablePath string) *Process {
 	process := Process{
 		converterName:  converterName,
 		executablePath: executablePath,
 		cmd:            nil,
 		input:          make(chan []byte),
-		output:         make(chan string),
-		status:         make(chan error),
+		output:         make(chan []byte),
 	}
 
 	process.Start()
@@ -37,16 +37,16 @@ func (process *Process) Start() {
 	}
 }
 
-func (process *Process) Abort() error {
-	if process.cmd == nil {
-		return nil
-	}
-	process.cmd.Process.Kill()
-	close(process.input)
-	err := <-process.status
-	process.cmd = nil
-	return err
-}
+// func (process *Process) Abort() error {
+// 	if process.cmd == nil {
+// 		return nil
+// 	}
+// 	process.cmd.Process.Kill()
+// 	close(process.input)
+// 	err := <-process.status
+// 	process.cmd = nil
+// 	return err
+// }
 
 func (process *Process) IsRunning() bool {
 	return process.cmd != nil
@@ -66,12 +66,8 @@ func ReadLine(reader *bufio.Reader) ([]byte, error) {
 	}
 }
 
+// Run until input channel is closed
 func (process *Process) runProcess() {
-	defer func() {
-		if r := recover(); r != nil {
-			process.status <- r.(error)
-		}
-	}()
 	if process.IsRunning() {
 		return
 	}
@@ -91,7 +87,7 @@ func (process *Process) runProcess() {
 			if err != nil {
 				break
 			}
-			process.output <- string(line)
+			process.output <- line
 		}
 		close(process.output)
 	}()
@@ -127,13 +123,19 @@ func (process *Process) runProcess() {
 		stdin.Close()
 		return
 	}
-	defer process.cmd.Process.Kill()
-	defer process.cmd.Wait()
 
 	for line := range process.input {
 		if _, err := stdin.Write(line); err != nil {
 			log.Printf("Filter (%s): Failed to write to stdin: %q", process.converterName, err)
+			// wait for process to exit and close std pipes.
+			process.cmd.Wait()
+			// drain input channel to unblock caller
+			for range process.input {
+			}
 			return
 		}
 	}
+
+	process.cmd.Process.Kill()
+	process.cmd.Wait()
 }

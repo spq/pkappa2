@@ -5,23 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/spq/pkappa2/internal/index"
 )
 
+const (
+	MAX_PROCESS_COUNT = 8
+)
+
 type (
 	Converter struct {
-		executablePath string
-		name           string
-		jobs           chan func()
-		running        bool
-		process        *Process
-	}
-	Result struct {
-		data        []index.Data
-		clientBytes uint64
-		serverBytes uint64
-		err         error
+		executablePath        string
+		name                  string
+		started_process_count int
+		reset_epoch           int
+		rwmutex               sync.RWMutex
+		mutex                 sync.Mutex
+		signal                chan struct{}
+		available_processes   []*Process
 	}
 	// JSON Protocol
 	ConverterStreamMetadata struct {
@@ -37,77 +39,115 @@ type (
 	}
 )
 
+var (
+	directionsToString = map[index.Direction]string{
+		index.DirectionClientToServer: "client-to-server",
+		index.DirectionServerToClient: "server-to-client",
+	}
+	directionsToInt = map[string]index.Direction{
+		"client-to-server": index.DirectionClientToServer,
+		"server-to-client": index.DirectionServerToClient,
+	}
+)
+
 func New(converterName string, executablePath string) *Converter {
 	converter := Converter{
 		executablePath: executablePath,
 		name:           converterName,
-		jobs:           make(chan func()),
-		running:        true,
-		process:        NewProcess(converterName, executablePath),
+		signal:         make(chan struct{}),
 	}
-
-	go func() {
-		for f := range converter.jobs {
-			f()
-		}
-	}()
 
 	return &converter
 }
 
+// Stop the converter process.
 func (converter *Converter) Reset() {
-	converter.running = false
-	converter.process.Abort()
+	converter.rwmutex.Lock()
+	defer converter.rwmutex.Unlock()
+
+	// Signal in-use processes to stop after they finish their current job.
+	converter.reset_epoch++
+
+	// Kill all currently idle processes.
+	for _, process := range converter.available_processes {
+		close(process.input)
+		converter.started_process_count--
+		// Tell any waiting Data call to start a new process.
+		select {
+		case converter.signal <- struct{}{}:
+		default:
+		}
+	}
+	converter.available_processes = nil
+
+}
+
+func (converter *Converter) reserveProcess() (*Process, int) {
+	// See if we want to stop the process and we're in a Reset call. Reset would grab a write lock.
+	converter.rwmutex.RLock()
+	defer converter.rwmutex.RUnlock()
+
+	converter.mutex.Lock()
+	defer converter.mutex.Unlock()
+
+	// TODO: If Reset is called before Data is called, the process will start again, which we might not want.
+	for {
+		if len(converter.available_processes) > 0 {
+			process := converter.available_processes[len(converter.available_processes)-1]
+			converter.available_processes = converter.available_processes[:len(converter.available_processes)-1]
+			return process, converter.reset_epoch
+		}
+
+		if converter.started_process_count < MAX_PROCESS_COUNT {
+			process := NewProcess(converter.name, converter.executablePath)
+			converter.started_process_count++
+			return process, converter.reset_epoch
+		}
+
+		// Wait for signal from process that it's done.
+		converter.mutex.Unlock()
+		converter.rwmutex.RUnlock()
+		<-converter.signal
+		converter.rwmutex.RLock()
+		converter.mutex.Lock()
+	}
+}
+
+func (converter *Converter) releaseProcess(process *Process, reset_epoch int) {
+	converter.rwmutex.RLock()
+	defer converter.rwmutex.RUnlock()
+
+	converter.mutex.Lock()
+	defer converter.mutex.Unlock()
+
+	// Signal that a process is available.
+	select {
+	case converter.signal <- struct{}{}:
+	default:
+	}
+
+	if reset_epoch != converter.reset_epoch {
+		// The converter was reset while this process was running.
+		close(process.input)
+		// Drain the output until the process exits.
+		for range process.output {
+		}
+		converter.started_process_count--
+		return
+	}
+
+	converter.available_processes = append(converter.available_processes, process)
 }
 
 func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clientBytes, serverBytes uint64, err error) {
-	ch := make(chan Result)
-	converter.jobs <- func() {
-		if !converter.running {
-			ch <- Result{
-				data:        nil,
-				clientBytes: 0,
-				serverBytes: 0,
-				err:         fmt.Errorf("converter (%s): Cannot convert since the process is not running", converter.name),
-			}
-			return
-		}
-		ch <- converter.tryData(stream)
-	}
-	result := <-ch
-	close(ch)
-	return result.data, result.clientBytes, result.serverBytes, result.err
-}
-
-func (converter *Converter) tryData(stream *index.Stream) (result Result) {
-	defer func() {
-		if r := recover(); r != nil {
-			result.err = r.(error)
-		}
-	}()
-	directionsToString := map[index.Direction]string{
-		index.DirectionClientToServer: "client-to-server",
-		index.DirectionServerToClient: "server-to-client",
-	}
-	directionsToInt := map[string]index.Direction{
-		"client-to-server": index.DirectionClientToServer,
-		"server-to-client": index.DirectionServerToClient,
-	}
-
-	result = Result{
-		data:        nil,
-		clientBytes: 0,
-		serverBytes: 0,
-		err:         nil,
-	}
-
 	// TODO: Start a timeout here, so that we don't wait forever for the converter to respond
-	log.Printf("Converter (%s): Running for stream %d", converter.name, stream.StreamID)
-	packets, err := stream.Data() // FIXME: Lock index reader
+
+	// Grab stream data before getting any locks, since this can take a while.
+	packets, err := stream.Data()
 	if err != nil {
-		result.err = fmt.Errorf("converter (%s): Failed to get packets: %w", converter.name, err)
-		return result
+		return nil, 0, 0, fmt.Errorf("converter (%s): Failed to get packets: %w", converter.name, err)
 	}
+
 	metadata := ConverterStreamMetadata{
 		ClientHost: stream.ClientHostIP(),
 		ClientPort: stream.ClientPort,
@@ -118,10 +158,15 @@ func (converter *Converter) tryData(stream *index.Stream) (result Result) {
 
 	metadataEncoded, err := json.Marshal(metadata)
 	if err != nil {
-		result.err = fmt.Errorf("converter (%s): Failed to encode metadata: %w", converter.name, err)
-		return result
+		return nil, 0, 0, fmt.Errorf("converter (%s): Failed to encode metadata: %w", converter.name, err)
 	}
-	converter.process.input <- metadataEncoded
+
+	process, reset_epoch := converter.reserveProcess()
+
+	log.Printf("Converter (%s): Running for stream %d", converter.name, stream.StreamID)
+
+	// Initiate converter protocol
+	process.input <- metadataEncoded
 
 	for _, packet := range packets {
 		jsonPacket := ConverterStreamChunk{
@@ -131,37 +176,38 @@ func (converter *Converter) tryData(stream *index.Stream) (result Result) {
 		// FIXME: Should we notify the converter about this somehow?
 		jsonPacketEncoded, err := json.Marshal(jsonPacket)
 		if err != nil {
-			result.err = fmt.Errorf("converter (%s): Failed to encode packet: %w", converter.name, err)
-			return result
+			converter.releaseProcess(process, -1)
+			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to encode packet: %w", converter.name, err)
 		}
-		converter.process.input <- jsonPacketEncoded
+		process.input <- jsonPacketEncoded
 	}
 
-	converter.process.input <- []byte("\n")
+	process.input <- []byte("\n")
 
-	var convertedPackets []index.Data
-	clientBytes, serverBytes := uint64(0), uint64(0)
-	for line := range converter.process.output {
-		if line == "" {
+	// TODO: The converter process could send a response line after every received json line,
+	//       and the stdout buffer could fill up causing a deadlock.
+	//       select?
+	for line := range process.output {
+		if len(line) == 0 {
 			break
 		}
 		var convertedPacket ConverterStreamChunk
-		if err := json.Unmarshal([]byte(line), &convertedPacket); err != nil {
-			result.err = fmt.Errorf("converter (%s): Failed to read converted packet: %w", converter.name, err)
-			return result
+		if err := json.Unmarshal(line, &convertedPacket); err != nil {
+			converter.releaseProcess(process, -1)
+			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to read converted packet: %w", converter.name, err)
 		}
 		decodedData, err := base64.StdEncoding.DecodeString(convertedPacket.Content)
 		if err != nil {
-			result.err = fmt.Errorf("converter (%s): Failed to decode converted packet data: %w", converter.name, err)
-			return result
+			converter.releaseProcess(process, -1)
+			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to decode converted packet data: %w", converter.name, err)
 		}
 
 		direction, ok := directionsToInt[convertedPacket.Direction]
 		if !ok {
-			result.err = fmt.Errorf("converter (%s): Invalid direction: %q", converter.name, convertedPacket.Direction)
-			return result
+			converter.releaseProcess(process, -1)
+			return nil, 0, 0, fmt.Errorf("converter (%s): Invalid direction: %q", converter.name, convertedPacket.Direction)
 		}
-		convertedPackets = append(convertedPackets, index.Data{Content: decodedData, Direction: direction})
+		data = append(data, index.Data{Content: decodedData, Direction: direction})
 		if direction == index.DirectionClientToServer {
 			clientBytes += uint64(len(decodedData))
 		} else {
@@ -169,20 +215,21 @@ func (converter *Converter) tryData(stream *index.Stream) (result Result) {
 		}
 	}
 	var convertedMetadata ConverterStreamMetadata
-	line := <-converter.process.output
-	if err := json.Unmarshal([]byte(line), &convertedMetadata); err != nil {
-		result.err = fmt.Errorf("converter (%s): Failed to read converted metadata: %w", converter.name, err)
-		return result
+	line, ok := <-process.output
+	if !ok {
+		converter.releaseProcess(process, -1)
+		return nil, 0, 0, fmt.Errorf("converter (%s): Converter process exited unexpectedly", converter.name)
+	}
+	if err := json.Unmarshal(line, &convertedMetadata); err != nil {
+		converter.releaseProcess(process, -1)
+		return nil, 0, 0, fmt.Errorf("converter (%s): Failed to read converted metadata: %w", converter.name, err)
 	}
 
-	result.data = convertedPackets
-	result.clientBytes = clientBytes
-	result.serverBytes = serverBytes
-
 	// log.Printf("Converter (%s): Converted stream: %q", converter.name, convertedMetadata)
-	// for _, convertedPacket := range convertedPackets {
+	// for _, convertedPacket := range data {
 	// 	log.Printf("Converter (%s): Converted packet: %q", converter.name, convertedPacket)
 	// }
 
-	return result
+	converter.releaseProcess(process, reset_epoch)
+	return
 }
