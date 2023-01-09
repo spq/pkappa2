@@ -26,14 +26,14 @@ type (
 		available_processes   []*Process
 	}
 	// JSON Protocol
-	ConverterStreamMetadata struct {
+	converterStreamMetadata struct {
 		ClientHost string
 		ClientPort uint16
 		ServerHost string
 		ServerPort uint16
 		Protocol   string
 	}
-	ConverterStreamChunk struct {
+	converterStreamChunk struct {
 		Direction string
 		Content   string
 	}
@@ -50,7 +50,7 @@ var (
 	}
 )
 
-func New(converterName string, executablePath string) *Converter {
+func New(converterName, executablePath string) *Converter {
 	converter := Converter{
 		executablePath: executablePath,
 		name:           converterName,
@@ -58,6 +58,10 @@ func New(converterName string, executablePath string) *Converter {
 	}
 
 	return &converter
+}
+
+func (converter *Converter) Name() string {
+	return converter.name
 }
 
 // Stop the converter process.
@@ -148,7 +152,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 		return nil, 0, 0, fmt.Errorf("converter (%s): Failed to get packets: %w", converter.name, err)
 	}
 
-	metadata := ConverterStreamMetadata{
+	metadata := converterStreamMetadata{
 		ClientHost: stream.ClientHostIP(),
 		ClientPort: stream.ClientPort,
 		ServerHost: stream.ServerHostIP(),
@@ -163,13 +167,13 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 
 	process, reset_epoch := converter.reserveProcess()
 
-	log.Printf("Converter (%s): Running for stream %d", converter.name, stream.StreamID)
+	log.Printf("Converter (%s): Running for stream %d", converter.name, stream.ID())
 
 	// Initiate converter protocol
 	process.input <- metadataEncoded
 
 	for _, packet := range packets {
-		jsonPacket := ConverterStreamChunk{
+		jsonPacket := converterStreamChunk{
 			Direction: directionsToString[packet.Direction],
 			Content:   base64.StdEncoding.EncodeToString(packet.Content),
 		}
@@ -191,7 +195,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 		if len(line) == 0 {
 			break
 		}
-		var convertedPacket ConverterStreamChunk
+		var convertedPacket converterStreamChunk
 		if err := json.Unmarshal(line, &convertedPacket); err != nil {
 			converter.releaseProcess(process, -1)
 			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to read converted packet: %w", converter.name, err)
@@ -214,7 +218,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 			serverBytes += uint64(len(decodedData))
 		}
 	}
-	var convertedMetadata ConverterStreamMetadata
+	var convertedMetadata converterStreamMetadata
 	line, ok := <-process.output
 	if !ok {
 		converter.releaseProcess(process, -1)

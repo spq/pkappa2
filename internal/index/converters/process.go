@@ -27,29 +27,8 @@ func NewProcess(converterName string, executablePath string) *Process {
 		output:         make(chan []byte),
 	}
 
-	process.Start()
+	go process.run()
 	return &process
-}
-
-func (process *Process) Start() {
-	if process.IsRunning() {
-		go process.runProcess()
-	}
-}
-
-// func (process *Process) Abort() error {
-// 	if process.cmd == nil {
-// 		return nil
-// 	}
-// 	process.cmd.Process.Kill()
-// 	close(process.input)
-// 	err := <-process.status
-// 	process.cmd = nil
-// 	return err
-// }
-
-func (process *Process) IsRunning() bool {
-	return process.cmd != nil
 }
 
 func ReadLine(reader *bufio.Reader) ([]byte, error) {
@@ -67,10 +46,7 @@ func ReadLine(reader *bufio.Reader) ([]byte, error) {
 }
 
 // Run until input channel is closed
-func (process *Process) runProcess() {
-	if process.IsRunning() {
-		return
-	}
+func (process *Process) run() {
 	process.cmd = exec.Command(process.executablePath)
 	stdout, err := process.cmd.StdoutPipe()
 	if err != nil {
