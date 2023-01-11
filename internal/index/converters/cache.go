@@ -12,6 +12,11 @@ type (
 		converter *Converter
 		cacheFile *cacheFile
 	}
+	Stats struct {
+		Name              string
+		CachedStreamCount uint64
+		Processes         []ProcessStats
+	}
 )
 
 func NewCache(converterName, executablePath, indexCachePath string) (*CachedConverter, error) {
@@ -31,6 +36,14 @@ func NewCache(converterName, executablePath, indexCachePath string) (*CachedConv
 
 func (cache *CachedConverter) Name() string {
 	return cache.converter.Name()
+}
+
+func (cache *CachedConverter) Stats() *Stats {
+	return &Stats{
+		Name:              cache.converter.Name(),
+		CachedStreamCount: cache.cacheFile.StreamCount(),
+		Processes:         cache.converter.ProcessStats(),
+	}
 }
 
 func (cache *CachedConverter) Reset() error {

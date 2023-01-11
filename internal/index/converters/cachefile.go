@@ -106,6 +106,13 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 	}, nil
 }
 
+func (cachefile *cacheFile) StreamCount() uint64 {
+	cachefile.rwmutex.RLock()
+	defer cachefile.rwmutex.RUnlock()
+
+	return uint64(len(cachefile.containedStreamIds))
+}
+
 func (cachefile *cacheFile) Reset() error {
 	cachefile.rwmutex.Lock()
 	defer cachefile.rwmutex.Unlock()

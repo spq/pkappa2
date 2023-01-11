@@ -74,7 +74,7 @@ func (process *Process) run() {
 	process.cmd = exec.Command(process.executablePath)
 	stdout, err := process.cmd.StdoutPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stdout pipe: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to create stdout pipe: %q", process.converterName, err)
 		close(process.output)
 		return
 	}
@@ -94,7 +94,7 @@ func (process *Process) run() {
 
 	stderr, err := process.cmd.StderrPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stderr pipe: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to create stderr pipe: %q", process.converterName, err)
 		stdout.Close()
 		return
 	}
@@ -104,7 +104,7 @@ func (process *Process) run() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			line := scanner.Text()
-			log.Printf("Filter (%s) stderr: %s", process.converterName, line)
+			log.Printf("Converter (%s) stderr: %s", process.converterName, line)
 
 			process.stderrLock.Lock()
 			process.stderrRing.Value = line
@@ -115,7 +115,7 @@ func (process *Process) run() {
 
 	stdin, err := process.cmd.StdinPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stdin pipe: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to create stdin pipe: %q", process.converterName, err)
 		stdout.Close()
 		stderr.Close()
 		return
@@ -123,7 +123,7 @@ func (process *Process) run() {
 
 	err = process.cmd.Start()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to start process: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to start process: %q", process.converterName, err)
 		stdout.Close()
 		stderr.Close()
 		stdin.Close()
@@ -132,7 +132,7 @@ func (process *Process) run() {
 
 	for line := range process.input {
 		if _, err := stdin.Write(line); err != nil {
-			log.Printf("Filter (%s): Failed to write to stdin: %q", process.converterName, err)
+			log.Printf("Converter (%s): Failed to write to stdin: %q", process.converterName, err)
 			// wait for process to exit and close std pipes.
 			process.cmd.Wait()
 			// drain input channel to unblock caller
