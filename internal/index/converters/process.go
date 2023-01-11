@@ -2,8 +2,10 @@ package converters
 
 import (
 	"bufio"
+	"container/ring"
 	"log"
 	"os/exec"
+	"sync"
 )
 
 type (
@@ -13,7 +15,14 @@ type (
 		cmd            *exec.Cmd
 		input          chan []byte
 		output         chan []byte
+		stderrRing     *ring.Ring
+		stderrLock     sync.RWMutex
 	}
+)
+
+const (
+	// Number of lines to keep in the stderr buffer.
+	STDERR_BUFFER_SIZE = 512
 )
 
 // To stop the process, close the input channel.
@@ -25,6 +34,8 @@ func NewProcess(converterName string, executablePath string) *Process {
 		cmd:            nil,
 		input:          make(chan []byte),
 		output:         make(chan []byte),
+		stderrRing:     ring.New(STDERR_BUFFER_SIZE),
+		stderrLock:     sync.RWMutex{},
 	}
 
 	go process.run()
@@ -43,6 +54,19 @@ func ReadLine(reader *bufio.Reader) ([]byte, error) {
 			return result, nil
 		}
 	}
+}
+
+func (process *Process) Stderr() []string {
+	process.stderrLock.RLock()
+	defer process.stderrLock.RUnlock()
+
+	output := []string{}
+	process.stderrRing.Do(func(value any) {
+		if value != nil {
+			output = append(output, value.(string))
+		}
+	})
+	return output
 }
 
 // Run until input channel is closed
@@ -79,7 +103,13 @@ func (process *Process) run() {
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			log.Printf("Filter (%s) stderr: %s", process.converterName, scanner.Text())
+			line := scanner.Text()
+			log.Printf("Filter (%s) stderr: %s", process.converterName, line)
+
+			process.stderrLock.Lock()
+			process.stderrRing.Value = line
+			process.stderrRing = process.stderrRing.Next()
+			process.stderrLock.Unlock()
 		}
 	}()
 
