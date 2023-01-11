@@ -32,6 +32,8 @@ type (
 		started_processes map[*Process]bool
 		// Processes that are currently idle.
 		available_processes []*Process
+		// Processes that died unexpectedly.
+		failed_processes []*Process
 	}
 	ProcessStats struct {
 		Running  bool
@@ -88,6 +90,13 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 		output = append(output, ProcessStats{
 			Running:  true,
 			ExitCode: 0,
+			Stderr:   process.Stderr(),
+		})
+	}
+	for _, process := range converter.failed_processes {
+		output = append(output, ProcessStats{
+			Running:  false,
+			ExitCode: process.ExitCode(),
 			Stderr:   process.Stderr(),
 		})
 	}
@@ -166,6 +175,9 @@ func (converter *Converter) releaseProcess(process *Process, reset_epoch int) {
 		for range process.output {
 		}
 		delete(converter.started_processes, process)
+		if process.ExitCode() != 0 {
+			converter.failed_processes = append(converter.failed_processes, process)
+		}
 		return
 	}
 

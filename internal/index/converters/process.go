@@ -17,6 +17,7 @@ type (
 		output         chan []byte
 		stderrRing     *ring.Ring
 		stderrLock     sync.RWMutex
+		exitCode       int
 	}
 )
 
@@ -67,6 +68,10 @@ func (process *Process) Stderr() []string {
 		}
 	})
 	return output
+}
+
+func (process *Process) ExitCode() int {
+	return process.exitCode
 }
 
 // Run until input channel is closed
@@ -134,7 +139,13 @@ func (process *Process) run() {
 		if _, err := stdin.Write(line); err != nil {
 			log.Printf("Converter (%s): Failed to write to stdin: %q", process.converterName, err)
 			// wait for process to exit and close std pipes.
-			process.cmd.Wait()
+			if err := process.cmd.Wait(); err != nil {
+				log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
+				process.exitCode = -1
+			} else {
+				process.exitCode = process.cmd.ProcessState.ExitCode()
+			}
+
 			// drain input channel to unblock caller
 			for range process.input {
 			}
@@ -143,5 +154,10 @@ func (process *Process) run() {
 	}
 
 	process.cmd.Process.Kill()
-	process.cmd.Wait()
+	if err := process.cmd.Wait(); err != nil {
+		log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
+		process.exitCode = -1
+		return
+	}
+	process.exitCode = process.cmd.ProcessState.ExitCode()
 }
