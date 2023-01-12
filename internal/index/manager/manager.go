@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -1029,9 +1030,18 @@ func (mgr *Manager) addConverter(path string) error {
 		return fmt.Errorf("error: converter %s is not executable", path)
 	}
 
-	// TODO: Check converter name for uniqueness
-
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	if _, ok := mgr.converters[name]; ok {
+		return fmt.Errorf("error: converter %s already exists", name)
+	}
+	if name == "none" {
+		return fmt.Errorf("error: converter %s is reserved", name)
+	}
+	// Converter names have to be plain ascii so we can use them in the query language easily.
+	if !regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(name) {
+		return fmt.Errorf("error: converter %s has to be alphanumeric", name)
+	}
+
 	converter, err := index.NewConverter(path, name, mgr.IndexDir)
 	if err != nil {
 		return err

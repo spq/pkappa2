@@ -84,7 +84,6 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 	converter.mutex.Lock()
 	defer converter.mutex.Unlock()
 
-	// TODO: Keep stderr and exitcode of processes that have exited.
 	output := []ProcessStats{}
 	for process := range converter.started_processes {
 		output = append(output, ProcessStats{
@@ -93,6 +92,7 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 			Stderr:   process.Stderr(),
 		})
 	}
+	// Keep stderr and exitcode of processes that have exited.
 	for _, process := range converter.failed_processes {
 		output = append(output, ProcessStats{
 			Running:  false,
