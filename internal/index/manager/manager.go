@@ -1001,10 +1001,10 @@ func (mgr *Manager) startConverterJobIfNeeded() {
 }
 
 func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.LongBitmask, indexes []*index.Reader, releaser indexReleaser) {
-	err := func() error {
+	convertedStreamIDs, err := func() (bitmask.LongBitmask, error) {
 		converter, ok := mgr.converters[converterName]
 		if !ok {
-			return fmt.Errorf("unknown converter %q", converterName)
+			return bitmask.LongBitmask{}, fmt.Errorf("unknown converter %q", converterName)
 		}
 
 		errorChannels := make([]chan error, converters.MAX_PROCESS_COUNT)
@@ -1029,7 +1029,7 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 				stream, err := index.StreamByID(uint64(streamID))
 				streamID++
 				if err != nil {
-					return err
+					return bitmask.LongBitmask{}, err
 				}
 				if stream == nil {
 					continue
@@ -1073,14 +1073,17 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 				lastError = err
 			}
 		}
+
+		convertedStreamIDs := bitmask.LongBitmask{}
 		for _, c := range resultChannels {
 			streamID, ok := <-c
 			if !ok {
 				continue
 			}
+			convertedStreamIDs.Set(uint(streamID))
 			streamIDs.Unset(uint(streamID))
 		}
-		return lastError
+		return convertedStreamIDs, lastError
 	}()
 
 	if err != nil {
@@ -1089,11 +1092,17 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 
 	mgr.jobs <- func() {
 		mgr.converterJobRunning[converterName] = false
-		// FIXME: this could have changed in the meantime
-		mgr.streamsToConvert[converterName] = &streamIDs
-		// TODO: Mark the converted streams as uncertain on all tags using a data: filter
-		//       The tag could match on the converted data now.
-		// mgr.startTaggingJobIfNeeded()
+		mgr.streamsToConvert[converterName].Sub(convertedStreamIDs)
+		// Mark the converted streams as uncertain on all tags using a data: filter
+		// The tag could match on the converted data now.
+		for _, tag := range mgr.tags {
+			// TODO: Only tag again if the tag matches converted data
+			if tag.features.MainFeatures&query.FeatureFilterData == 0 && tag.features.SubQueryFeatures&query.FeatureFilterData == 0 {
+				continue
+			}
+			tag.Uncertain.Or(convertedStreamIDs)
+		}
+		mgr.startTaggingJobIfNeeded()
 		mgr.startConverterJobIfNeeded()
 		releaser.release(mgr)
 	}
@@ -1239,7 +1248,7 @@ func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *co
 	// cannot attach converter to tag which references other tags or matches on stream data
 	// because we don't want to recursively trigger converters
 	// TODO: we could allow data queries if they only reference the stream's own plain data
-	if tag.features.MainFeatures&query.FeatureFilterData != 0 || len(tag.features.MainTags) > 0 || len(tag.features.SubQueryTags) > 0 {
+	if tag.features.MainFeatures&query.FeatureFilterData != 0 || tag.features.SubQueryFeatures&query.FeatureFilterData != 0 || len(tag.features.MainTags) > 0 || len(tag.features.SubQueryTags) > 0 {
 		return fmt.Errorf("error: cannot attach converter to tag %s because it's query is too complex", tagName)
 	}
 
