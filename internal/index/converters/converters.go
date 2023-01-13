@@ -70,7 +70,7 @@ func New(converterName, executablePath string) *Converter {
 		executablePath:    executablePath,
 		name:              converterName,
 		signal:            make(chan struct{}),
-		started_processes: map[*Process]bool{},
+		started_processes: make(map[*Process]bool),
 	}
 
 	return &converter

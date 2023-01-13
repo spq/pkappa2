@@ -54,6 +54,20 @@ func (cache *CachedConverter) Reset() error {
 	return cache.cacheFile.Reset()
 }
 
+func (cache *CachedConverter) Cache(stream *index.Stream) (wasAdded bool, err error) {
+	// See if the stream data is cached already.
+	if cache.cacheFile.Contains(stream.ID()) {
+		return false, nil
+	}
+
+	// Convert the stream if it's not in the cache.
+	_, _, _, err = cache.Data(stream)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, clientBytes, serverBytes uint64, err error) {
 	// See if the stream data is cached already.
 	data, clientBytes, serverBytes, err = cache.cacheFile.Data(stream.ID())

@@ -125,6 +125,14 @@ func (cachefile *cacheFile) Reset() error {
 	return nil
 }
 
+func (cachefile *cacheFile) Contains(streamID uint64) bool {
+	cachefile.rwmutex.RLock()
+	defer cachefile.rwmutex.RUnlock()
+
+	_, ok := cachefile.containedStreamIds[streamID]
+	return ok
+}
+
 func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64, error) {
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
