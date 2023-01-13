@@ -76,15 +76,15 @@ type (
 	}
 
 	Statistics struct {
-		ImportJobCount            int
-		IndexCount                int
-		IndexLockCount            uint
-		PcapCount                 int
-		StreamCount               int
-		PacketCount               int
-		MergeJobRunning           bool
-		TaggingJobRunning         bool
-		ConverterProcessesRunning map[string]bool
+		ImportJobCount       int
+		IndexCount           int
+		IndexLockCount       uint
+		PcapCount            int
+		StreamCount          int
+		PacketCount          int
+		MergeJobRunning      bool
+		TaggingJobRunning    bool
+		ConverterJobsRunning map[string]bool
 	}
 
 	indexReleaser []*index.Reader
@@ -642,20 +642,16 @@ func (mgr *Manager) Status() Statistics {
 		for _, n := range mgr.usedIndexes {
 			locks += n
 		}
-		converterProcessesRunning := make(map[string]bool)
-		// for name, converter := range mgr.converters {
-		// 	converterProcessesRunning[name] = converter.IsRunning()
-		// }
 		c <- Statistics{
-			IndexCount:                len(mgr.indexes),
-			IndexLockCount:            locks,
-			PcapCount:                 len(mgr.builder.KnownPcaps()),
-			ImportJobCount:            len(mgr.importJobs),
-			StreamCount:               mgr.nStreams,
-			PacketCount:               mgr.nPackets,
-			MergeJobRunning:           mgr.mergeJobRunning,
-			TaggingJobRunning:         mgr.taggingJobRunning,
-			ConverterProcessesRunning: converterProcessesRunning,
+			IndexCount:           len(mgr.indexes),
+			IndexLockCount:       locks,
+			PcapCount:            len(mgr.builder.KnownPcaps()),
+			ImportJobCount:       len(mgr.importJobs),
+			StreamCount:          mgr.nStreams,
+			PacketCount:          mgr.nPackets,
+			MergeJobRunning:      mgr.mergeJobRunning,
+			TaggingJobRunning:    mgr.taggingJobRunning,
+			ConverterJobsRunning: mgr.converterJobRunning,
 		}
 		close(c)
 	}
@@ -1019,6 +1015,13 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 					break
 				}
 				streamID += uint(zeros)
+				if uint64(streamID) < index.MinStreamID() {
+					streamID++
+					continue
+				}
+				if uint64(streamID) > index.MaxStreamID() {
+					break
+				}
 				stream, err := index.StreamByID(uint64(streamID))
 				streamID++
 				if err != nil {
