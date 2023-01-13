@@ -1209,6 +1209,14 @@ func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *
 	return nil
 }
 
+func (mgr *Manager) ConverterDetails(converterName string) (*converters.Stats, error) {
+	converter, ok := mgr.converters[converterName]
+	if !ok {
+		return nil, fmt.Errorf("error: converter %s does not exist", converterName)
+	}
+	return converter.Stats(), nil
+}
+
 func (mgr *Manager) GetView() View {
 	return View{mgr: mgr}
 }
