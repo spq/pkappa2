@@ -296,7 +296,8 @@ func (cachefile *cacheFile) SetData(streamID, packetCount uint64, convertedPacke
 	// [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
 	// Write stream header
 	streamSection := converterStreamSection{
-		StreamID: streamID,
+		StreamID:    streamID,
+		PacketCount: packetCount,
 	}
 	if err := binary.Write(writer, binary.LittleEndian, &streamSection); err != nil {
 		return err

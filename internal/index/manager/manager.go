@@ -1087,6 +1087,9 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 		mgr.converterJobRunning[converterName] = false
 		// FIXME: this could have changed in the meantime
 		mgr.streamsToConvert[converterName] = &streamIDs
+		// TODO: Mark the converted streams as uncertain on all tags using a data: filter
+		//       The tag could match on the converted data now.
+		// mgr.startTaggingJobIfNeeded()
 		mgr.startConverterJobIfNeeded()
 		releaser.release(mgr)
 	}
