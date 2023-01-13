@@ -24,14 +24,15 @@ type (
 	}
 
 	streamInfo struct {
-		offset int64
-		size   uint64
+		packetCount uint64
+		offset      int64
+		size        uint64
 	}
 
 	// File format
-	// TODO: Add packetcount
 	converterStreamSection struct {
-		StreamID uint64
+		StreamID    uint64
+		PacketCount uint64
 	}
 )
 
@@ -62,6 +63,7 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 		// Read total data size of the stream by adding all chunk sizes up.
 		prevWasZero := false
 		dataSize := uint64(0)
+		chunksSize := uint64(0)
 		for {
 			sz := uint64(0)
 			for {
@@ -69,7 +71,7 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 				if err != nil {
 					return nil, err
 				}
-				dataSize++
+				chunksSize++
 				sz <<= 7
 				sz |= uint64(b & 0x7f)
 				if b < 0x80 {
@@ -85,14 +87,15 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 
 		if streamSection.StreamID != InvalidStreamID {
 			containedStreamIds[streamSection.StreamID] = streamInfo{
-				offset: offset,
-				size:   dataSize,
+				packetCount: streamSection.PacketCount,
+				offset:      offset,
+				size:        chunksSize + dataSize,
 			}
 		}
 		if _, err := buffer.Discard(int(dataSize)); err != nil {
 			return nil, err
 		}
-		offset += int64(dataSize)
+		offset += int64(chunksSize + dataSize)
 	}
 
 	// Keep the file pointer at the end of the file.
@@ -127,20 +130,23 @@ func (cachefile *cacheFile) Reset() error {
 	return nil
 }
 
-func (cachefile *cacheFile) Contains(streamID uint64) bool {
-	cachefile.rwmutex.RLock()
-	defer cachefile.rwmutex.RUnlock()
-
-	_, ok := cachefile.containedStreamIds[streamID]
-	return ok
-}
-
-func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64, error) {
+func (cachefile *cacheFile) Contains(streamID, packetCount uint64) bool {
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
 
 	info, ok := cachefile.containedStreamIds[streamID]
 	if !ok {
+		return false
+	}
+	return info.packetCount == packetCount
+}
+
+func (cachefile *cacheFile) Data(streamID, packetCount uint64) ([]index.Data, uint64, uint64, error) {
+	cachefile.rwmutex.RLock()
+	defer cachefile.rwmutex.RUnlock()
+
+	info, ok := cachefile.containedStreamIds[streamID]
+	if !ok || info.packetCount != packetCount {
 		return nil, 0, 0, nil
 	}
 
@@ -282,7 +288,7 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 	return [2][]byte{clientData, serverData}, dataSizes, clientBytes, serverBytes, nil
 }
 
-func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Data) error {
+func (cachefile *cacheFile) SetData(streamID, packetCount uint64, convertedPackets []index.Data) error {
 	cachefile.rwmutex.Lock()
 	defer cachefile.rwmutex.Unlock()
 
@@ -355,8 +361,9 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 
 	// Remember where to look for this stream.
 	cachefile.containedStreamIds[streamID] = streamInfo{
-		offset: cachefile.fileSize + int64(unsafe.Sizeof(streamSection)),
-		size:   streamSize,
+		packetCount: packetCount,
+		offset:      cachefile.fileSize + int64(unsafe.Sizeof(streamSection)),
+		size:        streamSize,
 	}
 
 	cachefile.fileSize += int64(unsafe.Sizeof(streamSection)) + int64(streamSize)
