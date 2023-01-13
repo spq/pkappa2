@@ -211,7 +211,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 	log.Printf("Converter (%s): Running for stream %d", converter.name, stream.ID())
 
 	// Initiate converter protocol
-	process.input <- metadataEncoded
+	process.input <- append(metadataEncoded, '\n')
 
 	for _, packet := range packets {
 		jsonPacket := converterStreamChunk{
@@ -224,7 +224,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 			converter.releaseProcess(process, -1)
 			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to encode packet: %w", converter.name, err)
 		}
-		process.input <- jsonPacketEncoded
+		process.input <- append(jsonPacketEncoded, '\n')
 	}
 
 	process.input <- []byte("\n")
