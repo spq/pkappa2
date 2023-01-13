@@ -1007,6 +1007,8 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 			return fmt.Errorf("unknown converter %q", converterName)
 		}
 
+		errorChannels := make([]chan error, converters.MAX_PROCESS_COUNT)
+		resultChannels := make([]chan uint64, converters.MAX_PROCESS_COUNT)
 		convertedCount := uint64(0)
 	outer:
 		for _, index := range indexes {
@@ -1018,6 +1020,7 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 				}
 				streamID += uint(zeros)
 				stream, err := index.StreamByID(uint64(streamID))
+				streamID++
 				if err != nil {
 					return err
 				}
@@ -1025,23 +1028,52 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 					continue
 				}
 
-				wasAdded, err := converter.Cache(stream)
-				if err != nil {
-					return err
+				if converter.Contains(stream) {
+					continue
 				}
-				streamIDs.Unset(streamID)
-				streamID++
+
+				errorChannels[convertedCount] = make(chan error)
+				resultChannels[convertedCount] = make(chan uint64)
+				go func(id uint64) {
+					_, _, _, err := converter.Data(stream)
+					if err != nil {
+						errorChannels[id] <- err
+						close(errorChannels[id])
+						close(resultChannels[id])
+						return
+					}
+
+					close(errorChannels[id])
+					resultChannels[id] <- stream.ID()
+					close(resultChannels[id])
+				}(convertedCount)
 
 				// Only convert X streams at a time
-				if wasAdded {
-					convertedCount++
-				}
-				if convertedCount >= 50 {
+				convertedCount++
+				if convertedCount == converters.MAX_PROCESS_COUNT {
 					break outer
 				}
 			}
 		}
-		return nil
+		var lastError error
+		lastError = nil
+		for _, c := range errorChannels {
+			err, ok := <-c
+			if !ok {
+				continue
+			}
+			if err != nil {
+				lastError = err
+			}
+		}
+		for _, c := range resultChannels {
+			streamID, ok := <-c
+			if !ok {
+				continue
+			}
+			streamIDs.Unset(uint(streamID))
+		}
+		return lastError
 	}()
 
 	if err != nil {
@@ -1050,6 +1082,8 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 
 	mgr.jobs <- func() {
 		mgr.converterJobRunning[converterName] = false
+		// FIXME: this could have changed in the meantime
+		mgr.streamsToConvert[converterName] = &streamIDs
 		mgr.startConverterJobIfNeeded()
 		releaser.release(mgr)
 	}

@@ -29,6 +29,7 @@ type (
 	}
 
 	// File format
+	// TODO: Add packetcount
 	converterStreamSection struct {
 		StreamID uint64
 	}
