@@ -148,21 +148,21 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
 	}
 	mgr.startMonitoringConverters(watcher)
 
 	// Lookup all available converter binaries
 	entries, err := os.ReadDir(mgr.ConverterDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read converter directory: %w", err)
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		if err := mgr.addConverterInternal(filepath.Join(mgr.ConverterDir, entry.Name())); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to add converter %q: %w", entry.Name(), err)
 		}
 	}
 
@@ -254,7 +254,9 @@ nextStateFile:
 					log.Printf("Invalid tag %q in statefile %q: references non-existing converter %q", t.Name, fn, converterName)
 					continue
 				}
-				mgr.attachConverterToTag(nt, t.Name, converter)
+				if err := mgr.attachConverterToTag(nt, t.Name, converter); err != nil {
+					log.Printf("Invalid tag %q in statefile %q: Failed to attach converter %q: %v", t.Name, fn, converterName, err)
+				}
 			}
 			newTags[t.Name] = nt
 		}
@@ -892,7 +894,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						continue
 					}
 					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
-						return err
+						return fmt.Errorf("failed to detach converter %q from tag %q: %w", converter.Name(), name, err)
 					}
 				}
 				// attach new converters to tag
@@ -904,7 +906,9 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					if converter, ok := mgr.converters[converterName]; !ok {
 						return fmt.Errorf("unknown converter %q", converterName)
 					} else {
-						mgr.attachConverterToTag(tag, name, converter)
+						if err := mgr.attachConverterToTag(tag, name, converter); err != nil {
+							return fmt.Errorf("failed to attach converter %q to tag %q: %w", converterName, name, err)
+						}
 					}
 				}
 				mgr.saveState()
@@ -1226,17 +1230,23 @@ func (mgr *Manager) restartConverterProcess(path string) error {
 	return <-c
 }
 
-func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *converters.CachedConverter) bool {
+func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *converters.CachedConverter) error {
 	// check if converter already exists
 	if slices.Contains(tag.converters, converter) {
-		return false
+		return nil
 	}
-	// FIXME assert low complexity of this tag's query
+	// assert low complexity of this tag's query
+	// cannot attach converter to tag which references other tags or matches on stream data
+	// because we don't want to recursively trigger converters
+	// TODO: we could allow data queries if they only reference the stream's own plain data
+	if tag.features.MainFeatures&query.FeatureFilterData != 0 || len(tag.features.MainTags) > 0 || len(tag.features.SubQueryTags) > 0 {
+		return fmt.Errorf("error: cannot attach converter to tag %s because it's query is too complex", tagName)
+	}
 
 	tag.converters = append(tag.converters, converter)
 	mgr.streamsToConvert[converter.Name()].Or(tag.Matches)
 	mgr.startConverterJobIfNeeded()
-	return true
+	return nil
 }
 
 func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *converters.CachedConverter) error {
