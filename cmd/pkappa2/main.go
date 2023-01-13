@@ -378,6 +378,7 @@ func main() {
 			http.Error(w, fmt.Sprintf("AllTags() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+		// TODO: Send correct ClientBytes and ServerBytes when sending converter output.
 		response := struct {
 			Stream          *index.Stream
 			Data            []index.Data

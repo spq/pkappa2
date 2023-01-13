@@ -1182,7 +1182,9 @@ func (mgr *Manager) removeConverter(path string) error {
 
 			// remove converter from all tags
 			for _, t := range mgr.tags {
-				mgr.detachConverterFromTag(t, name, converter)
+				if err := mgr.detachConverterFromTag(t, name, converter); err != nil {
+					return err
+				}
 			}
 
 			// Stop the process if it is running and delete the cache file.
@@ -1244,8 +1246,30 @@ func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *
 			break
 		}
 	}
-	// TODO: delete/invalidate converter results for all matching streams now
-	//       but only if they aren't matches of other tags the converter is attached to.
+	// delete/invalidate converter results for all matching streams now
+	// but only if they aren't matches of other tags the converter is attached to.
+	matchingStreams := bitmask.LongBitmask{}
+	for _, t := range mgr.tags {
+		if t == tag {
+			continue
+		}
+		if slices.Contains(t.converters, converter) {
+			matchingStreams.Or(t.Matches)
+		}
+	}
+
+	// only delete results for streams that are not matched by other tags
+	onlyThisTag := tag.Matches.Copy()
+	onlyThisTag.Sub(matchingStreams)
+	mgr.streamsToConvert[converter.Name()].Sub(onlyThisTag)
+	// TODO: invalidate all streams in the cache that are only matched by this tag.
+
+	if matchingStreams.IsZero() {
+		// no other tags use this converter, delete all results
+		if err := converter.Reset(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
