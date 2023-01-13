@@ -3,6 +3,7 @@ package converters
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -211,6 +212,73 @@ func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64,
 		})
 	}
 	return data, clientBytes, serverBytes, nil
+}
+
+func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error) {
+	cachefile.rwmutex.RLock()
+	defer cachefile.rwmutex.RUnlock()
+
+	// [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
+	info, ok := cachefile.containedStreamIds[streamID]
+	if !ok {
+		return [2][]byte{}, [][2]int{}, 0, 0, fmt.Errorf("stream %d not found in %s", streamID, cachefile.file.Name())
+	}
+	buffer := bufio.NewReader(io.NewSectionReader(cachefile.file, info.offset, int64(info.size)))
+
+	// Read chunk sizes
+	dataSizes := [][2]int{{}}
+	prevWasZero := false
+	direction := index.DirectionClientToServer
+	clientBytes := uint64(0)
+	serverBytes := uint64(0)
+	for {
+		last := dataSizes[len(dataSizes)-1]
+		sz := uint64(0)
+		for {
+			b, err := buffer.ReadByte()
+			if err != nil {
+				return [2][]byte{}, [][2]int{}, 0, 0, err
+			}
+			sz <<= 7
+			sz |= uint64(b & 0x7f)
+			if b < 0x80 {
+				break
+			}
+		}
+		if sz == 0 {
+			if prevWasZero {
+				break
+			} else {
+				prevWasZero = true
+				direction = direction.Reverse()
+				continue
+			}
+		}
+		new := [2]int{
+			last[0],
+			last[1],
+		}
+		new[direction] += int(sz)
+		dataSizes = append(dataSizes, new)
+		prevWasZero = false
+		if direction == index.DirectionClientToServer {
+			clientBytes += sz
+		} else {
+			serverBytes += sz
+		}
+		direction = direction.Reverse()
+	}
+
+	// Read data
+	clientData := make([]byte, clientBytes)
+	if _, err := io.ReadFull(buffer, clientData); err != nil {
+		return [2][]byte{}, [][2]int{}, 0, 0, err
+	}
+	serverData := make([]byte, serverBytes)
+	if _, err := io.ReadFull(buffer, serverData); err != nil {
+		return [2][]byte{}, [][2]int{}, 0, 0, err
+	}
+	return [2][]byte{clientData, serverData}, dataSizes, clientBytes, serverBytes, nil
 }
 
 func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Data) error {
