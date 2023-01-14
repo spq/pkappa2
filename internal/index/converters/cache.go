@@ -84,3 +84,7 @@ func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, cli
 	}
 	return convertedPackets, clientBytes, serverBytes, nil
 }
+
+func (cache *CachedConverter) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error) {
+	return cache.cacheFile.DataForSearch(streamID)
+}

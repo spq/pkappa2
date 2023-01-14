@@ -116,6 +116,7 @@ type (
 		releaser indexReleaser
 
 		tagDetails map[string]query.TagDetails
+		converters map[string]index.ConverterAccess
 	}
 
 	StreamContext struct {
@@ -585,7 +586,11 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails)
+		converters := make(map[string]index.ConverterAccess)
+		for converterName, converter := range mgr.converters {
+			converters[converterName] = converter
+		}
+		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters)
 		if err != nil {
 			return err
 		}
@@ -972,7 +977,7 @@ func (r *indexReleaser) release(mgr *Manager) {
 }
 
 func (mgr *Manager) startConverterJobIfNeeded() {
-	for converterName := range mgr.converters {
+	for converterName, converter := range mgr.converters {
 		if mgr.converterJobRunning[converterName] {
 			continue
 		}
@@ -982,37 +987,29 @@ func (mgr *Manager) startConverterJobIfNeeded() {
 
 		mgr.converterJobRunning[converterName] = true
 		indexes, releaser := mgr.getIndexesCopy(0)
-		go mgr.convertStreamJob(converterName, *mgr.streamsToConvert[converterName], indexes, releaser)
+		go mgr.convertStreamJob(converter, mgr.streamsToConvert[converterName].Copy(), indexes, releaser)
 	}
 }
 
-func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.LongBitmask, indexes []*index.Reader, releaser indexReleaser) {
+func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, streamIDs bitmask.LongBitmask, indexes []*index.Reader, releaser indexReleaser) {
 	convertedStreamIDs, err := func() (bitmask.LongBitmask, error) {
-		converter, ok := mgr.converters[converterName]
-		if !ok {
-			return bitmask.LongBitmask{}, fmt.Errorf("unknown converter %q", converterName)
-		}
-
 		errorChannels := make([]chan error, converters.MAX_PROCESS_COUNT)
 		resultChannels := make([]chan uint64, converters.MAX_PROCESS_COUNT)
 		convertedCount := uint64(0)
 	outer:
-		for _, index := range indexes {
-			streamID := uint(0)
+		for idxIdx := len(indexes) - 1; idxIdx >= 0; idxIdx-- {
+			index := indexes[idxIdx]
+			streamID := index.MinStreamID()
 			for {
-				zeros := streamIDs.TrailingZerosFrom(streamID)
+				zeros := streamIDs.TrailingZerosFrom(uint(streamID))
 				if zeros < 0 {
 					break
 				}
-				streamID += uint(zeros)
-				if uint64(streamID) < index.MinStreamID() {
-					streamID++
-					continue
-				}
-				if uint64(streamID) > index.MaxStreamID() {
+				streamID += uint64(zeros)
+				if streamID > index.MaxStreamID() {
 					break
 				}
-				stream, err := index.StreamByID(uint64(streamID))
+				stream, err := index.StreamByID(streamID)
 				streamID++
 				if err != nil {
 					return bitmask.LongBitmask{}, err
@@ -1041,6 +1038,8 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 					close(resultChannels[id])
 				}(convertedCount)
 
+				streamIDs.Unset(uint(streamID))
+
 				// Only convert X streams at a time
 				convertedCount++
 				if convertedCount == converters.MAX_PROCESS_COUNT {
@@ -1067,7 +1066,6 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 				continue
 			}
 			convertedStreamIDs.Set(uint(streamID))
-			streamIDs.Unset(uint(streamID))
 		}
 		return convertedStreamIDs, lastError
 	}()
@@ -1077,8 +1075,16 @@ func (mgr *Manager) convertStreamJob(converterName string, streamIDs bitmask.Lon
 	}
 
 	mgr.jobs <- func() {
-		mgr.converterJobRunning[converterName] = false
-		mgr.streamsToConvert[converterName].Sub(convertedStreamIDs)
+		// The converter was removed while we were running.
+		// Discard the result.
+		if _, ok := mgr.converters[converter.Name()]; !ok {
+			converter.Reset()
+			releaser.release(mgr)
+			return
+		}
+
+		mgr.converterJobRunning[converter.Name()] = false
+		mgr.streamsToConvert[converter.Name()].Sub(convertedStreamIDs)
 		// Mark the converted streams as uncertain on all tags using a data: filter
 		// The tag could match on the converted data now.
 		for _, tag := range mgr.tags {
@@ -1151,7 +1157,7 @@ func (mgr *Manager) addConverterInternal(path string) error {
 
 	converter, err := converters.NewCache(name, path, mgr.IndexDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("error: failed to create converter %s: %w", name, err)
 	}
 	mgr.converters[name] = converter
 	mgr.converterJobRunning[name] = false
@@ -1303,11 +1309,15 @@ func (v *View) fetch() error {
 		return nil
 	}
 	v.tagDetails = make(map[string]query.TagDetails)
+	v.converters = make(map[string]index.ConverterAccess)
 	c := make(chan error)
 	v.mgr.jobs <- func() {
 		v.indexes, v.releaser = v.mgr.getIndexesCopy(0)
 		for tn, ti := range v.mgr.tags {
 			v.tagDetails[tn] = ti.TagDetails
+		}
+		for converterName, converter := range v.mgr.converters {
+			v.converters[converterName] = converter
 		}
 		c <- nil
 		close(c)
@@ -1400,7 +1410,7 @@ func (v *View) prefetchTags(tags []string, bm bitmask.LongBitmask) error {
 					continue outer
 				}
 			}
-			matches, _, err := index.SearchStreams(v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails)
+			matches, _, err := index.SearchStreams(v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters)
 			if err != nil {
 				return err
 			}
@@ -1472,7 +1482,7 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 		limit = *filter.Limit
 	}
 	offset := opts.page * limit
-	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails)
+	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters)
 	if err != nil {
 		return false, 0, err
 	}

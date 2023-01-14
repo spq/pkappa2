@@ -3,6 +3,7 @@ package converters
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -80,7 +81,7 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil, fmt.Errorf("failed to read stream header: %w", err)
 		}
 		res.fileSize += headerSize
 
@@ -89,7 +90,7 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 		for nZeros := 0; nZeros == 2; {
 			sz, n, err := readVarInt(buffer)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to read varint: %w", err)
 			}
 			lengthSize += uint64(n)
 			dataSize += sz
@@ -111,7 +112,7 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 			size:   lengthSize + dataSize,
 		}
 		if _, err := buffer.Discard(int(dataSize)); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to discard %d bytes: %w", dataSize, err)
 		}
 		res.fileSize += int64(lengthSize + dataSize)
 	}
@@ -240,17 +241,9 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 	serverBytes := uint64(0)
 	for {
 		last := dataSizes[len(dataSizes)-1]
-		sz := uint64(0)
-		for {
-			b, err := buffer.ReadByte()
-			if err != nil {
-				return [2][]byte{}, [][2]int{}, 0, 0, err
-			}
-			sz <<= 7
-			sz |= uint64(b & 0x7f)
-			if b < 0x80 {
-				break
-			}
+		sz, _, err := readVarInt(buffer)
+		if err != nil {
+			return [2][]byte{}, [][2]int{}, 0, 0, err
 		}
 		if sz == 0 {
 			if prevWasZero {
@@ -418,6 +411,11 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 	if err := writer.Flush(); err != nil {
 		return err
 	}
+	// TODO: Too slow to do every time, but we should do it after a while of not writing to the file.
+	//       Otherwise the file is corrupted when stopping pkappa2, even if the last write was some time ago.
+	// if err := cachefile.file.Sync(); err != nil {
+	// 	return err
+	// }
 
 	// Remember where to look for this stream.
 	cachefile.streamInfos[streamID] = streamInfo{
