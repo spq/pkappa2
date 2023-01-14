@@ -2,6 +2,7 @@ import Vue from 'vue';
 import VueRouter from 'vue-router';
 
 import Base from './components/Base';
+import Converters from './components/Converters';
 import Home from './components/Home';
 import Status from './components/Status';
 import Pcaps from './components/Pcaps';
@@ -38,6 +39,11 @@ export default new VueRouter({
                     path: 'tags',
                     name: 'tags',
                     component: Tags,
+                },
+                {
+                    path: 'converters',
+                    name: 'converters',
+                    component: Converters,
                 },
                 {
                     path: 'graph',

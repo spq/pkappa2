@@ -171,6 +171,18 @@
           <v-list-item-title>Manage Tags</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+      <v-list-item
+        link
+        dense
+        exact
+        :to="{
+          name: 'converters',
+        }"
+      >
+        <v-list-item-content>
+          <v-list-item-title>Manage Converters</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
     </v-list-group>
   </v-list>
 </template>

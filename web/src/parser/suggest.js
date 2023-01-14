@@ -36,7 +36,7 @@ export default function suggest(query, cursorOffset, groupedTags, converters) {
         const text = targetElem['converter']['text'];
         const start = targetElem['converter']['col'];
         const end = start + (text?.length ?? 0) - 1;
-        const suggestions = converters.filter((c) => null == value || (c.startsWith(value) && c !== value));
+        const suggestions = converters.filter((c) => null == value || (c.Name.startsWith(value) && c.Name !== value));
         return {
             suggestions,
             start,

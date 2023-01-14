@@ -38,7 +38,6 @@ type (
 	ProcessStats struct {
 		Running  bool
 		ExitCode int
-		Stderr   []string
 	}
 	// JSON Protocol
 	converterStreamMetadata struct {
@@ -88,8 +87,7 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 	for process := range converter.started_processes {
 		output = append(output, ProcessStats{
 			Running:  true,
-			ExitCode: 0,
-			Stderr:   process.Stderr(),
+			ExitCode: process.ExitCode(),
 		})
 	}
 	// Keep stderr and exitcode of processes that have exited.
@@ -97,8 +95,21 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 		output = append(output, ProcessStats{
 			Running:  false,
 			ExitCode: process.ExitCode(),
-			Stderr:   process.Stderr(),
 		})
+	}
+	return output
+}
+
+func (converter *Converter) Stderrs() [][]string {
+	converter.mutex.Lock()
+	defer converter.mutex.Unlock()
+
+	output := [][]string{}
+	for process := range converter.started_processes {
+		output = append(output, process.Stderr())
+	}
+	for _, process := range converter.failed_processes {
+		output = append(output, process.Stderr())
 	}
 	return output
 }

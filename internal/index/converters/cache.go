@@ -12,7 +12,7 @@ type (
 		converter *Converter
 		cacheFile *cacheFile
 	}
-	Stats struct {
+	Statistics struct {
 		Name              string
 		CachedStreamCount uint64
 		Processes         []ProcessStats
@@ -38,12 +38,16 @@ func (cache *CachedConverter) Name() string {
 	return cache.converter.Name()
 }
 
-func (cache *CachedConverter) Stats() *Stats {
-	return &Stats{
+func (cache *CachedConverter) Statistics() *Statistics {
+	return &Statistics{
 		Name:              cache.converter.Name(),
 		CachedStreamCount: cache.cacheFile.StreamCount(),
 		Processes:         cache.converter.ProcessStats(),
 	}
+}
+
+func (cache *CachedConverter) Stderrs() [][]string {
+	return cache.converter.Stderrs()
 }
 
 func (cache *CachedConverter) Reset() error {

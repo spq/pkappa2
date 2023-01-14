@@ -17,9 +17,9 @@
           <v-card-text>
             <v-checkbox
               v-for="converter in converters"
-              :key="converter"
-              :label="converter"
-              :value="converter"
+              :key="converter.Name"
+              :label="converter.Name"
+              :value="converter.Name"
               v-model="checkedConverters"
             ></v-checkbox>
           </v-card-text>
@@ -78,9 +78,7 @@
         this.getConvertersFromTag();
       },
       getConvertersFromTag() {
-        this.checkedConverters = this.tag.Converters.concat()
-          .filter((converter) => converter !== ""); // TODO: REMOVE FIX FOR BACKEND
-        console.log(this.checkedConverters, this.tag);
+        this.checkedConverters = this.tag.Converters.concat();
       },
       submitTagConverters() {
         this.loading = true;

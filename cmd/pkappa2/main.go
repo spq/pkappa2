@@ -232,11 +232,11 @@ func main() {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
-	rUser.Get("/api/converters/{name:.+}", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Get("/api/converters/stderr/{name:.+}", func(w http.ResponseWriter, r *http.Request) {
 		name := chi.URLParam(r, "name")
-		converterDetails, err := mgr.ConverterDetails(name)
+		converterDetails, err := mgr.ConverterStderr(name)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("get converter details failed: %v", err), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("get converter stderr failed: %v", err), http.StatusBadRequest)
 			return
 		}
 

@@ -675,20 +675,6 @@ func (mgr *Manager) KnownPcaps() []pcapmetadata.PcapInfo {
 	return res
 }
 
-func (mgr *Manager) ListConverters() []string {
-	c := make(chan []string)
-	mgr.jobs <- func() {
-		r := []string{}
-		for _, converter := range mgr.converters {
-			r = append(r, converter.Name())
-		}
-		c <- r
-		close(c)
-	}
-	res := <-c
-	return res
-}
-
 func (mgr *Manager) ListTags() []TagInfo {
 	c := make(chan []TagInfo)
 	mgr.jobs <- func() {
@@ -1292,12 +1278,20 @@ func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *
 	return nil
 }
 
-func (mgr *Manager) ConverterDetails(converterName string) (*converters.Stats, error) {
+func (mgr *Manager) ListConverters() []*converters.Statistics {
+	stats := make([]*converters.Statistics, 0, len(mgr.converters))
+	for _, c := range mgr.converters {
+		stats = append(stats, c.Statistics())
+	}
+	return stats
+}
+
+func (mgr *Manager) ConverterStderr(converterName string) ([][]string, error) {
 	converter, ok := mgr.converters[converterName]
 	if !ok {
 		return nil, fmt.Errorf("error: converter %s does not exist", converterName)
 	}
-	return converter.Stats(), nil
+	return converter.Stderrs(), nil
 }
 
 func (mgr *Manager) GetView() View {
