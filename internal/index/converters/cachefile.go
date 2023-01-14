@@ -128,6 +128,18 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 	return &res, nil
 }
 
+func (cachefile *cacheFile) Close() error {
+	cachefile.rwmutex.Lock()
+	// Don't unlock the mutex here, because we don't want to allow any other
+	// operations on the file after closing it.
+
+	if err := cachefile.file.Sync(); err != nil {
+		return err
+	}
+
+	return cachefile.file.Close()
+}
+
 func (cachefile *cacheFile) StreamCount() uint64 {
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
@@ -411,11 +423,6 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 	if err := writer.Flush(); err != nil {
 		return err
 	}
-	// TODO: Too slow to do every time, but we should do it after a while of not writing to the file.
-	//       Otherwise the file is corrupted when stopping pkappa2, even if the last write was some time ago.
-	// if err := cachefile.file.Sync(); err != nil {
-	// 	return err
-	// }
 
 	// Remember where to look for this stream.
 	cachefile.streamInfos[streamID] = streamInfo{

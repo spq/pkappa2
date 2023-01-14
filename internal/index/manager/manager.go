@@ -335,8 +335,20 @@ func (t tag) converterNames() []string {
 
 func (mgr *Manager) Close() {
 	if mgr.watcher != nil {
-		mgr.watcher.Close()
+		if err := mgr.watcher.Close(); err != nil {
+			log.Printf("Failed to close watcher: %v", err)
+		}
 	}
+	c := make(chan struct{})
+	mgr.jobs <- func() {
+		for _, converter := range mgr.converters {
+			if err := converter.Close(); err != nil {
+				log.Printf("Failed to close converter %q: %v", converter.Name(), err)
+			}
+		}
+		close(c)
+	}
+	<-c
 }
 
 func (mgr *Manager) saveState() error {
@@ -1210,6 +1222,7 @@ func (mgr *Manager) removeConverter(path string) error {
 }
 
 func (mgr *Manager) restartConverterProcess(path string) error {
+	log.Printf("restarting converter %s", path)
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
@@ -1218,16 +1231,18 @@ func (mgr *Manager) restartConverterProcess(path string) error {
 			if !ok {
 				return fmt.Errorf("error: converter %s does not exist, cannot restart", name)
 			}
+			log.Printf("in job: restarting converter %s", name)
 			// Stop the process if it is running and restart it
 			if err := converter.Reset(); err != nil {
 				return err
 			}
-
+			log.Printf("in job: restarted converter %s", name)
 			return nil
 		}()
 		c <- err
 		close(c)
 	}
+	log.Printf("after job: restarted converter %s", path)
 	return <-c
 }
 

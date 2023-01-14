@@ -34,6 +34,10 @@ func NewCache(converterName, executablePath, indexCachePath string) (*CachedConv
 	}, nil
 }
 
+func (cache *CachedConverter) Close() error {
+	return cache.cacheFile.Close()
+}
+
 func (cache *CachedConverter) Name() string {
 	return cache.converter.Name()
 }

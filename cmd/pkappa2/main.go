@@ -8,10 +8,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -55,6 +57,15 @@ func main() {
 		log.Fatalf("manager.New failed: %v", err)
 	}
 	defer mgr.Close()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-signals
+		log.Println("Interrupt received. Cleaning up...")
+		mgr.Close()
+		os.Exit(1)
+	}()
 
 	var server *http.Server
 
