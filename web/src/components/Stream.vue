@@ -414,7 +414,7 @@ export default {
     ...mapActions(["fetchStream", "markTagAdd", "markTagDel"]),
     changeConverter(converter) {
       this.$router.push({
-        query: { converter },
+        query: { converter, q: this.$route.query.q, p: this.$route.query.p },
       });
     },
     fetchStreamForId() {
