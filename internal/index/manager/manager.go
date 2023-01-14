@@ -162,7 +162,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		if entry.IsDir() {
 			continue
 		}
-		if err := mgr.addConverterInternal(filepath.Join(mgr.ConverterDir, entry.Name())); err != nil {
+		if err := mgr.addConverter(filepath.Join(mgr.ConverterDir, entry.Name())); err != nil {
 			return nil, fmt.Errorf("failed to add converter %q: %w", entry.Name(), err)
 		}
 	}
@@ -1150,7 +1150,7 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 	}
 }
 
-func (mgr *Manager) addConverterInternal(path string) error {
+func (mgr *Manager) addConverter(path string) error {
 	err := unix.Access(path, unix.X_OK)
 	if err != nil {
 		return fmt.Errorf("error: converter %s is not executable", path)
@@ -1177,48 +1177,30 @@ func (mgr *Manager) addConverterInternal(path string) error {
 	return nil
 }
 
-func (mgr *Manager) addConverter(path string) error {
-	c := make(chan error)
-	mgr.jobs <- func() {
-		err := mgr.addConverterInternal(path)
-		c <- err
-		close(c)
-	}
-	return <-c
-}
-
 func (mgr *Manager) removeConverter(path string) error {
-	c := make(chan error)
-	mgr.jobs <- func() {
-		err := func() error {
-			name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-			converter, ok := mgr.converters[name]
-			if !ok {
-				return fmt.Errorf("error: converter %s does not exist", name)
-			}
-
-			// remove converter from all tags
-			for _, t := range mgr.tags {
-				if err := mgr.detachConverterFromTag(t, name, converter); err != nil {
-					return err
-				}
-			}
-
-			// Stop the process if it is running and delete the cache file.
-			if err := converter.Reset(); err != nil {
-				return err
-			}
-
-			delete(mgr.converters, name)
-			delete(mgr.converterJobRunning, name)
-			delete(mgr.streamsToConvert, name)
-			return nil
-		}()
-		c <- err
-		close(c)
-		mgr.saveState()
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	converter, ok := mgr.converters[name]
+	if !ok {
+		return fmt.Errorf("error: converter %s does not exist", name)
 	}
-	return <-c
+
+	// remove converter from all tags
+	for _, t := range mgr.tags {
+		if err := mgr.detachConverterFromTag(t, name, converter); err != nil {
+			return err
+		}
+	}
+
+	// Stop the process if it is running and delete the cache file.
+	if err := converter.Reset(); err != nil {
+		return err
+	}
+
+	delete(mgr.converters, name)
+	delete(mgr.converterJobRunning, name)
+	delete(mgr.streamsToConvert, name)
+	mgr.saveState()
+	return nil
 }
 
 func (mgr *Manager) restartConverterProcess(path string) error {
