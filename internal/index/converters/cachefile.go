@@ -17,9 +17,10 @@ type (
 		cachePath string
 		rwmutex   sync.RWMutex
 		fileSize  int64
+		freeSize  int64
+		freeStart int64
 
-		// Map of streamid to file offset in the cache file.
-		containedStreamIds map[uint64]streamInfo
+		streamInfos map[uint64]streamInfo
 	}
 
 	streamInfo struct {
@@ -34,8 +35,30 @@ type (
 )
 
 const (
-	InvalidStreamID = ^uint64(0)
+	headerSize = int64(unsafe.Sizeof(converterStreamSection{}))
+
+	// cleanup if at least 16 MiB are free and at least 50%
+	cleanupMinFreeSize   = 16 * 1024 * 1024
+	cleanupMinFreeFactor = 0.5
 )
+
+func readVarInt(r io.ByteReader) (uint64, int, error) {
+	bytes := 0
+	result := uint64(0)
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return 0, 0, err
+		}
+		bytes++
+		result <<= 7
+		result |= uint64(b & 0x7f)
+		if b < 0x80 {
+			break
+		}
+	}
+	return result, bytes, nil
+}
 
 func NewCacheFile(cachePath string) (*cacheFile, error) {
 	file, err := os.OpenFile(cachePath, os.O_CREATE|os.O_RDWR, 0644)
@@ -43,11 +66,15 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 		return nil, err
 	}
 
+	res := cacheFile{
+		file:        file,
+		cachePath:   cachePath,
+		streamInfos: map[uint64]streamInfo{},
+	}
+
 	// Read all stream ids
-	containedStreamIds := make(map[uint64]streamInfo)
-	buffer := bufio.NewReader(file)
-	offset := int64(0)
-	for {
+	// format: [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
+	for buffer := bufio.NewReader(file); ; {
 		streamSection := converterStreamSection{}
 		if err := binary.Read(buffer, binary.LittleEndian, &streamSection); err != nil {
 			if err == io.EOF {
@@ -55,42 +82,41 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 			}
 			return nil, err
 		}
-		offset += int64(unsafe.Sizeof(streamSection))
+		res.fileSize += headerSize
 
 		// Read total data size of the stream by adding all chunk sizes up.
-		prevWasZero := false
-		dataSize := uint64(0)
-		for {
-			sz := uint64(0)
-			for {
-				b, err := buffer.ReadByte()
-				if err != nil {
-					return nil, err
-				}
-				dataSize++
-				sz <<= 7
-				sz |= uint64(b & 0x7f)
-				if b < 0x80 {
-					break
-				}
+		lengthSize, dataSize := uint64(0), uint64(0)
+		for nZeros := 0; nZeros == 2; {
+			sz, n, err := readVarInt(buffer)
+			if err != nil {
+				return nil, err
 			}
-			if sz == 0 && prevWasZero {
-				break
-			}
+			lengthSize += uint64(n)
 			dataSize += sz
-			prevWasZero = sz == 0
+			if sz != 0 {
+				nZeros = 0
+			} else {
+				nZeros++
+			}
 		}
 
-		if streamSection.StreamID != InvalidStreamID {
-			containedStreamIds[streamSection.StreamID] = streamInfo{
-				offset: offset,
-				size:   dataSize,
+		if info, ok := res.streamInfos[streamSection.StreamID]; ok {
+			if res.freeSize == 0 || res.freeStart > info.offset-headerSize {
+				res.freeStart = info.offset - headerSize
 			}
+			res.freeSize += headerSize + int64(info.size)
+		}
+		res.streamInfos[streamSection.StreamID] = streamInfo{
+			offset: res.fileSize,
+			size:   lengthSize + dataSize,
 		}
 		if _, err := buffer.Discard(int(dataSize)); err != nil {
 			return nil, err
 		}
-		offset += int64(dataSize)
+		res.fileSize += int64(lengthSize + dataSize)
+	}
+	if res.freeSize == 0 {
+		res.freeStart = res.fileSize
 	}
 
 	// Keep the file pointer at the end of the file.
@@ -98,12 +124,7 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 		return nil, err
 	}
 
-	return &cacheFile{
-		file:               file,
-		cachePath:          cachePath,
-		containedStreamIds: containedStreamIds,
-		fileSize:           offset,
-	}, nil
+	return &res, nil
 }
 
 func (cachefile *cacheFile) Reset() error {
@@ -113,8 +134,10 @@ func (cachefile *cacheFile) Reset() error {
 	if err := cachefile.file.Truncate(0); err != nil {
 		return err
 	}
-	cachefile.containedStreamIds = make(map[uint64]streamInfo)
+	cachefile.streamInfos = map[uint64]streamInfo{}
+	cachefile.freeSize = 0
 	cachefile.fileSize = 0
+	cachefile.freeStart = 0
 	return nil
 }
 
@@ -122,7 +145,7 @@ func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64,
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
 
-	info, ok := cachefile.containedStreamIds[streamID]
+	info, ok := cachefile.streamInfos[streamID]
 	if !ok {
 		return nil, 0, 0, nil
 	}
@@ -139,40 +162,27 @@ func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64,
 	dataSizes := []sizeAndDirection{}
 	prevWasZero := false
 	direction := index.DirectionClientToServer
-	clientBytes := uint64(0)
-	serverBytes := uint64(0)
+	bytes := [2]uint64{0, 0}
 	for {
-		sz := uint64(0)
-		for {
-			b, err := buffer.ReadByte()
-			if err != nil {
-				return nil, 0, 0, err
-			}
-			sz <<= 7
-			sz |= uint64(b & 0x7f)
-			if b < 0x80 {
-				break
-			}
+		sz, _, err := readVarInt(buffer)
+		if err != nil {
+			return nil, 0, 0, err
 		}
 		if sz == 0 && prevWasZero {
 			break
 		}
 		dataSizes = append(dataSizes, sizeAndDirection{Direction: direction, Size: sz})
 		prevWasZero = sz == 0
-		if direction == index.DirectionClientToServer {
-			clientBytes += sz
-		} else {
-			serverBytes += sz
-		}
+		bytes[direction] += sz
 		direction = direction.Reverse()
 	}
 
 	// Read data
-	clientData := make([]byte, clientBytes)
+	clientData := make([]byte, bytes[index.DirectionClientToServer])
 	if _, err := io.ReadFull(buffer, clientData); err != nil {
 		return nil, 0, 0, err
 	}
-	serverData := make([]byte, serverBytes)
+	serverData := make([]byte, bytes[index.DirectionServerToClient])
 	if _, err := io.ReadFull(buffer, serverData); err != nil {
 		return nil, 0, 0, err
 	}
@@ -195,15 +205,75 @@ func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64,
 			Content:   bytes,
 		})
 	}
-	return data, clientBytes, serverBytes, nil
+	return data, bytes[index.DirectionClientToServer], bytes[index.DirectionServerToClient], nil
 }
 
 func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Data) error {
 	cachefile.rwmutex.Lock()
 	defer cachefile.rwmutex.Unlock()
 
+	if info, ok := cachefile.streamInfos[streamID]; ok {
+		cachefile.freeSize += int64(info.size) + headerSize
+		if cachefile.freeStart > info.offset-headerSize {
+			cachefile.freeStart = info.offset - headerSize
+		}
+		if cachefile.freeSize >= cleanupMinFreeSize && cachefile.freeSize >= int64(float64(cachefile.fileSize)*cleanupMinFreeFactor) {
+			delete(cachefile.streamInfos, streamID)
+			// cleanup the file
+			if _, err := cachefile.file.Seek(cachefile.freeStart, io.SeekStart); err != nil {
+				return err
+			}
+
+			reader := bufio.NewReader(io.NewSectionReader(cachefile.file, cachefile.freeStart, cachefile.fileSize-cachefile.freeStart))
+			writer := bufio.NewWriter(cachefile.file)
+
+			header := converterStreamSection{}
+			for pos := cachefile.freeStart; ; {
+				if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
+					if err == io.EOF {
+						break
+					}
+					return err
+				}
+				pos += headerSize
+				if info := cachefile.streamInfos[streamID]; info.offset == pos {
+					if err := binary.Write(writer, binary.LittleEndian, header); err != nil {
+						return err
+					}
+					if _, err := io.CopyN(writer, reader, int64(info.size)); err != nil {
+						return err
+					}
+					pos += int64(info.size)
+					continue
+				}
+				dataSize := 0
+				for nZeros := 0; nZeros != 2; {
+					sz, n, err := readVarInt(reader)
+					if err != nil {
+						return err
+					}
+					dataSize += int(sz)
+					pos += int64(n)
+					if sz != 0 {
+						nZeros = 0
+					} else {
+						nZeros++
+					}
+				}
+				if _, err := reader.Discard(dataSize); err != nil {
+					return err
+				}
+				pos += int64(dataSize)
+			}
+
+			if err := cachefile.file.Truncate(cachefile.fileSize); err != nil {
+				return err
+			}
+			cachefile.freeSize = 0
+		}
+	}
+
 	writer := bufio.NewWriter(cachefile.file)
-	// [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
 	// Write stream header
 	streamSection := converterStreamSection{
 		StreamID: streamID,
@@ -270,12 +340,15 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 	}
 
 	// Remember where to look for this stream.
-	cachefile.containedStreamIds[streamID] = streamInfo{
-		offset: cachefile.fileSize + int64(unsafe.Sizeof(streamSection)),
+	cachefile.streamInfos[streamID] = streamInfo{
+		offset: cachefile.fileSize + headerSize,
 		size:   streamSize,
 	}
 
-	cachefile.fileSize += int64(unsafe.Sizeof(streamSection)) + int64(streamSize)
+	if cachefile.freeStart == cachefile.fileSize {
+		cachefile.freeStart += headerSize + int64(streamSize)
+	}
+	cachefile.fileSize += headerSize + int64(streamSize)
 
 	return nil
 }
