@@ -30,7 +30,8 @@ type (
 		size        uint64
 	}
 
-	// File format
+	// File format:
+	// [u64 stream id] [u64 packet count] [u8 varint chunk sizes] [client data] [server data]
 	converterStreamSection struct {
 		StreamID    uint64
 		PacketCount uint64
@@ -76,7 +77,6 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 	}
 
 	// Read all stream ids
-	// format: [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
 	for buffer := bufio.NewReader(file); ; {
 		streamSection := converterStreamSection{}
 		if err := binary.Read(buffer, binary.LittleEndian, &streamSection); err != nil {
@@ -169,7 +169,6 @@ func (cachefile *cacheFile) Data(streamID, packetCount uint64) ([]index.Data, ui
 		return nil, 0, 0, nil
 	}
 
-	// [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
 	buffer := bufio.NewReader(io.NewSectionReader(cachefile.file, info.offset, int64(info.size)))
 	data := []index.Data{}
 
@@ -231,7 +230,6 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
 
-	// [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
 	info, ok := cachefile.streamInfos[streamID]
 	if !ok {
 		return [2][]byte{}, [][2]int{}, 0, 0, fmt.Errorf("stream %d not found in %s", streamID, cachefile.file.Name())
