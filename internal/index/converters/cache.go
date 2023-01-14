@@ -59,12 +59,12 @@ func (cache *CachedConverter) Reset() error {
 }
 
 func (cache *CachedConverter) Contains(stream *index.Stream) bool {
-	return cache.cacheFile.Contains(stream.ID(), uint64(stream.Reader().PacketCount()))
+	return cache.cacheFile.Contains(stream.ID())
 }
 
 func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, clientBytes, serverBytes uint64, err error) {
 	// See if the stream data is cached already.
-	data, clientBytes, serverBytes, err = cache.cacheFile.Data(stream.ID(), uint64(stream.Reader().PacketCount()))
+	data, clientBytes, serverBytes, err = cache.cacheFile.Data(stream.ID())
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -79,7 +79,7 @@ func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, cli
 	}
 
 	// Save it to the cache.
-	if err := cache.cacheFile.SetData(stream.ID(), uint64(stream.Reader().PacketCount()), convertedPackets); err != nil {
+	if err := cache.cacheFile.SetData(stream.ID(), convertedPackets); err != nil {
 		return nil, 0, 0, err
 	}
 	return convertedPackets, clientBytes, serverBytes, nil

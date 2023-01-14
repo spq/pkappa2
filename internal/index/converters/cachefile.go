@@ -3,7 +3,6 @@ package converters
 import (
 	"bufio"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -25,16 +24,14 @@ type (
 	}
 
 	streamInfo struct {
-		packetCount uint64
-		offset      int64
-		size        uint64
+		offset int64
+		size   uint64
 	}
 
 	// File format:
-	// [u64 stream id] [u64 packet count] [u8 varint chunk sizes] [client data] [server data]
+	// [u64 stream id] [u8 varint chunk sizes] [client data] [server data]
 	converterStreamSection struct {
-		StreamID    uint64
-		PacketCount uint64
+		StreamID uint64
 	}
 )
 
@@ -110,9 +107,8 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 			res.freeSize += headerSize + int64(info.size)
 		}
 		res.streamInfos[streamSection.StreamID] = streamInfo{
-			offset:      res.fileSize,
-			size:        lengthSize + dataSize,
-			packetCount: streamSection.PacketCount,
+			offset: res.fileSize,
+			size:   lengthSize + dataSize,
 		}
 		if _, err := buffer.Discard(int(dataSize)); err != nil {
 			return nil, err
@@ -152,20 +148,20 @@ func (cachefile *cacheFile) Reset() error {
 	return nil
 }
 
-func (cachefile *cacheFile) Contains(streamID, packetCount uint64) bool {
+func (cachefile *cacheFile) Contains(streamID uint64) bool {
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
 
-	info, ok := cachefile.streamInfos[streamID]
-	return ok && info.packetCount == packetCount
+	_, ok := cachefile.streamInfos[streamID]
+	return ok
 }
 
-func (cachefile *cacheFile) Data(streamID, packetCount uint64) ([]index.Data, uint64, uint64, error) {
+func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64, error) {
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
 
 	info, ok := cachefile.streamInfos[streamID]
-	if !ok || info.packetCount != packetCount {
+	if !ok {
 		return nil, 0, 0, nil
 	}
 
@@ -232,7 +228,7 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 
 	info, ok := cachefile.streamInfos[streamID]
 	if !ok {
-		return [2][]byte{}, [][2]int{}, 0, 0, fmt.Errorf("stream %d not found in %s", streamID, cachefile.file.Name())
+		return [2][]byte{}, [][2]int{}, 0, 0, nil
 	}
 	buffer := bufio.NewReader(io.NewSectionReader(cachefile.file, info.offset, int64(info.size)))
 
@@ -292,7 +288,7 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 	return [2][]byte{clientData, serverData}, dataSizes, clientBytes, serverBytes, nil
 }
 
-func (cachefile *cacheFile) SetData(streamID, packetCount uint64, convertedPackets []index.Data) error {
+func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Data) error {
 	cachefile.rwmutex.Lock()
 	defer cachefile.rwmutex.Unlock()
 
@@ -360,8 +356,7 @@ func (cachefile *cacheFile) SetData(streamID, packetCount uint64, convertedPacke
 	writer := bufio.NewWriter(cachefile.file)
 	// Write stream header
 	streamSection := converterStreamSection{
-		StreamID:    streamID,
-		PacketCount: packetCount,
+		StreamID: streamID,
 	}
 	if err := binary.Write(writer, binary.LittleEndian, &streamSection); err != nil {
 		return err
@@ -426,9 +421,8 @@ func (cachefile *cacheFile) SetData(streamID, packetCount uint64, convertedPacke
 
 	// Remember where to look for this stream.
 	cachefile.streamInfos[streamID] = streamInfo{
-		packetCount: packetCount,
-		offset:      cachefile.fileSize + int64(unsafe.Sizeof(streamSection)),
-		size:        streamSize,
+		offset: cachefile.fileSize + int64(unsafe.Sizeof(streamSection)),
+		size:   streamSize,
 	}
 
 	if cachefile.freeStart == cachefile.fileSize {
