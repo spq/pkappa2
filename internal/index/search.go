@@ -1193,7 +1193,6 @@ conditions:
 				bufferLengths := [][2]int{{}}
 
 				if converterName == "none" {
-					// TODO: search all converter output as well
 					streamLength[C2S] = int(s.ClientBytes)
 					streamLength[S2C] = int(s.ServerBytes)
 

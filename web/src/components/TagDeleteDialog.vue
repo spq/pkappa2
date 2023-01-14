@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="visible" width="500" @keydown="deleteTag">
+  <v-dialog v-model="visible" width="500" @keydown.enter="deleteTag">
     <v-form>
       <v-card>
         <v-card-title>
