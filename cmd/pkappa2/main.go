@@ -232,6 +232,19 @@ func main() {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
+	rUser.Get("/api/converters/{name:.+}", func(w http.ResponseWriter, r *http.Request) {
+		name := chi.URLParam(r, "name")
+		converterDetails, err := mgr.ConverterDetails(name)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("get converter details failed: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(converterDetails); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
 	rUser.Get(`/api/download/{stream:\d+}.pcap`, func(w http.ResponseWriter, r *http.Request) {
 		streamIDStr := chi.URLParam(r, "stream")
 		streamID, err := strconv.ParseUint(streamIDStr, 10, 64)
@@ -365,6 +378,7 @@ func main() {
 			http.Error(w, fmt.Sprintf("AllTags() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+		// TODO: Send correct ClientBytes and ServerBytes when sending converter output.
 		response := struct {
 			Stream          *index.Stream
 			Data            []index.Data

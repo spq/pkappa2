@@ -263,6 +263,10 @@ func (r *Reader) maxStream(lookup section) (*stream, error) {
 	return r.streamByIndex(i)
 }
 
+func (r *Reader) MinStreamID() uint64 {
+	return r.packetID.min
+}
+
 func (r *Reader) MaxStreamID() uint64 {
 	return r.packetID.max
 }

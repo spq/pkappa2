@@ -16,14 +16,29 @@ const (
 
 type (
 	Converter struct {
-		executablePath        string
-		name                  string
-		started_process_count int
-		reset_epoch           int
-		rwmutex               sync.RWMutex
-		mutex                 sync.Mutex
-		signal                chan struct{}
-		available_processes   []*Process
+		executablePath string
+		name           string
+		// Keep track of when a process was claimed by a stream.
+		// If the epoch changed since the process was claimed, the process is no longer valid.
+		reset_epoch int
+		// Used by Reset to stop new processes from starting while resetting is in process.
+		rwmutex sync.RWMutex
+		// Synchronizes access to the `started_processes` and `available_processes` members
+		mutex sync.Mutex
+		// Used to signal waiting Data() calls that a process is available.
+		// reserveProcess() waits on this channel when all processes are in use.
+		signal chan struct{}
+		// All processes started for this converter.
+		started_processes map[*Process]bool
+		// Processes that are currently idle.
+		available_processes []*Process
+		// Processes that died unexpectedly.
+		failed_processes []*Process
+	}
+	ProcessStats struct {
+		Running  bool
+		ExitCode int
+		Stderr   []string
 	}
 	// JSON Protocol
 	converterStreamMetadata struct {
@@ -52,9 +67,10 @@ var (
 
 func New(converterName, executablePath string) *Converter {
 	converter := Converter{
-		executablePath: executablePath,
-		name:           converterName,
-		signal:         make(chan struct{}),
+		executablePath:    executablePath,
+		name:              converterName,
+		signal:            make(chan struct{}),
+		started_processes: make(map[*Process]bool),
 	}
 
 	return &converter
@@ -62,6 +78,29 @@ func New(converterName, executablePath string) *Converter {
 
 func (converter *Converter) Name() string {
 	return converter.name
+}
+
+func (converter *Converter) ProcessStats() []ProcessStats {
+	converter.mutex.Lock()
+	defer converter.mutex.Unlock()
+
+	output := []ProcessStats{}
+	for process := range converter.started_processes {
+		output = append(output, ProcessStats{
+			Running:  true,
+			ExitCode: 0,
+			Stderr:   process.Stderr(),
+		})
+	}
+	// Keep stderr and exitcode of processes that have exited.
+	for _, process := range converter.failed_processes {
+		output = append(output, ProcessStats{
+			Running:  false,
+			ExitCode: process.ExitCode(),
+			Stderr:   process.Stderr(),
+		})
+	}
+	return output
 }
 
 // Stop the converter process.
@@ -75,7 +114,7 @@ func (converter *Converter) Reset() {
 	// Kill all currently idle processes.
 	for _, process := range converter.available_processes {
 		close(process.input)
-		converter.started_process_count--
+		delete(converter.started_processes, process)
 		// Tell any waiting Data call to start a new process.
 		select {
 		case converter.signal <- struct{}{}:
@@ -83,7 +122,6 @@ func (converter *Converter) Reset() {
 		}
 	}
 	converter.available_processes = nil
-
 }
 
 func (converter *Converter) reserveProcess() (*Process, int) {
@@ -102,9 +140,9 @@ func (converter *Converter) reserveProcess() (*Process, int) {
 			return process, converter.reset_epoch
 		}
 
-		if converter.started_process_count < MAX_PROCESS_COUNT {
+		if len(converter.started_processes) < MAX_PROCESS_COUNT {
 			process := NewProcess(converter.name, converter.executablePath)
-			converter.started_process_count++
+			converter.started_processes[process] = true
 			return process, converter.reset_epoch
 		}
 
@@ -136,7 +174,10 @@ func (converter *Converter) releaseProcess(process *Process, reset_epoch int) {
 		// Drain the output until the process exits.
 		for range process.output {
 		}
-		converter.started_process_count--
+		delete(converter.started_processes, process)
+		if process.ExitCode() != 0 {
+			converter.failed_processes = append(converter.failed_processes, process)
+		}
 		return
 	}
 
@@ -170,7 +211,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 	log.Printf("Converter (%s): Running for stream %d", converter.name, stream.ID())
 
 	// Initiate converter protocol
-	process.input <- metadataEncoded
+	process.input <- append(metadataEncoded, '\n')
 
 	for _, packet := range packets {
 		jsonPacket := converterStreamChunk{
@@ -183,7 +224,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 			converter.releaseProcess(process, -1)
 			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to encode packet: %w", converter.name, err)
 		}
-		process.input <- jsonPacketEncoded
+		process.input <- append(jsonPacketEncoded, '\n')
 	}
 
 	process.input <- []byte("\n")

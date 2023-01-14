@@ -86,7 +86,7 @@ func (sqs *subQuerySelection) empty() bool {
 	return len(sqs.remaining) == 0
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, limitIDs *bitmask.LongBitmask, tagDetails map[string]query.TagDetails, converters map[string]*Converter) (queryPart, error) {
+func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, limitIDs *bitmask.LongBitmask, tagDetails map[string]query.TagDetails) (queryPart, error) {
 	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
 
@@ -755,9 +755,9 @@ conditions:
 				return queryPart{}, errors.New("SubQueries not yet fully supported")
 			}
 			if converterName != "" {
-				if _, ok := converters[converterName]; !ok {
-					return queryPart{}, errors.New("converter name not found")
-				}
+				// if _, ok := converters[converterName]; !ok {
+				// 	return queryPart{}, errors.New("converter name not found")
+				// }
 			}
 			// loop over regexconditions and see if all of them have the same converter name as the curent one
 			// TODO: allow this
@@ -1178,7 +1178,7 @@ conditions:
 			streamLength := [2]int{}
 			bufferLengths := [][2]int{{}}
 
-			if converterName == "" {
+			if converterName == "" || converterName == "none" {
 				// TODO: search all converter output as well
 				streamLength[C2S] = int(s.ClientBytes)
 				streamLength[S2C] = int(s.ServerBytes)
@@ -1227,22 +1227,22 @@ conditions:
 					bufferLengths = append(bufferLengths, new)
 				}
 			} else {
-				converter, ok := converters[converterName]
-				if !ok {
-					return false, fmt.Errorf("unknown converter %q", converterName)
-				}
-				if !converter.HasStream(s.StreamID) {
-					return false, nil
-				}
+				// converter, ok := converters[converterName]
+				// if !ok {
+				// 	return false, fmt.Errorf("unknown converter %q", converterName)
+				// }
+				// if !converter.HasStream(s.StreamID) {
+				// 	return false, nil
+				// }
 
-				data, dataSizes, clientBytes, serverBytes, err := converter.DataForSearch(s.StreamID)
-				if err != nil {
-					return false, fmt.Errorf("data for search %w", err)
-				}
-				streamLength[C2S] = int(clientBytes)
-				streamLength[S2C] = int(serverBytes)
-				buffers = data
-				bufferLengths = dataSizes
+				// data, dataSizes, clientBytes, serverBytes, err := converter.DataForSearch(s.StreamID)
+				// if err != nil {
+				// 	return false, fmt.Errorf("data for search %w", err)
+				// }
+				// streamLength[C2S] = int(clientBytes)
+				// streamLength[S2C] = int(serverBytes)
+				// buffers = data
+				// bufferLengths = dataSizes
 			}
 			for {
 				recheckRegexes := false
@@ -1634,7 +1634,7 @@ var (
 	}
 )
 
-func SearchStreams(indexes []*Reader, converters map[string]*Converter, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails) ([]*Stream, bool, error) {
+func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
@@ -1832,7 +1832,7 @@ func SearchStreams(indexes []*Reader, converters map[string]*Converter, limitIDs
 			queryParts := make([]queryPart, 0, len(qs))
 			for qID := range qs {
 				//build search structures
-				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails, converters)
+				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails)
 				if err != nil {
 					return nil, false, err
 				}
@@ -1841,7 +1841,7 @@ func SearchStreams(indexes []*Reader, converters map[string]*Converter, limitIDs
 				}
 				queryParts = append(queryParts, queryPart)
 			}
-			err := idx.searchStreams(&results, converters, allResults, queryParts, groupingData, sorter, resultLimit)
+			err := idx.searchStreams(&results, allResults, queryParts, groupingData, sorter, resultLimit)
 			if err != nil {
 				return nil, false, err
 			}
@@ -1858,7 +1858,7 @@ func SearchStreams(indexes []*Reader, converters map[string]*Converter, limitIDs
 	return results.streams[skip:], results.resultDropped != 0, nil
 }
 
-func (r *Reader) searchStreams(result *resultData, converters map[string]*Converter, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
+func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
 	allImpossible := true

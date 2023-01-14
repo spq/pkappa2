@@ -12,6 +12,11 @@ type (
 		converter *Converter
 		cacheFile *cacheFile
 	}
+	Stats struct {
+		Name              string
+		CachedStreamCount uint64
+		Processes         []ProcessStats
+	}
 )
 
 func NewCache(converterName, executablePath, indexCachePath string) (*CachedConverter, error) {
@@ -33,6 +38,14 @@ func (cache *CachedConverter) Name() string {
 	return cache.converter.Name()
 }
 
+func (cache *CachedConverter) Stats() *Stats {
+	return &Stats{
+		Name:              cache.converter.Name(),
+		CachedStreamCount: cache.cacheFile.StreamCount(),
+		Processes:         cache.converter.ProcessStats(),
+	}
+}
+
 func (cache *CachedConverter) Reset() error {
 	// Stop all converter processes.
 	cache.converter.Reset()
@@ -41,9 +54,13 @@ func (cache *CachedConverter) Reset() error {
 	return cache.cacheFile.Reset()
 }
 
+func (cache *CachedConverter) Contains(stream *index.Stream) bool {
+	return cache.cacheFile.Contains(stream.ID(), uint64(stream.Reader().PacketCount()))
+}
+
 func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, clientBytes, serverBytes uint64, err error) {
 	// See if the stream data is cached already.
-	data, clientBytes, serverBytes, err = cache.cacheFile.Data(stream.ID())
+	data, clientBytes, serverBytes, err = cache.cacheFile.Data(stream.ID(), uint64(stream.Reader().PacketCount()))
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -58,7 +75,7 @@ func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, cli
 	}
 
 	// Save it to the cache.
-	if err := cache.cacheFile.SetData(stream.ID(), convertedPackets); err != nil {
+	if err := cache.cacheFile.SetData(stream.ID(), uint64(stream.Reader().PacketCount()), convertedPackets); err != nil {
 		return nil, 0, 0, err
 	}
 	return convertedPackets, clientBytes, serverBytes, nil

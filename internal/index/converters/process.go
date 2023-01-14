@@ -2,8 +2,10 @@ package converters
 
 import (
 	"bufio"
+	"container/ring"
 	"log"
 	"os/exec"
+	"sync"
 )
 
 type (
@@ -13,7 +15,15 @@ type (
 		cmd            *exec.Cmd
 		input          chan []byte
 		output         chan []byte
+		stderrRing     *ring.Ring
+		stderrLock     sync.RWMutex
+		exitCode       int
 	}
+)
+
+const (
+	// Number of lines to keep in the stderr buffer.
+	STDERR_BUFFER_SIZE = 512
 )
 
 // To stop the process, close the input channel.
@@ -25,6 +35,8 @@ func NewProcess(converterName string, executablePath string) *Process {
 		cmd:            nil,
 		input:          make(chan []byte),
 		output:         make(chan []byte),
+		stderrRing:     ring.New(STDERR_BUFFER_SIZE),
+		stderrLock:     sync.RWMutex{},
 	}
 
 	go process.run()
@@ -45,12 +57,29 @@ func ReadLine(reader *bufio.Reader) ([]byte, error) {
 	}
 }
 
+func (process *Process) Stderr() []string {
+	process.stderrLock.RLock()
+	defer process.stderrLock.RUnlock()
+
+	output := []string{}
+	process.stderrRing.Do(func(value any) {
+		if value != nil {
+			output = append(output, value.(string))
+		}
+	})
+	return output
+}
+
+func (process *Process) ExitCode() int {
+	return process.exitCode
+}
+
 // Run until input channel is closed
 func (process *Process) run() {
 	process.cmd = exec.Command(process.executablePath)
 	stdout, err := process.cmd.StdoutPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stdout pipe: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to create stdout pipe: %q", process.converterName, err)
 		close(process.output)
 		return
 	}
@@ -70,7 +99,7 @@ func (process *Process) run() {
 
 	stderr, err := process.cmd.StderrPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stderr pipe: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to create stderr pipe: %q", process.converterName, err)
 		stdout.Close()
 		return
 	}
@@ -79,13 +108,19 @@ func (process *Process) run() {
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			log.Printf("Filter (%s) stderr: %s", process.converterName, scanner.Text())
+			line := scanner.Text()
+			log.Printf("Converter (%s) stderr: %s", process.converterName, line)
+
+			process.stderrLock.Lock()
+			process.stderrRing.Value = line
+			process.stderrRing = process.stderrRing.Next()
+			process.stderrLock.Unlock()
 		}
 	}()
 
 	stdin, err := process.cmd.StdinPipe()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to create stdin pipe: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to create stdin pipe: %q", process.converterName, err)
 		stdout.Close()
 		stderr.Close()
 		return
@@ -93,7 +128,7 @@ func (process *Process) run() {
 
 	err = process.cmd.Start()
 	if err != nil {
-		log.Printf("Filter (%s): Failed to start process: %q", process.converterName, err)
+		log.Printf("Converter (%s): Failed to start process: %q", process.converterName, err)
 		stdout.Close()
 		stderr.Close()
 		stdin.Close()
@@ -102,9 +137,15 @@ func (process *Process) run() {
 
 	for line := range process.input {
 		if _, err := stdin.Write(line); err != nil {
-			log.Printf("Filter (%s): Failed to write to stdin: %q", process.converterName, err)
+			log.Printf("Converter (%s): Failed to write to stdin: %q", process.converterName, err)
 			// wait for process to exit and close std pipes.
-			process.cmd.Wait()
+			if err := process.cmd.Wait(); err != nil {
+				log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
+				process.exitCode = -1
+			} else {
+				process.exitCode = process.cmd.ProcessState.ExitCode()
+			}
+
 			// drain input channel to unblock caller
 			for range process.input {
 			}
@@ -113,5 +154,10 @@ func (process *Process) run() {
 	}
 
 	process.cmd.Process.Kill()
-	process.cmd.Wait()
+	if err := process.cmd.Wait(); err != nil {
+		log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
+		process.exitCode = -1
+		return
+	}
+	process.exitCode = process.cmd.ProcessState.ExitCode()
 }

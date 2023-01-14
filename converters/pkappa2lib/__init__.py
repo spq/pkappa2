@@ -117,23 +117,26 @@ class Pkappa2Converter:
         result of the handle_stream method is then written to stdout.
         """
         while True:
-            metadata_json = json.loads(sys.stdin.buffer.readline().decode(),
-                                       cls=ConverterDecoder)
-            metadata = StreamMetadata(**metadata_json)
-            stream_chunks = []
-            while True:
-                line = sys.stdin.buffer.readline().strip()
-                if not line:
-                    break
-                chunk = json.loads(line.decode(), cls=ConverterDecoder)
-                stream_chunks.append(StreamChunk(**chunk))
-            stream = Stream(metadata, stream_chunks)
-            result = self.handle_stream(stream)
-            for chunk in result.Chunks:
-                json.dump(chunk, sys.stdout, cls=ConverterEncoder)
+            try:
+                metadata_json = json.loads(sys.stdin.buffer.readline().decode(),
+                                        cls=ConverterDecoder)
+                metadata = StreamMetadata(**metadata_json)
+                stream_chunks = []
+                while True:
+                    line = sys.stdin.buffer.readline().strip()
+                    if not line:
+                        break
+                    chunk = json.loads(line.decode(), cls=ConverterDecoder)
+                    stream_chunks.append(StreamChunk(**chunk))
+                stream = Stream(metadata, stream_chunks)
+                result = self.handle_stream(stream)
+                for chunk in result.Chunks:
+                    json.dump(chunk, sys.stdout, cls=ConverterEncoder)
+                    print("")
                 print("")
-            print("")
-            print("{}", flush=True)
+                print("{}", flush=True)
+            except KeyboardInterrupt:
+                break
 
     def handle_stream(self, stream: Stream) -> Result:
         """
