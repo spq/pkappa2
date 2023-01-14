@@ -1222,28 +1222,25 @@ func (mgr *Manager) removeConverter(path string) error {
 }
 
 func (mgr *Manager) restartConverterProcess(path string) error {
-	log.Printf("restarting converter %s", path)
-	c := make(chan error)
-	mgr.jobs <- func() {
-		err := func() error {
-			name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-			converter, ok := mgr.converters[name]
-			if !ok {
-				return fmt.Errorf("error: converter %s does not exist, cannot restart", name)
-			}
-			log.Printf("in job: restarting converter %s", name)
-			// Stop the process if it is running and restart it
-			if err := converter.Reset(); err != nil {
-				return err
-			}
-			log.Printf("in job: restarted converter %s", name)
-			return nil
-		}()
-		c <- err
-		close(c)
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	converter, ok := mgr.converters[name]
+	if !ok {
+		return fmt.Errorf("error: converter %s does not exist, cannot restart", name)
 	}
-	log.Printf("after job: restarted converter %s", path)
-	return <-c
+	// Stop the process if it is running and restart it
+	if err := converter.Reset(); err != nil {
+		return err
+	}
+
+	// run the converter on all streams that match the tags it is attached to again
+	for _, tag := range mgr.tags {
+		if slices.Contains(tag.converters, converter) {
+			mgr.streamsToConvert[name].Or(tag.Matches)
+		}
+	}
+	mgr.startConverterJobIfNeeded()
+
+	return nil
 }
 
 func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *converters.CachedConverter) error {

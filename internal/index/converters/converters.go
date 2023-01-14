@@ -166,7 +166,7 @@ func (converter *Converter) reserveProcess() (*Process, int) {
 	}
 }
 
-func (converter *Converter) releaseProcess(process *Process, reset_epoch int) {
+func (converter *Converter) releaseProcess(process *Process, reset_epoch int) bool {
 	converter.rwmutex.RLock()
 	defer converter.rwmutex.RUnlock()
 
@@ -189,10 +189,11 @@ func (converter *Converter) releaseProcess(process *Process, reset_epoch int) {
 		if process.ExitCode() != 0 {
 			converter.failed_processes = append(converter.failed_processes, process)
 		}
-		return
+		return false
 	}
 
 	converter.available_processes = append(converter.available_processes, process)
+	return true
 }
 
 func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clientBytes, serverBytes uint64, err error) {
@@ -281,11 +282,8 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 		return nil, 0, 0, fmt.Errorf("converter (%s): Failed to read converted metadata: %w", converter.name, err)
 	}
 
-	// log.Printf("Converter (%s): Converted stream: %q", converter.name, convertedMetadata)
-	// for _, convertedPacket := range data {
-	// 	log.Printf("Converter (%s): Converted packet: %q", converter.name, convertedPacket)
-	// }
-
-	converter.releaseProcess(process, reset_epoch)
+	if !converter.releaseProcess(process, reset_epoch) {
+		return nil, 0, 0, fmt.Errorf("converter (%s): Converter was reset while running", converter.name)
+	}
 	return
 }
