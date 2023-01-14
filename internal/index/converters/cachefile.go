@@ -87,7 +87,7 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 
 		// Read total data size of the stream by adding all chunk sizes up.
 		lengthSize, dataSize := uint64(0), uint64(0)
-		for nZeros := 0; nZeros == 2; {
+		for nZeros := 0; nZeros < 2; {
 			sz, n, err := readVarInt(buffer)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read varint: %w", err)
