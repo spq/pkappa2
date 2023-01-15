@@ -151,6 +151,9 @@ func (cachefile *cacheFile) Reset() error {
 	cachefile.rwmutex.Lock()
 	defer cachefile.rwmutex.Unlock()
 
+	if _, err := cachefile.file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
 	if err := cachefile.file.Truncate(0); err != nil {
 		return err
 	}
@@ -351,6 +354,9 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 				pos += int64(dataSize)
 			}
 
+			if _, err := cachefile.file.Seek(cachefile.fileSize, io.SeekStart); err != nil {
+				return err
+			}
 			if err := cachefile.file.Truncate(cachefile.fileSize); err != nil {
 				return err
 			}
