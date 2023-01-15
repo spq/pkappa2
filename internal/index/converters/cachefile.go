@@ -63,21 +63,15 @@ func readVarInt(r io.ByteReader) (uint64, int, error) {
 }
 
 func writeVarInt(writer io.Writer, number uint64) (int, error) {
-	bytesWritten := 0
 	buf := [10]byte{}
-	pos := len(buf)
-	flag := byte(0)
-	for {
-		pos--
-		bytesWritten++
-		buf[pos] = byte(number&0x7f) | flag
-		flag = 0x80
+	for bytesWritten := 1; ; bytesWritten++ {
+		buf[len(buf)-bytesWritten] = byte(number) | 0x80
 		number >>= 7
 		if number == 0 {
-			break
+			buf[len(buf)-1] &= 0x7f
+			return bytesWritten, binary.Write(writer, binary.LittleEndian, buf[len(buf)-bytesWritten:])
 		}
 	}
-	return bytesWritten, binary.Write(writer, binary.LittleEndian, buf[pos:])
 }
 
 func NewCacheFile(cachePath string) (*cacheFile, error) {
