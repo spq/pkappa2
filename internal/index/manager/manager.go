@@ -1209,6 +1209,8 @@ func (mgr *Manager) restartConverterProcess(path string) error {
 	if !ok {
 		return fmt.Errorf("error: converter %s does not exist, cannot restart", name)
 	}
+	// FIXME: This sometimes doesn't restart the converter process with the new binary "text file is busy"
+	//        and stalls the queue.
 	// Stop the process if it is running and restart it
 	if err := converter.Reset(); err != nil {
 		return err
@@ -1276,6 +1278,15 @@ func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *
 		}
 	}
 	return nil
+}
+
+func (mgr *Manager) ResetConverter(converterName string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		c <- mgr.restartConverterProcess(converterName)
+		close(c)
+	}
+	return <-c
 }
 
 func (mgr *Manager) ListConverters() []*converters.Statistics {

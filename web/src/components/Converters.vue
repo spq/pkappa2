@@ -3,18 +3,32 @@
     <thead>
       <tr>
         <th class="text-left">Name</th>
-        <th class="text-left">Cached Stream Count</th>
+        <th colspan="2" class="text-left">Cached Stream Count</th>
       </tr>
     </thead>
     <tbody>
       <template v-for="converter in converters">
         <tr :key="converter.Name">
-          <th>
+          <td>
             {{ converter.Name }}
-          </th>
-          <th>
+          </td>
+          <td>
             {{ converter.CachedStreamCount }}
-          </th>
+          </td>
+          <td style="text-align: right">
+            <v-tooltip bottom>
+              <template #activator="{ on, attrs }">
+                <v-btn
+                  v-bind="attrs"
+                  v-on="on"
+                  icon
+                  @click="confirmConverterReset(converter)"
+                  ><v-icon>mdi-restart-alert</v-icon></v-btn
+                >
+              </template>
+              <span>Reset Converter</span>
+            </v-tooltip>
+          </td>
         </tr>
       </template>
     </tbody>
@@ -23,6 +37,7 @@
 
 <script>
 import { mapActions, mapState } from "vuex";
+import { EventBus } from "./EventBus";
 
 export default {
   name: "Converters",
@@ -35,6 +50,10 @@ export default {
   },
   methods: {
     ...mapActions(["updateTags", "updateConverters"]),
+    
+    confirmConverterReset(converter) {
+      EventBus.$emit("showConverterResetDialog", { converter });
+    },
   },
 };
 </script>

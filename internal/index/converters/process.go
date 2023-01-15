@@ -153,6 +153,8 @@ func (process *Process) run() {
 		}
 	}
 
+	// FIXME: Wait doesn't work if we kill the process first. Are the resources still cleared?
+	//        Maybe just silently ignore errors when waiting and just check if ProcessState is nil?
 	process.cmd.Process.Kill()
 	if err := process.cmd.Wait(); err != nil {
 		log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)

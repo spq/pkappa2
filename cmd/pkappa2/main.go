@@ -256,6 +256,12 @@ func main() {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
+	rUser.Delete("/api/converters/{name:.+}", func(w http.ResponseWriter, r *http.Request) {
+		name := chi.URLParam(r, "name")
+		if err := mgr.ResetConverter(name); err != nil {
+			http.Error(w, fmt.Sprintf("reset failed: %v", err), http.StatusBadRequest)
+		}
+	})
 	rUser.Get(`/api/download/{stream:\d+}.pcap`, func(w http.ResponseWriter, r *http.Request) {
 		streamIDStr := chi.URLParam(r, "stream")
 		streamID, err := strconv.ParseUint(streamIDStr, 10, 64)

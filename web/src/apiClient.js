@@ -24,6 +24,9 @@ const APIClient = {
     getConverterStderr(converter) {
         return this.perform('get', `/converters/stderr/${converter}`);
     },
+    resetConverter(converter) {
+        return this.perform(`delete`, `/converters/${converter}`);
+    },
     getTags() {
         return this.perform('get', `/tags`);
     },
