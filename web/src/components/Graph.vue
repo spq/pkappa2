@@ -75,6 +75,12 @@
   </div>
 </template>
 
+<style>
+.apexcharts-toolbar {
+    z-index: 0 !important;
+}
+</style>
+
 <script>
 import { mapActions, mapState } from "vuex";
 import ToolBar from './ToolBar.vue';
