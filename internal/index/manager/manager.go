@@ -1147,7 +1147,9 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 
 				if event.Has(fsnotify.Remove) {
 					mgr.jobs <- func() {
-						mgr.removeConverter(event.Name)
+						if err := mgr.removeConverter(event.Name); err != nil {
+							log.Printf("error while removing converter: %v", err)
+						}
 					}
 				}
 
@@ -1168,10 +1170,14 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 
 						mgr.jobs <- func() {
 							if event.Has(fsnotify.Create) {
-								mgr.addConverter(event.Name)
+								if err := mgr.addConverter(event.Name); err != nil {
+									log.Printf("error while adding converter: %v", err)
+								}
 							}
 							if event.Has(fsnotify.Write) {
-								mgr.restartConverterProcess(event.Name)
+								if err := mgr.restartConverterProcess(event.Name); err != nil {
+									log.Printf("error while restarting converter: %v", err)
+								}
 							}
 						}
 					})
@@ -1251,10 +1257,10 @@ func (mgr *Manager) restartConverterProcess(path string) error {
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	converter, ok := mgr.converters[name]
 	if !ok {
-		return fmt.Errorf("error: converter %s does not exist, cannot restart", name)
+		if err := mgr.addConverter(path); err != nil {
+			return err
+		}
 	}
-	// FIXME: This sometimes doesn't restart the converter process with the new binary "text file is busy"
-	//        and stalls the queue.
 	// Stop the process if it is running and restart it
 	if err := converter.Reset(); err != nil {
 		return err
@@ -1627,6 +1633,7 @@ func (c StreamContext) Data(converterName string) ([]index.Data, error) {
 		if !ok {
 			continue
 		}
+		// FIXME: don't reference mgr directly, but cache this in the view
 		tag := c.v.mgr.tags[tn]
 		for _, converter := range tag.converters {
 			if converter.Name() == converterName {
@@ -1672,6 +1679,7 @@ func (c StreamContext) AllConverters() ([]string, error) {
 		if !ok {
 			continue
 		}
+		// FIXME: don't reference mgr here, but cache this info in the view
 		tag := c.v.mgr.tags[tn]
 		for _, converter := range tag.converters {
 			if !slices.Contains(converters, converter.Name()) {
