@@ -22,6 +22,7 @@ class Protocol(Enum):
 
 @dataclass
 class StreamMetadata:
+    StreamID: int
     ClientHost: str
     ClientPort: int
     ServerHost: str

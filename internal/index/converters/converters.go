@@ -42,6 +42,7 @@ type (
 	}
 	// JSON Protocol
 	converterStreamMetadata struct {
+		StreamID   uint64
 		ClientHost string
 		ClientPort uint16
 		ServerHost string
@@ -188,6 +189,7 @@ func (converter *Converter) releaseProcess(process *Process, reset_epoch int) bo
 		for range process.output {
 		}
 		delete(converter.started_processes, process)
+		// TODO: Exitcode might not be set yet
 		if process.ExitCode() != 0 {
 			converter.failed_processes = append(converter.failed_processes, process)
 		}
@@ -208,6 +210,7 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 	}
 
 	metadata := converterStreamMetadata{
+		StreamID:   stream.ID(),
 		ClientHost: stream.ClientHostIP(),
 		ClientPort: stream.ClientPort,
 		ServerHost: stream.ServerHostIP(),
