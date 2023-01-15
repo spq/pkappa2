@@ -1674,7 +1674,9 @@ func (c StreamContext) AllConverters() ([]string, error) {
 		}
 		tag := c.v.mgr.tags[tn]
 		for _, converter := range tag.converters {
-			converters = append(converters, converter.Name())
+			if !slices.Contains(converters, converter.Name()) {
+				converters = append(converters, converter.Name())
+			}
 		}
 	}
 	sort.Strings(converters)
