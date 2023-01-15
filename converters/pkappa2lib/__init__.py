@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
+import base64
+import datetime
 import json
 import sys
-import base64
 
 
 class Protocol(Enum):
@@ -109,6 +110,20 @@ class Pkappa2Converter:
     displayed in the UI.
     """
 
+    def log(self, message: str):
+        """
+        Log a message to stderr.
+
+        This method can be used to log messages to the UI. The message will be
+        displayed in the stderr tab of the UI.
+        
+        Can be used for debugging.
+        """
+        now = datetime.datetime.now().strftime("%d.%b %Y %H:%M:%S")
+        print(f'{now} (stream: {self.current_stream_id}): {message}',
+              flush=True,
+              file=sys.stderr)
+
     def run(self):
         """
         Run the converter.
@@ -117,11 +132,13 @@ class Pkappa2Converter:
         pkappa2 and calls the handle_stream method for each stream. The
         result of the handle_stream method is then written to stdout.
         """
+        self.current_stream_id = -1
         while True:
             try:
-                metadata_json = json.loads(sys.stdin.buffer.readline().decode(),
-                                        cls=ConverterDecoder)
+                metadata_json = json.loads(
+                    sys.stdin.buffer.readline().decode(), cls=ConverterDecoder)
                 metadata = StreamMetadata(**metadata_json)
+                self.current_stream_id = metadata.StreamID
                 stream_chunks = []
                 while True:
                     line = sys.stdin.buffer.readline().strip()
