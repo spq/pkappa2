@@ -62,6 +62,18 @@ func readVarInt(r io.ByteReader) (uint64, int, error) {
 	return result, bytes, nil
 }
 
+func writeVarInt(writer io.Writer, number uint64) (int, error) {
+	buf := [10]byte{}
+	for bytesWritten := 1; ; bytesWritten++ {
+		buf[len(buf)-bytesWritten] = byte(number) | 0x80
+		number >>= 7
+		if number == 0 {
+			buf[len(buf)-1] &= 0x7f
+			return bytesWritten, binary.Write(writer, binary.LittleEndian, buf[len(buf)-bytesWritten:])
+		}
+	}
+}
+
 func NewCacheFile(cachePath string) (*cacheFile, error) {
 	file, err := os.OpenFile(cachePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -374,11 +386,9 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 	}
 
 	streamSize := uint64(0)
-	buf := [10]byte{}
 	for pIndex, wantDir := 0, index.DirectionClientToServer; pIndex < len(convertedPackets); {
 		// TODO: Merge packets with the same direction. Do we even want to allow converters to change the direction?
 		convertedPacket := convertedPackets[pIndex]
-		sz := len(convertedPacket.Content)
 		dir := convertedPacket.Direction
 		// Write a length of 0 if the server sent the first packet.
 		if dir != wantDir {
@@ -388,21 +398,12 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 			streamSize++
 			wantDir = wantDir.Reverse()
 		}
-		pos := len(buf)
-		flag := byte(0)
-		for {
-			pos--
-			streamSize++
-			buf[pos] = byte(sz&0x7f) | flag
-			flag = 0x80
-			sz >>= 7
-			if sz == 0 {
-				break
-			}
-		}
-		if err := binary.Write(writer, binary.LittleEndian, buf[pos:]); err != nil {
+		bytesWritten, err := writeVarInt(writer, uint64(len(convertedPacket.Content)))
+		if err != nil {
 			return err
 		}
+		streamSize += uint64(bytesWritten)
+
 		wantDir = wantDir.Reverse()
 		pIndex++
 	}
