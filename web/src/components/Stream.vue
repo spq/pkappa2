@@ -19,7 +19,7 @@
       </v-tooltip>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" v-on="on" icon @click="fetchStream()">
+          <v-btn v-bind="attrs" v-on="on" icon @click="fetchStreamForId()">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
