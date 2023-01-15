@@ -145,6 +145,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		converters:          make(map[string]*converters.CachedConverter),
 		converterJobRunning: make(map[string]bool),
 		streamsToConvert:    make(map[string]*bitmask.LongBitmask),
+		jobs:                make(chan func()),
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -308,7 +309,6 @@ nextStateFile:
 		mgr.saveState()
 	}
 
-	mgr.jobs = make(chan func())
 	go func() {
 		for f := range mgr.jobs {
 			f()
