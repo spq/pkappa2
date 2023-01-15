@@ -1201,6 +1201,7 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 }
 
 func (mgr *Manager) addConverter(path string) error {
+	// TODO: Do we want to check this now or when we start the converter?
 	err := unix.Access(path, unix.X_OK)
 	if err != nil {
 		return fmt.Errorf("error: converter %s is not executable", path)
