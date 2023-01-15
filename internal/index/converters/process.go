@@ -147,9 +147,12 @@ func (process *Process) run() {
 			log.Printf("Converter (%s): Failed to write to stdin: %q", process.converterName, err)
 			// wait for process to exit and close std pipes.
 			if err := process.cmd.Wait(); err != nil {
+				if _, ok := err.(*exec.ExitError); !ok {
 				log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
 				process.exitCode = -1
-			} else {
+				}
+			}
+			if process.cmd.ProcessState != nil {
 				process.exitCode = process.cmd.ProcessState.ExitCode()
 			}
 
@@ -164,9 +167,11 @@ func (process *Process) run() {
 	//        Maybe just silently ignore errors when waiting and just check if ProcessState is nil?
 	process.cmd.Process.Kill()
 	if err := process.cmd.Wait(); err != nil {
+		if _, ok := err.(*exec.ExitError); !ok {
 		log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
 		process.exitCode = -1
 		return
+		}
 	}
 	process.exitCode = process.cmd.ProcessState.ExitCode()
 }
