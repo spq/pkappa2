@@ -991,6 +991,7 @@ func (r *indexReleaser) release(mgr *Manager) {
 }
 
 func (mgr *Manager) startConverterJobIfNeeded() {
+	// TODO: limit number of concurrent jobs, spread across all converters
 	for converterName, converter := range mgr.converters {
 		if mgr.converterJobRunning[converterName] {
 			continue
@@ -1001,14 +1002,18 @@ func (mgr *Manager) startConverterJobIfNeeded() {
 
 		mgr.converterJobRunning[converterName] = true
 		indexes, releaser := mgr.getIndexesCopy(0)
+		// FIXME: process whole work queue in one job and reset it here now.
+		//        otherwise streams could get updated while the job is running
+		//        but we wouldn't run the converter again.
 		go mgr.convertStreamJob(converter, mgr.streamsToConvert[converterName].Copy(), indexes, releaser)
 	}
 }
 
 func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, streamIDs bitmask.LongBitmask, indexes []*index.Reader, releaser indexReleaser) {
 	convertedStreamIDs, err := func() (bitmask.LongBitmask, error) {
-		errorChannels := make([]chan error, converters.MAX_PROCESS_COUNT)
-		resultChannels := make([]chan uint64, converters.MAX_PROCESS_COUNT)
+		// TODO: use a result struct and only one channel
+		errorChannels := make([]chan error, 0, converters.MAX_PROCESS_COUNT)
+		resultChannels := make([]chan uint64, 0, converters.MAX_PROCESS_COUNT)
 		convertedCount := uint64(0)
 	outer:
 		for idxIdx := len(indexes) - 1; idxIdx >= 0; idxIdx-- {
@@ -1036,8 +1041,8 @@ func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, stre
 					continue
 				}
 
-				errorChannels[convertedCount] = make(chan error)
-				resultChannels[convertedCount] = make(chan uint64)
+				errorChannels = append(errorChannels, make(chan error))
+				resultChannels = append(resultChannels, make(chan uint64))
 				go func(id uint64) {
 					_, _, _, err := converter.Data(stream)
 					if err != nil {
@@ -1056,6 +1061,7 @@ func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, stre
 
 				// Only convert X streams at a time
 				convertedCount++
+				// TODO: don't use the internal constant here
 				if convertedCount == converters.MAX_PROCESS_COUNT {
 					break outer
 				}
@@ -1109,6 +1115,7 @@ func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, stre
 			tag.Uncertain.Or(convertedStreamIDs)
 		}
 		mgr.startTaggingJobIfNeeded()
+		// TODO: process all streams to convert in a loop here and only start a new job if there are still streams to convert afterwards
 		mgr.startConverterJobIfNeeded()
 		releaser.release(mgr)
 	}
@@ -1159,14 +1166,14 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 						delete(timers, event.Name)
 						mu.Unlock()
 
-				mgr.jobs <- func() {
-					if event.Has(fsnotify.Create) {
-						mgr.addConverter(event.Name)
-					}
-					if event.Has(fsnotify.Write) {
-						mgr.restartConverterProcess(event.Name)
-					}
-				}
+						mgr.jobs <- func() {
+							if event.Has(fsnotify.Create) {
+								mgr.addConverter(event.Name)
+							}
+							if event.Has(fsnotify.Write) {
+								mgr.restartConverterProcess(event.Name)
+							}
+						}
 					})
 					timer.Stop()
 
