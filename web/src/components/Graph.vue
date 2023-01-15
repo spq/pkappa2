@@ -3,7 +3,7 @@
     <ToolBar>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" v-on="on" icon @click="fetchGraph">
+          <v-btn v-bind="attrs" v-on="on" icon @click="fetchGraphLocal">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -74,6 +74,12 @@
     </div>
   </div>
 </template>
+
+<style>
+.apexcharts-toolbar {
+    z-index: 0 !important;
+}
+</style>
 
 <script>
 import { mapActions, mapState } from "vuex";
@@ -422,7 +428,7 @@ export default {
     };
   },
   mounted() {
-    this.fetchGraph();
+    this.fetchGraphLocal();
   },
   computed: {
     ...mapState(["tags", "graph"]),
@@ -503,7 +509,7 @@ export default {
         this.chartTags = sel;
       });
     },
-    fetchGraph() {
+    fetchGraphLocal() {
       const type = this.chartType;
       if (!type) return;
       let tags = this.chartTags;
@@ -523,7 +529,7 @@ export default {
   },
   watch: {
     $route: function () {
-      this.fetchGraph();
+      this.fetchGraphLocal();
     },
     graph(val) {
       const type = this.chartTypes[val.type];
