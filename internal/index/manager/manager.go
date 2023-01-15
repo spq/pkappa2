@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -1114,32 +1116,67 @@ func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, stre
 
 func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 	go func() {
+		var (
+			// Wait 500ms for new events; each new event resets the timer.
+			waitFor = 500 * time.Millisecond
+
+			// Keep track of the timers, as path → timer.
+			mu     sync.Mutex
+			timers = make(map[string]*time.Timer)
+		)
 		for {
 			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				ch := make(chan struct{})
-				mgr.jobs <- func() {
-					log.Println("event:", event)
-					if event.Has(fsnotify.Create) {
-						mgr.addConverter(event.Name)
-					}
-					if event.Has(fsnotify.Remove) {
-						mgr.removeConverter(event.Name)
-					}
-					if event.Has(fsnotify.Write) {
-						mgr.restartConverterProcess(event.Name)
-					}
-					close(ch)
-				}
-				<-ch
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
 				}
 				log.Println("error:", err)
+
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				log.Println("event:", event)
+
+				if event.Has(fsnotify.Remove) {
+					mgr.jobs <- func() {
+						mgr.removeConverter(event.Name)
+					}
+				}
+
+				if !event.Has(fsnotify.Create) && !event.Has(fsnotify.Write) {
+					continue
+				}
+
+				mu.Lock()
+				timer, ok := timers[event.Name]
+				mu.Unlock()
+
+				// No timer yet, so create one.
+				if !ok {
+					timer = time.AfterFunc(math.MaxInt64, func() {
+						mu.Lock()
+						delete(timers, event.Name)
+						mu.Unlock()
+
+				mgr.jobs <- func() {
+					if event.Has(fsnotify.Create) {
+						mgr.addConverter(event.Name)
+					}
+					if event.Has(fsnotify.Write) {
+						mgr.restartConverterProcess(event.Name)
+					}
+				}
+					})
+					timer.Stop()
+
+					mu.Lock()
+					timers[event.Name] = timer
+					mu.Unlock()
+				}
+
+				// Reset the timer for this path, so it will start again.
+				timer.Reset(waitFor)
 			}
 		}
 	}()
