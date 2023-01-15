@@ -550,7 +550,11 @@ outer:
 		mgr.addedStreamsDuringTaggingJob = bitmask.LongBitmask{}
 		mgr.taggingJobRunning = true
 		indexes, releaser := mgr.getIndexesCopy(0)
-		go mgr.updateTagJob(n, *t, tagDetails, indexes, releaser)
+		converters := make(map[string]index.ConverterAccess)
+		for converterName, converter := range mgr.converters {
+			converters[converterName] = converter
+		}
+		go mgr.updateTagJob(n, *t, tagDetails, converters, indexes, releaser)
 		return
 	}
 }
@@ -592,15 +596,11 @@ func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, release
 	}
 }
 
-func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query.TagDetails, indexes []*index.Reader, releaser indexReleaser) {
+func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query.TagDetails, converters map[string]index.ConverterAccess, indexes []*index.Reader, releaser indexReleaser) {
 	err := func() error {
 		q, err := query.Parse(t.definition)
 		if err != nil {
 			return err
-		}
-		converters := make(map[string]index.ConverterAccess)
-		for converterName, converter := range mgr.converters {
-			converters[converterName] = converter
 		}
 		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters)
 		if err != nil {
@@ -1279,19 +1279,35 @@ func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *
 }
 
 func (mgr *Manager) ListConverters() []*converters.Statistics {
-	stats := make([]*converters.Statistics, 0, len(mgr.converters))
-	for _, c := range mgr.converters {
-		stats = append(stats, c.Statistics())
+	c := make(chan []*converters.Statistics)
+	mgr.jobs <- func() {
+		stats := make([]*converters.Statistics, 0, len(mgr.converters))
+		for _, converter := range mgr.converters {
+			stats = append(stats, converter.Statistics())
+		}
+		c <- stats
+		close(c)
 	}
-	return stats
+	return <-c
 }
 
 func (mgr *Manager) ConverterStderr(converterName string) ([][]string, error) {
-	converter, ok := mgr.converters[converterName]
-	if !ok {
+	c := make(chan [][]string)
+	mgr.jobs <- func() {
+		converter, ok := mgr.converters[converterName]
+		if !ok {
+			c <- nil
+			close(c)
+			return
+		}
+		c <- converter.Stderrs()
+		close(c)
+	}
+	stderrs := <-c
+	if stderrs == nil {
 		return nil, fmt.Errorf("error: converter %s does not exist", converterName)
 	}
-	return converter.Stderrs(), nil
+	return stderrs, nil
 }
 
 func (mgr *Manager) GetView() View {
