@@ -23,7 +23,7 @@ type (
 
 const (
 	// Number of lines to keep in the stderr buffer.
-	STDERR_BUFFER_SIZE = 512
+	STDERR_RING_SIZE = 512
 )
 
 // To stop the process, close the input channel.
@@ -35,7 +35,7 @@ func NewProcess(converterName string, executablePath string) *Process {
 		cmd:            nil,
 		input:          make(chan []byte),
 		output:         make(chan []byte),
-		stderrRing:     ring.New(STDERR_BUFFER_SIZE),
+		stderrRing:     ring.New(STDERR_RING_SIZE),
 		stderrLock:     sync.RWMutex{},
 	}
 
@@ -61,10 +61,12 @@ func (process *Process) Stderr() []string {
 	process.stderrLock.RLock()
 	defer process.stderrLock.RUnlock()
 
+	// TODO: Return []byte to avoid copying when constructing the string?
+	//       Would require base64 encoding in the JSON response.
 	output := []string{}
 	process.stderrRing.Do(func(value any) {
 		if value != nil {
-			output = append(output, value.(string))
+			output = append(output, string(value.([]byte)))
 		}
 	})
 	return output
@@ -113,9 +115,12 @@ func (process *Process) run() {
 
 	// Dump stderr directly
 	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			line := scanner.Text()
+		reader := bufio.NewReaderSize(stderr, 65536)
+		for {
+			line, err := ReadLine(reader)
+			if err != nil {
+				break
+			}
 			log.Printf("Converter (%s) stderr: %s", process.converterName, line)
 
 			process.stderrLock.Lock()
@@ -148,8 +153,8 @@ func (process *Process) run() {
 			// wait for process to exit and close std pipes.
 			if err := process.cmd.Wait(); err != nil {
 				if _, ok := err.(*exec.ExitError); !ok {
-				log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
-				process.exitCode = -1
+					log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
+					process.exitCode = -1
 				}
 			}
 			if process.cmd.ProcessState != nil {
@@ -168,9 +173,9 @@ func (process *Process) run() {
 	process.cmd.Process.Kill()
 	if err := process.cmd.Wait(); err != nil {
 		if _, ok := err.(*exec.ExitError); !ok {
-		log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
-		process.exitCode = -1
-		return
+			log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
+			process.exitCode = -1
+			return
 		}
 	}
 	process.exitCode = process.cmd.ProcessState.ExitCode()
