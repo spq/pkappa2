@@ -29,7 +29,7 @@ type (
 		// reserveProcess() waits on this channel when all processes are in use.
 		signal chan struct{}
 		// All processes started for this converter.
-		started_processes map[*Process]bool
+		started_processes map[*Process]struct{}
 		// Processes that are currently idle.
 		available_processes []*Process
 		// Processes that died unexpectedly.
@@ -38,6 +38,7 @@ type (
 	ProcessStats struct {
 		Running  bool
 		ExitCode int
+		Pid      int
 	}
 	// JSON Protocol
 	converterStreamMetadata struct {
@@ -69,7 +70,7 @@ func New(converterName, executablePath string) *Converter {
 		executablePath:    executablePath,
 		name:              converterName,
 		signal:            make(chan struct{}),
-		started_processes: make(map[*Process]bool),
+		started_processes: make(map[*Process]struct{}),
 	}
 
 	return &converter
@@ -88,6 +89,7 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 		output = append(output, ProcessStats{
 			Running:  true,
 			ExitCode: process.ExitCode(),
+			Pid:      process.Pid(),
 		})
 	}
 	// Keep stderr and exitcode of processes that have exited.
@@ -153,7 +155,7 @@ func (converter *Converter) reserveProcess() (*Process, int) {
 
 		if len(converter.started_processes) < MAX_PROCESS_COUNT {
 			process := NewProcess(converter.name, converter.executablePath)
-			converter.started_processes[process] = true
+			converter.started_processes[process] = struct{}{}
 			return process, converter.reset_epoch
 		}
 

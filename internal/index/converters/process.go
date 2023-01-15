@@ -74,6 +74,13 @@ func (process *Process) ExitCode() int {
 	return process.exitCode
 }
 
+func (process *Process) Pid() int {
+	if process.cmd == nil || process.cmd.Process == nil {
+		return -1
+	}
+	return process.cmd.Process.Pid
+}
+
 // Run until input channel is closed
 func (process *Process) run() {
 	process.cmd = exec.Command(process.executablePath)
