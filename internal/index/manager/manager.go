@@ -1626,24 +1626,12 @@ func (c StreamContext) Data(converterName string) ([]index.Data, error) {
 	if converterName == "" {
 		return c.Stream().Data()
 	}
-	for tn := range c.v.tagDetails {
-		ok, err := c.HasTag(tn)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			continue
-		}
-		// FIXME: don't reference mgr directly, but cache this in the view
-		tag := c.v.mgr.tags[tn]
-		for _, converter := range tag.converters {
-			if converter.Name() == converterName {
-				data, _, _, err := converter.Data(c.Stream())
-				return data, err
-			}
-		}
+	converter, ok := c.v.converters[converterName]
+	if !ok {
+		return nil, fmt.Errorf("invalid converter %q", converterName)
 	}
-	return nil, fmt.Errorf("converter %q not attached to a tag of the stream", converterName)
+	data, _, _, err := converter.Data(c.Stream())
+	return data, err
 }
 
 func (c StreamContext) HasTag(name string) (bool, error) {

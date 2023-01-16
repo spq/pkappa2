@@ -312,7 +312,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(["stream", "streams", "tags"]),
+    ...mapState(["stream", "streams", "tags", "converters"]),
     ...mapGetters(["groupedTags"]),
     streamTags() {
       let res = {
@@ -343,13 +343,19 @@ export default {
     },
     selectableConverters() {
       return [{
-          text: 'none',
+          text: '* none',
           value: 'none',
         },
         ...this.stream.stream.Converters.map(
           (converter) => ({
-            text: converter,
+            text: `* ${converter}`,
             value: 'converter:' + converter,
+          }),
+        ),
+        ...this.converters.map(
+          (converter) => ({
+            text: converter.Name,
+            value: 'converter:' + converter.Name,
           }),
         ),
       ];
