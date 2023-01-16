@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-from pkappa2lib import *
+from base64 import b64encode
+from typing import Any, Dict, List, Union
 from dataclasses import dataclass
+from hashlib import sha1
 from http.server import BaseHTTPRequestHandler
 from http.client import parse_headers
 from io import BytesIO
-from urllib3 import HTTPResponse
-from base64 import b64encode
-from hashlib import sha1
 import zlib
 import traceback
+from urllib3 import HTTPResponse
+from pkappa2lib import *
 
 
 # https://stackoverflow.com/questions/4685217/parse-raw-http-headers
@@ -32,6 +33,12 @@ class WebsocketFrame:
 
 class WebsocketConverter(Pkappa2Converter):
 
+    websocket_key: Union[bytes, None]
+    switched_protocols: bool
+    websocket_deflate: bool
+    websocket_deflate_decompressor: Dict[Direction, Any]
+    websocket_message_fragmented_frames: List[WebsocketFrame]
+
     def unmask_websocket_frames(self, frame: WebsocketFrame) -> WebsocketFrame:
         # this frame is unmasked
         if frame.Header[1] & 0x80 == 0:
@@ -45,16 +52,38 @@ class WebsocketConverter(Pkappa2Converter):
         frame.Header[1] = frame.Header[1] & 0x7F
         return WebsocketFrame(frame.Direction, frame.Header, bytearray(unmasked))
 
-    def handle_websocket_permessage_deflate(self, frame: WebsocketFrame) -> WebsocketFrame:
+    def handle_websocket_permessage_deflate(self, frame: WebsocketFrame) -> Union[WebsocketFrame, None]:
         opcode = frame.Header[0] & 0x0F
         # control frames are not compressed
         if opcode & 0x08 != 0:
             return frame
         
-        # TODO: handle fragmented messages
-        if frame.Header[0] & 0x80 == 0:
-            self.log(f'Websocket frame is fragmented, not supported yet.')
-            return frame
+        # handle fragmented messages
+        if frame.Header[0] & 0x80 == 0: # FIN bit not set
+            self.websocket_message_fragmented_frames.append(frame)
+            if len(self.websocket_message_fragmented_frames) > 0 and opcode != 0:
+                self.websocket_message_fragmented_frames = []
+                raise Exception("Invalid fragmented message")
+            if len(self.websocket_message_fragmented_frames) > 50: # arbitrary limit
+                self.websocket_message_fragmented_frames = []
+                raise Exception("Fragmented message too long")
+            return None
+        
+        if len(self.websocket_message_fragmented_frames) > 0:
+            if opcode != 0:
+                self.websocket_message_fragmented_frames = []
+                raise Exception("Invalid fragmented message")
+            # this is the last frame of a fragmented message
+            self.websocket_message_fragmented_frames.append(frame)
+            frame = WebsocketFrame(
+                Direction=frame.Direction,
+                Header=self.websocket_message_fragmented_frames[0].Header,
+                Data=bytearray(b''.join([f.Data for f in self.websocket_message_fragmented_frames]))
+            )
+            frame.Header[0] |= 0x80 # set FIN bit
+            # datalength in the header is wrong now, but we don't care
+            self.websocket_message_fragmented_frames = []
+
 
         # only the first frame of a fragmented message has the RSV1 bit set
         if frame.Header[0] & 0x40 == 0: # RSV1 "Per-Message Compressed" bit not set
@@ -92,6 +121,8 @@ class WebsocketConverter(Pkappa2Converter):
                 websocket_frame = self.unmask_websocket_frames(websocket_frame)
                 if self.websocket_deflate:
                     websocket_frame = self.handle_websocket_permessage_deflate(websocket_frame)
+                    if websocket_frame is None:
+                        continue
 
                 frames.append(websocket_frame.Header + bytes(websocket_frame.Data))
                 frame = frame[data_offset + data_length:]
@@ -102,16 +133,16 @@ class WebsocketConverter(Pkappa2Converter):
             
             raise Exception(f"Error while handling websocket frame: {ex}") from ex
 
-    def handle_permessage_deflate_extension(self, extension: dict):
+    def handle_permessage_deflate_extension(self, websocket_deflate_parameters: Dict[str, Union[bool, str]]) -> None:
         self.websocket_deflate = True
-        self.websocket_deflate_parameters = extension
+        self.websocket_message_fragmented_frames = []
         window_bits = 15
-        if 'server_max_window_bits' in self.websocket_deflate_parameters:
-            window_bits = int(self.websocket_deflate_parameters['server_max_window_bits'])
+        if 'server_max_window_bits' in websocket_deflate_parameters:
+            window_bits = int(websocket_deflate_parameters['server_max_window_bits'])
         self.websocket_deflate_decompressor[Direction.SERVERTOCLIENT] = zlib.decompressobj(wbits=-window_bits)
         window_bits = 15
-        if 'client_max_window_bits' in self.websocket_deflate_parameters:
-            window_bits = int(self.websocket_deflate_parameters['client_max_window_bits'])
+        if 'client_max_window_bits' in websocket_deflate_parameters:
+            window_bits = int(websocket_deflate_parameters['client_max_window_bits'])
         self.websocket_deflate_decompressor[Direction.CLIENTTOSERVER] = zlib.decompressobj(wbits=-window_bits)
 
     def handle_protocol_switch(self, chunk: StreamChunk) -> bytes:
@@ -125,11 +156,11 @@ class WebsocketConverter(Pkappa2Converter):
                 if request.headers.get(
                         "Connection") == "Upgrade" and request.headers.get(
                             "Upgrade") == "websocket":
-                    self.websocket_key = request.headers.get(
+                    websocket_key = request.headers.get(
                         "Sec-WebSocket-Key", None)
-                    if self.websocket_key is None:
+                    if websocket_key is None:
                         raise Exception("No websocket key found")
-                    self.websocket_key = self.websocket_key.encode()
+                    self.websocket_key = websocket_key.encode()
                 return chunk.Content
             except Exception as ex:
                 raise Exception(
@@ -150,7 +181,7 @@ class WebsocketConverter(Pkappa2Converter):
                     status=status,
                 )
 
-                data = response.data
+                data: bytes = response.data
                 if response.headers.get(
                         "Connection") == "Upgrade" and response.headers.get(
                             "Upgrade") == "websocket":
@@ -170,12 +201,12 @@ class WebsocketConverter(Pkappa2Converter):
                     # Decode extensions header
                     # Sec-WebSocket-Extensions: extension-name; param1=value1; param2="value2", extension-name2; param1, extension-name3, extension-name4; param1=value1
                     raw_extensions = response.headers.get("Sec-WebSocket-Extensions")
-                    extensions = {}
+                    extensions: Dict[str, Dict[str, Union[str, bool]]] = {}
                     if raw_extensions:
                         raw_extensions = map(lambda s: s.strip().lower(), raw_extensions.split(","))
                         for extension in raw_extensions:
                             extension, raw_params = extension.split(";", 1) if ";" in extension else (extension, '')
-                            params = {}
+                            params: Dict[str, Union[str, bool]] = {}
                             raw_params = filter(lambda p: len(p) != 0, map(lambda p: p.strip(), raw_params.split(";")))
                             for param in raw_params:
                                 param = param.split("=", 1)
@@ -205,9 +236,9 @@ class WebsocketConverter(Pkappa2Converter):
         result_data = []
         self.websocket_key = None
         self.switched_protocols = False
-        self.websocket_deflate = False 
-        self.websocket_websocket_deflate_parameters = None
+        self.websocket_deflate = False
         self.websocket_deflate_decompressor = {}
+        self.websocket_message_fragmented_frames = []
         for chunk in stream.Chunks:
             try:
                 if not self.switched_protocols:
