@@ -21,9 +21,6 @@ class HTTPRequest(BaseHTTPRequestHandler):
 class PythonRequestsConverter(Pkappa2Converter):
 
     def handle_stream(self, stream: Stream) -> Result:
-        typ = ''
-        if stream.Metadata.Protocol == Protocol.UDP:
-            typ = ', typ = "udp"'
         output = f'''#!/usr/bin/env python3
 import requests
 

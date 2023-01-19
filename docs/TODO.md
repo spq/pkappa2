@@ -19,6 +19,7 @@
 - [ ] history reverse search with strg+r
 - [ ] improve/document graph ui
 - [ ] diffing of two streams
+- [ ] render http response in iframe with correct content type
 
 ## both:
 - [ ] add search history overlay for recent searches
@@ -68,6 +69,9 @@ the converter feature will be implemented like this:
   - stderr can be fetched from `/api/converters/stderr/[name]`
 - [ ] use states in filter json protocol and display which state we're currently in in UI for debugging filter scripts
 - [x] name filters transformations? converters? -> `converters` it is
-- [ ] allow to run any converter for any stream even if not attached to a stream in the stream view
+- [x] allow to run any converter for any stream even if not attached to a stream in the stream view
   - this could be used to implement the "stream to pwntools or python requests" generators
   - should indicate if the converter is also attached to one of the tags matching the stream
+- [ ] allow converters to add (generated) tags to a stream
+- [ ] option to mark converter output "informative" and render it differently than client/server traffic
+  - e.g. to render the pwntools script generator output in an easy to copy way without the "client sent" coloring
