@@ -2,6 +2,7 @@ module.exports = {
   transpileDependencies: [
     'vuetify'
   ],
+
   devServer: {
     allowedHosts: ["all"],
     proxy: {
@@ -11,4 +12,10 @@ module.exports = {
       },
     },
   },
+
+  pluginOptions: {
+    vuetify: {
+			// https://github.com/vuetifyjs/vuetify-loader/tree/next/packages/vuetify-loader
+		}
+  }
 }
