@@ -37,88 +37,87 @@
           <v-list-item-title>{{ tagType.title }}</v-list-item-title>
         </v-list-item-content>
       </template>
-      <template v-for="tag in groupedTags[tagType.key]">
-        <v-hover 
-        #default="{ hover }"
-        :key="tag.Name"
-        :style="{ backgroundColor: tag.Color }">
-          <v-list-item
-            link
-            dense
-            exact
-            :to="{
-              name: 'search',
-              query: {
-                q: $options.filters.tagForURI(tag.Name),
-              },
-            }"
-          >
-            <v-list-item-content>
-              <v-list-item-title>{{
-                  tag.Name.substr(tagType.key.length + 1)
-                }}</v-list-item-title>
-            </v-list-item-content>
-            <v-menu offset-y bottom open-on-hover right>
-              <template #activator="{ on, attrs }">
-                <v-list-item-action v-on="on" v-bind="attrs">
-                  <v-btn icon x-small v-if="hover">
-                    <v-icon>mdi-dots-vertical</v-icon>
-                  </v-btn>
-                  <v-chip v-else x-small
-                    >{{ tag.MatchingCount
-                    }}{{ tag.UncertainCount != 0 ? "+" : "" }}</v-chip
-                  >
-                </v-list-item-action>
-              </template>
-              <v-list dense>
-                <v-list-item
-                  link
-                  exact
-                  :to="{
-                    name: 'search',
-                    query: {
-                      q: $options.filters.tagForURI(tag.Name),
-                    },
-                  }"
+      <v-hover
+      v-for="tag in groupedTags[tagType.key]"
+      #default="{ hover }"
+      :key="tag.Name"
+      :style="{ backgroundColor: tag.Color }">
+        <v-list-item
+          link
+          dense
+          exact
+          :to="{
+            name: 'search',
+            query: {
+              q: $options.filters.tagForURI(tag.Name),
+            },
+          }"
+        >
+          <v-list-item-content>
+            <v-list-item-title>{{
+                tag.Name.substr(tagType.key.length + 1)
+              }}</v-list-item-title>
+          </v-list-item-content>
+          <v-menu offset-y bottom open-on-hover right>
+            <template #activator="{ on, attrs }">
+              <v-list-item-action v-on="on" v-bind="attrs">
+                <v-btn icon x-small v-if="hover">
+                  <v-icon>mdi-dots-vertical</v-icon>
+                </v-btn>
+                <v-chip v-else x-small
+                  >{{ tag.MatchingCount
+                  }}{{ tag.UncertainCount != 0 ? "+" : "" }}</v-chip
                 >
-                  <v-list-item-icon>
-                    <v-icon>mdi-magnify</v-icon>
-                  </v-list-item-icon>
-                  <v-list-item-title>Show Streams</v-list-item-title>
-                </v-list-item>
-                <v-list-item link @click="showTagDetailsDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-clipboard-list-outline</v-icon>
-                  </v-list-item-icon>
-                  <v-list-item-title>Details</v-list-item-title>
-                </v-list-item>
-                <v-list-item link @click="setQuery(tag.Definition)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-form-textbox</v-icon>
-                  </v-list-item-icon>
-                  <v-list-item-title>Use Query</v-list-item-title>
-                </v-list-item>
-                <v-list-item link @click="showTagColorChangeDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-palette</v-icon>
-                  </v-list-item-icon>
-                  <v-list-item-title>Change Color</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  link
-                  :disabled="tag.Referenced"
-                  @click="confirmTagDeletion(tag.Name)"
-                >
-                  <v-list-item-icon>
-                    <v-icon>mdi-delete-outline</v-icon>
-                  </v-list-item-icon>
-                  <v-list-item-title>Delete</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
-          </v-list-item>
-        </v-hover>
-      </template>
+              </v-list-item-action>
+            </template>
+            <v-list dense>
+              <v-list-item
+                link
+                exact
+                :to="{
+                  name: 'search',
+                  query: {
+                    q: $options.filters.tagForURI(tag.Name),
+                  },
+                }"
+              >
+                <v-list-item-icon>
+                  <v-icon>mdi-magnify</v-icon>
+                </v-list-item-icon>
+                <v-list-item-title>Show Streams</v-list-item-title>
+              </v-list-item>
+              <v-list-item link @click="showTagDetailsDialog(tag.Name)">
+                <v-list-item-icon>
+                  <v-icon>mdi-clipboard-list-outline</v-icon>
+                </v-list-item-icon>
+                <v-list-item-title>Details</v-list-item-title>
+              </v-list-item>
+              <v-list-item link @click="setQuery(tag.Definition)">
+                <v-list-item-icon>
+                  <v-icon>mdi-form-textbox</v-icon>
+                </v-list-item-icon>
+                <v-list-item-title>Use Query</v-list-item-title>
+              </v-list-item>
+              <v-list-item link @click="showTagColorChangeDialog(tag.Name)">
+                <v-list-item-icon>
+                  <v-icon>mdi-palette</v-icon>
+                </v-list-item-icon>
+                <v-list-item-title>Change Color</v-list-item-title>
+              </v-list-item>
+              <v-list-item
+                link
+                :disabled="tag.Referenced"
+                @click="confirmTagDeletion(tag.Name)"
+              >
+                <v-list-item-icon>
+                  <v-icon>mdi-delete-outline</v-icon>
+                </v-list-item-icon>
+                <v-list-item-title>Delete</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </v-list-item>
+      </v-hover>
     </v-list-group>
     <v-list-group link dense v-model="moreOpen" sub-group>
       <template #activator>

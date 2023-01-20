@@ -57,30 +57,29 @@
           </v-tooltip>
         </template>
         <v-list dense v-if="stream.stream != null">
-          <template v-for="tag of groupedTags.mark">
-            <v-list-item
-              :key="tag.Name"
-              link
-              @click="
-                markStream(tag.Name, !stream.stream.Tags.includes(tag.Name))
-              "
-            >
-              <v-list-item-action>
-                <v-icon
-                  >mdi-{{
-                    stream.stream.Tags.includes(tag.Name)
-                      ? "checkbox-outline"
-                      : "checkbox-blank-outline"
-                  }}</v-icon
-                >
-              </v-list-item-action>
-              <v-list-item-content>
-                <v-list-item-title>{{
-                  tag.Name | tagify("name")
-                }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-          </template>
+          <v-list-item
+            v-for="tag of groupedTags.mark"
+            :key="tag.Name"
+            link
+            @click="
+              markStream(tag.Name, !stream.stream.Tags.includes(tag.Name))
+            "
+          >
+            <v-list-item-action>
+              <v-icon
+                >mdi-{{
+                  stream.stream.Tags.includes(tag.Name)
+                    ? "checkbox-outline"
+                    : "checkbox-blank-outline"
+                }}</v-icon
+              >
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title>{{
+                tag.Name | tagify("name")
+              }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
           <v-divider />
           <v-list-item link @click="createMark">
             <v-list-item-action />
