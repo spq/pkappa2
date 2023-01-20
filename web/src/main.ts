@@ -8,20 +8,12 @@ import moment from "moment";
 
 const app = createApp(App);
 
-app.config.productionTip = process.env.NODE_ENV === 'production';
-
 app.use(createVuetify());
 app.use(VueApexCharts);
 app.use(store);
 app.use(router);
 
 app.component('apexchart', VueApexCharts);
-
-app.filter('capitalize', function (value) {
-  if (!value) return ''
-  value = value.toString()
-  return value.charAt(0).toUpperCase() + value.slice(1)
-})
 app.filter('tagify', function (id, what) {
   const type = id.split("/", 1)[0];
   const name = id.substr(type.length + 1);
