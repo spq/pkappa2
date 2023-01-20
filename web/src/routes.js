@@ -1,5 +1,4 @@
-import Vue from 'vue';
-import VueRouter from 'vue-router';
+import {createRouter, createWebHistory} from 'vue-router';
 
 import Base from './components/Base';
 import Home from './components/Home';
@@ -10,9 +9,8 @@ import Graph from './components/Graph';
 import Results from './components/Results';
 import Stream from './components/Stream';
 
-Vue.use(VueRouter);
-
-export default new VueRouter({
+export default createRouter({
+    history: createWebHistory(),
     mode: 'hash',
     routes: [
         {
