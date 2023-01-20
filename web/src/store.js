@@ -1,11 +1,8 @@
-import Vue from 'vue';
-import Vuex from 'vuex';
+import {createStore} from 'vuex';
 
 import APIClient from './apiClient';
 
-Vue.use(Vuex);
-
-const store = new Vuex.Store({
+const store = new createStore({
     state: {
         status: null,
         pcaps: null,
