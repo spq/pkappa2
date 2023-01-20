@@ -1,54 +1,51 @@
-import Vue from 'vue';
-import Vuetify from 'vuetify';
 import App from './App.vue';
 import store from './store';
 import router from './routes';
-import VueApexCharts from 'vue-apexcharts';
+import VueApexCharts from 'vue3-apexcharts';
+import {createVuetify} from "vuetify";
+import {createApp} from "vue";
+import moment from "moment";
 
-Vue.config.productionTip = process.env.NODE_ENV == 'production';
+const app = createApp(App);
 
-Vue.use(Vuetify);
-Vue.use(VueApexCharts)
-Vue.use(require('vue-moment'));
+app.config.productionTip = process.env.NODE_ENV === 'production';
 
-Vue.component('apexchart', VueApexCharts)
+app.use(createVuetify());
+app.use(VueApexCharts);
+app.use(store);
+app.use(router);
 
-const vue = new Vue({
-  vuetify: new Vuetify(),
-  store,
-  router,
-  render: h => h(App)
-});
+app.component('apexchart', VueApexCharts);
 
-Vue.filter('capitalize', function (value) {
+app.filter('capitalize', function (value) {
   if (!value) return ''
   value = value.toString()
   return value.charAt(0).toUpperCase() + value.slice(1)
 })
-Vue.filter('tagify', function (id, what) {
+app.filter('tagify', function (id, what) {
   const type = id.split("/", 1)[0];
   const name = id.substr(type.length + 1);
   return { id, type, name }[what];
 })
-Vue.filter('formatDate', function (time) {
+app.filter('formatDate', function (time) {
   if (time === null) return null;
-  time = vue.$moment(time).local();
+  time = moment(time).local();
   let format = "HH:mm:ss.SSS";
-  if (!time.isSame(vue.$moment(), "day")) format = `YYYY-MM-DD ${format}`;
+  if (!time.isSame(moment(), "day")) format = `YYYY-MM-DD ${format}`;
   return time.format(format);
 })
-Vue.filter('formatDateLong', function (time) {
+app.filter('formatDateLong', function (time) {
   if (time === null) return null;
-  time = vue.$moment(time).local();
+  time = moment(time).local();
   return time.format('YYYY-MM-DD HH:mm:ss.SSS ZZ');
 })
-Vue.filter('tagForURI', function (tagId) {
+app.filter('tagForURI', function (tagId) {
   const type = tagId.split("/", 1)[0];
   const name = this.tagNameForURI(tagId.substr(type.length + 1));
 
   return `${type}:${name}`;
 })
-Vue.filter('tagNameForURI', function (tagName) {
+app.filter('tagNameForURI', function (tagName) {
   if (tagName.includes('"')) {
     tagName = tagName.replaceAll('"', '""');
   }
@@ -58,7 +55,7 @@ Vue.filter('tagNameForURI', function (tagName) {
 
   return tagName;
 })
-Vue.filter('regexEscape', function (text) {
+app.filter('regexEscape', function (text) {
   return text
     .split("")
     .map(char => char.replace(
