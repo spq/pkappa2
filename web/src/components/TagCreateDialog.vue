@@ -3,7 +3,7 @@
     <v-form>
       <v-card>
         <v-card-title>
-          <span class="text-h5">Create {{ tagType | capitalize }}</span>
+          <span class="text-h5">Create {{ capitalize(tagType) }}</span>
         </v-card-title>
         <v-card-text>
           <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
@@ -57,6 +57,7 @@
 <script>
 import { EventBus } from "./EventBus";
 import { mapActions } from "vuex";
+import {capitalize} from "../filters/capitalize";
 
 export default {
   name: "TagCreateDialog",
@@ -92,6 +93,7 @@ export default {
     },
   },
   methods: {
+      capitalize,
     ...mapActions(["addTag", "markTagNew"]),
     openDialog({ tagType, tagQuery, tagStreams }) {
       this.tagType = tagType;

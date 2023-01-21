@@ -37,7 +37,7 @@
                 :to="{
                   name: 'search',
                   query: {
-                    q: $options.filters.tagForURI(tag.Name),
+                    q: tagForURI(tag.Name),
                   },
                 }"
                 ><v-icon>mdi-magnify</v-icon></v-btn
@@ -91,6 +91,7 @@
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
 import { EventBus } from "./EventBus";
+import {tagForURI} from "@/filters/tagForURI";
 
 export default {
   name: "Tags",
@@ -128,6 +129,7 @@ export default {
     ...mapGetters(["groupedTags"]),
   },
   methods: {
+      tagForURI,
     ...mapActions(["updateTags"]),
     confirmTagDeletion(tagId) {
       EventBus.$emit("showTagDeleteDialog", { tagId });

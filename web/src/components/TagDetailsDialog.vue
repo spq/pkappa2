@@ -3,7 +3,7 @@
     <v-card>
       <v-card-title>
         <span class="text-h5"
-          >{{ tagType | capitalize }} <code>{{ tagName }}</code> details</span
+          >{{ capitalize(tagType) }} <code>{{ tagName }}</code> details</span
         >
       </v-card-title>
       <v-card-text v-if="tag != null">
@@ -47,6 +47,7 @@
 <script>
 import { EventBus } from "./EventBus";
 import { mapState } from "vuex";
+import {capitalize} from "../filters/capitalize";
 
 export default {
   name: "TagDetailsDialog",
@@ -72,6 +73,7 @@ export default {
     },
   },
   methods: {
+      capitalize,
     openDialog({ tagId }) {
       this.tagId = tagId;
       this.tagType = tagId.split("/", 1)[0];

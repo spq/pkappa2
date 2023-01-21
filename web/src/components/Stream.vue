@@ -76,7 +76,7 @@
             </v-list-item-action>
             <v-list-item-content>
               <v-list-item-title>{{
-                tag.Name | tagify("name")
+                  tagify(tag.Name, "name")
               }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
@@ -204,8 +204,8 @@
           <v-col
             cols="3"
             class="text-body-2"
-            :title="stream.stream.Stream.FirstPacket | formatDateLong"
-            >{{ stream.stream.Stream.FirstPacket | formatDate }}</v-col
+            :title="formatDateLong(stream.stream.Stream.FirstPacket)"
+            >{{ formatDate(stream.stream.Stream.FirstPacket) }}</v-col
           >
           <v-col cols="1" class="text-subtitle-2"
             >{{
@@ -235,8 +235,8 @@
           <v-col
             cols="3"
             class="text-body-2"
-            :title="stream.stream.Stream.LastPacket | formatDateLong"
-            >{{ stream.stream.Stream.LastPacket | formatDate }}</v-col
+            :title="formatDateLong(stream.stream.Stream.LastPacket)"
+            >{{ formatDate(stream.stream.Stream.LastPacket) }}</v-col
           >
           <v-col cols="1" class="text-body-2"
             ><span v-if="streamTags.service.length == 0">{{
@@ -284,6 +284,9 @@ import {
 
 import { mapActions, mapGetters, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
+import {tagify} from "../filters/tagify";
+import {formatDateLong} from "@/filters/formatDateLong";
+import {formatDate} from "../filters/formatDate";
 
 export default {
   name: "Stream",
@@ -376,6 +379,9 @@ export default {
     destroySelectionListener();
   },
   methods: {
+      formatDate,
+      formatDateLong,
+      tagify,
     ...mapActions(["fetchStream", "markTagAdd", "markTagDel"]),
     fetchStreamForId() {
       if (this.streamId != null) {

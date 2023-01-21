@@ -49,7 +49,7 @@
           :to="{
             name: 'search',
             query: {
-              q: $options.filters.tagForURI(tag.Name),
+              q: tagForURI(tag.Name),
             },
           }"
         >
@@ -77,7 +77,7 @@
                 :to="{
                   name: 'search',
                   query: {
-                    q: $options.filters.tagForURI(tag.Name),
+                    q: tagForURI(tag.Name),
                   },
                 }"
               >
@@ -192,6 +192,7 @@
 <script>
 import { EventBus } from "./EventBus";
 import { mapActions, mapGetters, mapState } from "vuex";
+import {tagForURI} from "@/filters/tagForURI";
 
 export default {
   name: "Navigation",
@@ -227,6 +228,7 @@ export default {
     ...mapState(["status"]),
   },
   methods: {
+      tagForURI,
     ...mapActions(["updateTags", "updateStatus"]),
     confirmTagDeletion(tagId) {
       EventBus.$emit("showTagDeleteDialog", { tagId });

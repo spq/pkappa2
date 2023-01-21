@@ -72,7 +72,7 @@
               </v-list-item-action>
               <v-list-item-content>
                 <v-list-item-title>{{
-                  tag.Name | tagify("name")
+                    tagify(tag.Name, "name")
                 }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -167,7 +167,7 @@
                 $router.push({
                   name: 'search',
                   query: {
-                    q: `data:\x22${$options.filters.regexEscape(
+                    q: `data:\x22${regexEscape(
                       $route.query.q
                     )}\x22`,
                   },
@@ -227,10 +227,10 @@
                   :key="tag"
                   ><v-chip small :color="tagColors[tag]"
                     ><template v-if="hover"
-                      >{{ tag | tagify("type") | capitalize }}
-                      {{ tag | tagify("name") }}</template
+                      >{{ capitalize(tagify(tag, "type")) }}
+                      {{ tagify(tag, "name") }}</template
                     ><template v-else>{{
-                      tag | tagify("name")
+                      tagify(tag, "name")
                     }}</template></v-chip
                   ></v-hover
                 >
@@ -245,9 +245,9 @@
               <td>{{ stream.Stream.Server.Bytes }}</td>
               <td
                 class="text-right"
-                :title="stream.Stream.FirstPacket | formatDateLong"
+                :title="formatDateLong(stream.Stream.FirstPacket)"
               >
-                {{ stream.Stream.FirstPacket | formatDate }}
+                {{ formatDate(stream.Stream.FirstPacket) }}
               </td>
             </tr>
           </router-link>
@@ -264,6 +264,9 @@
 import { EventBus } from "./EventBus";
 import { mapActions, mapGetters, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
+import {capitalize} from "@/filters/capitalize";
+import {tagify} from "../filters/tagify";
+import {regexEscape} from "@/filters/regexEscape";
 
 export default {
   name: "Results",
@@ -349,6 +352,9 @@ export default {
     },
   },
   methods: {
+      regexEscape,
+      tagify,
+      capitalize,
     ...mapActions(["searchStreams", "markTagAdd", "markTagDel"]),
     checkboxAction() {
       let tmp = [];

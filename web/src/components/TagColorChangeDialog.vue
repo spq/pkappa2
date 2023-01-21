@@ -4,7 +4,7 @@
       <v-card>
         <v-card-title>
           <span class="text-h5"
-            >Change Color of {{ tagType | capitalize }}
+            >Change Color of {{ capitalize(tagType) }}
             <v-chip :color="tagColor">{{ tagName }}</v-chip></span
           >
         </v-card-title>
@@ -59,6 +59,7 @@
 <script>
 import { mapActions, mapState } from "vuex";
 import { EventBus } from "./EventBus";
+import {capitalize} from "@/filters/capitalize";
 
 export default {
   name: "TagColorChangeDialog",
@@ -93,6 +94,7 @@ export default {
     },
   },
   methods: {
+      capitalize,
     ...mapActions(["changeTagColor"]),
     openDialog({ tagId }) {
       this.tagId = tagId;

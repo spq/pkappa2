@@ -15,8 +15,8 @@
           'PacketTimestampMax',
         ]"
         v-slot:[`item.${field}`]="{ index, value }"
-        ><span :title="value | formatDateLong" :key="`${field}/${index}`">{{
-          value | formatDate
+        ><span :title="formatDateLong(value)" :key="`${field}/${index}`">{{
+          formatDate(value)
         }}</span></template
       >
     </v-data-table>
@@ -25,6 +25,8 @@
 
 <script>
 import { mapActions, mapState } from "vuex";
+import {formatDateLong} from "@/filters/formatDateLong";
+import {formatDate} from "../filters/formatDate";
 
 export default {
   name: "Pcaps",
@@ -81,6 +83,8 @@ export default {
     },
   },
   methods: {
+      formatDate,
+      formatDateLong
     ...mapActions(["updatePcaps"]),
   },
 };

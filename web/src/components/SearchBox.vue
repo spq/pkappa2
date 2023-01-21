@@ -81,6 +81,7 @@ import { EventBus } from "./EventBus";
 import { addSearch, getTermAt } from "./searchHistory";
 import { mapGetters, mapState } from "vuex";
 import suggest from "../parser/suggest";
+import {tagNameForURI} from "@/filters/tagNameForURI";
 
 export default {
   name: "SearchBox",
@@ -177,7 +178,7 @@ export default {
       if (null == replace) {
         return;
       }
-      replace = this.$options.filters.tagNameForURI(replace);
+      replace = tagNameForURI(replace);
       const prefix = this.searchBox.substring(0, this.suggestionStart);
       const suffix = this.searchBox.substring(this.suggestionEnd);
       this.searchBox = prefix + replace + suffix;

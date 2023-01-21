@@ -4,11 +4,11 @@
       <v-card>
         <v-card-title>
           <span class="text-h5"
-            >Confirm {{ tagType | capitalize }} deletion</span
+            >Confirm {{ capitalize(tagType) }} deletion</span
           >
         </v-card-title>
         <v-card-text>
-          Do you want to delete the {{ tagType | capitalize }}
+          Do you want to delete the {{ capitalize(tagType) }}
           <code>{{ tagName }}</code
           >?
         </v-card-text>
@@ -32,6 +32,7 @@
 <script>
 import { mapActions } from "vuex";
 import { EventBus } from "./EventBus";
+import {capitalize} from "../filters/capitalize";
 
 export default {
   name: "TagDeleteDialog",
@@ -48,6 +49,7 @@ export default {
     EventBus.$on("showTagDeleteDialog", this.openDialog);
   },
   methods: {
+      capitalize,
     ...mapActions(["delTag"]),
     openDialog({ tagId }) {
       this.tagId = tagId;
