@@ -387,7 +387,6 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 
 	streamSize := uint64(0)
 	for pIndex, wantDir := 0, index.DirectionClientToServer; pIndex < len(convertedPackets); {
-		// TODO: Merge packets with the same direction. Do we even want to allow converters to change the direction?
 		convertedPacket := convertedPackets[pIndex]
 		dir := convertedPacket.Direction
 		// Write a length of 0 if the server sent the first packet.
