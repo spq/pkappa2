@@ -9,25 +9,17 @@
   </v-snackbar>
 </template>
 
-<script>
+<script lang="ts" setup>
+import { ref } from "vue";
 import { EventBus } from "./EventBus";
 
-export default {
-  name: "ErrorBanner",
-  data() {
-    return {
-      visible: false,
-      message: "",
-    };
-  },
-  created() {
-    EventBus.$on("showError", this.showError);
-  },
-  methods: {
-    showError({ message }) {
-      this.message = message;
-      this.visible = true;
-    },
-  },
-};
+const visible = ref(false);
+const message = ref('');
+
+function showError(event: {message: string}) {
+    message.value = event.message;
+    visible.value = true;
+}
+
+EventBus.$on("showError", showError);
 </script>
