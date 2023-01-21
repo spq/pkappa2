@@ -26,7 +26,7 @@
 <script>
 import { mapActions, mapState } from "vuex";
 import {formatDateLong} from "@/filters/formatDateLong";
-import {formatDate} from "../filters/formatDate";
+import {formatDate} from "@/filters/formatDate";
 
 export default {
   name: "Pcaps",
@@ -84,7 +84,7 @@ export default {
   },
   methods: {
       formatDate,
-      formatDateLong
+      formatDateLong,
     ...mapActions(["updatePcaps"]),
   },
 };

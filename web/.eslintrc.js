@@ -29,6 +29,7 @@ module.exports = {
         'no-console': 'off',
         'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
         'vue/no-deprecated-slot-attribute': 'off',
+        '@typescript-eslint/ban-ts-comment': 'warn',
         '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/no-inferrable-types': 'off',
         '@typescript-eslint/no-non-null-assertion': 'off',
