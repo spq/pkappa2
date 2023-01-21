@@ -230,7 +230,49 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 	// Initiate converter protocol
 	process.input <- append(metadataEncoded, '\n')
 
+	readOutputLine := func(line []byte) error {
+		var convertedPacket converterStreamChunk
+		if err := json.Unmarshal(line, &convertedPacket); err != nil {
+			converter.releaseProcess(process, -1)
+			return fmt.Errorf("converter (%s): Failed to read converted packet: %w", converter.name, err)
+		}
+		decodedData, err := base64.StdEncoding.DecodeString(convertedPacket.Content)
+		if err != nil {
+			converter.releaseProcess(process, -1)
+			return fmt.Errorf("converter (%s): Failed to decode converted packet data: %w", converter.name, err)
+		}
+
+		direction, ok := directionsToInt[convertedPacket.Direction]
+		if !ok {
+			converter.releaseProcess(process, -1)
+			return fmt.Errorf("converter (%s): Invalid direction: %q", converter.name, convertedPacket.Direction)
+		}
+		data = append(data, index.Data{Content: decodedData, Direction: direction})
+		if direction == index.DirectionClientToServer {
+			clientBytes += uint64(len(decodedData))
+		} else {
+			serverBytes += uint64(len(decodedData))
+		}
+		return nil
+	}
+
 	for _, packet := range packets {
+		// See if there's any output available already.
+		select {
+		case line := <-process.output:
+			// The protocol requires that the list of packets is terminated with an empty line.
+			// So if we get an empty line before the end of the list, the converter process
+			// exited unexpectedly or didn't follow the protocol.
+			if len(line) == 0 {
+				converter.releaseProcess(process, -1)
+				return nil, 0, 0, fmt.Errorf("converter (%s): Converter process exited unexpectedly. Received empty line before sending all packets", converter.name)
+			}
+			if err := readOutputLine(line); err != nil {
+				return nil, 0, 0, err
+			}
+		default:
+		}
+
 		jsonPacket := converterStreamChunk{
 			Direction: directionsToString[packet.Direction],
 			Content:   base64.StdEncoding.EncodeToString(packet.Content),
@@ -246,34 +288,12 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 
 	process.input <- []byte("\n")
 
-	// TODO: The converter process could send a response line after every received json line,
-	//       and the stdout buffer could fill up causing a deadlock.
-	//       select?
 	for line := range process.output {
 		if len(line) == 0 {
 			break
 		}
-		var convertedPacket converterStreamChunk
-		if err := json.Unmarshal(line, &convertedPacket); err != nil {
-			converter.releaseProcess(process, -1)
-			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to read converted packet: %w", converter.name, err)
-		}
-		decodedData, err := base64.StdEncoding.DecodeString(convertedPacket.Content)
-		if err != nil {
-			converter.releaseProcess(process, -1)
-			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to decode converted packet data: %w", converter.name, err)
-		}
-
-		direction, ok := directionsToInt[convertedPacket.Direction]
-		if !ok {
-			converter.releaseProcess(process, -1)
-			return nil, 0, 0, fmt.Errorf("converter (%s): Invalid direction: %q", converter.name, convertedPacket.Direction)
-		}
-		data = append(data, index.Data{Content: decodedData, Direction: direction})
-		if direction == index.DirectionClientToServer {
-			clientBytes += uint64(len(decodedData))
-		} else {
-			serverBytes += uint64(len(decodedData))
+		if err := readOutputLine(line); err != nil {
+			return nil, 0, 0, err
 		}
 	}
 	var convertedMetadata converterStreamMetadata
