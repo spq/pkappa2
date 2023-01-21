@@ -20,12 +20,14 @@
 - [ ] improve/document graph ui
 - [ ] diffing of two streams
 - [ ] render http response in iframe with correct content type
+- [ ] add button to download raw data of a stream
+- [ ] autocomplete keywords while typing the query "nearley unparse"
 
 ## both:
 - [ ] add search history overlay for recent searches
 - [ ] support showing alternatives for groups
 - [ ] support showing sub query results
-- [ ] add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
+- [x] add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
 - [ ] optional search result snippets
 - [ ] support filters for search and display, see below for how
 - [ ] calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
