@@ -1055,6 +1055,7 @@ func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, stre
 				// Already have that result
 				if converter.Contains(streamID) {
 					streamIDs.Unset(uint(streamID))
+					streamID++
 					continue
 				}
 
@@ -1076,7 +1077,7 @@ func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, stre
 					_, _, _, err := converter.Data(stream)
 					resultChannel <- result{streamID: stream.ID(), err: err}
 				}()
-				streamIDs.Unset(uint(streamID))
+				streamIDs.Unset(uint(stream.ID()))
 				convertedCount++
 
 				if convertedCount%uint64(numCPU) == 0 {
@@ -1088,12 +1089,11 @@ func (mgr *Manager) convertStreamJob(converter *converters.CachedConverter, stre
 					}
 				}
 			}
-
-			lastError := waitForResults(convertedCount)
-			if lastError != nil {
-				close(resultChannel)
-				return convertedStreamIDs, lastError
-			}
+		}
+		lastError := waitForResults(convertedCount)
+		if lastError != nil {
+			close(resultChannel)
+			return convertedStreamIDs, lastError
 		}
 		close(resultChannel)
 		return convertedStreamIDs, nil
