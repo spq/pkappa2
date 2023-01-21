@@ -3,7 +3,8 @@
     <thead>
       <tr>
         <th class="text-left">Name</th>
-        <th colspan="2" class="text-left">Cached Stream Count</th>
+        <th class="text-left">Cached Stream Count</th>
+        <th colspan="2" class="text-left">Processes</th>
       </tr>
     </thead>
     <tbody>
@@ -14,6 +15,9 @@
           </td>
           <td>
             {{ converter.CachedStreamCount }}
+          </td>
+          <td>
+            {{ converter.Processes }}
           </td>
           <td style="text-align: right">
             <v-tooltip bottom>

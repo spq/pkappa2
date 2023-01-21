@@ -34,7 +34,7 @@ type (
 		definition string
 		features   query.FeatureSet
 		color      string
-		converters []*converters.CachedConverter // TODO: put this into TagDetails too?
+		converters []*converters.CachedConverter
 	}
 	TagInfo struct {
 		Name           string
