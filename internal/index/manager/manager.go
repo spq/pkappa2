@@ -612,9 +612,6 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		t.Matches.Sub(t.Uncertain)
 		for _, s := range streams {
 			t.Matches.Set(uint(s.ID()))
-			for _, converter := range t.converters {
-				mgr.streamsToConvert[converter.Name()].Set(uint(s.ID()))
-			}
 		}
 		return nil
 	}()
@@ -626,6 +623,9 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 	mgr.jobs <- func() {
 		// don't touch the tag if it was modified
 		if ot, ok := mgr.tags[name]; ok && ot.definition == t.definition {
+			for _, converter := range t.converters {
+				mgr.streamsToConvert[converter.Name()].Or(t.Matches)
+			}
 			mgr.tags[name] = &t
 			if !(mgr.updatedStreamsDuringTaggingJob.IsZero() && mgr.addedStreamsDuringTaggingJob.IsZero()) {
 				mgr.invalidateTags(mgr.updatedStreamsDuringTaggingJob, mgr.addedStreamsDuringTaggingJob)
