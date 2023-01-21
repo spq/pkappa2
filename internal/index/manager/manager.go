@@ -118,8 +118,9 @@ type (
 		indexes  []*index.Reader
 		releaser indexReleaser
 
-		tagDetails map[string]query.TagDetails
-		converters map[string]index.ConverterAccess
+		tagDetails    map[string]query.TagDetails
+		tagConverters map[string][]string
+		converters    map[string]index.ConverterAccess
 	}
 
 	StreamContext struct {
@@ -1397,12 +1398,16 @@ func (v *View) fetch() error {
 		return nil
 	}
 	v.tagDetails = make(map[string]query.TagDetails)
+	v.tagConverters = make(map[string][]string)
 	v.converters = make(map[string]index.ConverterAccess)
 	c := make(chan error)
 	v.mgr.jobs <- func() {
 		v.indexes, v.releaser = v.mgr.getIndexesCopy(0)
 		for tn, ti := range v.mgr.tags {
 			v.tagDetails[tn] = ti.TagDetails
+			for _, c := range ti.converters {
+				v.tagConverters[tn] = append(v.tagConverters[tn], c.Name())
+			}
 		}
 		for converterName, converter := range v.mgr.converters {
 			v.converters[converterName] = converter
@@ -1676,7 +1681,7 @@ func (c StreamContext) AllTags() ([]string, error) {
 
 func (c StreamContext) AllConverters() ([]string, error) {
 	converters := []string{}
-	for tn := range c.v.tagDetails {
+	for tn, cns := range c.v.tagConverters {
 		ok, err := c.HasTag(tn)
 		if err != nil {
 			return nil, err
@@ -1684,11 +1689,9 @@ func (c StreamContext) AllConverters() ([]string, error) {
 		if !ok {
 			continue
 		}
-		// FIXME: don't reference mgr here, but cache this info in the view
-		tag := c.v.mgr.tags[tn]
-		for _, converter := range tag.converters {
-			if !slices.Contains(converters, converter.Name()) {
-				converters = append(converters, converter.Name())
+		for _, cn := range cns {
+			if !slices.Contains(converters, cn) {
+				converters = append(converters, cn)
 			}
 		}
 	}

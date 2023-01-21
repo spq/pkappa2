@@ -763,7 +763,7 @@ conditions:
 					return queryPart{}, fmt.Errorf("converter %q not found", converterName)
 				}
 			}
-			// loop over regexconditions and see if all of them have the same converter name as the curent one
+			// loop over regexconditions and see if all of them have the same converter name as the current one
 			// TODO: allow this
 			for _, rc := range regexConditions {
 				dc := (*q)[rc].(*query.DataCondition)
