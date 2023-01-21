@@ -62,8 +62,8 @@ func (cache *CachedConverter) Reset() error {
 	return cache.cacheFile.Reset()
 }
 
-func (cache *CachedConverter) Contains(stream *index.Stream) bool {
-	return cache.cacheFile.Contains(stream.ID())
+func (cache *CachedConverter) Contains(streamID uint64) bool {
+	return cache.cacheFile.Contains(streamID)
 }
 
 func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, clientBytes, serverBytes uint64, err error) {
