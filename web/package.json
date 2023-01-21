@@ -15,7 +15,7 @@
     "moment": "^2.29.4",
     "moo": "^0.5.2",
     "nearley": "^2.20.1",
-    "tiny-emitter": "^2.1.0",
+    "tiny-typed-emitter": "^2.1.0",
     "vue": "^3.2.45",
     "vue-router": "^4.1.6",
     "vue3-apexcharts": "^1.4.1",
