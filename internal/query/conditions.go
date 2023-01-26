@@ -608,7 +608,7 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 						"shost": HostConditionSourceTypeServer,
 					}[e.Variable.Name]
 					if !ok {
-						return nil, fmt.Errorf("unsupported variable type in host filer: %q", e.Variable.Name)
+						return nil, fmt.Errorf("unsupported variable type in host filter: %q", e.Variable.Name)
 					}
 					cond.HostConditionSources = append(cond.HostConditionSources, HostConditionSource{
 						SubQuery: e.Variable.Sub,
