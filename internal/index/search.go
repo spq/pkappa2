@@ -377,6 +377,10 @@ conditions:
 					continue
 				}
 				bitmap := hostConditionBitmaps[hgi]
+				// another host condition already excluded all results in this host group
+				if bitmap == nil {
+					continue
+				}
 				m := cc.Mask4
 				if hg.hostSize == 16 {
 					m = cc.Mask6
