@@ -984,12 +984,10 @@ func (a ConditionsSet) Or(b ConditionsSet) ConditionsSet {
 }
 
 func (c Conditions) impossible() bool {
-	c = c.clean()
 	return len(c) == 1 && impossibleCondition.equal(c[0])
 }
 
 func (c ConditionsSet) impossible() bool {
-	c = c.clean()
 	return len(c) == 1 && c[0].impossible()
 }
 
@@ -1009,10 +1007,10 @@ func (c ConditionsSet) Clean() ConditionsSet {
 	new := ConditionsSet(nil)
 outer:
 	for _, cc := range c {
+		cc = cc.clean()
 		if cc.impossible() {
 			continue
 		}
-		cc = cc.clean()
 		for i, cc2 := range new {
 			if cc2.equal(cc) {
 				continue outer
