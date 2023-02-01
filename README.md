@@ -6,7 +6,7 @@ The received pcaps are processed and using the webinterface, users can run queri
 Streams matching the query are displayed and their content can be viewed in multiple formats.
 
 The tool is under development and might not work!
-See docs/TODO.txt for missing features.
+See [docs/TODO.md](docs/TODO.md) for missing features.
 
 Add pcaps using a POST to `/upload/filename.pcap`:
 ```

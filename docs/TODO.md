@@ -32,6 +32,8 @@
 - [ ] support filters for search and display, see below for how
 - [ ] calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
 - [ ] add documentation
+- [ ] show matching generated marks in stream view
+- [ ] let large tag queries and names overflow instead of widening the page layout
 
 ## filters / converters
 the converter feature will be implemented like this:
@@ -65,6 +67,7 @@ the converter feature will be implemented like this:
   - [x] there will be modifiers for these [cs]data/bytes filters that allow to specify which of the filtered outputs are searched, or to specify exactly one output that is used
     - The modifier looks like `[cs]data.convertername:content`
     - `none` is a reserved converter name and selects the plain unprocessed stream data
+  - [ ] [cs]bytes filters will support specifying the converter modifier too
 - [x] when a filter was evaluated tags and services might be re-evaluated when they contain [cs]data filters, thats why those tags/services may not be used as triggers
 - [ ] keep stderr and exit code in all cases. keep stderr if stderr not empty, but the process exited as expected?
 - [ ] show stderr of filters in UI
