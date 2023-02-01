@@ -829,7 +829,6 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 				cond = append(cond, tcs[1])
 			}
 			conds = append(conds, cond)
-			fmt.Printf("%s\n", conds.String())
 		}
 	case "cdata", "sdata", "data":
 		val := stringParser{}
@@ -885,7 +884,7 @@ func (cs Conditions) invert() ConditionsSet {
 	// !(a & b & c) == !a | !b | !c
 	res := ConditionsSet(nil)
 	for _, c := range cs {
-		res = res.or(c.invert())
+		res = res.Or(c.invert())
 	}
 	return res
 }
@@ -894,7 +893,7 @@ func (c ConditionsSet) invert() ConditionsSet {
 	// !(a | b | c) == (!a & !b & !c)
 	conds := ConditionsSet{}
 	for _, cc := range c {
-		conds = conds.and(cc.invert())
+		conds = conds.And(cc.invert())
 	}
 	return conds
 }
@@ -949,7 +948,7 @@ func (a ConditionsSet) then(b ConditionsSet) ConditionsSet {
 	res := ConditionsSet(nil)
 	for _, c1 := range a {
 		for _, c2 := range b {
-			res = res.or(ConditionsSet{c1.then(c2)})
+			res = res.Or(ConditionsSet{c1.then(c2)})
 		}
 	}
 	return res
@@ -959,7 +958,7 @@ func (a Conditions) and(b Conditions) Conditions {
 	return append(append(Conditions(nil), a...), b...).clean()
 }
 
-func (a ConditionsSet) and(b ConditionsSet) ConditionsSet {
+func (a ConditionsSet) And(b ConditionsSet) ConditionsSet {
 	if len(a) == 0 {
 		return b
 	}
@@ -969,7 +968,7 @@ func (a ConditionsSet) and(b ConditionsSet) ConditionsSet {
 	res := ConditionsSet{}
 	for _, c1 := range a {
 		for _, c2 := range b {
-			res = res.or(ConditionsSet{c1.and(c2)})
+			res = res.Or(ConditionsSet{c1.and(c2)})
 		}
 	}
 	return res
@@ -980,7 +979,7 @@ func (a Conditions) or(b Conditions) ConditionsSet {
 	return ConditionsSet{a, b}
 }
 
-func (a ConditionsSet) or(b ConditionsSet) ConditionsSet {
+func (a ConditionsSet) Or(b ConditionsSet) ConditionsSet {
 	return append(append(ConditionsSet(nil), a...), b...)
 }
 
@@ -1006,7 +1005,7 @@ func (a Conditions) equal(b Conditions) bool {
 	return true
 }
 
-func (c ConditionsSet) clean() ConditionsSet {
+func (c ConditionsSet) Clean() ConditionsSet {
 	new := ConditionsSet(nil)
 outer:
 	for _, cc := range c {
@@ -1732,7 +1731,7 @@ func (c *queryAndCondition) QueryConditions(pc *parserContext) (ConditionsSet, e
 			return nil, err
 		}
 		if cond != nil {
-			conds = conds.and(cond)
+			conds = conds.And(cond)
 		}
 	}
 	return conds, nil
@@ -1746,7 +1745,7 @@ func (c *queryOrCondition) QueryConditions(pc *parserContext) (ConditionsSet, er
 			return nil, err
 		}
 		if cond != nil {
-			conds = conds.or(cond)
+			conds = conds.Or(cond)
 		}
 	}
 	return conds, nil
@@ -2096,5 +2095,5 @@ func (cs ConditionsSet) InlineTagFilters(tags map[string]TagDetails) ConditionsS
 	for _, c := range cs {
 		csNew = append(csNew, c.inlineTagFilter(tags)...)
 	}
-	return csNew.clean()
+	return csNew.Clean()
 }

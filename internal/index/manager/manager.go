@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -752,7 +753,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	maxUsedStreamID := uint64(0)
 	if len(info.markTagAddStreams) != 0 || len(info.markTagDelStreams) != 0 {
 		if !(strings.HasPrefix(name, "mark/") || strings.HasPrefix(name, "generated/")) {
-			return fmt.Errorf("tag %q is not of type 'mark' or 'enerated'", name)
+			return fmt.Errorf("tag %q is not of type 'mark' or 'generated'", name)
 		}
 		for _, s := range info.markTagAddStreams {
 			if maxUsedStreamID <= s {
@@ -784,41 +785,66 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				if maxUsedStreamID >= mgr.nextStreamID {
 					return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
 				}
-				newTag := *t
-				newTag.Matches = t.Matches.Copy()
-				for _, s := range info.markTagAddStreams {
-					newTag.Matches.Set(uint(s))
-					newTag.Uncertain.Set(uint(s))
-				}
-				for _, s := range info.markTagDelStreams {
-					newTag.Matches.Unset(uint(s))
-					newTag.Uncertain.Set(uint(s))
-				}
-
+				// update mark streamid tag matches without parsing the definition again
+				// this is a bit hacky but it is much faster than parsing the definition of long mark tags again
 				b := strings.Builder{}
-				if newTag.Matches.IsZero() {
-					b.WriteString("id:-1")
-				} else {
-					b.WriteString("id:")
-					last := uint(0)
-					for {
-						zeros := newTag.Matches.TrailingZerosFrom(last)
-						if zeros < 0 {
-							break
-						}
-						if last != 0 {
-							b.WriteByte(',')
-						}
-						last += uint(zeros)
-						b.WriteString(fmt.Sprintf("%d", last))
-						last++
+				b.WriteString("id:")
+				for i, s := range info.markTagAddStreams {
+					if t.Matches.IsSet(uint(s)) {
+						continue
+					}
+					t.Matches.Set(uint(s))
+					t.Uncertain.Set(uint(s))
+					if i != 0 {
+						b.WriteByte(',')
+					}
+					b.WriteString(fmt.Sprintf("%d", s))
+				}
+				if b.Len() > 3 {
+					markQuery := b.String()
+					if q, err := query.Parse(markQuery); err == nil {
+						t.Conditions = t.Conditions.Or(q.Conditions)
+					}
+					if t.definition == "id:-1" {
+						t.definition = markQuery
+					} else {
+						t.definition = fmt.Sprintf("%s,%s", t.definition, markQuery[3:])
 					}
 				}
-				newTag.definition = b.String()
-				if q, err := query.Parse(newTag.definition); err == nil {
-					newTag.Conditions = q.Conditions
+
+				b.Reset()
+				b.WriteString("!id:")
+				for i, s := range info.markTagDelStreams {
+					if !t.Matches.IsSet(uint(s)) {
+						continue
+					}
+					t.Matches.Unset(uint(s))
+					t.Uncertain.Set(uint(s))
+
+					if i != 0 {
+						b.WriteByte(',')
+					}
+
+					b.WriteString(fmt.Sprintf("%d", s))
+					t.definition = t.definition[:3] + regexp.MustCompile(fmt.Sprintf("(,|^)%d(,|$)", s)).ReplaceAllString(t.definition[3:], ",")
 				}
-				mgr.tags[name] = &newTag
+				if b.Len() > 4 {
+					markQuery := b.String()
+					if q, err := query.Parse(markQuery); err == nil {
+						t.Conditions = t.Conditions.And(q.Conditions).Clean()
+					}
+					oldLen := 0
+					for oldLen != len(t.definition) {
+						t.definition = strings.TrimSuffix(t.definition, ",")
+						t.definition = strings.Replace(t.definition, ":,", ":", 1)
+						t.definition = strings.ReplaceAll(t.definition, ",,", ",")
+						oldLen = len(t.definition)
+					}
+					if t.definition == "id:" {
+						t.definition = "id:-1"
+					}
+				}
+
 				mgr.inheritTagUncertainty()
 				mgr.tags[name].Uncertain = bitmask.LongBitmask{}
 				mgr.startTaggingJobIfNeeded()
