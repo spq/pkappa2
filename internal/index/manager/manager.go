@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -785,66 +784,62 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				if maxUsedStreamID >= mgr.nextStreamID {
 					return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
 				}
+				newTag := *t
+				newTag.Matches = t.Matches.Copy()
+				newTag.Uncertain = t.Uncertain.Copy()
 				// update mark streamid tag matches without parsing the definition again
 				// this is a bit hacky but it is much faster than parsing the definition of long mark tags again
-				b := strings.Builder{}
-				b.WriteString("id:")
-				for i, s := range info.markTagAddStreams {
-					if t.Matches.IsSet(uint(s)) {
-						continue
+				if len(info.markTagAddStreams) != 0 {
+					b := strings.Builder{}
+					b.WriteString("id:")
+					for _, s := range info.markTagAddStreams {
+						if newTag.Matches.IsSet(uint(s)) {
+							continue
+						}
+						newTag.Matches.Set(uint(s))
+						newTag.Uncertain.Set(uint(s))
+						b.WriteString(fmt.Sprintf("%d,", s))
 					}
-					t.Matches.Set(uint(s))
-					t.Uncertain.Set(uint(s))
-					if i != 0 {
-						b.WriteByte(',')
-					}
-					b.WriteString(fmt.Sprintf("%d", s))
-				}
-				if b.Len() > 3 {
-					markQuery := b.String()
-					if q, err := query.Parse(markQuery); err == nil {
-						t.Conditions = t.Conditions.Or(q.Conditions)
-					}
-					if t.definition == "id:-1" {
-						t.definition = markQuery
-					} else {
-						t.definition = fmt.Sprintf("%s,%s", t.definition, markQuery[3:])
-					}
-				}
-
-				b.Reset()
-				b.WriteString("!id:")
-				for i, s := range info.markTagDelStreams {
-					if !t.Matches.IsSet(uint(s)) {
-						continue
-					}
-					t.Matches.Unset(uint(s))
-					t.Uncertain.Set(uint(s))
-
-					if i != 0 {
-						b.WriteByte(',')
-					}
-
-					b.WriteString(fmt.Sprintf("%d", s))
-					t.definition = t.definition[:3] + regexp.MustCompile(fmt.Sprintf("(,|^)%d(,|$)", s)).ReplaceAllString(t.definition[3:], ",")
-				}
-				if b.Len() > 4 {
-					markQuery := b.String()
-					if q, err := query.Parse(markQuery); err == nil {
-						t.Conditions = t.Conditions.And(q.Conditions).Clean()
-					}
-					oldLen := 0
-					for oldLen != len(t.definition) {
-						t.definition = strings.TrimSuffix(t.definition, ",")
-						t.definition = strings.Replace(t.definition, ":,", ":", 1)
-						t.definition = strings.ReplaceAll(t.definition, ",,", ",")
-						oldLen = len(t.definition)
-					}
-					if t.definition == "id:" {
-						t.definition = "id:-1"
+					if b.Len() != len("id:") {
+						markQuery := b.String()
+						markQuery = markQuery[:len(markQuery)-1]
+						if q, err := query.Parse(markQuery); err == nil {
+							newTag.Conditions = newTag.Conditions.Or(q.Conditions)
+						}
+						if newTag.definition == "id:-1" {
+							newTag.definition = markQuery
+						} else {
+							newTag.definition = fmt.Sprintf("%s,%s", newTag.definition, markQuery[3:])
+						}
 					}
 				}
-
+				if len(info.markTagDelStreams) != 0 {
+					b := strings.Builder{}
+					b.WriteString("!id:")
+					newDefinition := fmt.Sprintf(",%s,", newTag.definition[3:])
+					for _, s := range info.markTagDelStreams {
+						if !newTag.Matches.IsSet(uint(s)) {
+							continue
+						}
+						newTag.Matches.Unset(uint(s))
+						newTag.Uncertain.Set(uint(s))
+						b.WriteString(fmt.Sprintf("%d,", s))
+						newDefinition = strings.Replace(newDefinition, fmt.Sprintf(",%d,", s), ",", 1)
+					}
+					if b.Len() != len("!id:") {
+						markQuery := b.String()
+						markQuery = markQuery[:len(markQuery)-1]
+						if q, err := query.Parse(markQuery); err == nil {
+							newTag.Conditions = newTag.Conditions.And(q.Conditions).Clean()
+						}
+						if newDefinition == "," {
+							newTag.definition = "id:-1"
+						} else {
+							newTag.definition = fmt.Sprintf("id:%s", newDefinition[1:len(newDefinition)-1])
+						}
+					}
+				}
+				mgr.tags[name] = &newTag
 				mgr.inheritTagUncertainty()
 				mgr.tags[name].Uncertain = bitmask.LongBitmask{}
 				mgr.startTaggingJobIfNeeded()
