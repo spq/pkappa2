@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,10 +38,20 @@ var (
 	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
 
 	listenAddress = flag.String("address", ":8080", "Listen address")
+
+	startupCpuprofile = flag.String("startup_cpuprofile", "", "write cpu profile to file")
 )
 
 func main() {
 	flag.Parse()
+
+	if *startupCpuprofile != "" {
+		f, err := os.Create(*startupCpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+	}
 
 	tools.AssertFolderRWXPermissions("base_dir", *baseDir)
 
@@ -706,6 +717,12 @@ func main() {
 		Handler: r,
 	}
 	log.Println("Ready to serve...")
+
+	if *startupCpuprofile != "" {
+		pprof.StopCPUProfile()
+		log.Printf("CPU profile written to %s", *startupCpuprofile)
+	}
+
 	if err := server.ListenAndServe(); err != nil {
 		log.Printf("ListenAndServe failed: %v", err)
 	}
