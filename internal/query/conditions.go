@@ -829,7 +829,6 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 				cond = append(cond, tcs[1])
 			}
 			conds = append(conds, cond)
-			fmt.Printf("%s\n", conds.String())
 		}
 	case "cdata", "sdata", "data":
 		val := stringParser{}
@@ -885,7 +884,7 @@ func (cs Conditions) invert() ConditionsSet {
 	// !(a & b & c) == !a | !b | !c
 	res := ConditionsSet(nil)
 	for _, c := range cs {
-		res = res.or(c.invert())
+		res = res.Or(c.invert())
 	}
 	return res
 }
@@ -894,7 +893,7 @@ func (c ConditionsSet) invert() ConditionsSet {
 	// !(a | b | c) == (!a & !b & !c)
 	conds := ConditionsSet{}
 	for _, cc := range c {
-		conds = conds.and(cc.invert())
+		conds = conds.And(cc.invert())
 	}
 	return conds
 }
@@ -949,7 +948,7 @@ func (a ConditionsSet) then(b ConditionsSet) ConditionsSet {
 	res := ConditionsSet(nil)
 	for _, c1 := range a {
 		for _, c2 := range b {
-			res = res.or(ConditionsSet{c1.then(c2)})
+			res = res.Or(ConditionsSet{c1.then(c2)})
 		}
 	}
 	return res
@@ -959,7 +958,7 @@ func (a Conditions) and(b Conditions) Conditions {
 	return append(append(Conditions(nil), a...), b...).clean()
 }
 
-func (a ConditionsSet) and(b ConditionsSet) ConditionsSet {
+func (a ConditionsSet) And(b ConditionsSet) ConditionsSet {
 	if len(a) == 0 {
 		return b
 	}
@@ -969,7 +968,7 @@ func (a ConditionsSet) and(b ConditionsSet) ConditionsSet {
 	res := ConditionsSet{}
 	for _, c1 := range a {
 		for _, c2 := range b {
-			res = res.or(ConditionsSet{c1.and(c2)})
+			res = res.Or(ConditionsSet{c1.and(c2)})
 		}
 	}
 	return res
@@ -980,17 +979,15 @@ func (a Conditions) or(b Conditions) ConditionsSet {
 	return ConditionsSet{a, b}
 }
 
-func (a ConditionsSet) or(b ConditionsSet) ConditionsSet {
+func (a ConditionsSet) Or(b ConditionsSet) ConditionsSet {
 	return append(append(ConditionsSet(nil), a...), b...)
 }
 
 func (c Conditions) impossible() bool {
-	c = c.clean()
 	return len(c) == 1 && impossibleCondition.equal(c[0])
 }
 
 func (c ConditionsSet) impossible() bool {
-	c = c.clean()
 	return len(c) == 1 && c[0].impossible()
 }
 
@@ -1006,14 +1003,106 @@ func (a Conditions) equal(b Conditions) bool {
 	return true
 }
 
-func (c ConditionsSet) clean() ConditionsSet {
+func (c ConditionsSet) cleanSimpleIDFilter() (ConditionsSet, bool) {
+	// auto generated id filters can become huge and the startup performance suffered because of this.
+	// this is an optimized version that only supports id:1,2,3 style filters but ist fast for them.
+	if len(c) == 0 {
+		return nil, false
+	}
+	ids := map[uint]struct{}{}
+	for _, cc := range c {
+		min, max, ok := cc.clean().extractSimpleIDFilter()
+		if !ok || min != max {
+			return nil, false
+		}
+		for i := min; i <= max; i++ {
+			ids[i] = struct{}{}
+		}
+	}
+	sortedIDs := make([]uint, 0, len(ids))
+	for id := range ids {
+		sortedIDs = append(sortedIDs, id)
+	}
+	ids = nil
+	sort.Slice(sortedIDs, func(i, j int) bool {
+		return sortedIDs[i] < sortedIDs[j]
+	})
+
+	new := ConditionsSet(nil)
+	for i := 0; i < len(sortedIDs); {
+		min := sortedIDs[i]
+		max := min
+		for i++; i < len(sortedIDs) && sortedIDs[i] == max+1; i++ {
+			max++
+		}
+		new = append(new, Conditions{
+			// -min + id >= 0 -> id >= min
+			&NumberCondition{
+				Summands: []NumberConditionSummand{{
+					Type:   NumberConditionSummandTypeID,
+					Factor: 1,
+				}},
+				Number: -int(min),
+			},
+			// max + -id >= 0 -> id <= max
+			&NumberCondition{
+				Summands: []NumberConditionSummand{{
+					Type:   NumberConditionSummandTypeID,
+					Factor: -1,
+				}},
+				Number: int(max),
+			},
+		})
+	}
+	return new, true
+}
+
+func (c Conditions) extractSimpleIDFilter() (uint, uint, bool) {
+	if len(c) == 0 {
+		return 0, 0, false
+	}
+	min, max := uint(0), uint(math.MaxUint)
+	for _, cc := range c {
+		ccc, ok := cc.(*NumberCondition)
+		if !ok || len(ccc.Summands) != 1 {
+			return 0, 0, false
+		}
+		s := ccc.Summands[0]
+		if s.Type != NumberConditionSummandTypeID || s.SubQuery != "" {
+			return 0, 0, false
+		}
+		switch s.Factor {
+		case 1:
+			// ID >= -Number
+			if ccc.Number <= 0 && min < uint(-ccc.Number) {
+				min = uint(-ccc.Number)
+			}
+		case -1:
+			// ID <= Number
+			if ccc.Number < 0 {
+				return 0, 0, false
+			}
+			if max > uint(ccc.Number) {
+				max = uint(ccc.Number)
+			}
+		default:
+			return 0, 0, false
+		}
+	}
+	return min, max, true
+}
+
+func (c ConditionsSet) Clean() ConditionsSet {
+	if cleaned, ok := c.cleanSimpleIDFilter(); ok {
+		return cleaned
+	}
 	new := ConditionsSet(nil)
 outer:
 	for _, cc := range c {
+		cc = cc.clean()
 		if cc.impossible() {
 			continue
 		}
-		cc = cc.clean()
 		for i, cc2 := range new {
 			if cc2.equal(cc) {
 				continue outer
@@ -1732,7 +1821,7 @@ func (c *queryAndCondition) QueryConditions(pc *parserContext) (ConditionsSet, e
 			return nil, err
 		}
 		if cond != nil {
-			conds = conds.and(cond)
+			conds = conds.And(cond)
 		}
 	}
 	return conds, nil
@@ -1746,7 +1835,7 @@ func (c *queryOrCondition) QueryConditions(pc *parserContext) (ConditionsSet, er
 			return nil, err
 		}
 		if cond != nil {
-			conds = conds.or(cond)
+			conds = conds.Or(cond)
 		}
 	}
 	return conds, nil
@@ -1868,31 +1957,12 @@ func (cs *ConditionsSet) StreamIDs(nextStreamID uint64) (bitmask.LongBitmask, bo
 	}
 	res := bitmask.LongBitmask{}
 	for _, ccs := range *cs {
-		min, max := 0, int(nextStreamID)
-		for _, cc := range ccs {
-			// Number + X >= 0
-			c, ok := cc.(*NumberCondition)
-			if !ok || len(c.Summands) != 1 {
-				return bitmask.LongBitmask{}, false
-			}
-			s := c.Summands[0]
-			if s.SubQuery != "" || s.Type != NumberConditionSummandTypeID {
-				return bitmask.LongBitmask{}, false
-			}
-			switch s.Factor {
-			case 1:
-				// ID >= -Number
-				if min < -c.Number {
-					min = -c.Number
-				}
-			case -1:
-				// ID <= Number
-				if max > c.Number+1 {
-					max = c.Number + 1
-				}
-			default:
-				return bitmask.LongBitmask{}, false
-			}
+		min, max, ok := ccs.extractSimpleIDFilter()
+		if !ok {
+			return bitmask.LongBitmask{}, false
+		}
+		if max > uint(nextStreamID) {
+			max = uint(nextStreamID)
 		}
 		for i := min; i < max; i++ {
 			res.Set(uint(i))
@@ -2096,5 +2166,5 @@ func (cs ConditionsSet) InlineTagFilters(tags map[string]TagDetails) ConditionsS
 	for _, c := range cs {
 		csNew = append(csNew, c.inlineTagFilter(tags)...)
 	}
-	return csNew.clean()
+	return csNew.Clean()
 }
