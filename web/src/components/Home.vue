@@ -197,10 +197,6 @@
   </v-card>
 </template>
 
-<style>
-
-</style>
-
 <script>
 export default {
   name: "Home",

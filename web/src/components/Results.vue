@@ -257,9 +257,6 @@
   </div>
 </template>
 
-<style>
-</style>
-
 <script>
 import { EventBus } from "./EventBus";
 import { mapActions, mapGetters, mapState } from "vuex";

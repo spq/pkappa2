@@ -2,9 +2,9 @@
   <v-simple-table dense>
     <thead>
       <tr>
-        <th class="text-left">Name</th>
-        <th class="text-left">Query</th>
-        <th colspan="2" class="text-left">Status</th>
+        <th class="text-left" width="20%">Name</th>
+        <th class="text-left" width="50%">Query</th>
+        <th colspan="2" class="text-left" width="30%">Status</th>
       </tr>
     </thead>
     <tbody>
@@ -20,7 +20,7 @@
             <v-icon>mdi-circle-small</v-icon
             ><v-chip :color="tag.Color" small>{{ tag.Name.substring(1 + tagType.key.length) }}</v-chip>
           </td>
-          <td>{{ tag.Definition }}</td>
+          <td><div class="tag_definition" :title="tag.Definition">{{ tag.Definition }}</div></td>
           <td>
             Matching {{ tag.MatchingCount }} Streams<span
               v-if="tag.UncertainCount != 0"
@@ -89,6 +89,16 @@
     </tbody>
   </v-simple-table>
 </template>
+
+<style scoped>
+.tag_definition {
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+</style>
 
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";

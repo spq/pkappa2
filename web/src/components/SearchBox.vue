@@ -76,6 +76,13 @@
   </div>
 </template>
 
+<style scoped>
+.font-white {
+  color: black;
+  font-weight: bold;
+}
+</style>
+
 <script>
 import { EventBus } from "./EventBus";
 import { addSearch, getTermAt } from "./searchHistory";
@@ -280,9 +287,3 @@ export default {
   },
 };
 </script>
-<style scoped>
-.font-white {
-  color: black;
-  font-weight: bold;
-}
-</style>
