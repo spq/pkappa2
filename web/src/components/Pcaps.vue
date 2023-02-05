@@ -1,24 +1,17 @@
 <template>
   <div>
-    <v-data-table
-      :headers="headers"
-      :items="pcapsPretty"
-      :loading="pcaps === null"
-      disable-pagination
-      hide-default-footer
-      dense
-    >
-      <template
-        v-for="field of [
-          'ParseTime',
-          'PacketTimestampMin',
-          'PacketTimestampMax',
-        ]"
-        v-slot:[`item.${field}`]="{ index, value }"
-        ><span :title="value | formatDateLong" :key="`${field}/${index}`">{{
-          value | formatDate
-        }}</span></template
-      >
+    <v-data-table :headers="headers" :items="pcapsPretty" :loading="pcaps === null" disable-pagination
+      hide-default-footer dense>
+      <template v-for="field of [
+        'ParseTime',
+        'PacketTimestampMin',
+        'PacketTimestampMax',
+      ]" v-slot:[`item.${field}`]="{ index, value }"><span :title="value | formatDateLong"
+          :key="`${field}/${index}`">{{
+  value | formatDate
+          }}</span></template>
+      <template v-slot:[`item.Filesize`]="{ value }"><span :title="`${value} Bytes`">{{ value | prettyBytes(1, true)
+      }}</span></template>
     </v-data-table>
   </div>
 </template>

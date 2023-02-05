@@ -9,14 +9,14 @@
             icon
             @click="checkboxAction"
             :disabled="
-              streams.result == null || streams.result.Results.length == 0
+            streams.result == null || streams.result.Results.length == 0
             "
           >
             <v-icon
               >mdi-{{
-                noneSelected
-                  ? "checkbox-blank-outline"
-                  : allSelected
+              noneSelected
+              ? "checkbox-blank-outline"
+                : allSelected
                   ? "checkbox-marked"
                   : "minus-box"
               }}</v-icon
@@ -53,18 +53,18 @@
               :key="tag.Name"
               link
               @click="
-                markSelectedStreams(
-                  tag.Name,
-                  tagStatusForSelection[tag.Name] !== true
-                )
+              markSelectedStreams(
+                tag.Name,
+                tagStatusForSelection[tag.Name] !== true
+              )
               "
             >
               <v-list-item-action>
                 <v-icon
                   >mdi-{{
-                    tagStatusForSelection[tag.Name] === true
-                      ? "checkbox-outline"
-                      : tagStatusForSelection[tag.Name] === false
+                  tagStatusForSelection[tag.Name] === true
+                    ? "checkbox-outline"
+                    : tagStatusForSelection[tag.Name] === false
                       ? "minus-box"
                       : "checkbox-blank-outline"
                   }}</v-icon
@@ -87,16 +87,16 @@
       <v-spacer />
       <div
         v-if="
-          !streams.running &&
-          !streams.error &&
-          streams.result &&
-          streams.result.Results.length != 0
+        !streams.running &&
+        !streams.error &&
+        streams.result &&
+        streams.result.Results.length != 0
         "
       >
         <span class="text-caption"
           >{{ streams.result.Offset + 1 }}–{{
-            streams.result.Offset + streams.result.Results.length
-          }}
+          streams.result.Offset + streams.result.Results.length
+        }}
           of
           {{
             streams.result.MoreResults
@@ -112,13 +112,13 @@
               icon
               :disabled="streams.page == 0"
               @click="
-                $router.push({
-                  name: 'search',
-                  query: {
-                    q: $route.query.q,
-                    p: ($route.query.p | 0) - 1,
-                  },
-                })
+              $router.push({
+                name: 'search',
+                query: {
+                  q: $route.query.q,
+                  p: ($route.query.p | 0) - 1,
+                },
+              })
               "
             >
               <v-icon>mdi-chevron-left</v-icon>
@@ -134,13 +134,13 @@
               icon
               :disabled="!streams.result.MoreResults"
               @click="
-                $router.push({
-                  name: 'search',
-                  query: {
-                    q: $route.query.q,
-                    p: ($route.query.p | 0) + 1,
-                  },
-                })
+              $router.push({
+                name: 'search',
+                query: {
+                  q: $route.query.q,
+                  p: ($route.query.p | 0) + 1,
+                },
+              })
               "
             >
               <v-icon>mdi-chevron-right</v-icon>
@@ -164,14 +164,14 @@
           <v-col class="shrink">
             <v-btn
               @click="
-                $router.push({
-                  name: 'search',
-                  query: {
-                    q: `data:\x22${$options.filters.regexEscape(
-                      $route.query.q
-                    )}\x22`,
-                  },
-                })
+              $router.push({
+                name: 'search',
+                query: {
+                  q: `data:\x22${$options.filters.regexEscape(
+                    $route.query.q
+                  )}\x22`,
+                },
+              })
               "
               >Search for the input</v-btn
             >
@@ -201,9 +201,9 @@
             v-for="(stream, index) in streams.result.Results"
             :key="index"
             :to="{
-              name: 'stream',
-              query: { q: $route.query.q, p: $route.query.p },
-              params: { streamId: stream.Stream.ID },
+            name: 'stream',
+            query: { q: $route.query.q, p: $route.query.p },
+            params: { streamId: stream.Stream.ID },
             }"
             custom
             #default="{ navigate }"
@@ -230,7 +230,7 @@
                       >{{ tag | tagify("type") | capitalize }}
                       {{ tag | tagify("name") }}</template
                     ><template v-else>{{
-                      tag | tagify("name")
+  tag | tagify("name")
                     }}</template></v-chip
                   ></v-hover
                 >
@@ -238,11 +238,11 @@
               <td>
                 {{ stream.Stream.Client.Host }}:{{ stream.Stream.Client.Port }}
               </td>
-              <td>{{ stream.Stream.Client.Bytes }}</td>
+              <td><span :title="`${stream.Stream.Client.Bytes} Bytes`">{{ stream.Stream.Client.Bytes | prettyBytes(1, true) }}</span></td>
               <td>
                 {{ stream.Stream.Server.Host }}:{{ stream.Stream.Server.Port }}
               </td>
-              <td>{{ stream.Stream.Server.Bytes }}</td>
+              <td><span :title="`${stream.Stream.Server.Bytes} Bytes`">{{ stream.Stream.Server.Bytes | prettyBytes(1, true) }}</span></td>
               <td
                 class="text-right"
                 :title="stream.Stream.FirstPacket | formatDateLong"

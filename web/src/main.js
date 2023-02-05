@@ -4,12 +4,15 @@ import App from './App.vue';
 import store from './store';
 import router from './routes';
 import VueApexCharts from 'vue-apexcharts';
+import vueFilterPrettyBytes from 'vue-filter-pretty-bytes'
+
 
 Vue.config.productionTip = process.env.NODE_ENV == 'production';
 
 Vue.use(Vuetify);
 Vue.use(VueApexCharts)
 Vue.use(require('vue-moment'));
+Vue.use(vueFilterPrettyBytes)
 
 Vue.component('apexchart', VueApexCharts)
 
