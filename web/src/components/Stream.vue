@@ -195,12 +195,16 @@
       <v-container fluid>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Client:</v-col>
-          <v-col cols="2" class="text-body-2"
+          <v-col
+            cols="2"
+            class="text-body-2"
             :title="`${stream.stream.Stream.Client.Host}:${stream.stream.Stream.Client.Port} (${stream.stream.Stream.Client.Bytes} Bytes)`"
             >{{ stream.stream.Stream.Client.Host }}:{{
               stream.stream.Stream.Client.Port
             }}
-            ({{ stream.stream.Stream.Client.Bytes | prettyBytes(1, true) }})</v-col
+            ({{
+              stream.stream.Stream.Client.Bytes | prettyBytes(1, true)
+            }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
           <v-col
@@ -211,7 +215,7 @@
           >
           <v-col cols="1" class="text-subtitle-2"
             >{{
-            streamTags.service.length == 0 ? "Protocol" : "Service"
+              streamTags.service.length == 0 ? "Protocol" : "Service"
             }}:</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Tags:</v-col>
@@ -227,12 +231,16 @@
         </v-row>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Server:</v-col>
-          <v-col cols="2" class="text-body-2"
+          <v-col
+            cols="2"
+            class="text-body-2"
             :title="`${stream.stream.Stream.Server.Host}:${stream.stream.Stream.Server.Port} (${stream.stream.Stream.Server.Bytes} Bytes)`"
             >{{ stream.stream.Stream.Server.Host }}:{{
               stream.stream.Stream.Server.Port
             }}
-            ({{ stream.stream.Stream.Server.Bytes | prettyBytes(1, true) }})</v-col
+            ({{
+              stream.stream.Stream.Server.Bytes | prettyBytes(1, true)
+            }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
           <v-col

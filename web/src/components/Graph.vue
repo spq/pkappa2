@@ -77,13 +77,13 @@
 
 <style>
 .apexcharts-toolbar {
-    z-index: 0 !important;
+  z-index: 0 !important;
 }
 </style>
 
 <script>
 import { mapActions, mapState } from "vuex";
-import ToolBar from './ToolBar.vue';
+import ToolBar from "./ToolBar.vue";
 
 export default {
   components: { ToolBar },
