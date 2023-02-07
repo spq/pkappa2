@@ -1776,7 +1776,9 @@ func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime tim
 					sortingLookup = func() ([]uint32, error) {
 						if res == nil {
 							res = make([]uint32, idx.StreamCount())
-							idx.readObject(section, 0, 0, res)
+							if err := idx.readObject(section, 0, 0, res); err != nil {
+								return nil, err
+							}
 							if reverse {
 								for i, j := 0, len(res)-1; i < j; {
 									res[i], res[j] = res[j], res[i]

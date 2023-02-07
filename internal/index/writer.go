@@ -82,7 +82,7 @@ func (w *Writer) pos() (uint64, error) {
 	if err := w.buffer.Flush(); err != nil {
 		return 0, err
 	}
-	pos, err := w.file.Seek(0, os.SEEK_CUR)
+	pos, err := w.file.Seek(0, io.SeekCurrent)
 	if err != nil {
 		debug.PrintStack()
 	}

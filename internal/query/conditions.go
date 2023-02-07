@@ -1023,7 +1023,6 @@ func (c ConditionsSet) cleanSimpleIDFilter() (ConditionsSet, bool) {
 	for id := range ids {
 		sortedIDs = append(sortedIDs, id)
 	}
-	ids = nil
 	sort.Slice(sortedIDs, func(i, j int) bool {
 		return sortedIDs[i] < sortedIDs[j]
 	})
