@@ -3,7 +3,7 @@
     <ToolBar>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" v-on="on" icon @click="fetchGraphLocal">
+          <v-btn v-bind="attrs" icon v-on="on" @click="fetchGraphLocal">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -11,16 +11,16 @@
       </v-tooltip>
       <v-toolbar-items class="pt-1">
         <v-select
-          :items="Object.keys(chartTypes)"
           v-model="chartType"
+          :items="Object.keys(chartTypes)"
           flat
           solo
           dense
           label="Type"
         ></v-select>
         <v-select
-          :items="chartTagOptions"
           v-model="chartTags"
+          :items="chartTagOptions"
           multiple
           flat
           solo
@@ -49,7 +49,7 @@
                 >
               </v-list-item-content>
             </v-list-item>
-            <v-list-item v-else v-on="on" v-bind="attrs" #default="{ active }">
+            <v-list-item v-else v-slot="{ active }" v-bind="attrs" v-on="on">
               <v-list-item-action>
                 <v-checkbox :ripple="false" :input-value="active"></v-checkbox>
               </v-list-item-action>
@@ -59,8 +59,8 @@
         </v-select>
       </v-toolbar-items>
     </ToolBar>
-    <v-skeleton-loader type="image" v-if="graph.running"></v-skeleton-loader>
-    <v-alert type="error" dense v-else-if="graph.error">{{
+    <v-skeleton-loader v-if="graph.running" type="image"></v-skeleton-loader>
+    <v-alert v-else-if="graph.error" type="error" dense>{{
       graph.error
     }}</v-alert>
     <div v-else-if="chartData != null && chartOptions != null">
@@ -70,24 +70,18 @@
         :series="chartData"
         height="400px"
       ></apexchart>
-      <v-text-field disabled v-model="chartTimeFilter"></v-text-field>
+      <v-text-field v-model="chartTimeFilter" disabled></v-text-field>
     </div>
   </div>
 </template>
-
-<style>
-.apexcharts-toolbar {
-  z-index: 0 !important;
-}
-</style>
 
 <script>
 import { mapActions, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
 
 export default {
-  components: { ToolBar },
   name: "Graph",
+  components: { ToolBar },
   data() {
     return {
       chartOptions: null,
@@ -642,3 +636,9 @@ export default {
   },
 };
 </script>
+
+<style>
+.apexcharts-toolbar {
+  z-index: 0 !important;
+}
+</style>

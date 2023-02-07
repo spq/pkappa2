@@ -10,7 +10,7 @@
         </v-card-title>
         <v-card-text>
           <v-text-field v-model="tagColor" label="Color" hide-details>
-            <template v-slot:append>
+            <template #append>
               <v-menu
                 v-model="colorPickerOpen"
                 top
@@ -18,19 +18,19 @@
                 nudge-left="32"
                 :close-on-content-click="false"
               >
-                <template v-slot:activator="{ on }">
+                <template #activator="{ on }">
                   <div :style="swatchStyle" v-on="on" />
                 </template>
                 <v-card>
                   <v-card-text>
                     <v-color-picker
                       v-model="colorPickerValue"
-                      @update:color="colorPickerValueUpdate"
                       mode="hexa"
                       hide-mode-switch
                       hide-inputs
                       show-swatches
                       flat
+                      @update:color="colorPickerValueUpdate"
                     />
                   </v-card-text>
                 </v-card>
@@ -43,11 +43,11 @@
           <v-btn text @click="visible = false">Cancel</v-btn>
           <v-btn
             text
-            @click="updateColor"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
             type="submit"
+            @click="updateColor"
             >Save</v-btn
           >
         </v-card-actions>

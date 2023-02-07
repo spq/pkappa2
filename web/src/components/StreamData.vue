@@ -4,8 +4,8 @@
       <template v-if="presentation == 'ascii'">
         <span
           v-for="(chunk, index) in data"
-          :data-chunk-idx="index"
           :key="index"
+          :data-chunk-idx="index"
           :style="
             chunk.Direction != 0
               ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
@@ -61,7 +61,6 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
 });
 export default {
   name: "StreamData",
-  props: ["presentation", "data"],
   filters: {
     inlineAscii(b64) {
       return atob(b64)
@@ -126,5 +125,6 @@ export default {
       return str;
     },
   },
+  props: ["presentation", "data"],
 };
 </script>

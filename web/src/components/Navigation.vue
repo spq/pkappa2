@@ -22,12 +22,12 @@
       >
     </v-list-item>
     <v-list-group
+      v-for="tagType in tagTypes"
+      :key="tagType.key"
       link
       dense
       :value="true"
       sub-group
-      v-for="tagType in tagTypes"
-      :key="tagType.key"
     >
       <template #activator>
         <v-list-item-icon>
@@ -39,7 +39,7 @@
       </template>
       <template v-for="tag in groupedTags[tagType.key]">
         <v-hover
-          #default="{ hover }"
+          v-slot="{ hover }"
           :key="tag.Name"
           :style="{ backgroundColor: tag.Color }"
         >
@@ -66,8 +66,8 @@
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
-                <v-list-item-action v-on="on" v-bind="attrs">
-                  <v-btn icon x-small v-if="hover">
+                <v-list-item-action v-bind="attrs" v-on="on">
+                  <v-btn v-if="hover" icon x-small>
                     <v-icon>mdi-dots-vertical</v-icon>
                   </v-btn>
                   <v-chip v-else x-small
@@ -126,7 +126,7 @@
         </v-hover>
       </template>
     </v-list-group>
-    <v-list-group link dense v-model="moreOpen" sub-group>
+    <v-list-group v-model="moreOpen" link dense sub-group>
       <template #activator>
         <v-list-item-icon>
           <v-icon dense>mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon>
@@ -174,30 +174,6 @@
     </v-list-group>
   </v-list>
 </template>
-
-<style>
-.v-application--is-ltr
-  .v-navigation-drawer
-  .v-list-item__icon.v-list-group__header__prepend-icon {
-  display: none;
-}
-
-.v-application--is-ltr .v-navigation-drawer .v-list-item__icon:first-child {
-  display: none;
-}
-
-.v-application--is-ltr
-  .v-navigation-drawer
-  .v-list-group--sub-group
-  .v-list-group__header {
-  padding-left: 8px;
-}
-
-.v-application--is-ltr .v-navigation-drawer .v-list-item__action {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-</style>
 
 <script>
 import { EventBus } from "./EventBus";
@@ -257,3 +233,27 @@ export default {
   },
 };
 </script>
+
+<style>
+.v-application--is-ltr
+  .v-navigation-drawer
+  .v-list-item__icon.v-list-group__header__prepend-icon {
+  display: none;
+}
+
+.v-application--is-ltr .v-navigation-drawer .v-list-item__icon:first-child {
+  display: none;
+}
+
+.v-application--is-ltr
+  .v-navigation-drawer
+  .v-list-group--sub-group
+  .v-list-group__header {
+  padding-left: 8px;
+}
+
+.v-application--is-ltr .v-navigation-drawer .v-list-item__action {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+</style>

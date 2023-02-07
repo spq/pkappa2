@@ -13,7 +13,7 @@ Vue.use(VueApexCharts);
 Vue.use(require("vue-moment"));
 Vue.use(vueFilterPrettyBytes);
 
-Vue.component("apexchart", VueApexCharts);
+Vue.component("Apexchart", VueApexCharts);
 
 const vue = new Vue({
   vuetify: new Vuetify(),

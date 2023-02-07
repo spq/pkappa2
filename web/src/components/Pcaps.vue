@@ -14,12 +14,12 @@
           'PacketTimestampMin',
           'PacketTimestampMax',
         ]"
-        v-slot:[`item.${field}`]="{ index, value }"
-        ><span :title="value | formatDateLong" :key="`${field}/${index}`">{{
+        #[`item.${field}`]="{ index, value }"
+        ><span :key="`${field}/${index}`" :title="value | formatDateLong">{{
           value | formatDate
         }}</span></template
       >
-      <template v-slot:[`item.Filesize`]="{ value }"
+      <template #[`item.Filesize`]="{ value }"
         ><span :title="`${value} Bytes`">{{
           value | prettyBytes(1, true)
         }}</span></template
