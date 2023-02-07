@@ -15,5 +15,7 @@
   },
   "[go]": {
     "editor.defaultFormatter": "golang.go"
-  }
+  },
+  "prettier.ignorePath": "./web/.prettierignore",
+  "prettier.configPath": "./web/.prettierrc.json"
 }
