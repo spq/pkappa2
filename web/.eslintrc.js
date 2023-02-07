@@ -1,4 +1,8 @@
 module.exports = {
+  root: true,
+  env: {
+    node: true,
+  },
   parserOptions: {
     ecmaVersion: 2021,
     parser: "@babel/eslint-parser",
@@ -9,6 +13,7 @@ module.exports = {
     // 'plugin:vue/vue3-recommended',
     // 'plugin:vue/recommended', // Use this if you are using Vue.js 2.x.
     "plugin:vue/essential",
+    "prettier",
   ],
   rules: {
     // override/add rules settings here, such as:
