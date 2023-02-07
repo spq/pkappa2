@@ -2,17 +2,17 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.19', '1.18' ]
-        node: [ 19, 18 ]
+        go: ["1.19", "1.18"]
+        node: [19, 18]
         exclude:
           - go: 1.19
             node: 18
@@ -20,29 +20,73 @@ jobs:
             node: 19
     name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Use Node.js ${{ matrix.node }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node }}
-        cache: 'yarn'
-        cache-dependency-path: 'web/yarn.lock'
+      - name: Set up Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+          cache: "yarn"
+          cache-dependency-path: "web/yarn.lock"
 
-    - name: Build frontend
-      working-directory: ./web
-      run: |
-        yarn install --frozen-lockfile
-        yarn build
+      - name: Build frontend
+        working-directory: ./web
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
 
-    - name: Set up Go ${{ matrix.go }}
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ matrix.go }}
-        cache: true
-    
-    - name: Install dependencies
-      run: sudo apt-get install -y libpcap-dev
+      - name: Set up Go ${{ matrix.go }}
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
 
-    - name: Build
-      run: go build -v ./cmd/pkappa2/main.go
+      - name: Install dependencies
+        run: sudo apt-get install -y libpcap-dev
+
+      - name: Build
+        run: go build -v ./cmd/pkappa2/main.go
+
+  golangci:
+    name: Lint Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+          cache: true
+
+      - name: Install dependencies
+        run: sudo apt-get install -y libpcap-dev
+
+      - name: Fake frontend build
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v3
+
+  yarnlint:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js 19
+        uses: actions/setup-node@v3
+        with:
+          node-version: 19
+          cache: "yarn"
+          cache-dependency-path: "web/yarn.lock"
+
+      - name: Install frontend dependencies
+        working-directory: ./web
+        run: yarn install --frozen-lockfile
+
+      - name: Lint frontend
+        working-directory: ./web
+        run: |
+          yarn lint
+          yarn prettier --check .
