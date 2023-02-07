@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-v-html -->
 <template>
   <v-card>
     <v-card-text>
@@ -13,10 +14,10 @@
           "
         >
           <span
-            v-for="({ str, offset }, index) in $options.filters.inlineAscii(
+            v-for="({ str, offset }, index2) in $options.filters.inlineAscii(
               chunk.Content
             )"
-            :key="index"
+            :key="index2"
             :data-offset="offset"
             v-html="str"
           >
@@ -125,6 +126,15 @@ export default {
       return str;
     },
   },
-  props: ["presentation", "data"],
+  props: {
+    presentation: {
+      type: String,
+      required: true,
+    },
+    data: {
+      type: Array,
+      required: true,
+    },
+  },
 };
 </script>

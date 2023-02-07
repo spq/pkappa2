@@ -212,6 +212,10 @@ export default {
     ...mapGetters(["groupedTags"]),
     ...mapState(["status"]),
   },
+  mounted() {
+    this.updateTags();
+    this.updateStatus();
+  },
   methods: {
     ...mapActions(["updateTags", "updateStatus"]),
     confirmTagDeletion(tagId) {
@@ -226,10 +230,6 @@ export default {
     showTagColorChangeDialog(tagId) {
       EventBus.$emit("showTagColorChangeDialog", { tagId });
     },
-  },
-  mounted() {
-    this.updateTags();
-    this.updateStatus();
   },
 };
 </script>

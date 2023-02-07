@@ -128,12 +128,12 @@ export default {
       ],
     };
   },
-  mounted() {
-    this.updateTags();
-  },
   computed: {
     ...mapState(["tags"]),
     ...mapGetters(["groupedTags"]),
+  },
+  mounted() {
+    this.updateTags();
   },
   methods: {
     ...mapActions(["updateTags"]),

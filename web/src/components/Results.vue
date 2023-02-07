@@ -280,40 +280,6 @@ export default {
       selected: [],
     };
   },
-  mounted() {
-    this.fetchStreams();
-
-    const handle = (e, pageOffset) => {
-      if (pageOffset >= 1 && !this.streams.result.MoreResults) return;
-      let p = this.$route.query.p | 0;
-      p += pageOffset;
-      if (p < 0) return;
-      e.preventDefault();
-      this.$router.push({
-        name: "search",
-        query: { q: this.$route.query.q, p },
-      });
-    };
-    const handlers = {
-      j: (e) => {
-        handle(e, -1);
-      },
-      k: (e) => {
-        handle(e, 1);
-      },
-    };
-    this._keyListener = function (e) {
-      if (["input", "textarea"].includes(e.target.tagName.toLowerCase()))
-        return;
-
-      if (!Object.keys(handlers).includes(e.key)) return;
-      handlers[e.key](e);
-    }.bind(this);
-    window.addEventListener("keydown", this._keyListener);
-  },
-  beforeDestroy() {
-    window.removeEventListener("keydown", this._keyListener);
-  },
   computed: {
     ...mapState(["streams", "tags"]),
     ...mapGetters(["groupedTags"]),
@@ -352,6 +318,43 @@ export default {
       this.tags?.forEach((t) => (colors[t.Name] = t.Color));
       return colors;
     },
+  },
+  watch: {
+    $route: "fetchStreams",
+  },
+  mounted() {
+    this.fetchStreams();
+
+    const handle = (e, pageOffset) => {
+      if (pageOffset >= 1 && !this.streams.result.MoreResults) return;
+      let p = this.$route.query.p | 0;
+      p += pageOffset;
+      if (p < 0) return;
+      e.preventDefault();
+      this.$router.push({
+        name: "search",
+        query: { q: this.$route.query.q, p },
+      });
+    };
+    const handlers = {
+      j: (e) => {
+        handle(e, -1);
+      },
+      k: (e) => {
+        handle(e, 1);
+      },
+    };
+    this._keyListener = function (e) {
+      if (["input", "textarea"].includes(e.target.tagName.toLowerCase()))
+        return;
+
+      if (!Object.keys(handlers).includes(e.key)) return;
+      handlers[e.key](e);
+    }.bind(this);
+    window.addEventListener("keydown", this._keyListener);
+  },
+  beforeDestroy() {
+    window.removeEventListener("keydown", this._keyListener);
   },
   methods: {
     ...mapActions(["searchStreams", "markTagAdd", "markTagDel"]),
@@ -395,9 +398,6 @@ export default {
     isTextSelected() {
       return window.getSelection().type == "Range";
     },
-  },
-  watch: {
-    $route: "fetchStreams",
   },
 };
 </script>

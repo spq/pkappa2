@@ -421,9 +421,6 @@ export default {
       },
     };
   },
-  mounted() {
-    this.fetchGraphLocal();
-  },
   computed: {
     ...mapState(["tags", "graph"]),
     chartType: {
@@ -481,44 +478,6 @@ export default {
         }
       }
       return options;
-    },
-  },
-  methods: {
-    ...mapActions(["fetchGraph"]),
-    setChartTagOptions(typ, active) {
-      this.$nextTick(() => {
-        const sel = this.chartTags;
-        for (var i = 0; i < sel.length; i++) {
-          if (sel[i].startsWith(`${typ}/`)) {
-            sel.splice(i--, 1);
-          }
-        }
-        if (active) {
-          for (const t of this.chartTagOptions) {
-            if (t.value.startsWith(`${typ}/`)) {
-              sel.push(t.value);
-            }
-          }
-        }
-        this.chartTags = sel;
-      });
-    },
-    fetchGraphLocal() {
-      const type = this.chartType;
-      if (!type) return;
-      let tags = this.chartTags;
-      if (!tags) tags = [];
-      let query = this.$route.query.q;
-      if (!query) query = null;
-
-      this.chartData = null;
-      this.fetchGraph({
-        delta: "1m",
-        aspects: this.chartTypes[type].aspects,
-        tags: tags,
-        query: query,
-        type,
-      });
     },
   },
   watch: {
@@ -632,6 +591,47 @@ export default {
       };
       this.chartData = [];
       obj.build(this.chartData, this.chartOptions);
+    },
+  },
+  mounted() {
+    this.fetchGraphLocal();
+  },
+  methods: {
+    ...mapActions(["fetchGraph"]),
+    setChartTagOptions(typ, active) {
+      this.$nextTick(() => {
+        const sel = this.chartTags;
+        for (var i = 0; i < sel.length; i++) {
+          if (sel[i].startsWith(`${typ}/`)) {
+            sel.splice(i--, 1);
+          }
+        }
+        if (active) {
+          for (const t of this.chartTagOptions) {
+            if (t.value.startsWith(`${typ}/`)) {
+              sel.push(t.value);
+            }
+          }
+        }
+        this.chartTags = sel;
+      });
+    },
+    fetchGraphLocal() {
+      const type = this.chartType;
+      if (!type) return;
+      let tags = this.chartTags;
+      if (!tags) tags = [];
+      let query = this.$route.query.q;
+      if (!query) query = null;
+
+      this.chartData = null;
+      this.fetchGraph({
+        delta: "1m",
+        aspects: this.chartTypes[type].aspects,
+        tags: tags,
+        query: query,
+        type,
+      });
     },
   },
 };

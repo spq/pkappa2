@@ -74,9 +74,6 @@ export default {
       colorPickerValue: "",
     };
   },
-  created() {
-    EventBus.$on("showTagColorChangeDialog", this.openDialog);
-  },
   computed: {
     ...mapState(["tags"]),
     // https://codepen.io/JamieCurnow/pen/KKPjraK
@@ -91,6 +88,14 @@ export default {
         transition: "border-radius 200ms ease-in-out",
       };
     },
+  },
+  watch: {
+    colorPickerOpen(val, old) {
+      if (val && !old) this.colorPickerValue = this.tagColor;
+    },
+  },
+  created() {
+    EventBus.$on("showTagColorChangeDialog", this.openDialog);
   },
   methods: {
     ...mapActions(["changeTagColor"]),
@@ -119,11 +124,6 @@ export default {
           this.loading = false;
           EventBus.$emit("showError", { message: err });
         });
-    },
-  },
-  watch: {
-    colorPickerOpen(val, old) {
-      if (val && !old) this.colorPickerValue = this.tagColor;
     },
   },
 };

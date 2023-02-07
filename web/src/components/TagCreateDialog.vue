@@ -88,6 +88,11 @@ export default {
       };
     },
   },
+  watch: {
+    colorPickerOpen(val, old) {
+      if (val && !old) this.colorPickerValue = this.tagColor;
+    },
+  },
   created() {
     EventBus.$on("showCreateTagDialog", this.openDialog);
   },
@@ -167,11 +172,6 @@ export default {
           .toString(16)
           .padStart(2, "0");
       return "#" + toHex(r) + toHex(g) + toHex(b);
-    },
-  },
-  watch: {
-    colorPickerOpen(val, old) {
-      if (val && !old) this.colorPickerValue = this.tagColor;
     },
   },
 };

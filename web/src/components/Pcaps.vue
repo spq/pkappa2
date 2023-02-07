@@ -63,9 +63,6 @@ export default {
       ],
     };
   },
-  mounted() {
-    this.updatePcaps();
-  },
   computed: {
     ...mapState(["pcaps"]),
     pcapsPretty() {
@@ -84,6 +81,9 @@ export default {
         return res;
       });
     },
+  },
+  mounted() {
+    this.updatePcaps();
   },
   methods: {
     ...mapActions(["updatePcaps"]),

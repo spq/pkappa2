@@ -352,6 +352,13 @@ export default {
       return this.streams.result.Results[index - 1].Stream.ID;
     },
   },
+  watch: {
+    $route: "fetchStreamForId",
+    presentation(v) {
+      localStorage.streamPresentation = v;
+      document.getSelection().empty();
+    },
+  },
   mounted() {
     this.fetchStreamForId();
     registerSelectionListener(this);
@@ -413,13 +420,6 @@ export default {
             EventBus.$emit("showError", { message: err });
           }
         );
-    },
-  },
-  watch: {
-    $route: "fetchStreamForId",
-    presentation(v) {
-      localStorage.streamPresentation = v;
-      document.getSelection().empty();
     },
   },
 };
