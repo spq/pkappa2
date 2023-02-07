@@ -1,6 +1,7 @@
 # nearleyc query.ne -o query.js
 @{%
 /* eslint-disable */
+/* prettier-ignore */
 const moo = require("moo");
 
 const lexer = moo.compile({

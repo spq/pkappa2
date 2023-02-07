@@ -238,11 +238,19 @@
               <td>
                 {{ stream.Stream.Client.Host }}:{{ stream.Stream.Client.Port }}
               </td>
-              <td>{{ stream.Stream.Client.Bytes }}</td>
+              <td>
+                <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
+                  stream.Stream.Client.Bytes | prettyBytes(1, true)
+                }}</span>
+              </td>
               <td>
                 {{ stream.Stream.Server.Host }}:{{ stream.Stream.Server.Port }}
               </td>
-              <td>{{ stream.Stream.Server.Bytes }}</td>
+              <td>
+                <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
+                  stream.Stream.Server.Bytes | prettyBytes(1, true)
+                }}</span>
+              </td>
               <td
                 class="text-right"
                 :title="stream.Stream.FirstPacket | formatDateLong"
@@ -256,9 +264,6 @@
     </v-simple-table>
   </div>
 </template>
-
-<style>
-</style>
 
 <script>
 import { EventBus } from "./EventBus";

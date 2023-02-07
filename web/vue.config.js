@@ -1,7 +1,5 @@
 module.exports = {
-  transpileDependencies: [
-    'vuetify'
-  ],
+  transpileDependencies: ["vuetify"],
   devServer: {
     allowedHosts: ["all"],
     proxy: {
@@ -11,4 +9,4 @@ module.exports = {
       },
     },
   },
-}
+};

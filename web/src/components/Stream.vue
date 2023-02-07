@@ -128,7 +128,10 @@
       </v-btn-toggle>
       <v-row>
         <v-col cols="6">
-          <v-tooltip bottom v-if="stream.stream != null && selectableConverters.length > 1">
+          <v-tooltip
+            bottom
+            v-if="stream.stream != null && selectableConverters.length > 1"
+          >
             <template #activator="{ on, attrs }">
               <v-select
                 v-bind="attrs"
@@ -211,11 +214,16 @@
       <v-container fluid>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Client:</v-col>
-          <v-col cols="2" class="text-body-2"
+          <v-col
+            cols="2"
+            class="text-body-2"
+            :title="`${stream.stream.Stream.Client.Host}:${stream.stream.Stream.Client.Port} (${stream.stream.Stream.Client.Bytes} Bytes)`"
             >{{ stream.stream.Stream.Client.Host }}:{{
               stream.stream.Stream.Client.Port
             }}
-            ({{ stream.stream.Stream.Client.Bytes }} Bytes)</v-col
+            ({{
+              stream.stream.Stream.Client.Bytes | prettyBytes(1, true)
+            }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
           <v-col
@@ -242,11 +250,16 @@
         </v-row>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Server:</v-col>
-          <v-col cols="2" class="text-body-2"
+          <v-col
+            cols="2"
+            class="text-body-2"
+            :title="`${stream.stream.Stream.Server.Host}:${stream.stream.Stream.Server.Port} (${stream.stream.Stream.Server.Bytes} Bytes)`"
             >{{ stream.stream.Stream.Server.Host }}:{{
               stream.stream.Stream.Server.Port
             }}
-            ({{ stream.stream.Stream.Server.Bytes }} Bytes)</v-col
+            ({{
+              stream.stream.Stream.Server.Bytes | prettyBytes(1, true)
+            }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
           <v-col
@@ -337,31 +350,28 @@ export default {
       return parseInt(this.$route.params.streamId, 10);
     },
     converter() {
-      return this.$route.query.converter ?? 'auto';
+      return this.$route.query.converter ?? "auto";
     },
     activeConverter() {
-      if (this.stream.stream.ActiveConverter === '') {
-        return 'none';
+      if (this.stream.stream.ActiveConverter === "") {
+        return "none";
       }
-      return 'converter:' + this.stream.stream.ActiveConverter;
+      return "converter:" + this.stream.stream.ActiveConverter;
     },
     selectableConverters() {
-      return [{
-          text: '* none',
-          value: 'none',
+      return [
+        {
+          text: "* none",
+          value: "none",
         },
-        ...this.stream.stream.Converters.map(
-          (converter) => ({
-            text: `* ${converter}`,
-            value: 'converter:' + converter,
-          }),
-        ),
-        ...this.converters.map(
-          (converter) => ({
-            text: converter.Name,
-            value: 'converter:' + converter.Name,
-          }),
-        ),
+        ...this.stream.stream.Converters.map((converter) => ({
+          text: `* ${converter}`,
+          value: "converter:" + converter,
+        })),
+        ...this.converters.map((converter) => ({
+          text: converter.Name,
+          value: "converter:" + converter.Name,
+        })),
       ];
     },
     streamIndex() {
@@ -429,7 +439,7 @@ export default {
     },
     fetchStreamForId() {
       if (this.streamId != null) {
-        this.fetchStream({ id: this.streamId, converter: this.converter});
+        this.fetchStream({ id: this.streamId, converter: this.converter });
         document.getSelection().empty();
       }
     },

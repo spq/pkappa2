@@ -38,10 +38,11 @@
         </v-list-item-content>
       </template>
       <template v-for="tag in groupedTags[tagType.key]">
-        <v-hover 
-        #default="{ hover }"
-        :key="tag.Name"
-        :style="{ backgroundColor: tag.Color }">
+        <v-hover
+          #default="{ hover }"
+          :key="tag.Name"
+          :style="{ backgroundColor: tag.Color }"
+        >
           <v-list-item
             link
             dense
@@ -54,9 +55,14 @@
             }"
           >
             <v-list-item-content>
-              <v-list-item-title>{{
+              <v-list-item-title
+                class="text-truncate"
+                style="max-width: 110px"
+                :title="tag.Name.substr(tagType.key.length + 1)"
+                >{{
                   tag.Name.substr(tagType.key.length + 1)
-                }}</v-list-item-title>
+                }}</v-list-item-title
+              >
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
@@ -193,15 +199,18 @@
   .v-list-item__icon.v-list-group__header__prepend-icon {
   display: none;
 }
+
 .v-application--is-ltr .v-navigation-drawer .v-list-item__icon:first-child {
   display: none;
 }
+
 .v-application--is-ltr
   .v-navigation-drawer
   .v-list-group--sub-group
   .v-list-group__header {
   padding-left: 8px;
 }
+
 .v-application--is-ltr .v-navigation-drawer .v-list-item__action {
   margin-top: 0;
   margin-bottom: 0;

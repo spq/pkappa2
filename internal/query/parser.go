@@ -268,7 +268,7 @@ func Parse(q string) (*Query, error) {
 		return nil, err
 	}
 	if cond != nil {
-		cond = cond.clean()
+		cond = cond.Clean()
 		if cond.impossible() {
 			cond = nil
 		} else if len(cond) == 0 {

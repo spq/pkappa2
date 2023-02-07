@@ -19,6 +19,11 @@
           value | formatDate
         }}</span></template
       >
+      <template v-slot:[`item.Filesize`]="{ value }"
+        ><span :title="`${value} Bytes`">{{
+          value | prettyBytes(1, true)
+        }}</span></template
+      >
     </v-data-table>
   </div>
 </template>

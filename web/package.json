@@ -15,6 +15,7 @@
     "nearley": "^2.20.1",
     "vue": "^2.7.14",
     "vue-apexcharts": "^1.6.2",
+    "vue-filter-pretty-bytes": "^0.1.6",
     "vue-moment": "^4.1.0",
     "vue-router": "^3.6.5",
     "vuetify": "^2.6.12",
@@ -27,25 +28,13 @@
     "@vue/cli-plugin-eslint": "^5.0.6",
     "@vue/cli-service": "^5.0.6",
     "eslint": "^8.27.0",
+    "eslint-config-prettier": "^8.6.0",
     "eslint-plugin-vue": "^9.7.0",
+    "prettier": "^2.8.3",
     "sass": "~1.32.0",
     "sass-loader": "^13.1.0",
     "vue-cli-plugin-vuetify": "^2.5.8",
     "vuetify-loader": "^1.9.2"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/essential",
-      "eslint:recommended"
-    ],
-    "parserOptions": {
-      "parser": "babel-eslint"
-    },
-    "rules": {}
   },
   "browserslist": [
     "> 1%",

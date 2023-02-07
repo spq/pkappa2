@@ -54,7 +54,7 @@ export default {
   },
   methods: {
     ...mapActions(["updateTags", "updateConverters"]),
-    
+
     confirmConverterReset(converter) {
       EventBus.$emit("showConverterResetDialog", { converter });
     },
