@@ -1,11 +1,12 @@
+<!-- eslint-disable vue/no-v-html -->
 <template>
   <v-card>
     <v-card-text>
       <template v-if="presentation == 'ascii'">
         <span
           v-for="(chunk, index) in data"
-          :data-chunk-idx="index"
           :key="index"
+          :data-chunk-idx="index"
           :style="
             chunk.Direction != 0
               ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
@@ -13,10 +14,10 @@
           "
         >
           <span
-            v-for="({ str, offset }, index) in $options.filters.inlineAscii(
+            v-for="({ str, offset }, index2) in $options.filters.inlineAscii(
               chunk.Content
             )"
-            :key="index"
+            :key="index2"
             :data-offset="offset"
             v-html="str"
           >
@@ -61,7 +62,6 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
 });
 export default {
   name: "StreamData",
-  props: ["presentation", "data"],
   filters: {
     inlineAscii(b64) {
       return atob(b64)
@@ -124,6 +124,16 @@ export default {
         })
         .join("\n");
       return str;
+    },
+  },
+  props: {
+    presentation: {
+      type: String,
+      required: true,
+    },
+    data: {
+      type: Array,
+      required: true,
     },
   },
 };

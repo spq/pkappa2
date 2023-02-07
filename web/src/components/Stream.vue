@@ -5,12 +5,12 @@
         <template #activator="{ on, attrs }">
           <v-btn
             v-bind="attrs"
-            v-on="on"
             icon
             :to="{
               name: 'search',
               query: { q: $route.query.q, p: $route.query.p },
             }"
+            v-on="on"
           >
             <v-icon>mdi-arrow-left</v-icon>
           </v-btn>
@@ -19,7 +19,7 @@
       </v-tooltip>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" v-on="on" icon @click="fetchStreamForId()">
+          <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreamForId()">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -32,7 +32,6 @@
             link
             exact
             v-bind="attrs"
-            v-on="on"
             icon
             :to="{
               name: 'search',
@@ -40,6 +39,7 @@
                 q: selectionQuery,
               },
             }"
+            v-on="on"
             ><v-icon>mdi-selection-search</v-icon></v-btn
           >
         </template>
@@ -49,14 +49,14 @@
         ><template #activator="{ on: onMenu, attrs }">
           <v-tooltip bottom>
             <template #activator="{ on: onTooltip }">
-              <v-btn v-bind="attrs" v-on="{ ...onMenu, ...onTooltip }" icon>
+              <v-btn v-bind="attrs" icon v-on="{ ...onMenu, ...onTooltip }">
                 <v-icon>mdi-checkbox-multiple-outline</v-icon>
               </v-btn>
             </template>
             <span>Marks</span>
           </v-tooltip>
         </template>
-        <v-list dense v-if="stream.stream != null">
+        <v-list v-if="stream.stream != null" dense>
           <template v-for="tag of groupedTags.mark">
             <v-list-item
               :key="tag.Name"
@@ -92,18 +92,18 @@
         <template #activator="{ on, attrs }">
           <v-btn
             v-bind="attrs"
-            v-on="on"
             icon
             :href="`/api/download/${streamId}.pcap`"
+            v-on="on"
             ><v-icon>mdi-download</v-icon></v-btn
           >
         </template>
         <span>Download PCAP</span>
       </v-tooltip>
-      <v-btn-toggle mandatory dense borderless v-model="presentation">
+      <v-btn-toggle v-model="presentation" mandatory dense borderless>
         <v-tooltip bottom>
           <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" v-on="on" value="ascii">
+            <v-btn v-bind="attrs" value="ascii" v-on="on">
               <v-icon>mdi-text-long</v-icon>
             </v-btn>
           </template>
@@ -111,7 +111,7 @@
         </v-tooltip>
         <v-tooltip bottom>
           <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" v-on="on" value="hexdump">
+            <v-btn v-bind="attrs" value="hexdump" v-on="on">
               <v-icon>mdi-format-columns</v-icon>
             </v-btn>
           </template>
@@ -119,7 +119,7 @@
         </v-tooltip>
         <v-tooltip bottom>
           <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" v-on="on" value="raw">
+            <v-btn v-bind="attrs" value="raw" v-on="on">
               <v-icon>mdi-hexadecimal</v-icon>
             </v-btn>
           </template>
@@ -129,15 +129,15 @@
       <v-row>
         <v-col cols="6">
           <v-tooltip
-            bottom
             v-if="stream.stream != null && selectableConverters.length > 1"
+            bottom
           >
             <template #activator="{ on, attrs }">
               <v-select
                 v-bind="attrs"
-                v-on="on"
                 :items="selectableConverters"
                 :value="activeConverter"
+                v-on="on"
                 @change="changeConverter"
               />
             </template>
@@ -159,8 +159,8 @@
           <template #activator="{ on }">
             <span v-on="on">
               <v-btn
-                icon
                 ref="prevStream"
+                icon
                 :disabled="prevStreamId == null"
                 :to="
                   prevStreamId == null
@@ -182,8 +182,8 @@
           <template #activator="{ on }">
             <span v-on="on">
               <v-btn
-                icon
                 ref="nextStream"
+                icon
                 :disabled="nextStreamId == null"
                 :to="
                   nextStreamId == null
@@ -204,10 +204,10 @@
       </div>
     </ToolBar>
     <v-skeleton-loader
-      type="table-thead, table-tbody"
       v-if="stream.running || !(stream.stream || stream.error) || null == tags"
+      type="table-thead, table-tbody"
     ></v-skeleton-loader>
-    <v-alert type="error" dense v-else-if="stream.error">{{
+    <v-alert v-else-if="stream.error" type="error" dense>{{
       stream.error
     }}</v-alert>
     <div v-else>
@@ -240,9 +240,9 @@
           <v-col cols="1" class="text-subtitle-2">Tags:</v-col>
           <v-col cols="3" class="text-body-2"
             ><v-chip
-              small
               v-for="tag in streamTags.tag"
               :key="`tag/${tag.name}`"
+              small
               :color="tag.color"
               >{{ tag.name }}</v-chip
             ></v-col
@@ -274,9 +274,9 @@
             }}</span
             ><span v-else
               ><v-chip
-                small
                 v-for="service in streamTags.service"
                 :key="`service/${service.name}`"
+                small
                 :color="service.color"
                 >{{ service.name }}</v-chip
               >
@@ -286,9 +286,9 @@
           <v-col cols="1" class="text-subtitle-2">Marks:</v-col>
           <v-col cols="3" class="text-body-2"
             ><v-chip
-              small
               v-for="mark in streamTags.mark"
               :key="`mark/${mark.name}`"
+              small
               :color="mark.color"
               >{{ mark.name }}</v-chip
             ></v-col
@@ -296,9 +296,9 @@
         </v-row>
       </v-container>
       <StreamData
+        ref="streamData"
         :data="stream.stream.Data"
         :presentation="presentation"
-        ref="streamData"
       ></StreamData>
     </div>
   </div>
@@ -396,6 +396,13 @@ export default {
       return this.streams.result.Results[index - 1].Stream.ID;
     },
   },
+  watch: {
+    $route: "fetchStreamForId",
+    presentation(v) {
+      localStorage.streamPresentation = v;
+      document.getSelection().empty();
+    },
+  },
   mounted() {
     this.fetchStreamForId();
     registerSelectionListener(this);
@@ -462,13 +469,6 @@ export default {
             EventBus.$emit("showError", { message: err });
           }
         );
-    },
-  },
-  watch: {
-    $route: "fetchStreamForId",
-    presentation(v) {
-      localStorage.streamPresentation = v;
-      document.getSelection().empty();
     },
   },
 };

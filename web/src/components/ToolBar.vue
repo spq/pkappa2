@@ -1,9 +1,9 @@
 <template>
   <div>
     <v-toolbar
+      id="toolbarReal"
       dense
       flat
-      id="toolbarReal"
       :style="{
         position: 'fixed',
         width: `${toolbarWidth}px`,

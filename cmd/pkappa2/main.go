@@ -50,9 +50,11 @@ func main() {
 	if *startupCpuprofile != "" {
 		f, err := os.Create(*startupCpuprofile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Failed to create profile folder %s: %v", *startupCpuprofile, err)
 		}
-		pprof.StartCPUProfile(f)
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatalf("Failed to start CPU profile: %v", err)
+		}
 	}
 
 	tools.AssertFolderRWXPermissions("base_dir", *baseDir)

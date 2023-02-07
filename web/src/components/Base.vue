@@ -14,7 +14,7 @@
         <SearchBox></SearchBox>
       </v-responsive>
     </v-app-bar>
-    <v-navigation-drawer app clipped v-model="showNavigation">
+    <v-navigation-drawer v-model="showNavigation" app clipped>
       <Navigation></Navigation>
     </v-navigation-drawer>
     <v-main>

@@ -58,9 +58,6 @@ export default {
       tagName: "",
     };
   },
-  created() {
-    EventBus.$on("showTagDetailsDialog", this.openDialog);
-  },
   computed: {
     ...mapState(["tags"]),
     tag() {
@@ -70,6 +67,9 @@ export default {
       }
       return null;
     },
+  },
+  created() {
+    EventBus.$on("showTagDetailsDialog", this.openDialog);
   },
   methods: {
     openDialog({ tagId }) {

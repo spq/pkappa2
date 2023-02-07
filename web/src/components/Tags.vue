@@ -42,7 +42,6 @@
               <template #activator="{ on, attrs }">
                 <v-btn
                   v-bind="attrs"
-                  v-on="on"
                   icon
                   exact
                   :to="{
@@ -51,6 +50,7 @@
                       q: $options.filters.tagForURI(tag.Name),
                     },
                   }"
+                  v-on="on"
                   ><v-icon>mdi-magnify</v-icon></v-btn
                 >
               </template>
@@ -60,8 +60,8 @@
               <template #activator="{ on, attrs }">
                 <v-btn
                   v-bind="attrs"
-                  v-on="on"
                   icon
+                  v-on="on"
                   @click="setQuery(tag.Definition)"
                   ><v-icon>mdi-form-textbox</v-icon></v-btn
                 >
@@ -72,8 +72,8 @@
               <template #activator="{ on, attrs }">
                 <v-btn
                   v-bind="attrs"
-                  v-on="on"
                   icon
+                  v-on="on"
                   @click="showTagColorChangeDialog(tag.Name)"
                   ><v-icon>mdi-palette</v-icon></v-btn
                 >
@@ -84,8 +84,8 @@
               <template #activator="{ on, attrs }">
                 <v-btn
                   v-bind="attrs"
-                  v-on="on"
                   icon
+                  v-on="on"
                   @click="showTagSetConvertersDialog(tag.Name)"
                   ><v-icon>mdi-file-replace-outline</v-icon></v-btn
                 >
@@ -96,9 +96,9 @@
               <template #activator="{ on, attrs }">
                 <v-btn
                   v-bind="attrs"
-                  v-on="on"
                   :disabled="tag.Referenced"
                   icon
+                  v-on="on"
                   @click="confirmTagDeletion(tag.Name)"
                   ><v-icon>mdi-delete</v-icon></v-btn
                 >
@@ -111,16 +111,6 @@
     </tbody>
   </v-simple-table>
 </template>
-
-<style scoped>
-.tag_definition {
-  word-break: break-all;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-}
-</style>
 
 <script>
 import { mapActions, mapGetters, mapState } from "vuex";
@@ -154,9 +144,6 @@ export default {
       ],
     };
   },
-  mounted() {
-    this.updateTags();
-  },
   computed: {
     ...mapState(["tags"]),
     ...mapGetters(["groupedTags"]),
@@ -166,6 +153,9 @@ export default {
         return acc;
       }, {});
     },
+  },
+  mounted() {
+    this.updateTags();
   },
   methods: {
     ...mapActions(["updateTags"]),
@@ -184,3 +174,13 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.tag_definition {
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+</style>

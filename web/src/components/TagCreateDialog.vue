@@ -8,7 +8,7 @@
         <v-card-text>
           <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
           <v-text-field v-model="tagColor" label="Color" hide-details>
-            <template v-slot:append>
+            <template #append>
               <v-menu
                 v-model="colorPickerOpen"
                 top
@@ -16,19 +16,19 @@
                 nudge-left="32"
                 :close-on-content-click="false"
               >
-                <template v-slot:activator="{ on }">
+                <template #activator="{ on }">
                   <div :style="swatchStyle" v-on="on" />
                 </template>
                 <v-card>
                   <v-card-text>
                     <v-color-picker
                       v-model="colorPickerValue"
-                      @update:color="colorPickerValueUpdate"
                       mode="hexa"
                       hide-mode-switch
                       hide-inputs
                       show-swatches
                       flat
+                      @update:color="colorPickerValueUpdate"
                     />
                   </v-card-text>
                 </v-card>
@@ -41,11 +41,11 @@
           <v-btn text @click="visible = false">Cancel</v-btn>
           <v-btn
             text
-            @click="createTag"
             :disabled="tagName == '' || loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
             type="submit"
+            @click="createTag"
             >Create</v-btn
           >
         </v-card-actions>
@@ -74,9 +74,6 @@ export default {
       colorPickerValue: "",
     };
   },
-  created() {
-    EventBus.$on("showCreateTagDialog", this.openDialog);
-  },
   computed: {
     // https://codepen.io/JamieCurnow/pen/KKPjraK
     swatchStyle() {
@@ -90,6 +87,14 @@ export default {
         transition: "border-radius 200ms ease-in-out",
       };
     },
+  },
+  watch: {
+    colorPickerOpen(val, old) {
+      if (val && !old) this.colorPickerValue = this.tagColor;
+    },
+  },
+  created() {
+    EventBus.$on("showCreateTagDialog", this.openDialog);
   },
   methods: {
     ...mapActions(["addTag", "markTagNew"]),
@@ -167,11 +172,6 @@ export default {
           .toString(16)
           .padStart(2, "0");
       return "#" + toHex(r) + toHex(g) + toHex(b);
-    },
-  },
-  watch: {
-    colorPickerOpen(val, old) {
-      if (val && !old) this.colorPickerValue = this.tagColor;
     },
   },
 };
