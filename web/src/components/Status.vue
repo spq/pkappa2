@@ -17,11 +17,11 @@ import { mapActions, mapState } from "vuex";
 
 export default {
   name: "Status",
-  mounted() {
-    this.updateStatus();
-  },
   computed: {
     ...mapState(["status"]),
+  },
+  mounted() {
+    this.updateStatus();
   },
   methods: {
     ...mapActions(["updateStatus"]),

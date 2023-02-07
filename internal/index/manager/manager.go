@@ -1013,7 +1013,9 @@ func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption)
 			opts.prefetchTags = append(opts.prefetchTags, tn)
 		}
 	}
-	v.prefetchTags(opts.prefetchTags, bitmask.LongBitmask{})
+	if err := v.prefetchTags(opts.prefetchTags, bitmask.LongBitmask{}); err != nil {
+		return err
+	}
 	for i := len(v.indexes); i > 0; i-- {
 		idx := v.indexes[i-1]
 		if err := idx.AllStreams(func(s *index.Stream) error {

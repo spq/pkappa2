@@ -1,6 +1,7 @@
 <template>
   <div>
     <v-text-field
+      ref="searchBox"
       autofocus
       hide-details
       flat
@@ -13,12 +14,11 @@
       @keydown.down.prevent="arrowDown"
       @keydown.tab.exact.prevent.stop="onTab"
       @keydown.esc.exact="suggestionMenuOpen = false"
-      ref="searchBox"
     >
       <template #append>
         <v-menu offset-y right bottom>
           <template #activator="{ on, attrs }">
-            <v-btn small icon v-on="on" v-bind="attrs"
+            <v-btn small icon v-bind="attrs" v-on="on"
               ><v-icon>mdi-dots-vertical</v-icon></v-btn
             >
           </template>
@@ -48,10 +48,10 @@
       </template>
     </v-text-field>
     <v-menu
-      :position-x="suggestionMenuPosX"
-      :position-y="suggestionMenuPosY"
       ref="suggestionMenu"
       v-model="suggestionMenuOpen"
+      :position-x="suggestionMenuPosX"
+      :position-y="suggestionMenuPosY"
       absolute
       dense
     >
@@ -64,9 +64,9 @@
           <v-list-item
             v-for="(item, index) in suggestionItems"
             :key="index"
-            @click="applySuggestion(index)"
             active-class="font-white"
             :style="{ backgroundColor: tagColors[suggestionType][item] }"
+            @click="applySuggestion(index)"
           >
             <v-list-item-title>{{ item }}</v-list-item-title>
           </v-list-item>
@@ -75,13 +75,6 @@
     </v-menu>
   </div>
 </template>
-
-<style scoped>
-.font-white {
-  color: black;
-  font-weight: bold;
-}
-</style>
 
 <script>
 import { EventBus } from "./EventBus";
@@ -287,3 +280,10 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.font-white {
+  color: black;
+  font-weight: bold;
+}
+</style>

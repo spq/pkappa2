@@ -17,10 +17,10 @@
           <v-btn text @click="visible = false">No</v-btn>
           <v-btn
             text
-            @click="deleteTag"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
+            @click="deleteTag"
             >Yes</v-btn
           >
         </v-card-actions>
