@@ -281,23 +281,6 @@ const store = new Vuex.Store({
           throw err.response.data;
         });
     },
-    async setTagConverters({ dispatch }, { name, converters }) {
-      try {
-        await APIClient.converterTagSet(name, converters);
-        dispatch("updateTags");
-      } catch (err) {
-        throw err.response.data;
-      }
-    },
-    async resetConverter({ dispatch }, name) {
-      return APIClient.resetConverter(name)
-        .then(() => {
-          dispatch("updateConverters");
-        })
-        .catch((err) => {
-          throw err.response.data;
-        });
-    },
     async markTagNew({ dispatch, commit }, { name, streams, color }) {
       return APIClient.markTagNew(name, streams, color)
         .catch((err) => {
