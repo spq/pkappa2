@@ -1425,6 +1425,9 @@ func (mgr *Manager) ListConverters() []*converters.Statistics {
 		for _, converter := range mgr.converters {
 			stats = append(stats, converter.Statistics())
 		}
+		sort.Slice(stats, func(i, j int) bool {
+			return stats[i].Name < stats[j].Name
+		})
 		c <- stats
 		close(c)
 	}
