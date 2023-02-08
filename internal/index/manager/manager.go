@@ -1093,7 +1093,7 @@ func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter
 	alreadyCached := errors.New("alreadyCached")
 	results := make(chan result, freeJobsGlobal)
 	failedJobs := make(map[job]struct{})
-	for jobIDs := []int(nil); len(jobs) == 0 && freeJobsGlobal != maxJobsGlobal; {
+	for jobIDs := []int(nil); len(jobs) != 0 || freeJobsGlobal != maxJobsGlobal; {
 		jobIDs = jobIDs[:0]
 		for i, job := range jobs {
 			if freeJobs[job.converter] == 0 {
