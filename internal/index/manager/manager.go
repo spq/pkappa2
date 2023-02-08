@@ -308,8 +308,9 @@ nextStateFile:
 		return nil, err
 	}
 	if len(mgr.builder.KnownPcaps()) != len(cachedKnownPcapData) {
-		//nolint:errcheck
-		mgr.saveState()
+		if err := mgr.saveState(); err != nil {
+			return nil, fmt.Errorf("unable to save state: %w", err)
+		}
 	}
 
 	go func() {
@@ -506,8 +507,9 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		//TODO: this is not doing anything right now because we don't invalidate cached conversions, but we should
 		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
-		//nolint:errcheck
-		mgr.saveState()
+		if err := mgr.saveState(); err != nil {
+			log.Printf("importPcapJob(%q) failed to save state file: %s", filenames, err)
+		}
 	}
 }
 
@@ -791,12 +793,10 @@ func (mgr *Manager) AddTag(name, color, queryString string) error {
 			if !isMark {
 				mgr.startTaggingJobIfNeeded()
 			}
-			return nil
+			return mgr.saveState()
 		}()
 		c <- err
 		close(c)
-		//nolint:errcheck
-		mgr.saveState()
 	}
 	return <-c
 }
@@ -825,12 +825,10 @@ func (mgr *Manager) DelTag(name string) error {
 				}
 			}
 			delete(mgr.tags, name)
-			return nil
+			return mgr.saveState()
 		}()
 		c <- err
 		close(c)
-		//nolint:errcheck
-		mgr.saveState()
 	}
 	return <-c
 }
@@ -994,12 +992,10 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				mgr.startTaggingJobIfNeeded()
 				mgr.startConverterJobIfNeeded()
 			}
-			return nil
+			return mgr.saveState()
 		}()
 		c <- err
 		close(c)
-		//nolint:errcheck
-		mgr.saveState()
 	}
 	return <-c
 }
@@ -1328,8 +1324,7 @@ func (mgr *Manager) removeConverter(path string) error {
 
 	delete(mgr.converters, name)
 	delete(mgr.streamsToConvert, name)
-	mgr.saveState()
-	return nil
+	return mgr.saveState()
 }
 
 func (mgr *Manager) restartConverterProcess(path string) error {
