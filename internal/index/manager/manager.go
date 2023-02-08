@@ -922,7 +922,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						}
 					}
 				}
-				mgr.saveState()
+				mgr.startConverterJobIfNeeded()
 			}
 			if maxUsedStreamID != 0 {
 				if maxUsedStreamID >= mgr.nextStreamID {
@@ -1371,7 +1371,6 @@ func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *co
 
 	tag.converters = append(tag.converters, converter)
 	mgr.streamsToConvert[converter.Name()].Or(tag.Matches)
-	mgr.startConverterJobIfNeeded()
 	return nil
 }
 
