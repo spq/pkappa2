@@ -19,9 +19,9 @@
           <v-checkbox
             v-for="converter in converters"
             :key="converter.Name"
+            v-model="checkedConverters"
             :label="converter.Name"
             :value="converter.Name"
-            v-model="checkedConverters"
           ></v-checkbox>
         </v-card-text>
         <v-card-actions>
@@ -29,10 +29,10 @@
           <v-btn text @click="visible = false">Cancel</v-btn>
           <v-btn
             text
-            @click="submitTagConverters"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
+            @click="submitTagConverters"
             >Save</v-btn
           >
         </v-card-actions>

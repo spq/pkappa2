@@ -24,8 +24,8 @@
               <template #activator="{ on, attrs }">
                 <v-btn
                   v-bind="attrs"
-                  v-on="on"
                   icon
+                  v-on="on"
                   @click="confirmConverterReset(converter)"
                   ><v-icon>mdi-restart-alert</v-icon></v-btn
                 >
@@ -45,12 +45,12 @@ import { EventBus } from "./EventBus";
 
 export default {
   name: "Converters",
+  computed: {
+    ...mapState(["tags", "converters"]),
+  },
   mounted() {
     this.updateTags();
     this.updateConverters();
-  },
-  computed: {
-    ...mapState(["tags", "converters"]),
   },
   methods: {
     ...mapActions(["updateTags", "updateConverters"]),
