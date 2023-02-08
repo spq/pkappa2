@@ -54,6 +54,10 @@ func (cache *CachedConverter) Stderrs() [][]string {
 	return cache.converter.Stderrs()
 }
 
+func (cache *CachedConverter) MaxProcessCount() int {
+	return cache.converter.MaxProcessCount()
+}
+
 func (cache *CachedConverter) Reset() error {
 	// Stop all converter processes.
 	cache.converter.Reset()

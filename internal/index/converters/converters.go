@@ -117,6 +117,10 @@ func (converter *Converter) Stderrs() [][]string {
 	return output
 }
 
+func (converter *Converter) MaxProcessCount() int {
+	return MAX_PROCESS_COUNT
+}
+
 // Stop the converter process.
 func (converter *Converter) Reset() {
 	converter.rwmutex.Lock()

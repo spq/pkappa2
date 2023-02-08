@@ -300,6 +300,9 @@ func (s stream) wrap(r *Reader, idx uint32) (*Stream, error) {
 }
 
 func (r *Reader) StreamByID(streamID uint64) (*Stream, error) {
+	if streamID < r.MinStreamID() || streamID > r.MaxStreamID() {
+		return nil, nil
+	}
 	streamIndex, ok := r.containedStreamIds[streamID]
 	if !ok {
 		return nil, nil
