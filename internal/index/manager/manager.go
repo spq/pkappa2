@@ -1026,6 +1026,8 @@ func (mgr *Manager) startConverterJobIfNeeded() {
 	activeConverters := []*converters.CachedConverter(nil)
 	streamsToConvert := []*bitmask.LongBitmask(nil)
 
+	// TODO: split this into smaller chunks so that we can abort long running jobs
+	//       when a converter gets detached from a tag while it is running
 	for converterName, converter := range mgr.converters {
 		streams := mgr.streamsToConvert[converterName]
 		if streams.IsZero() {

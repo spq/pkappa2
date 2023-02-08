@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 
 	"github.com/spq/pkappa2/internal/index"
@@ -100,6 +101,9 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 			ExitCode: process.ExitCode(),
 		})
 	}
+	sort.Slice(output, func(i, j int) bool {
+		return output[i].Pid < output[j].Pid
+	})
 	return output
 }
 
