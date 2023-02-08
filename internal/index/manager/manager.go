@@ -535,7 +535,7 @@ func (mgr *Manager) startMergeJobIfNeeded() {
 }
 
 func (mgr *Manager) startTaggingJobIfNeeded() {
-	if mgr.taggingJobRunning || mgr.converterJobRunning {
+	if mgr.taggingJobRunning {
 		return
 	}
 outer:
@@ -1024,7 +1024,7 @@ func (r *indexReleaser) release(mgr *Manager) {
 }
 
 func (mgr *Manager) startConverterJobIfNeeded() {
-	if mgr.converterJobRunning || mgr.taggingJobRunning {
+	if mgr.converterJobRunning {
 		return
 	}
 	activeConverters := []*converters.CachedConverter(nil)
@@ -1192,6 +1192,7 @@ func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter
 				}
 				tag.Uncertain.Or(*allStreamIDs[i])
 			}
+			mgr.updatedStreamsDuringTaggingJob.Or(*allStreamIDs[i])
 		}
 		mgr.inheritTagUncertainty()
 		mgr.startTaggingJobIfNeeded()
