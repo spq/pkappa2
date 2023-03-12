@@ -21,7 +21,7 @@ const APIClient = {
   getConverters() {
     return this.perform("get", `/converters`);
   },
-  getConverterStderr(converter) {
+  getConverterStderrs(converter) {
     return this.perform("get", `/converters/stderr/${converter}`);
   },
   resetConverter(converter) {

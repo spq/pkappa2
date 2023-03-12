@@ -40,6 +40,11 @@ type (
 		Running  bool
 		ExitCode int
 		Pid      int
+		Errors   int
+	}
+	ProcessStderr struct {
+	    Pid      int
+	    Stderr   []string
 	}
 	// JSON Protocol
 	converterStreamMetadata struct {
@@ -92,6 +97,7 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 			Running:  true,
 			ExitCode: process.ExitCode(),
 			Pid:      process.Pid(),
+			Errors:   len(process.Stderr()),
 		})
 	}
 	// Keep stderr and exitcode of processes that have exited.
@@ -99,6 +105,8 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 		output = append(output, ProcessStats{
 			Running:  false,
 			ExitCode: process.ExitCode(),
+			Pid:      process.Pid(),
+			Errors:   len(process.Stderr()),
 		})
 	}
 	sort.Slice(output, func(i, j int) bool {
@@ -107,16 +115,22 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 	return output
 }
 
-func (converter *Converter) Stderrs() [][]string {
+func (converter *Converter) Stderrs() []ProcessStderr {
 	converter.mutex.Lock()
 	defer converter.mutex.Unlock()
 
-	output := [][]string{}
+	output := []ProcessStderr{}
 	for process := range converter.started_processes {
-		output = append(output, process.Stderr())
+		output = append(output, ProcessStderr{
+            Stderr: process.Stderr(),
+            Pid:    process.Pid(),
+		})
 	}
 	for _, process := range converter.failed_processes {
-		output = append(output, process.Stderr())
+		output = append(output, ProcessStderr{
+            Stderr: process.Stderr(),
+            Pid:    process.Pid(),
+        })
 	}
 	return output
 }

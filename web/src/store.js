@@ -12,7 +12,6 @@ const store = new Vuex.Store({
 
     tags: null,
     converters: null,
-    convertersStderr: {},
 
     streams: {
       query: null,
@@ -82,9 +81,6 @@ const store = new Vuex.Store({
     },
     setConverters(state, converters) {
       state.converters = converters;
-    },
-    setConverterStderrs(state, converter, stderrs) {
-      state.convertersStderr[converter] = stderrs;
     },
     setPcaps(state, pcaps) {
       state.pcaps = pcaps;
@@ -201,18 +197,6 @@ const store = new Vuex.Store({
             running: false,
             error: err.response.data,
             graph: null,
-          });
-        });
-    },
-    fetchConverterStderrs({ commit }, { converter }) {
-      APIClient.getConverterStderrs(converter)
-        .then((data) => {
-          commit("setConverterStderrs", { converter, stderrs: data });
-        })
-        .catch((err) => {
-          commit("setConverterStderrs", {
-            converter,
-            stderrs: [err.response.data],
           });
         });
     },

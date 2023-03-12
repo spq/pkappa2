@@ -1430,8 +1430,8 @@ func (mgr *Manager) ListConverters() []*converters.Statistics {
 	return <-c
 }
 
-func (mgr *Manager) ConverterStderr(converterName string) ([][]string, error) {
-	c := make(chan [][]string)
+func (mgr *Manager) ConverterStderr(converterName string) ([]converters.ProcessStderr, error) {
+	c := make(chan []converters.ProcessStderr)
 	mgr.jobs <- func() {
 		converter, ok := mgr.converters[converterName]
 		if !ok {

@@ -50,7 +50,7 @@ func (cache *CachedConverter) Statistics() *Statistics {
 	}
 }
 
-func (cache *CachedConverter) Stderrs() [][]string {
+func (cache *CachedConverter) Stderrs() []ProcessStderr {
 	return cache.converter.Stderrs()
 }
 
