@@ -9,6 +9,8 @@ import hyperframe.frame
 from hpack import Decoder
 from pkappa2lib import *
 
+# pip install h2
+
 
 # https://stackoverflow.com/questions/4685217/parse-raw-http-headers
 class HTTPRequest(BaseHTTPRequestHandler):

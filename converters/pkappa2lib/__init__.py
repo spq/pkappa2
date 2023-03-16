@@ -34,10 +34,12 @@ class StreamMetadata:
 class ConverterDecoder(json.JSONDecoder):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+        super().__init__(object_hook=self.converter_object_hook,
+                         *args,
+                         **kwargs)
 
     @staticmethod
-    def object_hook(obj):
+    def converter_object_hook(obj):
         if "Protocol" in obj:
             obj["Protocol"] = Protocol.from_json(obj["Protocol"])
         if "Direction" in obj:
@@ -49,15 +51,15 @@ class ConverterDecoder(json.JSONDecoder):
 
 class ConverterEncoder(json.JSONEncoder):
 
-    def default(self, obj):
-        if isinstance(obj, StreamChunk):
+    def default(self, o):
+        if isinstance(o, StreamChunk):
             return {
-                "Content": base64.b64encode(obj.Content).decode(),
-                "Direction": obj.Direction.to_json()
+                "Content": base64.b64encode(o.Content).decode(),
+                "Direction": o.Direction.to_json()
             }
 
         else:
-            return super().default(obj)
+            return super().default(o)
 
 
 class Direction(Enum):
@@ -109,6 +111,8 @@ class Pkappa2Converter:
     expected to return a Result object that contains the data that should be
     displayed in the UI.
     """
+
+    current_stream_id: int
 
     def log(self, message: str):
         """

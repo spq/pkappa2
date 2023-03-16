@@ -11,11 +11,13 @@ import traceback
 from urllib3 import HTTPResponse
 from pkappa2lib import *
 
+# pip install h2
+
 
 # https://stackoverflow.com/questions/4685217/parse-raw-http-headers
 class HTTPRequest(BaseHTTPRequestHandler):
 
-    def __init__(self, request_text: str):
+    def __init__(self, request_text: bytes):
         self.rfile = BytesIO(request_text)
         self.raw_requestline = self.rfile.readline()
         self.error_code = self.error_message = None
@@ -188,7 +190,7 @@ class WebsocketConverter(Pkappa2Converter):
                 header_stream = BytesIO(header)
                 requestline = header_stream.readline().split(b' ')
                 status = int(requestline[1])
-                headers = parse_headers(header_stream)
+                headers = dict(parse_headers(header_stream))
 
                 body_stream = BytesIO(body)
                 response = HTTPResponse(
