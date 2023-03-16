@@ -50,8 +50,8 @@ func (cache *CachedConverter) Statistics() *Statistics {
 	}
 }
 
-func (cache *CachedConverter) Stderrs() []ProcessStderr {
-	return cache.converter.Stderrs()
+func (cache *CachedConverter) Stderr(pid int) *ProcessStderr {
+	return cache.converter.Stderr(pid)
 }
 
 func (cache *CachedConverter) MaxProcessCount() int {

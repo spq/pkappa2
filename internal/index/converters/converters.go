@@ -43,8 +43,8 @@ type (
 		Errors   int
 	}
 	ProcessStderr struct {
-	    Pid      int
-	    Stderr   []string
+		Pid    int
+		Stderr []string
 	}
 	// JSON Protocol
 	converterStreamMetadata struct {
@@ -115,24 +115,29 @@ func (converter *Converter) ProcessStats() []ProcessStats {
 	return output
 }
 
-func (converter *Converter) Stderrs() []ProcessStderr {
+func (converter *Converter) Stderr(pid int) *ProcessStderr {
 	converter.mutex.Lock()
 	defer converter.mutex.Unlock()
 
-	output := []ProcessStderr{}
 	for process := range converter.started_processes {
-		output = append(output, ProcessStderr{
-            Stderr: process.Stderr(),
-            Pid:    process.Pid(),
-		})
+		if process.Pid() != pid {
+			continue
+		}
+		return &ProcessStderr{
+			Stderr: process.Stderr(),
+			Pid:    process.Pid(),
+		}
 	}
 	for _, process := range converter.failed_processes {
-		output = append(output, ProcessStderr{
-            Stderr: process.Stderr(),
-            Pid:    process.Pid(),
-        })
+		if process.Pid() != pid {
+			continue
+		}
+		return &ProcessStderr{
+			Stderr: process.Stderr(),
+			Pid:    process.Pid(),
+		}
 	}
-	return output
+	return nil
 }
 
 func (converter *Converter) MaxProcessCount() int {

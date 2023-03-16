@@ -1430,8 +1430,8 @@ func (mgr *Manager) ListConverters() []*converters.Statistics {
 	return <-c
 }
 
-func (mgr *Manager) ConverterStderr(converterName string) ([]converters.ProcessStderr, error) {
-	c := make(chan []converters.ProcessStderr)
+func (mgr *Manager) ConverterStderr(converterName string, pid int) (*converters.ProcessStderr, error) {
+	c := make(chan *converters.ProcessStderr)
 	mgr.jobs <- func() {
 		converter, ok := mgr.converters[converterName]
 		if !ok {
@@ -1439,14 +1439,14 @@ func (mgr *Manager) ConverterStderr(converterName string) ([]converters.ProcessS
 			close(c)
 			return
 		}
-		c <- converter.Stderrs()
+		c <- converter.Stderr(pid)
 		close(c)
 	}
-	stderrs := <-c
-	if stderrs == nil {
-		return nil, fmt.Errorf("error: converter %s does not exist", converterName)
+	stderr := <-c
+	if stderr == nil {
+		return nil, fmt.Errorf("error: converter %s or process with pid %d does not exist", converterName, pid)
 	}
-	return stderrs, nil
+	return stderr, nil
 }
 
 func (mgr *Manager) GetView() View {

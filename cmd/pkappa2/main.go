@@ -256,9 +256,15 @@ func main() {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
-	rUser.Get("/api/converters/stderr/{name:.+}", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Get(`/api/converters/stderr/{name:.+}/{pid:\d+}`, func(w http.ResponseWriter, r *http.Request) {
 		name := chi.URLParam(r, "name")
-		converterDetails, err := mgr.ConverterStderr(name)
+		pidStr := chi.URLParam(r, "pid")
+		pid, err := strconv.ParseInt(pidStr, 10, 64)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid process id %q failed: %v", pidStr, err), http.StatusBadRequest)
+			return
+		}
+		converterDetails, err := mgr.ConverterStderr(name, int(pid))
 		if err != nil {
 			http.Error(w, fmt.Sprintf("get converter stderr failed: %v", err), http.StatusBadRequest)
 			return

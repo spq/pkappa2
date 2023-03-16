@@ -12,25 +12,24 @@
       <template #expanded-item="{ item }">
         <td colspan="4">
           <v-chip
-            v-for="(process) in item.converter.Processes"
+            v-for="process in item.converter.Processes"
+            :key="process.Pid"
             label
             link
-            :key="process.Pid"
             class="ma-2"
             :color="process.Running ? 'green' : 'yellow'"
             @click="showErrorLog(process, item.converter)"
           >
             <v-tooltip bottom>
               <template #activator="{ on, attrs }">
-                <v-icon
-                  v-if="process.Errors > 0"
-                  v-bind="attrs"
-                  v-on="on"
-                >
+                <v-icon v-if="process.Errors > 0" v-bind="attrs" v-on="on">
                   mdi-alert-outline
                 </v-icon>
               </template>
-              <span>Num errors in Process: {{ process.Errors }}, click to view stderr!</span>
+              <span>
+                Num errors in Process: {{ process.Errors }}, click to view
+                stderr!
+              </span>
             </v-tooltip>
             PID: {{ process.Pid }}
           </v-chip>
@@ -52,16 +51,16 @@
     </v-data-table>
     <v-dialog
       :value="shownProcess !== null"
-      @click:outside="shownProcess = null"
       width="600px"
+      @click:outside="shownProcess = null"
     >
       <v-card>
         <v-card-title>
-          <span class="text-h5">Stderr of Process {{shownProcess?.Pid}}</span>
+          <span class="text-h5">Stderr of Process {{ shownProcess?.Pid }}</span>
         </v-card-title>
         <v-card-text>
           <div v-if="fetchStderrError !== null">
-            {{fetchStderrError}}
+            {{ fetchStderrError }}
           </div>
           <div v-else>
             <pre><!--
@@ -71,12 +70,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn
-            text
-            @click="shownProcess = null"
-          >
-            Close
-          </v-btn>
+          <v-btn text @click="shownProcess = null"> Close </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -84,18 +78,30 @@
 </template>
 
 <script>
-import {mapActions, mapState} from "vuex";
-import {EventBus} from "./EventBus";
+import { mapActions, mapState } from "vuex";
+import { EventBus } from "./EventBus";
 import APIClient from "../apiClient";
 
 export default {
   name: "Converters",
   data: () => ({
     headers: [
-      {text: 'Name', value: 'name', cellClass: 'cursor-pointer'},
-      {text: 'Cached Stream Count', value: 'cachedStreamCount', cellClass: 'cursor-pointer'},
-      {text: 'Running Processes', value: 'runningProcesses', cellClass: 'cursor-pointer'},
-      {text: 'Failed Processes', value: 'failedProcesses', cellClass: 'cursor-pointer'},
+      { text: "Name", value: "name", cellClass: "cursor-pointer" },
+      {
+        text: "Cached Stream Count",
+        value: "cachedStreamCount",
+        cellClass: "cursor-pointer",
+      },
+      {
+        text: "Running Processes",
+        value: "runningProcesses",
+        cellClass: "cursor-pointer",
+      },
+      {
+        text: "Failed Processes",
+        value: "failedProcesses",
+        cellClass: "cursor-pointer",
+      },
     ],
     shownProcess: null,
     loadingStderr: false,
@@ -103,15 +109,21 @@ export default {
     shownProcessErrors: null,
   }),
   computed: {
-    ...mapState(["tags", "converters", 'convertersStderr']),
+    ...mapState(["tags", "converters", "convertersStderr"]),
     items() {
-      return this.converters?.map((converter) => ({
-        name: converter.Name,
-        cachedStreamCount: converter.CachedStreamCount,
-        runningProcesses: converter.Processes.filter((process) => process.Running).length,
-        failedProcesses: converter.Processes.filter((process) => !process.Running).length,
-        converter,
-      })) ?? [];
+      return (
+        this.converters?.map((converter) => ({
+          name: converter.Name,
+          cachedStreamCount: converter.CachedStreamCount,
+          runningProcesses: converter.Processes.filter(
+            (process) => process.Running
+          ).length,
+          failedProcesses: converter.Processes.filter(
+            (process) => !process.Running
+          ).length,
+          converter,
+        })) ?? []
+      );
     },
   },
   mounted() {
@@ -119,33 +131,40 @@ export default {
     this.updateConverters();
   },
   methods: {
-    ...mapActions(["updateTags", "updateConverters", 'fetchConverterStderrs']),
+    ...mapActions(["updateTags", "updateConverters", "fetchConverterStderrs"]),
     rowClick(item, handler) {
       handler.expand(!handler.isExpanded);
     },
     confirmConverterReset(converter) {
-      EventBus.$emit("showConverterResetDialog", {converter});
+      EventBus.$emit("showConverterResetDialog", { converter });
     },
     async showErrorLog(process, converter) {
+      if (process.Errors == 0) return;
       this.loadingStderr = true;
       this.shownProcess = process;
       try {
-        this.shownProcessErrors = (await APIClient.getConverterStderrs(converter.Name)).filter(processError => processError.Pid === process.Pid)?.[0];
+        this.shownProcessErrors = await APIClient.getConverterStderrs(
+          converter.Name,
+          process.Pid
+        );
         if (this.shownProcessErrors === null) {
-          this.fetchStderrError = 'Stderr is empty';
+          this.fetchStderrError = "Stderr is empty";
         }
       } catch (err) {
         this.fetchStderrError = err.toString();
       } finally {
         this.loadingStderr = false;
       }
-      console.log(this.shownProcessErrors, this.shownProcessErrors?.Stderr?.join('\n'));
+      console.log(
+        this.shownProcessErrors,
+        this.shownProcessErrors?.Stderr?.join("\n")
+      );
     },
   },
 };
 </script>
 <style lang="css">
-  .cursor-pointer {
-    cursor: pointer;
-  }
+.cursor-pointer {
+  cursor: pointer;
+}
 </style>
