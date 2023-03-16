@@ -21,7 +21,8 @@ RUN go build -o ./bin/pkappa2 ./cmd/pkappa2/main.go
 # Run
 FROM debian:latest
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8 python3 python3-pip && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --upgrade h2 urllib3
 
 COPY --from=backend_builder /app/bin/pkappa2 ./pkappa2
 COPY --from=backend_builder /app/web/dist ./web/dist

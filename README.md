@@ -19,6 +19,7 @@ curl --data-binary @some-file.pcap http://localhost:8080/upload/some-file.pcap
     - libpcap (e.g. `apt install libpcap-dev`)
 - run `yarn install && yarn build` in `/web`
 - run `go run cmd/pkappa2/main.go` in `/`
+- optionally, install stock converter python dependencies: `pip install h2 urllib3`
 - visit `localhost:8080` in your web browser
 
 You likely want to add some arguments to the `go run` command, check `-help`
@@ -34,3 +35,6 @@ You likely want to add some arguments to the `go run` command, check `-help`
 - run `yarn serve` in `/web`
 - run `go run cmd/pkappa2/main.go -address :8081` in `/`
 - visit `localhost:8080` in your web browser
+
+You can import multiple .pcap files in the current folder using:
+`for f in *.pcap; do curl --data-binary "@$f" "http://localhost:8081/upload/$f"; done`

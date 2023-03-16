@@ -22,6 +22,8 @@
 - [ ] render http response in iframe with correct content type
 - [ ] add button to download raw data of a stream
 - [ ] autocomplete keywords while typing the query "nearley unparse"
+- [ ] show matching generated marks in stream view
+- [x] let large tag queries and names overflow instead of widening the page layout
 
 ## both:
 - [ ] add search history overlay for recent searches
@@ -32,8 +34,6 @@
 - [ ] support filters for search and display, see below for how
 - [ ] calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
 - [ ] add documentation
-- [ ] show matching generated marks in stream view
-- [ ] let large tag queries and names overflow instead of widening the page layout
 
 ## filters / converters
 the converter feature will be implemented like this:
@@ -71,7 +71,7 @@ the converter feature will be implemented like this:
   - [ ] [cs]bytes filters will support specifying the converter modifier too
 - [x] when a filter was evaluated tags and services might be re-evaluated when they contain [cs]data filters, thats why those tags/services may not be used as triggers
 - [ ] keep stderr and exit code in all cases. keep stderr if stderr not empty, but the process exited as expected?
-- [ ] show stderr of filters in UI
+- [x] show stderr of filters in UI
   - stderr can be fetched from `/api/converters/stderr/[name]`
 - [ ] use states in filter json protocol and display which state we're currently in in UI for debugging filter scripts
 - [x] name filters transformations? converters? -> `converters` it is
