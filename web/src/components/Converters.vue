@@ -1,5 +1,15 @@
 <template>
   <div>
+    <ToolBar>
+      <v-tooltip bottom>
+        <template #activator="{ on, attrs }">
+          <v-btn v-bind="attrs" icon v-on="on" @click="refreshConverters">
+            <v-icon>mdi-refresh</v-icon>
+          </v-btn>
+        </template>
+        <span>Refresh</span>
+      </v-tooltip>
+    </ToolBar>
     <v-data-table
       :headers="headers"
       :items="items"
@@ -81,9 +91,13 @@
 import { mapActions, mapState } from "vuex";
 import { EventBus } from "./EventBus";
 import APIClient from "../apiClient";
+import ToolBar from "./ToolBar.vue";
 
 export default {
   name: "Converters",
+  components: {
+    ToolBar,
+  },
   data: () => ({
     headers: [
       { text: "Name", value: "name", cellClass: "cursor-pointer" },
@@ -127,11 +141,14 @@ export default {
     },
   },
   mounted() {
-    this.updateTags();
-    this.updateConverters();
+    this.refreshConverters();
   },
   methods: {
     ...mapActions(["updateTags", "updateConverters", "fetchConverterStderrs"]),
+    refreshConverters() {
+      this.updateTags();
+      this.updateConverters();
+    },
     rowClick(item, handler) {
       handler.expand(!handler.isExpanded);
     },
@@ -139,7 +156,7 @@ export default {
       EventBus.$emit("showConverterResetDialog", { converter });
     },
     async showErrorLog(process, converter) {
-      if (process.Errors == 0) return;
+      if (process.Errors === 0) return;
       this.loadingStderr = true;
       this.shownProcess = process;
       try {
