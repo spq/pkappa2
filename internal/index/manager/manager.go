@@ -1225,6 +1225,10 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 
 				if event.Has(fsnotify.Remove) {
 					mgr.jobs <- func() {
+						fileInfo, err := os.Stat(event.Name)
+						if err != nil || fileInfo.IsDir() {
+							return
+						}
 						if err := mgr.removeConverter(event.Name); err != nil {
 							log.Printf("error while removing converter: %v", err)
 						}
@@ -1248,11 +1252,19 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 
 						mgr.jobs <- func() {
 							if event.Has(fsnotify.Create) {
+								fileInfo, err := os.Stat(event.Name)
+								if err != nil || fileInfo.IsDir() {
+									return
+								}
 								if err := mgr.addConverter(event.Name); err != nil {
 									log.Printf("error while adding converter: %v", err)
 								}
 							}
 							if event.Has(fsnotify.Write) {
+								fileInfo, err := os.Stat(event.Name)
+								if err != nil || fileInfo.IsDir() {
+									return
+								}
 								if err := mgr.restartConverterProcess(event.Name); err != nil {
 									log.Printf("error while restarting converter: %v", err)
 								}
