@@ -1286,7 +1286,7 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 
 	err := watcher.Add(mgr.ConverterDir)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Errorf("error while adding converter dir to watcher %v: %w", mgr.ConverterDir, err))
 	}
 }
 
