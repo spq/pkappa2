@@ -30,19 +30,30 @@ class HTTP2Converter(HTTPConverter):
         self.hpack_decoder = None
         self.h2_active = False
 
-    def format_http2_frame(self, frame: hyperframe.frame.Frame) -> str:
+    def handle_http2_event(self, direction: Direction,
+                           frame: hyperframe.frame.Frame) -> bytes:
+        return self.format_http2_frame(frame)
+
+    def format_http2_frame(self, frame: hyperframe.frame.Frame) -> bytes:
         if isinstance(frame, hyperframe.frame.HeadersFrame):
             headers = self.hpack_decoder.decode(frame.data)
-            return f"{frame} {headers}"
+            output = ''
+            for header in headers:
+                output += f"{header[0]}: {header[1]}\n"
+            return f"{frame}\n{output}".encode()
         elif isinstance(frame, hyperframe.frame.DataFrame):
-            return f"{frame} {frame.data}"
+            return str(frame).encode() + b"\n" + frame.data + b"\n"
         elif isinstance(frame, hyperframe.frame.SettingsFrame):
             settings = {
                 self.SETTINGS_NAMES.get(k, k): v
                 for k, v in frame.settings.items()
             }
-            return f"{type(frame).__name__}(stream_id={frame.stream_id}, flags={frame.flags!r}): {settings}"
-        return str(frame)
+            output = ''
+            for k, v in settings.items():
+                output += f"{k}: {v}\n"
+            return f"{type(frame).__name__}(stream_id={frame.stream_id}, flags={frame.flags!r}):\n{output}".encode(
+            )
+        return (str(frame) + "\n").encode()
 
     def setup_http2_buffers(self):
         self.h2_server_buffer = h2.frame_buffer.FrameBuffer(server=True)
@@ -58,8 +69,10 @@ class HTTP2Converter(HTTPConverter):
             f = hyperframe.frame.SettingsFrame(0)
             f.parse_body(urlsafe_b64decode(settings))
             return [
-                StreamChunk(Direction.CLIENTTOSERVER,
-                            self.format_http2_frame(f).encode() + b"\n")
+                StreamChunk(
+                    Direction.CLIENTTOSERVER,
+                    self.handle_http2_event(Direction.CLIENTTOSERVER, f) +
+                    b"\n")
             ]
         return []
 
@@ -76,8 +89,10 @@ class HTTP2Converter(HTTPConverter):
         events = []
         for event in self.h2_server_buffer:
             events.append(
-                StreamChunk(Direction.CLIENTTOSERVER,
-                            self.format_http2_frame(event).encode() + b"\n"))
+                StreamChunk(
+                    Direction.CLIENTTOSERVER,
+                    self.handle_http2_event(Direction.CLIENTTOSERVER, event) +
+                    b"\n"))
         return events
 
     def handle_http2_response(self, chunk: bytes) -> List[StreamChunk]:
@@ -88,8 +103,10 @@ class HTTP2Converter(HTTPConverter):
         events = []
         for event in self.h2_client_buffer:
             events.append(
-                StreamChunk(Direction.SERVERTOCLIENT,
-                            self.format_http2_frame(event).encode() + b"\n"))
+                StreamChunk(
+                    Direction.SERVERTOCLIENT,
+                    self.handle_http2_event(Direction.SERVERTOCLIENT, event) +
+                    b"\n"))
         return events
 
     def handle_raw_client_chunk(
