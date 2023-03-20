@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from pkappa2lib import *
+from pkappa2lib import Pkappa2Converter, StreamChunk, Result, Stream, Direction, Protocol
 
 
 class PwntoolsRemoteConverter(Pkappa2Converter):
@@ -24,7 +24,7 @@ io = remote({stream.Metadata.ServerHost!r}, {stream.Metadata.ServerPort}{typ})
                     output += f"io.send({chunk.Content!r})\n"
             else:
                 if i == len(stream.Chunks) - 1:
-                    output += f"io.stream()\n"
+                    output += "io.stream()\n"
                 else:
                     output += f"io.recvuntil({chunk.Content[-20:]!r})\n"
         if len(stream.Chunks) > 0 and stream.Chunks[
