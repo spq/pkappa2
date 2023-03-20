@@ -1348,6 +1348,7 @@ func (mgr *Manager) restartConverterProcess(path string) error {
 		if err := mgr.addConverter(path); err != nil {
 			return err
 		}
+		converter = mgr.converters[name]
 	}
 	// Stop the process if it is running and restart it
 	if err := converter.Reset(); err != nil {
