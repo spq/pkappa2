@@ -172,6 +172,14 @@ class HTTP2Converter(HTTPConverter):
         self.h2_client_buffer = None
         self.hpack_decoder = None
         self.h2_server_buffer = None
+        if len(stream.Chunks) > 1 and stream.Chunks[
+                0].Direction == Direction.SERVERTOCLIENT:
+            # the server send something before the request arrived?!
+            # try to fix it by switching the first and second chunk transparently.
+            return super().handle_stream(
+                Stream(
+                    stream.Metadata, stream.Chunks[1:2] + stream.Chunks[0:1] +
+                    stream.Chunks[2:]))
         return super().handle_stream(stream)
 
 
