@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from base64 import urlsafe_b64decode
-from typing import List, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional
 import h2.frame_buffer
 from h2.exceptions import H2Error
 import hyperframe.frame
-from hpack import Decoder
+from hpack import Decoder, HeaderTuple
 from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
 from pkappa2lib import StreamChunk, Direction, Result, Stream
 
@@ -23,20 +24,34 @@ class HTTP2Converter(HTTPConverter):
         8: "ENABLE_CONNECT_PROTOCOL",
     }
 
+    hpack_decoder: Dict[Direction, Decoder]
+
     def __init__(self):
         super().__init__()
         self.h2_client_buffer = None
         self.h2_server_buffer = None
-        self.hpack_decoder = None
         self.h2_active = False
 
     def handle_http2_event(self, direction: Direction,
                            frame: hyperframe.frame.Frame) -> bytes:
-        return self.format_http2_frame(frame)
+        return self.format_http2_frame(direction, frame)
 
-    def format_http2_frame(self, frame: hyperframe.frame.Frame) -> bytes:
-        if isinstance(frame, hyperframe.frame.HeadersFrame):
-            headers = self.hpack_decoder.decode(frame.data)
+    # Avoid decoding the headers multiple times.
+    def handle_http2_headers(self, direction: Direction,
+                             frame: hyperframe.frame.Frame,
+                             headers: List[HeaderTuple]) -> None:
+        pass
+
+    def format_http2_frame(self, direction: Direction,
+                           frame: hyperframe.frame.Frame) -> bytes:
+        if isinstance(
+                frame,
+            (hyperframe.frame.HeadersFrame, hyperframe.frame.PushPromiseFrame,
+             hyperframe.frame.ContinuationFrame)):
+            if 'END_HEADERS' not in frame.flags:
+                raise Exception('TODO: Handle fragmented headers')
+            headers = self.hpack_decoder[direction].decode(frame.data)
+            self.handle_http2_headers(direction, frame, headers)
             output = ''
             for header in headers:
                 output += f"{header[0]}: {header[1]}\n"
@@ -48,6 +63,7 @@ class HTTP2Converter(HTTPConverter):
                 self.SETTINGS_NAMES.get(k, k): v
                 for k, v in frame.settings.items()
             }
+            # TODO: Update hpack decoder MAX_HEADER_LIST_SIZE with setting. The values only take effect after an ACK.
             output = ''
             for k, v in settings.items():
                 output += f"{k}: {v}\n"
@@ -60,7 +76,6 @@ class HTTP2Converter(HTTPConverter):
         self.h2_server_buffer.max_frame_size = 16384
         self.h2_client_buffer = h2.frame_buffer.FrameBuffer(server=False)
         self.h2_client_buffer.max_frame_size = 16384
-        self.hpack_decoder = Decoder()
 
     def handle_http2_upgrade(self, request: HTTPRequest) -> List[StreamChunk]:
         self.setup_http2_buffers()
@@ -170,7 +185,7 @@ class HTTP2Converter(HTTPConverter):
     def handle_stream(self, stream: Stream) -> Result:
         self.h2_active = False
         self.h2_client_buffer = None
-        self.hpack_decoder = None
+        self.hpack_decoder = defaultdict(Decoder)
         self.h2_server_buffer = None
         if len(stream.Chunks) > 1 and stream.Chunks[
                 0].Direction == Direction.SERVERTOCLIENT:

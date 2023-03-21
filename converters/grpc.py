@@ -3,10 +3,10 @@ from collections import defaultdict
 from io import BytesIO
 import re
 from struct import unpack
-from typing import Dict
+from typing import Dict, List
 import zlib
 
-from http2 import HTTP2Converter
+from http2 import HTTP2Converter, HeaderTuple
 from pkappa2lib import Direction, Result, Stream
 import hyperframe.frame
 from protobuf_inspector.types import StandardParser
@@ -54,33 +54,31 @@ class GRPCConverter(HTTP2Converter):
         else:
             raise ValueError(f"Unknown encoding '{encoding}'")
 
+    def handle_http2_headers(self, direction: Direction,
+                             frame: hyperframe.frame.Frame,
+                             headers: List[HeaderTuple]) -> None:
+        # extract content-type and check if it is grpc
+        content_type = next((x[1] for x in headers if x[0] == "content-type"),
+                            None)
+        if content_type is not None:
+            self._stream_content_type[
+                frame.stream_id][direction] = content_type.lower() in [
+                    "application/grpc", "application/grpc+proto"
+                ]
+        if self._stream_content_type[frame.stream_id][
+                direction] and direction == Direction.SERVERTOCLIENT:
+            self._stream_responded_grpc_once = True
+
+        # extract encoding for compression
+        # https://github.com/grpc/grpc/blob/master/doc/compression.md
+        encoding = next((x[1] for x in headers if x[0] == "grpc-encoding"),
+                        None)
+        if encoding is not None:
+            self._stream_encoding[frame.stream_id][direction] = encoding
+
     def handle_http2_event(self, direction: Direction,
                            frame: hyperframe.frame.Frame) -> bytes:
         # https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
-
-        if isinstance(frame, hyperframe.frame.HeadersFrame):
-            headers = self.hpack_decoder.decode(frame.data)
-
-            # extract content-type and check if it is grpc
-            content_type = next(
-                (x[1] for x in headers if x[0] == "content-type"), None)
-            if content_type is not None:
-                self._stream_content_type[
-                    frame.stream_id][direction] = content_type.lower() in [
-                        "application/grpc", "application/grpc+proto"
-                    ]
-            if self._stream_content_type[frame.stream_id][
-                    direction] and direction == Direction.SERVERTOCLIENT:
-                self._stream_responded_grpc_once = True
-
-            # extract encoding for compression
-            # https://github.com/grpc/grpc/blob/master/doc/compression.md
-            encoding = next((x[1] for x in headers if x[0] == "grpc-encoding"),
-                            None)
-            if encoding is not None:
-                self._stream_encoding[frame.stream_id][direction] = encoding
-
-            return self.format_http2_frame(frame)
 
         # FIXME: DATA frame boundaries have no relation to Length-Prefixed-Message
         #        boundaries and implementations should make no assumptions about
@@ -95,10 +93,10 @@ class GRPCConverter(HTTP2Converter):
                 # If we haven't seen a content-type header yet, we assume that
                 # the stream is not grpc.
                 if direction == Direction.SERVERTOCLIENT and not self._stream_responded_grpc_once:
-                    return self.format_http2_frame(frame)
+                    return self.format_http2_frame(direction, frame)
 
             if len(frame.data) == 0:
-                return self.format_http2_frame(frame)
+                return self.format_http2_frame(direction, frame)
 
             encoding = "identity"
             if frame.stream_id in self._stream_encoding and direction in self._stream_encoding[
@@ -138,9 +136,9 @@ class GRPCConverter(HTTP2Converter):
                 return output + b'\n'
             except Exception as ex:
                 return str(ex).encode() + b'\n' + self.format_http2_frame(
-                    frame)
+                    direction, frame)
 
-        return self.format_http2_frame(frame)
+        return self.format_http2_frame(direction, frame)
 
     def handle_stream(self, stream: Stream) -> Result:
         self._stream_content_type = defaultdict(lambda: defaultdict(bool))
