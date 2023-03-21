@@ -2,8 +2,11 @@
 
 ## server:
 - [x] support http
-- [x] support websocket, including compression
-- [ ] support quic and http/2
+- [x] support http/1 websocket, including compression
+- [x] support http/2
+- [ ] support http/2 websocket
+- [ ] support quic
+- [ ] support ocsp
 - [ ] support is:started|finished
 - [ ] support pcap groups, they have their own indexes & snapshots and may only be combined with packets in the same group
 - [ ] fix ip4 defragmentation (snapshottable, list of packets that are source for a reassembled pkg)
@@ -24,6 +27,8 @@
 - [ ] autocomplete keywords while typing the query "nearley unparse"
 - [ ] show matching generated marks in stream view
 - [x] let large tag queries and names overflow instead of widening the page layout
+- [ ] add open in CyberChef button to stream chunks
+- [ ] highlight data matches in stream view
 
 ## both:
 - [ ] add search history overlay for recent searches
