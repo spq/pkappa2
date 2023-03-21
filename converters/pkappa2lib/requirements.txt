@@ -1,3 +1,4 @@
 h2
 urllib3
-git+https://github.com/mildsunrise/protobuf-inspector
+protobuf-inspector
+dnslib
