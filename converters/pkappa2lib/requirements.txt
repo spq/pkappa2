@@ -4,3 +4,4 @@ protobuf-inspector
 dnslib
 cryptography
 scapy
+aioquic
