@@ -21,7 +21,6 @@ class HTTP2Converter(HTTPConverter):
         4: "INITIAL_WINDOW_SIZE",
         5: "MAX_FRAME_SIZE",
         6: "MAX_HEADER_LIST_SIZE",
-        8: "ENABLE_CONNECT_PROTOCOL",
     }
 
     hpack_decoder: Dict[Direction, Decoder]

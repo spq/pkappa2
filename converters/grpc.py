@@ -93,10 +93,10 @@ class GRPCConverter(HTTP2Converter):
                 # If we haven't seen a content-type header yet, we assume that
                 # the stream is not grpc.
                 if direction == Direction.SERVERTOCLIENT and not self._stream_responded_grpc_once:
-                    return self.format_http2_frame(direction, frame)
+                    return super().handle_http2_event(direction, frame)
 
             if len(frame.data) == 0:
-                return self.format_http2_frame(direction, frame)
+                return super().handle_http2_event(direction, frame)
 
             encoding = "identity"
             if frame.stream_id in self._stream_encoding and direction in self._stream_encoding[
@@ -135,10 +135,10 @@ class GRPCConverter(HTTP2Converter):
                     '', protobuf_message).encode()
                 return output + b'\n'
             except Exception as ex:
-                return str(ex).encode() + b'\n' + self.format_http2_frame(
+                return str(ex).encode() + b'\n' + super().handle_http2_event(
                     direction, frame)
 
-        return self.format_http2_frame(direction, frame)
+        return super().handle_http2_event(direction, frame)
 
     def handle_stream(self, stream: Stream) -> Result:
         self._stream_content_type = defaultdict(lambda: defaultdict(bool))

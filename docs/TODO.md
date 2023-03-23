@@ -4,7 +4,7 @@
 - [x] support http
 - [x] support http/1 websocket, including compression
 - [x] support http/2
-- [ ] support http/2 websocket
+- [x] support http/2 websocket
 - [ ] support quic
 - [ ] support ocsp
 - [ ] support is:started|finished
@@ -86,3 +86,4 @@ the converter feature will be implemented like this:
 - [ ] allow converters to add (generated) tags to a stream
 - [ ] option to mark converter output "informative" and render it differently than client/server traffic
   - e.g. to render the pwntools script generator output in an easy to copy way without the "client sent" coloring
+- [ ] split chunk into sub-chunks with different content-types to e.g. render images inline

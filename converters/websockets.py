@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 from base64 import b64encode
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 from hashlib import sha1
 import zlib
 import traceback
-from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
+
+from http2 import HTTP2Converter, HTTPRequest, HTTPResponse, HeaderTuple
+import hyperframe.frame
 from pkappa2lib import StreamChunk, Direction, Result, Stream
 
 
@@ -16,13 +19,21 @@ class WebsocketFrame:
     Data: bytearray
 
 
-class WebsocketConverter(HTTPConverter):
+class WebsocketConverter(HTTP2Converter):
 
     websocket_key: Union[bytes, None]
     switched_protocols: bool
-    websocket_deflate: bool
-    websocket_deflate_decompressor: Dict[Direction, Any]
-    websocket_message_fragmented_frames: List[WebsocketFrame]
+    websocket_deflate: Dict[int, bool]
+    websocket_deflate_decompressor: Dict[int, Dict[Direction, Any]]
+    websocket_message_fragmented_frames: Dict[int, List[WebsocketFrame]]
+    websocket_enable_connect_protocol: bool
+    websocket_stream: Dict[int, bool]
+
+    def __init__(self):
+        super().__init__()
+        self.SETTINGS_NAMES.update({
+            8: 'ENABLE_CONNECT_PROTOCOL',
+        })
 
     def unmask_websocket_frames(self, frame: WebsocketFrame) -> WebsocketFrame:
         # this frame is unmasked
@@ -39,7 +50,8 @@ class WebsocketConverter(HTTPConverter):
                               bytearray(unmasked))
 
     def handle_websocket_permessage_deflate(
-            self, frame: WebsocketFrame) -> Union[WebsocketFrame, None]:
+            self, stream_id: int,
+            frame: WebsocketFrame) -> Union[WebsocketFrame, None]:
         opcode = frame.Header[0] & 0x0F
         # control frames are not compressed
         if opcode & 0x08 != 0:
@@ -47,7 +59,7 @@ class WebsocketConverter(HTTPConverter):
 
         # handle fragmented messages
         if frame.Header[0] & 0x80 == 0:  # FIN bit not set
-            self.websocket_message_fragmented_frames.append(frame)
+            self.websocket_message_fragmented_frames[stream_id].append(frame)
             if len(self.websocket_message_fragmented_frames
                    ) > 0 and opcode != 0:
                 self.websocket_message_fragmented_frames = []
@@ -63,12 +75,14 @@ class WebsocketConverter(HTTPConverter):
                 self.websocket_message_fragmented_frames = []
                 raise Exception("Invalid fragmented message")
             # this is the last frame of a fragmented message
-            self.websocket_message_fragmented_frames.append(frame)
+            self.websocket_message_fragmented_frames[stream_id].append(frame)
             frame = WebsocketFrame(
                 Direction=frame.Direction,
-                Header=self.websocket_message_fragmented_frames[0].Header,
+                Header=self.websocket_message_fragmented_frames[stream_id]
+                [0].Header,
                 Data=bytearray(b''.join([
-                    f.Data for f in self.websocket_message_fragmented_frames
+                    f.Data for f in
+                    self.websocket_message_fragmented_frames[stream_id]
                 ])))
             frame.Header[0] |= 0x80  # set FIN bit
             # datalength in the header is wrong now, but we don't care
@@ -80,13 +94,12 @@ class WebsocketConverter(HTTPConverter):
             return frame
 
         data = frame.Data + b'\x00\x00\xff\xff'
-        data = self.websocket_deflate_decompressor[frame.Direction].decompress(
-            data)
+        data = self.websocket_deflate_decompressor[stream_id][
+            frame.Direction].decompress(data)
         frame.Header[0] = frame.Header[0] & 0xBF  # remove RSV1 bit
         return WebsocketFrame(frame.Direction, frame.Header, bytearray(data))
 
-    def handle_websocket_frame(self, chunk: StreamChunk,
-                               frame: WebsocketFrame) -> WebsocketFrame:
+    def handle_websocket_frame(self, frame: WebsocketFrame) -> WebsocketFrame:
         """
         Handle a websocket frame and possibly return a new frame.
         Use this to implement custom websocket protocols.
@@ -100,10 +113,11 @@ class WebsocketConverter(HTTPConverter):
         """
         return frame
 
-    def handle_websocket_frames(self, chunk: StreamChunk) -> bytes:
+    def handle_websocket_frames(self, direction: Direction, stream_id: int,
+                                content: bytes) -> bytes:
         try:
             frames: List[bytes] = []
-            frame = bytearray(chunk.Content)
+            frame = bytearray(content)
             while len(frame) > 0:
                 data_length = frame[1] & 0x7F
                 mask_offset = 2
@@ -120,18 +134,17 @@ class WebsocketConverter(HTTPConverter):
                     data_offset += 4
 
                 websocket_frame = WebsocketFrame(
-                    Direction=chunk.Direction,
+                    Direction=direction,
                     Header=frame[:mask_offset],
                     Data=frame[mask_offset:data_offset + data_length])
                 websocket_frame = self.unmask_websocket_frames(websocket_frame)
                 if self.websocket_deflate:
                     websocket_frame = self.handle_websocket_permessage_deflate(
-                        websocket_frame)
+                        stream_id, websocket_frame)
                     if websocket_frame is None:
                         continue
 
-                websocket_frame = self.handle_websocket_frame(
-                    chunk, websocket_frame)
+                websocket_frame = self.handle_websocket_frame(websocket_frame)
 
                 frames.append(websocket_frame.Header +
                               bytes(websocket_frame.Data))
@@ -145,21 +158,21 @@ class WebsocketConverter(HTTPConverter):
                 f"Error while handling websocket frame: {ex}") from ex
 
     def handle_permessage_deflate_extension(
-            self, websocket_deflate_parameters: Dict[str, Union[bool,
-                                                                str]]) -> None:
-        self.websocket_deflate = True
-        self.websocket_message_fragmented_frames = []
+            self, stream_id: int,
+            websocket_deflate_parameters: Dict[str, Union[bool, str]]) -> None:
+        self.websocket_deflate[stream_id] = True
+        self.websocket_message_fragmented_frames[stream_id] = []
         window_bits = 15
         if 'server_max_window_bits' in websocket_deflate_parameters:
             window_bits = int(
                 websocket_deflate_parameters['server_max_window_bits'])
-        self.websocket_deflate_decompressor[
+        self.websocket_deflate_decompressor[stream_id][
             Direction.SERVERTOCLIENT] = zlib.decompressobj(wbits=-window_bits)
         window_bits = 15
         if 'client_max_window_bits' in websocket_deflate_parameters:
             window_bits = int(
                 websocket_deflate_parameters['client_max_window_bits'])
-        self.websocket_deflate_decompressor[
+        self.websocket_deflate_decompressor[stream_id][
             Direction.CLIENTTOSERVER] = zlib.decompressobj(wbits=-window_bits)
 
     def decode_websocket_extensions(
@@ -187,13 +200,77 @@ class WebsocketConverter(HTTPConverter):
                 extensions[extension] = params
         return extensions
 
+    def handle_http2_headers(self, direction: Direction,
+                             frame: hyperframe.frame.Frame,
+                             headers: List[HeaderTuple]) -> None:
+        if not self.websocket_enable_connect_protocol or direction != Direction.CLIENTTOSERVER:
+            return
+
+        # The client wants to use the extended CONNECT protocol
+        # using the ":protocol" pseudo header.
+        protocol = None
+        scheme = None
+        extensions_header = None
+        for header in headers:
+            if header[0] == ":protocol":
+                protocol = header[1].decode()
+            elif header[0] == ":scheme":
+                scheme = header[1].decode()
+            elif header[0] == "sec-websocket-extensions":
+                extensions_header = header[1].decode()
+
+        # The client doesn't want to use the extended CONNECT protocol
+        if protocol is None:
+            return
+
+        if protocol != "websocket":
+            return
+
+        # I doubt we'll see "https" yet, but let's be prepared
+        if scheme not in ["http", "https"]:
+            return
+
+        # Decode extensions header
+        if extensions_header is not None:
+            # sec-websocket-extensions: extension-name; param1=value1; param2="value2", extension-name2; param1, extension-name3, extension-name4; param1=value1
+            extensions = self.decode_websocket_extensions(extensions_header)
+            if "permessage-deflate" in extensions:
+                self.handle_permessage_deflate_extension(
+                    frame.stream_id, extensions["permessage-deflate"])
+            elif len(extensions) > 0:
+                self.log(f"Unsupported extensions: {extensions}")
+
+        # Switch this stream to websocket mode
+        self.websocket_stream[frame.stream_id] = True
+
+    def handle_http2_event(self, direction: Direction,
+                           frame: hyperframe.frame.Frame) -> bytes:
+        if isinstance(frame, hyperframe.frame.SettingsFrame):
+            if direction != Direction.SERVERTOCLIENT or frame.settings.get(
+                    frame.ENABLE_CONNECT_PROTOCOL, 0) == 0:
+                return super().handle_http2_event(direction, frame)
+
+            # The client can use the extended CONNECT protocol
+            # using the ":protocol" pseudo header.
+            self.websocket_enable_connect_protocol = True
+        elif isinstance(frame, hyperframe.frame.DataFrame):
+            if not self.websocket_stream[frame.stream_id]:
+                return super().handle_http2_event(direction, frame)
+
+            return self.handle_websocket_frames(direction, frame.stream_id,
+                                                frame.data)
+
+        return super().handle_http2_event(direction, frame)
+
     def handle_raw_client_chunk(
             self, chunk: StreamChunk) -> Optional[List[StreamChunk]]:
         try:
             if self.switched_protocols:
                 return [
-                    StreamChunk(chunk.Direction,
-                                self.handle_websocket_frames(chunk))
+                    StreamChunk(
+                        chunk.Direction,
+                        self.handle_websocket_frames(chunk.Direction, 0,
+                                                     chunk.Content))
                 ]
             return super().handle_raw_client_chunk(chunk)
         except Exception as ex:
@@ -204,8 +281,10 @@ class WebsocketConverter(HTTPConverter):
         try:
             if self.switched_protocols:
                 return [
-                    StreamChunk(chunk.Direction,
-                                self.handle_websocket_frames(chunk))
+                    StreamChunk(
+                        chunk.Direction,
+                        self.handle_websocket_frames(chunk.Direction, 0,
+                                                     chunk.Content))
                 ]
             return super().handle_raw_server_chunk(chunk)
         except Exception as ex:
@@ -255,14 +334,14 @@ class WebsocketConverter(HTTPConverter):
                     extensions_header)
                 if "permessage-deflate" in extensions:
                     self.handle_permessage_deflate_extension(
-                        extensions["permessage-deflate"])
+                        0, extensions["permessage-deflate"])
                 elif len(extensions) > 0:
                     self.log(f"Unsupported extensions: {extensions}")
 
                 data = response.data
                 if len(data) > 0:
                     data = self.handle_websocket_frames(
-                        StreamChunk(chunk.Direction, data))
+                        chunk.Direction, 0, data)
 
                 return [
                     StreamChunk(chunk.Direction, header + b"\r\n\r\n" + data)
@@ -276,11 +355,18 @@ class WebsocketConverter(HTTPConverter):
             ]
 
     def handle_stream(self, stream: Stream) -> Result:
+        # http1
         self.websocket_key = None
         self.switched_protocols = False
-        self.websocket_deflate = False
-        self.websocket_deflate_decompressor = {}
-        self.websocket_message_fragmented_frames = []
+
+        # http2
+        self.websocket_enable_connect_protocol = False
+        self.websocket_stream = defaultdict(bool)
+
+        # deflate extension
+        self.websocket_deflate = defaultdict(bool)
+        self.websocket_deflate_decompressor = defaultdict(dict)
+        self.websocket_message_fragmented_frames = defaultdict(list)
         return super().handle_stream(stream)
 
 
