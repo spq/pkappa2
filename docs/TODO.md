@@ -7,6 +7,7 @@
 - [x] support http/2 websocket
 - [ ] support quic
 - [ ] support ocsp
+- [ ] support SignalR
 - [ ] support is:started|finished
 - [ ] support pcap groups, they have their own indexes & snapshots and may only be combined with packets in the same group
 - [ ] fix ip4 defragmentation (snapshottable, list of packets that are source for a reassembled pkg)
