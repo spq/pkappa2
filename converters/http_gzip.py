@@ -88,9 +88,17 @@ class HTTPConverter(Pkappa2Converter):
                     # https://stackoverflow.com/a/52418392
                     header, body = chunk.Content.split(b"\r\n\r\n", 1)
                     header_stream = BytesIO(header)
-                    requestline = header_stream.readline().split(b' ')
+                    requestline = header_stream.readline().strip().split(b' ')
                     status = int(requestline[1])
-                    headers = parse_headers(header_stream)
+                    headers_parsed = parse_headers(header_stream)
+                    try:
+                        # See if iterator returns a tuple (required by HTTPResponse)
+                        for key, value in headers_parsed:
+                            break
+                        headers = headers_parsed
+                    except:
+                        # Otherwise assume dictionary (for newer Python stdlib versions)
+                        headers = {k:headers_parsed[k] for k in headers_parsed}
 
                     body_stream = BytesIO(body)
                     response = HTTPResponse(

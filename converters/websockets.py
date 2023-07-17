@@ -294,8 +294,8 @@ class WebsocketConverter(HTTP2Converter):
                              request: HTTPRequest) -> List[StreamChunk]:
 
         if request.headers.get(
-                "Connection") == "Upgrade" and request.headers.get(
-                    "Upgrade") == "websocket":
+                "Connection").lower() == "upgrade" and request.headers.get(
+                    "Upgrade").lower() == "websocket":
             websocket_key = request.headers.get("Sec-WebSocket-Key", None)
             if websocket_key is None:
                 return [
@@ -351,7 +351,7 @@ class WebsocketConverter(HTTP2Converter):
         except Exception as ex:
             return [
                 StreamChunk(chunk.Direction,
-                            f"Unable to parse HTTP response: {ex}".encode())
+                            f"Unable to parse HTTP1 response (websockets): {ex}".encode())
             ]
 
     def handle_stream(self, stream: Stream) -> Result:
