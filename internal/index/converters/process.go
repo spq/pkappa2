@@ -168,7 +168,9 @@ func (process *Process) run() {
 		}
 	}
 
-	process.cmd.Process.Kill()
+	if err := process.cmd.Process.Kill(); err != nil {
+		log.Printf("Converter (%s): Failed to kill process: %q", process.converterName, err)
+	}
 	if err := process.cmd.Wait(); err != nil {
 		if _, ok := err.(*exec.ExitError); !ok {
 			log.Printf("Converter (%s): Failed to wait for process: %q", process.converterName, err)
