@@ -8,6 +8,14 @@ type (
 	}
 )
 
+func WrapAsLongBitmask(mask []uint64) LongBitmask {
+	return LongBitmask{mask: mask}
+}
+
+func (bm LongBitmask) Mask() []uint64 {
+	return bm.mask
+}
+
 func (bm LongBitmask) Copy() LongBitmask {
 	return LongBitmask{
 		mask: append([]uint64(nil), bm.mask...),

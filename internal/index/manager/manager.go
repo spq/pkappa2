@@ -98,6 +98,7 @@ type (
 		Tags  []struct {
 			Name       string
 			Definition string
+			Matches    []uint64
 			Color      string
 			Converters []string
 		}
@@ -234,8 +235,11 @@ nextStateFile:
 				log.Printf("Invalid tag %q in statefile %q: duplicate name", t.Name, fn)
 				continue nextStateFile
 			}
+			matches := bitmask.WrapAsLongBitmask(t.Matches)
+			matches.Shrink()
 			nt := &tag{
 				TagDetails: query.TagDetails{
+					Matches:    matches,
 					Uncertain:  mgr.allStreams,
 					Conditions: q.Conditions,
 				},
@@ -365,11 +369,13 @@ func (mgr *Manager) saveState() error {
 		j.Tags = append(j.Tags, struct {
 			Name       string
 			Definition string
+			Matches    []uint64
 			Color      string
 			Converters []string
 		}{
 			Name:       n,
 			Definition: t.definition,
+			Matches:    t.Matches.Mask(),
 			Color:      t.color,
 			Converters: t.converterNames(),
 		})
@@ -637,6 +643,9 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 			mgr.tags[name] = &t
 			if !(mgr.updatedStreamsDuringTaggingJob.IsZero() && mgr.addedStreamsDuringTaggingJob.IsZero()) {
 				mgr.invalidateTags(mgr.updatedStreamsDuringTaggingJob, mgr.addedStreamsDuringTaggingJob)
+			}
+			if err := mgr.saveState(); err != nil {
+				log.Printf("updateTagJob failed, unable to save state: %q", err)
 			}
 		}
 		mgr.taggingJobRunning = false
