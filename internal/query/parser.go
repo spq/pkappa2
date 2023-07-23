@@ -89,7 +89,7 @@ var (
 				Pattern: `(?i)(id|tag|service|mark|protocol|generated|[fl]?time|[cs]?(data|port|host|bytes))`,
 			}, {
 				Name:    "ConverterName",
-				Pattern: `\.([^:]+)`,
+				Pattern: `\.([^:=]+)`,
 			}, {
 				Name:    "SortKey",
 				Pattern: `(?i)sort`,
