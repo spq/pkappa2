@@ -99,7 +99,7 @@ func main() {
 	rUser := r.With(checkBasicAuth(*userPassword))
 	rPcap := r.With(checkBasicAuth(*pcapPassword))
 
-	rPcap.Post("/upload/{filename:.+[.]pcap}", func(w http.ResponseWriter, r *http.Request) {
+	rPcap.Post("/upload/{filename:.+[.]pcap[ng]?}", func(w http.ResponseWriter, r *http.Request) {
 		filename := chi.URLParam(r, "filename")
 		if filename != filepath.Base(filename) {
 			http.Error(w, "Invalid filename", http.StatusBadRequest)
@@ -115,14 +115,20 @@ func main() {
 		}
 
 		if _, err := io.Copy(dst, r.Body); err != nil {
-			http.Error(w, fmt.Sprintf("Error while storing file: %s", err), http.StatusInternalServerError)
-			dst.Close()
-			os.Remove(fullFilename)
+			http.Error(w, fmt.Sprintf("Error while storing file: %v", err), http.StatusInternalServerError)
+			if err := dst.Close(); err != nil {
+				log.Printf("Failed to close new pcap file in upload: %v", err)
+			}
+			if err := os.Remove(fullFilename); err != nil {
+				log.Printf("Failed to remove empty new pcap file in upload: %v", err)
+			}
 			return
 		}
 		if err := dst.Close(); err != nil {
 			http.Error(w, fmt.Sprintf("Error while storing file: %s", err), http.StatusInternalServerError)
-			os.Remove(fullFilename)
+			if err := os.Remove(fullFilename); err != nil {
+				log.Printf("Failed to remove new pcap file in upload after failed save: %v", err)
+			}
 			return
 		}
 		mgr.ImportPcap(filename)
