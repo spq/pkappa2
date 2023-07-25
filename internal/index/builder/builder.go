@@ -44,7 +44,7 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 		return nil, err
 	}
 	for _, p := range pcaps {
-		if p.IsDir() || !strings.HasSuffix(p.Name(), ".pcap") {
+		if p.IsDir() || (!strings.HasSuffix(p.Name(), ".pcap") && !strings.HasSuffix(p.Name(), ".pcapng")) {
 			continue
 		}
 		pInfo, err := p.Info()

@@ -1,7 +1,8 @@
 .DS_Store
 node_modules
 /web/dist
-docker_data/*
+__pycache__
+docker_data
 
 # local env files
 .env.local
