@@ -41,15 +41,16 @@ type (
 	queryCondition struct {
 		Negated   *queryCondition   `parser:"  Negation @@"`
 		Grouped   *queryOrCondition `parser:"| '(' @@ ')'"`
-		Term      *queryTerm        `parser:"| @( SubQuery? Key ( UnquotedValue | QuotedValue ) )"`
+		Term      *queryTerm        `parser:"| @( SubQuery? Key ConverterName? ( UnquotedValue | QuotedValue ) )"`
 		SortTerm  *sortTerm         `parser:"| ( SortKey @( UnquotedValue | QuotedValue ) )"`
 		LimitTerm *limitTerm        `parser:"| ( LimitKey @( UnquotedValue | QuotedValue ) )"`
 		GroupTerm *groupTerm        `parser:"| ( GroupKey @( UnquotedValue | QuotedValue ) )"`
 	}
 	queryTerm struct {
-		SubQuery string
-		Key      string
-		Value    string
+		SubQuery      string
+		Key           string
+		ConverterName string
+		Value         string
 	}
 	sortTerm  []Sorting
 	limitTerm uint
@@ -86,6 +87,9 @@ var (
 			}, {
 				Name:    "Key",
 				Pattern: `(?i)(id|tag|service|mark|protocol|generated|[fl]?time|[cs]?(data|port|host|bytes))`,
+			}, {
+				Name:    "ConverterName",
+				Pattern: `\.([^:=]+)`,
 			}, {
 				Name:    "SortKey",
 				Pattern: `(?i)sort`,
@@ -141,6 +145,10 @@ func (t *queryTerm) Capture(s []string) error {
 		s = s[1:]
 	}
 	t.Key = strings.ToLower(s[0])
+	if len(s) >= 3 && strings.HasPrefix(s[1], ".") {
+		t.ConverterName = s[1][1:]
+		s = s[1:]
+	}
 	t.Value = parseValue(s[1])
 	return nil
 }
@@ -187,6 +195,9 @@ func (t *limitTerm) Capture(s []string) error {
 }
 
 func (t *queryTerm) String() string {
+	if t.ConverterName != "" {
+		return fmt.Sprintf("%s.%s:%q", t.Key, t.ConverterName, t.Value)
+	}
 	return fmt.Sprintf("%s:%q", t.Key, t.Value)
 }
 

@@ -11,6 +11,7 @@ const store = new Vuex.Store({
     pcaps: null,
 
     tags: null,
+    converters: null,
 
     streams: {
       query: null,
@@ -78,6 +79,9 @@ const store = new Vuex.Store({
     setTags(state, tags) {
       state.tags = tags;
     },
+    setConverters(state, converters) {
+      state.converters = converters;
+    },
     setPcaps(state, pcaps) {
       state.pcaps = pcaps;
     },
@@ -139,9 +143,9 @@ const store = new Vuex.Store({
           });
         });
     },
-    fetchStream({ commit }, { id }) {
+    fetchStream({ commit }, { id, converter }) {
       commit("setStream", { id, running: true, error: null, stream: null });
-      APIClient.getStream(id)
+      APIClient.getStream(id, converter)
         .then((data) => {
           commit("setStream", {
             id,
@@ -206,6 +210,11 @@ const store = new Vuex.Store({
         commit("setTags", data);
       });
     },
+    updateConverters({ commit }) {
+      APIClient.getConverters().then((data) => {
+        commit("setConverters", data);
+      });
+    },
     updatePcaps({ commit }) {
       APIClient.getPcaps().then((data) => {
         commit("setPcaps", data);
@@ -237,6 +246,23 @@ const store = new Vuex.Store({
         })
         .then(() => {
           dispatch("updateTags");
+        });
+    },
+    async setTagConverters({ dispatch }, { name, converters }) {
+      try {
+        await APIClient.converterTagSet(name, converters);
+        dispatch("updateTags");
+      } catch (err) {
+        throw err.response.data;
+      }
+    },
+    async resetConverter({ dispatch }, name) {
+      return APIClient.resetConverter(name)
+        .then(() => {
+          dispatch("updateConverters");
+        })
+        .catch((err) => {
+          throw err.response.data;
         });
     },
     async markTagNew({ dispatch, commit }, { name, streams, color }) {

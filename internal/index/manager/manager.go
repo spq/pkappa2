@@ -5,13 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
+	"golang.org/x/sys/unix"
+
+	"github.com/fsnotify/fsnotify"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
+	"github.com/spq/pkappa2/internal/index/converters"
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
@@ -24,6 +34,7 @@ type (
 		definition string
 		features   query.FeatureSet
 		color      string
+		converters []*converters.CachedConverter
 	}
 	TagInfo struct {
 		Name           string
@@ -32,17 +43,20 @@ type (
 		MatchingCount  uint
 		UncertainCount uint
 		Referenced     bool
+		Converters     []string
 	}
 	Manager struct {
-		StateDir    string
-		PcapDir     string
-		IndexDir    string
-		SnapshotDir string
+		StateDir     string
+		PcapDir      string
+		IndexDir     string
+		SnapshotDir  string
+		ConverterDir string
 
-		jobs              chan func()
-		mergeJobRunning   bool
-		taggingJobRunning bool
-		importJobs        []string
+		jobs                chan func()
+		mergeJobRunning     bool
+		taggingJobRunning   bool
+		converterJobRunning bool
+		importJobs          []string
 
 		builder             *builder.Builder
 		indexes             []*index.Reader
@@ -55,24 +69,30 @@ type (
 		updatedStreamsDuringTaggingJob bitmask.LongBitmask
 		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
-		tags map[string]*tag
+		streamsToConvert map[string]*bitmask.LongBitmask
+
+		tags       map[string]*tag
+		converters map[string]*converters.CachedConverter
 
 		usedIndexes map[*index.Reader]uint
+		watcher     *fsnotify.Watcher
 	}
 
 	Statistics struct {
-		ImportJobCount    int
-		IndexCount        int
-		IndexLockCount    uint
-		PcapCount         int
-		StreamCount       int
-		PacketCount       int
-		MergeJobRunning   bool
-		TaggingJobRunning bool
+		ImportJobCount      int
+		IndexCount          int
+		IndexLockCount      uint
+		PcapCount           int
+		StreamCount         int
+		PacketCount         int
+		MergeJobRunning     bool
+		TaggingJobRunning   bool
+		ConverterJobRunning bool
 	}
 
 	indexReleaser []*index.Reader
 
+	// TODO: Maybe save md5 of converters to detect changes
 	stateFile struct {
 		Saved time.Time
 		Tags  []struct {
@@ -80,6 +100,7 @@ type (
 			Definition string
 			Matches    []uint64
 			Color      string
+			Converters []string
 		}
 		Pcaps []*pcapmetadata.PcapInfo
 	}
@@ -87,6 +108,8 @@ type (
 	updateTagOperationInfo struct {
 		markTagAddStreams, markTagDelStreams []uint64
 		color                                string
+		setConverterNames                    []string
+		convertersUpdated                    bool
 	}
 	UpdateTagOperation func(*updateTagOperationInfo)
 
@@ -96,7 +119,9 @@ type (
 		indexes  []*index.Reader
 		releaser indexReleaser
 
-		tagDetails map[string]query.TagDetails
+		tagDetails    map[string]query.TagDetails
+		tagConverters map[string][]string
+		converters    map[string]index.ConverterAccess
 	}
 
 	StreamContext struct {
@@ -112,15 +137,39 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir string) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
 	mgr := Manager{
-		PcapDir:     pcapDir,
-		IndexDir:    indexDir,
-		SnapshotDir: snapshotDir,
-		StateDir:    stateDir,
+		PcapDir:      pcapDir,
+		IndexDir:     indexDir,
+		SnapshotDir:  snapshotDir,
+		StateDir:     stateDir,
+		ConverterDir: converterDir,
 
-		usedIndexes: make(map[*index.Reader]uint),
-		tags:        make(map[string]*tag),
+		usedIndexes:      make(map[*index.Reader]uint),
+		tags:             make(map[string]*tag),
+		converters:       make(map[string]*converters.CachedConverter),
+		streamsToConvert: make(map[string]*bitmask.LongBitmask),
+		jobs:             make(chan func()),
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
+	}
+	mgr.startMonitoringConverters(watcher)
+
+	// Lookup all available converter binaries
+	entries, err := os.ReadDir(mgr.ConverterDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read converter directory: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if err := mgr.addConverter(filepath.Join(mgr.ConverterDir, entry.Name())); err != nil {
+			return nil, fmt.Errorf("failed to add converter %q: %w", entry.Name(), err)
+		}
 	}
 
 	tools.AssertFolderRWXPermissions("pcap_dir", pcapDir)
@@ -207,6 +256,17 @@ nextStateFile:
 				nt.Matches = ids
 				nt.Uncertain = bitmask.LongBitmask{}
 			}
+			for _, converterName := range t.Converters {
+				converter, ok := mgr.converters[converterName]
+				if !ok {
+					// TODO: just remove the cache file if any?
+					log.Printf("Invalid tag %q in statefile %q: references non-existing converter %q", t.Name, fn, converterName)
+					continue
+				}
+				if err := mgr.attachConverterToTag(nt, t.Name, converter); err != nil {
+					log.Printf("Invalid tag %q in statefile %q: Failed to attach converter %q: %v", t.Name, fn, converterName, err)
+				}
+			}
 			newTags[t.Name] = nt
 		}
 		cyclingTags := map[string]struct{}{}
@@ -252,11 +312,11 @@ nextStateFile:
 		return nil, err
 	}
 	if len(mgr.builder.KnownPcaps()) != len(cachedKnownPcapData) {
-		//nolint:errcheck
-		mgr.saveState()
+		if err := mgr.saveState(); err != nil {
+			return nil, fmt.Errorf("unable to save state: %w", err)
+		}
 	}
 
-	mgr.jobs = make(chan func())
 	go func() {
 		for f := range mgr.jobs {
 			f()
@@ -264,6 +324,7 @@ nextStateFile:
 	}()
 	mgr.jobs <- func() {
 		mgr.startTaggingJobIfNeeded()
+		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
 	}
 	return &mgr, nil
@@ -271,6 +332,32 @@ nextStateFile:
 
 func (t tag) referencedTags() []string {
 	return append(append([]string(nil), t.features.MainTags...), t.features.SubQueryTags...)
+}
+
+func (t tag) converterNames() []string {
+	converterNames := make([]string, len(t.converters))
+	for i, converter := range t.converters {
+		converterNames[i] = converter.Name()
+	}
+	return converterNames
+}
+
+func (mgr *Manager) Close() {
+	if mgr.watcher != nil {
+		if err := mgr.watcher.Close(); err != nil {
+			log.Printf("Failed to close watcher: %v", err)
+		}
+	}
+	c := make(chan struct{})
+	mgr.jobs <- func() {
+		for _, converter := range mgr.converters {
+			if err := converter.Close(); err != nil {
+				log.Printf("Failed to close converter %q: %v", converter.Name(), err)
+			}
+		}
+		close(c)
+	}
+	<-c
 }
 
 func (mgr *Manager) saveState() error {
@@ -284,11 +371,13 @@ func (mgr *Manager) saveState() error {
 			Definition string
 			Matches    []uint64
 			Color      string
+			Converters []string
 		}{
 			Name:       n,
 			Definition: t.definition,
 			Matches:    t.Matches.Mask(),
 			Color:      t.color,
+			Converters: t.converterNames(),
 		})
 	}
 	fn := tools.MakeFilename(mgr.StateDir, "state.json")
@@ -421,14 +510,17 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 			go mgr.importPcapJob(mgr.importJobs[:], mgr.nextStreamID, idxs, rel)
 		}
 		mgr.startTaggingJobIfNeeded()
+		//TODO: this is not doing anything right now because we don't invalidate cached conversions, but we should
+		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
-		//nolint:errcheck
-		mgr.saveState()
+		if err := mgr.saveState(); err != nil {
+			log.Printf("importPcapJob(%q) failed to save state file: %s", filenames, err)
+		}
 	}
 }
 
 func (mgr *Manager) startMergeJobIfNeeded() {
-	if mgr.mergeJobRunning || mgr.taggingJobRunning {
+	if mgr.mergeJobRunning || mgr.taggingJobRunning || mgr.converterJobRunning {
 		return
 	}
 	// only merge if all tags are on the newest version, prioritize updating tags
@@ -472,7 +564,11 @@ outer:
 		mgr.addedStreamsDuringTaggingJob = bitmask.LongBitmask{}
 		mgr.taggingJobRunning = true
 		indexes, releaser := mgr.getIndexesCopy(0)
-		go mgr.updateTagJob(n, *t, tagDetails, indexes, releaser)
+		converters := make(map[string]index.ConverterAccess)
+		for converterName, converter := range mgr.converters {
+			converters[converterName] = converter
+		}
+		go mgr.updateTagJob(n, *t, tagDetails, converters, indexes, releaser)
 		return
 	}
 }
@@ -514,13 +610,13 @@ func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, release
 	}
 }
 
-func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query.TagDetails, indexes []*index.Reader, releaser indexReleaser) {
+func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query.TagDetails, converters map[string]index.ConverterAccess, indexes []*index.Reader, releaser indexReleaser) {
 	err := func() error {
 		q, err := query.Parse(t.definition)
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails)
+		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters)
 		if err != nil {
 			return err
 		}
@@ -539,6 +635,11 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 	mgr.jobs <- func() {
 		// don't touch the tag if it was modified
 		if ot, ok := mgr.tags[name]; ok && ot.definition == t.definition {
+			t.color = ot.color
+			t.converters = ot.converters
+			for _, converter := range t.converters {
+				mgr.streamsToConvert[converter.Name()].Or(t.Matches)
+			}
 			mgr.tags[name] = &t
 			if !(mgr.updatedStreamsDuringTaggingJob.IsZero() && mgr.addedStreamsDuringTaggingJob.IsZero()) {
 				mgr.invalidateTags(mgr.updatedStreamsDuringTaggingJob, mgr.addedStreamsDuringTaggingJob)
@@ -549,6 +650,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		}
 		mgr.taggingJobRunning = false
 		mgr.startTaggingJobIfNeeded()
+		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
 		releaser.release(mgr)
 	}
@@ -579,14 +681,15 @@ func (mgr *Manager) Status() Statistics {
 			locks += n
 		}
 		c <- Statistics{
-			IndexCount:        len(mgr.indexes),
-			IndexLockCount:    locks,
-			PcapCount:         len(mgr.builder.KnownPcaps()),
-			ImportJobCount:    len(mgr.importJobs),
-			StreamCount:       mgr.nStreams,
-			PacketCount:       mgr.nPackets,
-			MergeJobRunning:   mgr.mergeJobRunning,
-			TaggingJobRunning: mgr.taggingJobRunning,
+			IndexCount:          len(mgr.indexes),
+			IndexLockCount:      locks,
+			PcapCount:           len(mgr.builder.KnownPcaps()),
+			ImportJobCount:      len(mgr.importJobs),
+			StreamCount:         mgr.nStreams,
+			PacketCount:         mgr.nPackets,
+			MergeJobRunning:     mgr.mergeJobRunning,
+			TaggingJobRunning:   mgr.taggingJobRunning,
+			ConverterJobRunning: mgr.converterJobRunning,
 		}
 		close(c)
 	}
@@ -629,6 +732,7 @@ func (mgr *Manager) ListTags() []TagInfo {
 				MatchingCount:  uint(m.OnesCount()),
 				UncertainCount: uint(t.Uncertain.OnesCount()),
 				Referenced:     referenced,
+				Converters:     t.converterNames(),
 			})
 		}
 		sort.Slice(res, func(i, j int) bool {
@@ -698,12 +802,10 @@ func (mgr *Manager) AddTag(name, color, queryString string) error {
 			if !isMark {
 				mgr.startTaggingJobIfNeeded()
 			}
-			return nil
+			return mgr.saveState()
 		}()
 		c <- err
 		close(c)
-		//nolint:errcheck
-		mgr.saveState()
 	}
 	return <-c
 }
@@ -712,7 +814,8 @@ func (mgr *Manager) DelTag(name string) error {
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
-			if _, ok := mgr.tags[name]; !ok {
+			tag, ok := mgr.tags[name]
+			if !ok {
 				return fmt.Errorf("unknown tag %q", name)
 			}
 			for t2name, t2 := range mgr.tags {
@@ -722,13 +825,19 @@ func (mgr *Manager) DelTag(name string) error {
 					}
 				}
 			}
+			// remove converter results of attached converters from cache
+			if len(tag.converters) > 0 {
+				for _, converter := range tag.converters {
+					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
+						return err
+					}
+				}
+			}
 			delete(mgr.tags, name)
-			return nil
+			return mgr.saveState()
 		}()
 		c <- err
 		close(c)
-		//nolint:errcheck
-		mgr.saveState()
 	}
 	return <-c
 }
@@ -755,8 +864,15 @@ func UpdateTagOperationUpdateColor(color string) UpdateTagOperation {
 	}
 }
 
+func UpdateTagOperationSetConverter(converterNames []string) UpdateTagOperation {
+	return func(i *updateTagOperationInfo) {
+		i.setConverterNames = converterNames
+		i.convertersUpdated = true
+	}
+}
+
 func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
-	info := updateTagOperationInfo{}
+	info := updateTagOperationInfo{convertersUpdated: false}
 	operation(&info)
 	maxUsedStreamID := uint64(0)
 	if len(info.markTagAddStreams) != 0 || len(info.markTagDelStreams) != 0 {
@@ -782,20 +898,46 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
-			t, ok := mgr.tags[name]
+			tag, ok := mgr.tags[name]
 			if !ok {
 				return fmt.Errorf("unknown tag %q", name)
 			}
 			if info.color != "" {
-				t.color = info.color
+				tag.color = info.color
+			}
+			if info.convertersUpdated {
+				// detach deselected converters from tag
+				for _, converter := range tag.converters {
+					if slices.Contains(info.setConverterNames, converter.Name()) {
+						continue
+					}
+					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
+						return fmt.Errorf("failed to detach converter %q from tag %q: %w", converter.Name(), name, err)
+					}
+				}
+				// attach new converters to tag
+				converterNames := tag.converterNames()
+				for _, converterName := range info.setConverterNames {
+					if slices.Contains(converterNames, converterName) {
+						continue
+					}
+					if converter, ok := mgr.converters[converterName]; !ok {
+						return fmt.Errorf("unknown converter %q", converterName)
+					} else {
+						if err := mgr.attachConverterToTag(tag, name, converter); err != nil {
+							return fmt.Errorf("failed to attach converter %q to tag %q: %w", converterName, name, err)
+						}
+					}
+				}
+				mgr.startConverterJobIfNeeded()
 			}
 			if maxUsedStreamID != 0 {
 				if maxUsedStreamID >= mgr.nextStreamID {
 					return fmt.Errorf("unknown stream id %d", maxUsedStreamID)
 				}
-				newTag := *t
-				newTag.Matches = t.Matches.Copy()
-				newTag.Uncertain = t.Uncertain.Copy()
+				newTag := *tag
+				newTag.Matches = tag.Matches.Copy()
+				newTag.Uncertain = tag.Uncertain.Copy()
 				// update mark streamid tag matches without parsing the definition again
 				// this is a bit hacky but it is much faster than parsing the definition of long mark tags again
 				if len(info.markTagAddStreams) != 0 {
@@ -808,6 +950,10 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						newTag.Matches.Set(uint(s))
 						newTag.Uncertain.Set(uint(s))
 						b.WriteString(fmt.Sprintf("%d,", s))
+
+						for _, converter := range newTag.converters {
+							mgr.streamsToConvert[converter.Name()].Set(uint(s))
+						}
 					}
 					if b.Len() != len("id:") {
 						markQuery := b.String()
@@ -834,6 +980,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						newTag.Uncertain.Set(uint(s))
 						b.WriteString(fmt.Sprintf("%d,", s))
 						newDefinition = strings.Replace(newDefinition, fmt.Sprintf(",%d,", s), ",", 1)
+						// TODO: invalidate converter cache for this stream
 					}
 					if b.Len() != len("!id:") {
 						markQuery := b.String()
@@ -852,13 +999,12 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				mgr.inheritTagUncertainty()
 				mgr.tags[name].Uncertain = bitmask.LongBitmask{}
 				mgr.startTaggingJobIfNeeded()
+				mgr.startConverterJobIfNeeded()
 			}
-			return nil
+			return mgr.saveState()
 		}()
 		c <- err
 		close(c)
-		//nolint:errcheck
-		mgr.saveState()
 	}
 	return <-c
 }
@@ -882,6 +1028,449 @@ func (r *indexReleaser) release(mgr *Manager) {
 	}
 }
 
+func (mgr *Manager) startConverterJobIfNeeded() {
+	if mgr.converterJobRunning {
+		return
+	}
+	activeConverters := []*converters.CachedConverter(nil)
+	streamsToConvert := []*bitmask.LongBitmask(nil)
+
+	// TODO: split this into smaller chunks so that we can abort long running jobs
+	//       when a converter gets detached from a tag while it is running
+	for converterName, converter := range mgr.converters {
+		streams := mgr.streamsToConvert[converterName]
+		if streams.IsZero() {
+			continue
+		}
+		mgr.streamsToConvert[converterName] = &bitmask.LongBitmask{}
+		streamsToConvert = append(streamsToConvert, streams)
+		activeConverters = append(activeConverters, converter)
+	}
+	if len(activeConverters) == 0 {
+		return
+	}
+	indexes, releaser := mgr.getIndexesCopy(0)
+	go mgr.convertStreamJob(activeConverters, streamsToConvert, indexes, releaser)
+	mgr.converterJobRunning = true
+}
+
+func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter, allStreamIDs []*bitmask.LongBitmask, indexes []*index.Reader, releaser indexReleaser) {
+	type job struct {
+		streamID  uint64
+		converter int
+	}
+	jobs := []job(nil)
+	for i, streamIDs := range allStreamIDs {
+		nextStreamId := uint64(0)
+		for {
+			offset := streamIDs.TrailingZerosFrom(uint(nextStreamId))
+			if offset == -1 {
+				break
+			}
+			nextStreamId += uint64(offset)
+			jobs = append(jobs, job{nextStreamId, i})
+			nextStreamId++
+		}
+	}
+	sort.Slice(jobs, func(i, j int) bool {
+		a, b := jobs[i], jobs[j]
+		if a.streamID != b.streamID {
+			return a.streamID < b.streamID
+		}
+		// "randomize" the order of the converters
+		offset := int(a.streamID)
+		return (a.converter+offset)%len(allConverters) < b.converter
+	})
+
+	freeJobsGlobal := 0
+	freeJobs := []int(nil)
+	for _, converter := range allConverters {
+		maxProcessCount := converter.MaxProcessCount()
+		freeJobs = append(freeJobs, maxProcessCount)
+		freeJobsGlobal += maxProcessCount
+	}
+	if numCPUs := runtime.NumCPU(); freeJobsGlobal > numCPUs {
+		freeJobsGlobal = numCPUs
+	}
+	maxJobsGlobal := freeJobsGlobal
+	type result struct {
+		job job
+		err error
+	}
+	alreadyCached := errors.New("alreadyCached")
+	results := make(chan result, freeJobsGlobal)
+	failedJobs := make(map[job]struct{})
+	for jobIDs := []int(nil); len(jobs) != 0 || freeJobsGlobal != maxJobsGlobal; {
+		jobIDs = jobIDs[:0]
+		for i, job := range jobs {
+			if freeJobs[job.converter] == 0 {
+				continue
+			}
+			jobIDs = append(jobIDs, i)
+
+			freeJobs[job.converter]--
+			freeJobsGlobal--
+			if freeJobsGlobal == 0 {
+				break
+			}
+		}
+		for numDeleted, jobID := range jobIDs {
+			jobID -= numDeleted
+			job := jobs[jobID]
+			jobs = append(jobs[:jobID], jobs[jobID+1:]...)
+
+			// Convert the stream
+			go func() {
+				converter := allConverters[job.converter]
+				if converter.Contains(job.streamID) {
+					results <- result{job, alreadyCached}
+					return
+				}
+				for idxIdx := len(indexes) - 1; idxIdx >= 0; idxIdx-- {
+					index := indexes[idxIdx]
+
+					// Load the stream from the index
+					stream, err := index.StreamByID(job.streamID)
+					if err != nil {
+						results <- result{job, err}
+						return
+					}
+					// The stream isn't in this index file
+					if stream == nil {
+						continue
+					}
+					_, _, _, err = converter.Data(stream)
+					results <- result{job, err}
+					return
+				}
+			}()
+		}
+
+		handleResult := func(res result) {
+			freeJobs[res.job.converter]++
+			freeJobsGlobal++
+			switch res.err {
+			case nil:
+				return
+			default:
+				log.Printf("Error converting stream %d with converter %q: %v", res.job.streamID, allConverters[res.job.converter].Name(), res.err)
+				if _, ok := failedJobs[res.job]; !ok {
+					failedJobs[res.job] = struct{}{}
+					jobs = append(jobs, res.job)
+					return
+				}
+				log.Printf("Discarding conversion of stream %d with converter %q because it failed twice", res.job.streamID, allConverters[res.job.converter].Name())
+				fallthrough
+			case alreadyCached:
+				allStreamIDs[res.job.converter].Unset(uint(res.job.streamID))
+			}
+		}
+		handleResult(<-results)
+	outer:
+		for {
+			select {
+			case res := <-results:
+				handleResult(res)
+			default:
+				break outer
+			}
+		}
+	}
+
+	mgr.jobs <- func() {
+		mgr.converterJobRunning = false
+
+		for i, converter := range allConverters {
+			// The converter was removed while we were running.
+			// Discard the result.
+			if _, ok := mgr.converters[converter.Name()]; !ok {
+				if err := converter.Reset(); err != nil {
+					log.Printf("error while resetting converter %q after discarding results: %v", converter.Name(), err)
+				}
+				continue
+			}
+
+			// Mark the converted streams as uncertain on all tags using a data: filter
+			// The tag could match on the converted data now.
+			for _, tag := range mgr.tags {
+				// TODO: Only tag again if the tag matches converted data
+				if tag.features.MainFeatures&query.FeatureFilterData == 0 && tag.features.SubQueryFeatures&query.FeatureFilterData == 0 {
+					continue
+				}
+				tag.Uncertain.Or(*allStreamIDs[i])
+			}
+			mgr.updatedStreamsDuringTaggingJob.Or(*allStreamIDs[i])
+		}
+		mgr.inheritTagUncertainty()
+		mgr.startTaggingJobIfNeeded()
+		mgr.startConverterJobIfNeeded()
+		releaser.release(mgr)
+	}
+}
+
+func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
+	go func() {
+		var (
+			// Wait 500ms for new events; each new event resets the timer.
+			waitFor = 500 * time.Millisecond
+
+			// Keep track of the timers, as path → timer.
+			mu     sync.Mutex
+			timers = make(map[string]*time.Timer)
+		)
+		for {
+			select {
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("error:", err)
+
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				log.Println("event:", event)
+
+				if event.Has(fsnotify.Remove) {
+					mgr.jobs <- func() {
+						fileInfo, err := os.Stat(event.Name)
+						if err != nil || fileInfo.IsDir() {
+							return
+						}
+						if err := mgr.removeConverter(event.Name); err != nil {
+							log.Printf("error while removing converter: %v", err)
+						}
+					}
+				}
+
+				if !event.Has(fsnotify.Create) && !event.Has(fsnotify.Write) {
+					continue
+				}
+
+				mu.Lock()
+				timer, ok := timers[event.Name]
+				mu.Unlock()
+
+				// No timer yet, so create one.
+				if !ok {
+					timer = time.AfterFunc(math.MaxInt64, func() {
+						mu.Lock()
+						delete(timers, event.Name)
+						mu.Unlock()
+
+						mgr.jobs <- func() {
+							if event.Has(fsnotify.Create) {
+								fileInfo, err := os.Stat(event.Name)
+								if err != nil || fileInfo.IsDir() {
+									return
+								}
+								if err := mgr.addConverter(event.Name); err != nil {
+									log.Printf("error while adding converter: %v", err)
+								}
+							}
+							if event.Has(fsnotify.Write) {
+								fileInfo, err := os.Stat(event.Name)
+								if err != nil || fileInfo.IsDir() {
+									return
+								}
+								if err := mgr.restartConverterProcess(event.Name); err != nil {
+									log.Printf("error while restarting converter: %v", err)
+								}
+							}
+						}
+					})
+					timer.Stop()
+
+					mu.Lock()
+					timers[event.Name] = timer
+					mu.Unlock()
+				}
+
+				// Reset the timer for this path, so it will start again.
+				timer.Reset(waitFor)
+			}
+		}
+	}()
+
+	err := watcher.Add(mgr.ConverterDir)
+	if err != nil {
+		log.Fatal(fmt.Errorf("error while adding converter dir to watcher %v: %w", mgr.ConverterDir, err))
+	}
+}
+
+func (mgr *Manager) addConverter(path string) error {
+	// TODO: Do we want to check this now or when we start the converter?
+	err := unix.Access(path, unix.X_OK)
+	if err != nil {
+		return fmt.Errorf("error: converter %s is not executable", path)
+	}
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	if _, ok := mgr.converters[name]; ok {
+		return fmt.Errorf("error: converter %s already exists", name)
+	}
+	if name == "none" {
+		return fmt.Errorf("error: converter %s is reserved", name)
+	}
+	// Converter names have to be plain ascii so we can use them in the query language easily.
+	if !regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(name) {
+		return fmt.Errorf("error: converter %s has to be alphanumeric", name)
+	}
+
+	converter, err := converters.NewCache(name, path, mgr.IndexDir)
+	if err != nil {
+		return fmt.Errorf("error: failed to create converter %s: %w", name, err)
+	}
+	mgr.converters[name] = converter
+	mgr.streamsToConvert[name] = &bitmask.LongBitmask{}
+	return nil
+}
+
+func (mgr *Manager) removeConverter(path string) error {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	converter, ok := mgr.converters[name]
+	if !ok {
+		return fmt.Errorf("error: converter %s does not exist", name)
+	}
+
+	// remove converter from all tags
+	for _, t := range mgr.tags {
+		if err := mgr.detachConverterFromTag(t, name, converter); err != nil {
+			return err
+		}
+	}
+
+	// Stop the process if it is running and delete the cache file.
+	if err := converter.Reset(); err != nil {
+		return err
+	}
+
+	delete(mgr.converters, name)
+	delete(mgr.streamsToConvert, name)
+	return mgr.saveState()
+}
+
+func (mgr *Manager) restartConverterProcess(path string) error {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	converter, ok := mgr.converters[name]
+	if !ok {
+		if err := mgr.addConverter(path); err != nil {
+			return err
+		}
+		converter = mgr.converters[name]
+	}
+	// Stop the process if it is running and restart it
+	if err := converter.Reset(); err != nil {
+		return err
+	}
+
+	// run the converter on all streams that match the tags it is attached to again
+	for _, tag := range mgr.tags {
+		if slices.Contains(tag.converters, converter) {
+			mgr.streamsToConvert[name].Or(tag.Matches)
+		}
+	}
+	mgr.startConverterJobIfNeeded()
+
+	return nil
+}
+
+func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *converters.CachedConverter) error {
+	// check if converter already exists
+	if slices.Contains(tag.converters, converter) {
+		return nil
+	}
+	// assert low complexity of this tag's query
+	// cannot attach converter to tag which references other tags or matches on stream data
+	// because we don't want to recursively trigger converters
+	// TODO: we could allow data queries if they only reference the stream's own plain data
+	if tag.features.MainFeatures&query.FeatureFilterData != 0 || tag.features.SubQueryFeatures&query.FeatureFilterData != 0 || len(tag.features.MainTags) > 0 || len(tag.features.SubQueryTags) > 0 {
+		return fmt.Errorf("error: cannot attach converter to tag %s because it's query is too complex", tagName)
+	}
+
+	tag.converters = append(tag.converters, converter)
+	mgr.streamsToConvert[converter.Name()].Or(tag.Matches)
+	return nil
+}
+
+func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *converters.CachedConverter) error {
+	for i, c := range tag.converters {
+		if c == converter {
+			tag.converters = append(tag.converters[:i], tag.converters[i+1:]...)
+			break
+		}
+	}
+	// delete/invalidate converter results for all matching streams now
+	// but only if they aren't matches of other tags the converter is attached to.
+	matchingStreams := bitmask.LongBitmask{}
+	for _, t := range mgr.tags {
+		if t == tag {
+			continue
+		}
+		if slices.Contains(t.converters, converter) {
+			matchingStreams.Or(t.Matches)
+		}
+	}
+
+	// only delete results for streams that are not matched by other tags
+	onlyThisTag := tag.Matches.Copy()
+	onlyThisTag.Sub(matchingStreams)
+	mgr.streamsToConvert[converter.Name()].Sub(onlyThisTag)
+	// TODO: invalidate all streams in the cache that are only matched by this tag.
+
+	if matchingStreams.IsZero() {
+		// no other tags use this converter, delete all results
+		if err := converter.Reset(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (mgr *Manager) ResetConverter(converterName string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		c <- mgr.restartConverterProcess(converterName)
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) ListConverters() []*converters.Statistics {
+	c := make(chan []*converters.Statistics)
+	mgr.jobs <- func() {
+		stats := make([]*converters.Statistics, 0, len(mgr.converters))
+		for _, converter := range mgr.converters {
+			stats = append(stats, converter.Statistics())
+		}
+		sort.Slice(stats, func(i, j int) bool {
+			return stats[i].Name < stats[j].Name
+		})
+		c <- stats
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) ConverterStderr(converterName string, pid int) (*converters.ProcessStderr, error) {
+	c := make(chan *converters.ProcessStderr)
+	mgr.jobs <- func() {
+		converter, ok := mgr.converters[converterName]
+		if !ok {
+			c <- nil
+			close(c)
+			return
+		}
+		c <- converter.Stderr(pid)
+		close(c)
+	}
+	stderr := <-c
+	if stderr == nil {
+		return nil, fmt.Errorf("error: converter %s or process with pid %d does not exist", converterName, pid)
+	}
+	return stderr, nil
+}
+
 func (mgr *Manager) GetView() View {
 	return View{mgr: mgr}
 }
@@ -891,11 +1480,19 @@ func (v *View) fetch() error {
 		return nil
 	}
 	v.tagDetails = make(map[string]query.TagDetails)
+	v.tagConverters = make(map[string][]string)
+	v.converters = make(map[string]index.ConverterAccess)
 	c := make(chan error)
 	v.mgr.jobs <- func() {
 		v.indexes, v.releaser = v.mgr.getIndexesCopy(0)
 		for tn, ti := range v.mgr.tags {
 			v.tagDetails[tn] = ti.TagDetails
+			for _, c := range ti.converters {
+				v.tagConverters[tn] = append(v.tagConverters[tn], c.Name())
+			}
+		}
+		for converterName, converter := range v.mgr.converters {
+			v.converters[converterName] = converter
 		}
 		c <- nil
 		close(c)
@@ -988,7 +1585,7 @@ func (v *View) prefetchTags(tags []string, bm bitmask.LongBitmask) error {
 					continue outer
 				}
 			}
-			matches, _, err := index.SearchStreams(v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails)
+			matches, _, err := index.SearchStreams(v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters)
 			if err != nil {
 				return err
 			}
@@ -1062,7 +1659,7 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 		limit = *filter.Limit
 	}
 	offset := opts.page * limit
-	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails)
+	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters)
 	if err != nil {
 		return false, 0, err
 	}
@@ -1127,6 +1724,21 @@ func (c StreamContext) Stream() *index.Stream {
 	return c.s
 }
 
+func (c StreamContext) Data(converterName string) ([]index.Data, error) {
+	if c.Stream() == nil {
+		return nil, fmt.Errorf("stream not found")
+	}
+	if converterName == "" {
+		return c.Stream().Data()
+	}
+	converter, ok := c.v.converters[converterName]
+	if !ok {
+		return nil, fmt.Errorf("invalid converter %q", converterName)
+	}
+	data, _, _, err := converter.Data(c.Stream())
+	return data, err
+}
+
 func (c StreamContext) HasTag(name string) (bool, error) {
 	td := c.v.tagDetails[name]
 	if !td.Uncertain.IsSet(uint(c.s.ID())) {
@@ -1149,4 +1761,24 @@ func (c StreamContext) AllTags() ([]string, error) {
 	}
 	sort.Strings(tags)
 	return tags, nil
+}
+
+func (c StreamContext) AllConverters() ([]string, error) {
+	converters := []string{}
+	for tn, cns := range c.v.tagConverters {
+		ok, err := c.HasTag(tn)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		for _, cn := range cns {
+			if !slices.Contains(converters, cn) {
+				converters = append(converters, cn)
+			}
+		}
+	}
+	sort.Strings(converters)
+	return converters, nil
 }

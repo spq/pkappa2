@@ -1,16 +1,15 @@
 <template>
-  <v-dialog v-model="visible" width="500" @keydown.enter="deleteTag">
+  <v-dialog v-model="visible" width="500" @keydown.enter="resetConverterAction">
     <v-form>
       <v-card>
         <v-card-title>
-          <span class="text-h5"
-            >Confirm {{ tagType | capitalize }} deletion</span
-          >
+          <span class="text-h5">Confirm reset of {{ converterName }}</span>
         </v-card-title>
         <v-card-text>
-          Do you want to delete the {{ tagType | capitalize }}
-          <code>{{ tagName }}</code
-          >?
+          Do you want to reset the converter
+          <code>{{ converterName }}</code
+          >? This will cause the {{ converterStreamCount }} cached streams to be
+          deleted and the converter processes to be restarted.
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -20,7 +19,7 @@
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
-            @click="deleteTag"
+            @click="resetConverterAction"
             >Yes</v-btn
           >
         </v-card-actions>
@@ -34,33 +33,32 @@ import { mapActions } from "vuex";
 import { EventBus } from "./EventBus";
 
 export default {
-  name: "TagDeleteDialog",
+  name: "ConverterResetDialog",
   data() {
     return {
       visible: false,
       loading: false,
       error: false,
-      tagType: "",
-      tagName: "",
+      converterName: "",
+      converterStreamCount: 0,
     };
   },
   created() {
-    EventBus.$on("showTagDeleteDialog", this.openDialog);
+    EventBus.$on("showConverterResetDialog", this.openDialog);
   },
   methods: {
-    ...mapActions(["delTag"]),
-    openDialog({ tagId }) {
-      this.tagId = tagId;
-      this.tagType = tagId.split("/", 1)[0];
-      this.tagName = tagId.substr(this.tagType.length + 1);
+    ...mapActions(["resetConverter"]),
+    openDialog({ converter }) {
+      this.converterName = converter.Name;
+      this.converterStreamCount = converter.CachedStreamCount;
       this.visible = true;
       this.loading = false;
       this.error = false;
     },
-    deleteTag() {
+    resetConverterAction() {
       this.loading = true;
       this.error = false;
-      this.delTag(this.tagId)
+      this.resetConverter(this.converterName)
         .then(() => {
           this.visible = false;
         })

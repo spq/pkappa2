@@ -18,6 +18,7 @@ const lexer = moo.compile({
     lparen: '(',
     rparen: ')',
     subquery: {match: /@[a-z0-9]+:/, value: x => x.slice(1, -1)},
+    converter: {match: /\.[a-z0-9]*/, value: x => x.slice(1)},
     negation: /[!-]/,
     keyword_or_error: {match: /[a-zA-Z]+/, error: true, type: moo.keywords({
         kw: ['id', 'tag', 'service', 'mark', 'generated', 'protocol', 'ftime', 'ltime', 'time', 'cdata', 'sdata', 'data', 'cport', 'sport', 'port', 'chost', 'shost', 'host', 'cbytes', 'sbytes', 'bytes', 'sort', 'limit', 'group'],
@@ -49,14 +50,18 @@ var grammar = {
     {"name": "queryCondition", "symbols": [(lexer.has("lparen") ? {type: "lparen"} : lparen), "queryCondition$ebnf$1", "queryOrCondition", "queryCondition$ebnf$2", (lexer.has("rparen") ? {type: "rparen"} : rparen)], "postprocess": function(d) {return {'type': 'subquery', 'expression': d[2]};}},
     {"name": "queryCondition$ebnf$3", "symbols": [(lexer.has("subquery") ? {type: "subquery"} : subquery)], "postprocess": id},
     {"name": "queryCondition$ebnf$3", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "queryCondition$ebnf$4", "symbols": [(lexer.has("value") ? {type: "value"} : value)], "postprocess": id},
+    {"name": "queryCondition$ebnf$4", "symbols": [(lexer.has("converter") ? {type: "converter"} : converter)], "postprocess": id},
     {"name": "queryCondition$ebnf$4", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "queryCondition", "symbols": ["queryCondition$ebnf$3", (lexer.has("kw") ? {type: "kw"} : kw), "queryCondition$ebnf$4"], "postprocess": function(d) {return {'type': 'expression', 'subquery_var':d[0], 'keyword':d[1], 'value': d[2]};}},
     {"name": "queryCondition$ebnf$5", "symbols": [(lexer.has("value") ? {type: "value"} : value)], "postprocess": id},
     {"name": "queryCondition$ebnf$5", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "queryCondition$ebnf$6", "symbols": [(lexer.has("ws") ? {type: "ws"} : ws)], "postprocess": id},
+    {"name": "queryCondition", "symbols": ["queryCondition$ebnf$3", (lexer.has("kw") ? {type: "kw"} : kw), "queryCondition$ebnf$4", "queryCondition$ebnf$5"], "postprocess": function(d) {return {'type': 'expression', 'subquery_var':d[0], 'keyword':d[1], 'converter': d[2], 'value': d[3]};}},
+    {"name": "queryCondition$ebnf$6", "symbols": [(lexer.has("converter") ? {type: "converter"} : converter)], "postprocess": id},
     {"name": "queryCondition$ebnf$6", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "queryCondition", "symbols": [(lexer.has("keyword_or_error") ? {type: "keyword_or_error"} : keyword_or_error), "queryCondition$ebnf$5", "queryCondition$ebnf$6"], "postprocess": function(d) {return {'type': 'error', 'expression': d[0]};}}
+    {"name": "queryCondition$ebnf$7", "symbols": [(lexer.has("value") ? {type: "value"} : value)], "postprocess": id},
+    {"name": "queryCondition$ebnf$7", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "queryCondition$ebnf$8", "symbols": [(lexer.has("ws") ? {type: "ws"} : ws)], "postprocess": id},
+    {"name": "queryCondition$ebnf$8", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "queryCondition", "symbols": [(lexer.has("keyword_or_error") ? {type: "keyword_or_error"} : keyword_or_error), "queryCondition$ebnf$6", "queryCondition$ebnf$7", "queryCondition$ebnf$8"], "postprocess": function(d) {return {'type': 'error', 'expression': d[0]};}}
 ]
   , ParserStart: "queryRoot"
 }

@@ -15,6 +15,7 @@ const lexer = moo.compile({
     lparen: '(',
     rparen: ')',
     subquery: {match: /@[a-z0-9]+:/, value: x => x.slice(1, -1)},
+    converter: {match: /\.[a-z0-9]*/, value: x => x.slice(1)},
     negation: /[!-]/,
     keyword_or_error: {match: /[a-zA-Z]+/, error: true, type: moo.keywords({
         kw: ['id', 'tag', 'service', 'mark', 'generated', 'protocol', 'ftime', 'ltime', 'time', 'cdata', 'sdata', 'data', 'cport', 'sport', 'port', 'chost', 'shost', 'host', 'cbytes', 'sbytes', 'bytes', 'sort', 'limit', 'group'],
@@ -41,5 +42,5 @@ queryThenCondition ->
 queryCondition ->
     %negation queryCondition  {% function(d) {return {'type': 'not', 'expression': d[1]};} %}
     | %lparen %ws:? queryOrCondition %ws:? %rparen {% function(d) {return {'type': 'subquery', 'expression': d[2]};} %}
-    | %subquery:? %kw %value:? {% function(d) {return {'type': 'expression', 'subquery_var':d[0], 'keyword':d[1], 'value': d[2]};} %}
-    | %keyword_or_error %value:? %ws:? {% function(d) {return {'type': 'error', 'expression': d[0]};} %}
+    | %subquery:? %kw %converter:? %value:? {% function(d) {return {'type': 'expression', 'subquery_var':d[0], 'keyword':d[1], 'converter': d[2], 'value': d[3]};} %}
+    | %keyword_or_error %converter:? %value:? %ws:? {% function(d) {return {'type': 'error', 'expression': d[0]};} %}

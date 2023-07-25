@@ -146,7 +146,7 @@
           </tr>
           <tr>
             <th>Data&nbsp;filter</th>
-            <td><code>[cs]data:flag[{}].+[}]</code></td>
+            <td><code>[cs]data[.converter]:flag[{}].+[}]</code></td>
             <td width="100%">
               Select streams that contain the given regex in the data send by
               the client(<code>cdata</code>), server(<code>sdata</code>) or any
@@ -168,7 +168,13 @@
               <code
                 >@sub:cdata:"the flag is (?P&lt;flag&gt;[0-9a-f]{16})"
                 sdata:"@sub:flag@"</code
-              >.
+              >. You can optionally specify the converter whose output is
+              searched for the regex. The converter name is specified after the
+              <code>.</code> and omitting the converter name causes the regex to
+              be applied to the raw stream data as well as to the output of all
+              converters attached to a stream. Setting the converter name to
+              <code>none</code> causes the regex to be applied to the raw stream
+              data only.
             </td>
           </tr>
           <tr>

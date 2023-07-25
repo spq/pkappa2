@@ -79,7 +79,7 @@ func (bm LongBitmask) TrailingZerosFrom(bit uint) int {
 		if m == 0 {
 			continue
 		}
-		return (idx+int(startIdx))*64 + bits.TrailingZeros64(m) - int(lbit)
+		return (idx)*64 + bits.TrailingZeros64(m) - int(lbit)
 	}
 	return -1
 }

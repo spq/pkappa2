@@ -20,8 +20,10 @@
     <v-main>
       <router-view></router-view>
     </v-main>
+    <ConverterResetDialog />
     <TagDeleteDialog />
     <TagCreateDialog />
+    <TagSetConverterDialog />
     <TagDetailsDialog />
     <TagColorChangeDialog />
     <ErrorBanner />
@@ -31,7 +33,9 @@
 <script>
 import Navigation from "./Navigation.vue";
 import SearchBox from "./SearchBox.vue";
+import ConverterResetDialog from "./ConverterResetDialog.vue";
 import TagDeleteDialog from "./TagDeleteDialog.vue";
+import TagSetConverterDialog from "./TagSetConverterDialog.vue";
 import TagCreateDialog from "./TagCreateDialog.vue";
 import TagDetailsDialog from "./TagDetailsDialog.vue";
 import TagColorChangeDialog from "./TagColorChangeDialog.vue";
@@ -42,8 +46,10 @@ export default {
   components: {
     Navigation,
     SearchBox,
+    ConverterResetDialog,
     TagDeleteDialog,
     TagCreateDialog,
+    TagSetConverterDialog,
     TagDetailsDialog,
     TagColorChangeDialog,
     ErrorBanner,

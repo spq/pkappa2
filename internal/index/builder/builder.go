@@ -1,7 +1,6 @@
 package builder
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -40,7 +39,7 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 		cachedKnownPcapsMap[p.Filename] = p
 	}
 	// read all existing pcaps to build the info structs
-	pcaps, err := ioutil.ReadDir(pcapDir)
+	pcaps, err := os.ReadDir(pcapDir)
 	if err != nil {
 		return nil, err
 	}
@@ -48,8 +47,13 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 		if p.IsDir() || (!strings.HasSuffix(p.Name(), ".pcap") && !strings.HasSuffix(p.Name(), ".pcapng")) {
 			continue
 		}
+		pInfo, err := p.Info()
+		if err != nil {
+			log.Printf("error stat pcap %s: %v", p.Name(), err)
+			continue
+		}
 		info := cachedKnownPcapsMap[p.Name()]
-		if info == nil || info.Filesize != uint64(p.Size()) {
+		if info == nil || info.Filesize != uint64(pInfo.Size()) {
 			info, _, err = readPackets(pcapDir, p.Name(), nil)
 			if err != nil {
 				log.Printf("error reading pcap %s: %v", p.Name(), err)
@@ -59,7 +63,7 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 		b.knownPcaps = append(b.knownPcaps, info)
 	}
 	// load the snapshot file with the most packets covered
-	snapshotFiles, err := ioutil.ReadDir(snapshotDir)
+	snapshotFiles, err := os.ReadDir(snapshotDir)
 	if err != nil {
 		return nil, err
 	}

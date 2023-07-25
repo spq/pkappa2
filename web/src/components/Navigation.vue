@@ -110,6 +110,12 @@
                   </v-list-item-icon>
                   <v-list-item-title>Change Color</v-list-item-title>
                 </v-list-item>
+                <v-list-item link @click="showTagSetConvertersDialog(tag.Name)">
+                  <v-list-item-icon>
+                    <v-icon>mdi-file-replace-outline</v-icon>
+                  </v-list-item-icon>
+                  <v-list-item-title>Attach converter</v-list-item-title>
+                </v-list-item>
                 <v-list-item
                   link
                   :disabled="tag.Referenced"
@@ -171,6 +177,18 @@
           <v-list-item-title>Manage Tags</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+      <v-list-item
+        link
+        dense
+        exact
+        :to="{
+          name: 'converters',
+        }"
+      >
+        <v-list-item-content>
+          <v-list-item-title>Manage Converters</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
     </v-list-group>
   </v-list>
 </template>
@@ -218,6 +236,9 @@ export default {
   },
   methods: {
     ...mapActions(["updateTags", "updateStatus"]),
+    showTagSetConvertersDialog(tagId) {
+      EventBus.$emit("showTagSetConvertersDialog", { tagId });
+    },
     confirmTagDeletion(tagId) {
       EventBus.$emit("showTagDeleteDialog", { tagId });
     },

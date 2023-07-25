@@ -18,6 +18,10 @@ import (
 )
 
 type (
+	ConverterAccess interface {
+		Data(stream *Stream) (data []Data, clientBytes, serverBytes uint64, err error)
+		DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error)
+	}
 	subQuerySelection struct {
 		remaining []map[string]bitmask.ConnectedBitmask
 	}
@@ -86,7 +90,7 @@ func (sqs *subQuerySelection) empty() bool {
 	return len(sqs.remaining) == 0
 }
 
-func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, limitIDs *bitmask.LongBitmask, tagDetails map[string]query.TagDetails) (queryPart, error) {
+func (r *Reader) buildSearchObjects(subQuery string, queryPartIndex int, previousResults map[string]resultData, refTime time.Time, q *query.Conditions, superseedingIndexes []*Reader, limitIDs *bitmask.LongBitmask, tagDetails map[string]query.TagDetails, converters map[string]ConverterAccess) (queryPart, error) {
 	filters := []func(*searchContext, *stream) (bool, error)(nil)
 	lookups := []func() ([]uint32, error)(nil)
 
@@ -733,7 +737,12 @@ conditions:
 			})
 		case *query.DataCondition:
 			shouldEvaluate, affectsSubquery := false, false
-			for _, e := range cc.Elements {
+			converterName := ""
+			for i, e := range cc.Elements {
+				if i > 0 && e.ConverterName != converterName {
+					return queryPart{}, errors.New("all 'data then data' conditions must use the same converter")
+				}
+				converterName = e.ConverterName
 				if e.SubQuery == subQuery {
 					for _, v := range e.Variables {
 						if _, ok := previousResults[v.SubQuery]; v.SubQuery != subQuery && !ok {
@@ -752,6 +761,21 @@ conditions:
 			}
 			if affectsSubquery {
 				return queryPart{}, errors.New("SubQueries not yet fully supported")
+			}
+			if converterName != "" && converterName != "none" {
+				if _, ok := converters[converterName]; !ok {
+					return queryPart{}, fmt.Errorf("converter %q not found", converterName)
+				}
+			}
+			// loop over regexconditions and see if all of them have the same converter name as the current one
+			// TODO: allow this
+			for _, rc := range regexConditions {
+				dc := (*q)[rc].(*query.DataCondition)
+				for _, e := range dc.Elements {
+					if e.ConverterName != converterName {
+						return queryPart{}, errors.New("all data conditions must have the same converter name")
+					}
+				}
 			}
 			regexConditions = append(regexConditions, cIdx)
 		regexElements:
@@ -1113,420 +1137,459 @@ conditions:
 		sr := io.NewSectionReader(r.file, int64(r.header.Sections[sectionData].Begin), r.header.Sections[sectionData].size())
 		br := seekbufio.NewSeekableBufferReader(sr)
 		buffers := [2][]byte{}
+		o := regexes[0].occurence[0]
+		converterName := (*q)[o.condition].(*query.DataCondition).Elements[o.element].ConverterName
+		convertersToSearch := []string{}
+		if converterName == "" {
+			convertersToSearch = append(convertersToSearch, "none")
+			for c := range converters {
+				convertersToSearch = append(convertersToSearch, c)
+			}
+		} else {
+			convertersToSearch = append(convertersToSearch, converterName)
+		}
 		filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
-			if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
-				return false, err
-			}
-			type (
-				progressVariantFlag byte
-				progressVariant     struct {
-					streamOffset [2]int
-					// how many regexes were sucessful
-					nSuccessful int
-					// the variables collected on the way
-					variables map[string]string
-					// the regex to use
-					regex *binaryregexp.Regexp
-					// the accepted length by the regex
-					acceptedLength regexanalysis.AcceptedLengths
-					// the prefix of the regex
-					prefix []byte
-					// the suffix of the regex
-					suffix []byte
-					// the variants chosen for this progress
-					variant map[string]int
-					// flags for this progress
-					flags progressVariantFlag
-				}
-				progressGroup struct {
-					variants []progressVariant
-				}
-			)
-			const (
-				progressVariantFlagState                    progressVariantFlag = 3
-				progressVariantFlagStateUninitialzed        progressVariantFlag = 0
-				progressVariantFlagStateExact               progressVariantFlag = 1
-				progressVariantFlagStatePrecondition        progressVariantFlag = 2
-				progressVariantFlagStatePreconditionMatched progressVariantFlag = 3
-			)
-			progressGroups := make([]progressGroup, len(*q))
-			for _, pIdx := range regexConditions {
-				progressGroups[pIdx] = progressGroup{
-					variants: make([]progressVariant, 1),
-				}
-			}
-			const (
-				C2S = query.DataRequirementSequenceFlagsDirectionClientToServer / query.DataRequirementSequenceFlagsDirection
-				S2C = query.DataRequirementSequenceFlagsDirectionServerToClient / query.DataRequirementSequenceFlagsDirection
-			)
-			streamLength := [2]int{}
-			streamLength[C2S] = int(s.ClientBytes)
-			streamLength[S2C] = int(s.ServerBytes)
+			for _, converterName := range convertersToSearch {
+				ok, err := func() (bool, error) {
+					type (
+						progressVariantFlag byte
+						progressVariant     struct {
+							streamOffset [2]int
+							// how many regexes were sucessful
+							nSuccessful int
+							// the variables collected on the way
+							variables map[string]string
+							// the regex to use
+							regex *binaryregexp.Regexp
+							// the accepted length by the regex
+							acceptedLength regexanalysis.AcceptedLengths
+							// the prefix of the regex
+							prefix []byte
+							// the suffix of the regex
+							suffix []byte
+							// the variants chosen for this progress
+							variant map[string]int
+							// flags for this progress
+							flags progressVariantFlag
+						}
+						progressGroup struct {
+							variants []progressVariant
+						}
+					)
+					const (
+						progressVariantFlagState                    progressVariantFlag = 3
+						progressVariantFlagStateUninitialzed        progressVariantFlag = 0
+						progressVariantFlagStateExact               progressVariantFlag = 1
+						progressVariantFlagStatePrecondition        progressVariantFlag = 2
+						progressVariantFlagStatePreconditionMatched progressVariantFlag = 3
+					)
+					const (
+						C2S = query.DataRequirementSequenceFlagsDirectionClientToServer / query.DataRequirementSequenceFlagsDirection
+						S2C = query.DataRequirementSequenceFlagsDirectionServerToClient / query.DataRequirementSequenceFlagsDirection
+					)
+					progressGroups := make([]progressGroup, len(*q))
+					for _, pIdx := range regexConditions {
+						progressGroups[pIdx] = progressGroup{
+							variants: make([]progressVariant, 1),
+						}
+					}
 
-			// read the data
-			for dir := range [2]int{C2S, S2C} {
-				l := streamLength[dir]
-				if cap(buffers[dir]) < l {
-					buffers[dir] = make([]byte, l)
-				} else {
-					buffers[dir] = buffers[dir][:l]
+					streamLength := [2]int{}
+					bufferLengths := [][2]int{{}}
+
+					if converterName == "none" {
+						streamLength[C2S] = int(s.ClientBytes)
+						streamLength[S2C] = int(s.ServerBytes)
+
+						// read the data
+						if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
+							return false, err
+						}
+						for dir := range [2]int{C2S, S2C} {
+							l := streamLength[dir]
+							if cap(buffers[dir]) < l {
+								buffers[dir] = make([]byte, l)
+							} else {
+								buffers[dir] = buffers[dir][:l]
+							}
+							if err := binary.Read(br, binary.LittleEndian, buffers[dir]); err != nil {
+								return false, err
+							}
+						}
+						// read the direction chunk sizes
+						for dir := C2S; ; dir ^= C2S ^ S2C {
+							last := bufferLengths[len(bufferLengths)-1]
+							if last[C2S] == streamLength[C2S] && last[S2C] == streamLength[S2C] {
+								break
+							}
+							sz := uint64(0)
+							for {
+								b := byte(0)
+								if err := binary.Read(br, binary.LittleEndian, &b); err != nil {
+									return false, err
+								}
+								sz <<= 7
+								sz |= uint64(b & 0x7f)
+								if b < 128 {
+									break
+								}
+							}
+							if sz == 0 {
+								continue
+							}
+							new := [2]int{
+								last[0],
+								last[1],
+							}
+							new[dir] += int(sz)
+							bufferLengths = append(bufferLengths, new)
+						}
+					} else {
+						converter := converters[converterName]
+						// TODO: pass `buffers` through to DataForSearch to avoid re-allocating?
+						data, dataSizes, clientBytes, serverBytes, err := converter.DataForSearch(s.StreamID)
+						if err != nil {
+							return false, fmt.Errorf("data for search %w", err)
+						}
+						streamLength[C2S] = int(clientBytes)
+						streamLength[S2C] = int(serverBytes)
+						buffers = data
+						bufferLengths = dataSizes
+					}
+					for {
+						recheckRegexes := false
+						for rIdx := range regexes {
+							r := &regexes[rIdx]
+							for _, o := range r.occurence {
+								e := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
+								dir := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
+
+								ps := &progressGroups[o.condition]
+							outer2:
+								for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
+									p := &ps.variants[pIdx]
+									if o.element != p.nSuccessful {
+										continue
+									}
+									if p.regex == nil {
+										root := &r.root
+										for {
+											if root.childSubQuery == "" {
+												break
+											}
+											v, ok := p.variant[root.childSubQuery]
+											if !ok {
+												break
+											}
+											root = &root.children[v]
+										}
+										explodeOneVariant := false
+										switch p.flags & progressVariantFlagState {
+										case progressVariantFlagStateUninitialzed:
+											if root.regex != nil {
+												p.regex = root.regex
+												p.prefix = root.prefix
+												p.suffix = root.suffix
+												p.acceptedLength = root.acceptedLength
+												if root.isPrecondition {
+													p.flags = progressVariantFlagStatePrecondition
+												} else {
+													p.flags = progressVariantFlagStateExact
+												}
+											}
+										case progressVariantFlagStateExact:
+											panic("why am i here?")
+										case progressVariantFlagStatePrecondition:
+											panic("why am i here?")
+										case progressVariantFlagStatePreconditionMatched:
+											if root.childSubQuery == "" {
+												explodeOneVariant = true
+												break
+											}
+											for cIdx, c := range root.children[1:] {
+												np := progressVariant{
+													streamOffset:   p.streamOffset,
+													nSuccessful:    p.nSuccessful,
+													regex:          c.regex,
+													acceptedLength: c.acceptedLength,
+													prefix:         c.prefix,
+													suffix:         c.suffix,
+													variant: map[string]int{
+														root.childSubQuery: cIdx,
+													},
+												}
+												for sq, v := range p.variant {
+													np.variant[sq] = v
+												}
+												if p.variables != nil {
+													np.variables = make(map[string]string)
+													for n, v := range p.variables {
+														np.variables[n] = v
+													}
+												}
+												if c.isPrecondition {
+													np.flags = progressVariantFlagStatePrecondition
+												} else {
+													np.flags = progressVariantFlagStateExact
+												}
+												if cIdx == 0 {
+													ps.variants[pIdx] = np
+												} else {
+													ps.variants = append(ps.variants, np)
+												}
+											}
+											p = &ps.variants[pIdx]
+										}
+
+										if p.regex == nil {
+											expr := e.Regex
+											p.flags = progressVariantFlagStateExact
+											for i := len(e.Variables) - 1; i >= 0; i-- {
+												v := e.Variables[i]
+												content := ""
+												if v.SubQuery == "" {
+													ok := false
+													content, ok = p.variables[v.Name]
+													if !ok {
+														return false, fmt.Errorf("variable %q not defined", v.Name)
+													}
+													content = binaryregexp.QuoteMeta(content)
+												} else {
+													psq := possibleSubQueries[v.SubQuery]
+													vIdx := psq.variableIndex[v.Name]
+													variant, ok := p.variant[v.SubQuery]
+													if ok || explodeOneVariant {
+														if !ok {
+															explodeOneVariant = false
+															// we have not yet split this progress element
+															// the precondition regex matched, split this progress element
+															for j := 1; j < len(psq.variableData); j++ {
+																np := progressVariant{
+																	streamOffset: p.streamOffset,
+																	nSuccessful:  p.nSuccessful,
+																	flags:        progressVariantFlagStateUninitialzed,
+																	variant:      map[string]int{v.SubQuery: j},
+																}
+																for k, v := range p.variant {
+																	np.variant[k] = v
+																}
+																if p.variables != nil {
+																	np.variables = make(map[string]string)
+																	for n, v := range p.variables {
+																		np.variables[n] = v
+																	}
+																}
+																ps.variants = append(ps.variants, np)
+															}
+															p = &ps.variants[pIdx]
+															if p.variant == nil {
+																p.variant = make(map[string]int)
+															}
+															p.variant[v.SubQuery] = 0
+														}
+														content = psq.variableData[variant].quotedData[vIdx]
+													} else {
+														p.flags = progressVariantFlagStatePrecondition
+														for _, vd := range psq.variableData {
+															content += vd.quotedData[vIdx] + "|"
+														}
+														content = content[:len(content)-1]
+													}
+												}
+												expr = fmt.Sprintf("%s(?:%s)%s", expr[:v.Position], content, expr[v.Position:])
+											}
+											var err error
+											if p.regex, err = binaryregexp.Compile(expr); err != nil {
+												return false, err
+											}
+											prefix, complete := p.regex.LiteralPrefix()
+											root.prefix = []byte(prefix)
+											if complete {
+												p.acceptedLength = regexanalysis.AcceptedLengths{
+													MinLength: uint(len(prefix)),
+													MaxLength: uint(len(prefix)),
+												}
+												root.suffix = root.prefix
+											} else {
+												if p.acceptedLength, err = regexanalysis.AcceptedLength(expr); err != nil {
+													return false, err
+												}
+												if p.suffix, err = regexanalysis.ConstantSuffix(expr); err != nil {
+													return false, err
+												}
+											}
+										}
+									}
+
+									buffer := buffers[dir][p.streamOffset[dir]:]
+									if uint(len(buffer)) < p.acceptedLength.MinLength {
+										continue
+									}
+
+									if len(p.prefix) != 0 {
+										//the regex has a prefix, find it
+										pos := bytes.Index(buffer, p.prefix)
+										if pos < 0 {
+											// the prefix is not in the string, we can discard part of the buffer
+											p.streamOffset[dir] = len(buffers[dir])
+											continue
+										}
+										//skip the part that doesn't have the prefix
+										p.streamOffset[dir] += pos
+										buffer = buffer[pos:]
+										if uint(len(buffer)) < p.acceptedLength.MinLength {
+											continue
+										}
+									}
+									if len(p.suffix) != 0 {
+										//the regex has a suffix, find it
+										pos := bytes.LastIndex(buffer, p.suffix)
+										if pos < 0 {
+											// the suffix is not in the string, we can discard part of the buffer
+											p.streamOffset[dir] = len(buffers[dir])
+											continue
+										}
+										//drop the part that doesn't have the suffix
+										buffer = buffer[:pos+len(p.suffix)]
+										if uint(len(buffer)) < p.acceptedLength.MinLength {
+											continue
+										}
+									}
+
+									var res []int
+									if p.acceptedLength.MinLength == p.acceptedLength.MaxLength && len(p.prefix) == 0 && len(p.suffix) != 0 {
+										beforeSuffixLen := int(p.acceptedLength.MinLength) - len(p.suffix)
+										for {
+											pos := bytes.Index(buffer[beforeSuffixLen:], p.suffix)
+											if pos < 0 {
+												p.streamOffset[dir] = len(buffers[dir])
+												continue outer2
+											}
+											p.streamOffset[dir] += pos
+											buffer = buffer[pos:]
+											res = p.regex.FindSubmatchIndex(buffer[:p.acceptedLength.MinLength])
+											if res != nil {
+												break
+											}
+											p.streamOffset[dir]++
+											buffer = buffer[1:]
+										}
+									} else {
+										res = p.regex.FindSubmatchIndex(buffer)
+									}
+
+									if res == nil {
+										p.streamOffset[dir] = len(buffers[dir])
+										continue
+									}
+									if p.flags&progressVariantFlagState == progressVariantFlagStatePrecondition {
+										recheckRegexes = true
+										p.regex = nil
+										p.flags += progressVariantFlagStatePreconditionMatched - progressVariantFlagStatePrecondition
+										continue
+									}
+									p.nSuccessful++
+									d := (*q)[o.condition].(*query.DataCondition)
+									if p.nSuccessful != len(d.Elements) {
+										// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
+										recheckRegexes = true
+									} else if d.Inverted {
+										return false, nil
+									}
+									variableNames := p.regex.SubexpNames()
+									p.regex = nil
+									p.flags = 0
+									for i := 2; i < len(res); i += 2 {
+										varName := variableNames[i/2]
+										if varName == "" {
+											continue
+										}
+										if _, ok := p.variables[varName]; ok {
+											return false, fmt.Errorf("variable %q already seen", varName)
+										}
+										if p.variables == nil {
+											p.variables = make(map[string]string)
+										}
+										p.variables[varName] = string(buffer[res[i]:res[i+1]])
+									}
+
+									if res[1] != 0 {
+										// update stream offsets: a follow up regex for the same direction
+										// may consume the byte following the match, a regex for the other
+										// direction may start reading from the next received packet,
+										// so everything read before is out-of reach.
+										p.streamOffset[dir] += res[1]
+										for i := len(bufferLengths) - 1; ; i-- {
+											if bufferLengths[i-1][dir] < p.streamOffset[dir] {
+												p.streamOffset[(C2S^S2C)-dir] = bufferLengths[i][(C2S^S2C)-dir]
+												break
+											}
+										}
+									}
+								}
+							}
+						}
+						if !recheckRegexes {
+							break
+						}
+					}
+
+					// check if any of the regexe's failed and collect variable contents
+					for _, cIdx := range regexConditions {
+						d := (*q)[cIdx].(*query.DataCondition)
+						pg := &progressGroups[cIdx]
+						for pIdx := range pg.variants {
+							p := &pg.variants[pIdx]
+							nUnsuccessful := len(d.Elements) - p.nSuccessful
+							if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
+								if len(p.variant) == 0 {
+									return false, nil
+								}
+								sqs := []string(nil)
+								forbidden := []*bitmask.ConnectedBitmask(nil)
+								for sq, v := range p.variant {
+									sqs = append(sqs, sq)
+									badSQR := &possibleSubQueries[sq].variableData[v].results
+									forbidden = append(forbidden, badSQR)
+
+								}
+								sc.allowedSubQueries.remove(sqs, forbidden)
+								if sc.allowedSubQueries.empty() {
+									return false, nil
+								}
+								continue
+							}
+							if p.variables == nil {
+								continue
+							}
+							if sc.outputVariables == nil {
+								sc.outputVariables = make(map[string][]string)
+							}
+						outer:
+							for n, v := range p.variables {
+								values := sc.outputVariables[n]
+								for _, on := range values {
+									if n == on {
+										continue outer
+									}
+								}
+								sc.outputVariables[n] = append(values, v)
+							}
+						}
+					}
+					return true, nil
+				}()
+				// if it's a match on one of the converter outputs, there's no need to check the
+				// other outputs.
+				if ok {
+					return true, nil
 				}
-				if err := binary.Read(br, binary.LittleEndian, buffers[dir]); err != nil {
+				// if there's an error on any converter's output, always return it.
+				if err != nil {
 					return false, err
 				}
 			}
-			// read the direction chunk sizes
-			bufferLengths := [][2]int{{}}
-			for dir := C2S; ; dir ^= C2S ^ S2C {
-				last := bufferLengths[len(bufferLengths)-1]
-				if last[C2S] == streamLength[C2S] && last[S2C] == streamLength[S2C] {
-					break
-				}
-				sz := uint64(0)
-				for {
-					b := byte(0)
-					if err := binary.Read(br, binary.LittleEndian, &b); err != nil {
-						return false, err
-					}
-					sz <<= 7
-					sz |= uint64(b & 0x7f)
-					if b < 128 {
-						break
-					}
-				}
-				if sz == 0 {
-					continue
-				}
-				new := [2]int{
-					last[0],
-					last[1],
-				}
-				new[dir] += int(sz)
-				bufferLengths = append(bufferLengths, new)
-			}
-
-			for {
-				recheckRegexes := false
-				for rIdx := range regexes {
-					r := &regexes[rIdx]
-					for _, o := range r.occurence {
-						e := (*q)[o.condition].(*query.DataCondition).Elements[o.element]
-						dir := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
-
-						ps := &progressGroups[o.condition]
-					outer2:
-						for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
-							p := &ps.variants[pIdx]
-							if o.element != p.nSuccessful {
-								continue
-							}
-							if p.regex == nil {
-								root := &r.root
-								for {
-									if root.childSubQuery == "" {
-										break
-									}
-									v, ok := p.variant[root.childSubQuery]
-									if !ok {
-										break
-									}
-									root = &root.children[v]
-								}
-								explodeOneVariant := false
-								switch p.flags & progressVariantFlagState {
-								case progressVariantFlagStateUninitialzed:
-									if root.regex != nil {
-										p.regex = root.regex
-										p.prefix = root.prefix
-										p.suffix = root.suffix
-										p.acceptedLength = root.acceptedLength
-										if root.isPrecondition {
-											p.flags = progressVariantFlagStatePrecondition
-										} else {
-											p.flags = progressVariantFlagStateExact
-										}
-									}
-								case progressVariantFlagStateExact:
-									panic("why am i here?")
-								case progressVariantFlagStatePrecondition:
-									panic("why am i here?")
-								case progressVariantFlagStatePreconditionMatched:
-									if root.childSubQuery == "" {
-										explodeOneVariant = true
-										break
-									}
-									for cIdx, c := range root.children[1:] {
-										np := progressVariant{
-											streamOffset:   p.streamOffset,
-											nSuccessful:    p.nSuccessful,
-											regex:          c.regex,
-											acceptedLength: c.acceptedLength,
-											prefix:         c.prefix,
-											suffix:         c.suffix,
-											variant: map[string]int{
-												root.childSubQuery: cIdx,
-											},
-										}
-										for sq, v := range p.variant {
-											np.variant[sq] = v
-										}
-										if p.variables != nil {
-											np.variables = make(map[string]string)
-											for n, v := range p.variables {
-												np.variables[n] = v
-											}
-										}
-										if c.isPrecondition {
-											np.flags = progressVariantFlagStatePrecondition
-										} else {
-											np.flags = progressVariantFlagStateExact
-										}
-										if cIdx == 0 {
-											ps.variants[pIdx] = np
-										} else {
-											ps.variants = append(ps.variants, np)
-										}
-									}
-									p = &ps.variants[pIdx]
-								}
-
-								if p.regex == nil {
-									expr := e.Regex
-									p.flags = progressVariantFlagStateExact
-									for i := len(e.Variables) - 1; i >= 0; i-- {
-										v := e.Variables[i]
-										content := ""
-										if v.SubQuery == "" {
-											ok := false
-											content, ok = p.variables[v.Name]
-											if !ok {
-												return false, fmt.Errorf("variable %q not defined", v.Name)
-											}
-											content = binaryregexp.QuoteMeta(content)
-										} else {
-											psq := possibleSubQueries[v.SubQuery]
-											vIdx := psq.variableIndex[v.Name]
-											variant, ok := p.variant[v.SubQuery]
-											if ok || explodeOneVariant {
-												if !ok {
-													explodeOneVariant = false
-													// we have not yet split this progress element
-													// the precondition regex matched, split this progress element
-													for j := 1; j < len(psq.variableData); j++ {
-														np := progressVariant{
-															streamOffset: p.streamOffset,
-															nSuccessful:  p.nSuccessful,
-															flags:        progressVariantFlagStateUninitialzed,
-															variant:      map[string]int{v.SubQuery: j},
-														}
-														for k, v := range p.variant {
-															np.variant[k] = v
-														}
-														if p.variables != nil {
-															np.variables = make(map[string]string)
-															for n, v := range p.variables {
-																np.variables[n] = v
-															}
-														}
-														ps.variants = append(ps.variants, np)
-													}
-													p = &ps.variants[pIdx]
-													if p.variant == nil {
-														p.variant = make(map[string]int)
-													}
-													p.variant[v.SubQuery] = 0
-												}
-												content = psq.variableData[variant].quotedData[vIdx]
-											} else {
-												p.flags = progressVariantFlagStatePrecondition
-												for _, vd := range psq.variableData {
-													content += vd.quotedData[vIdx] + "|"
-												}
-												content = content[:len(content)-1]
-											}
-										}
-										expr = fmt.Sprintf("%s(?:%s)%s", expr[:v.Position], content, expr[v.Position:])
-									}
-									var err error
-									if p.regex, err = binaryregexp.Compile(expr); err != nil {
-										return false, err
-									}
-									prefix, complete := p.regex.LiteralPrefix()
-									root.prefix = []byte(prefix)
-									if complete {
-										p.acceptedLength = regexanalysis.AcceptedLengths{
-											MinLength: uint(len(prefix)),
-											MaxLength: uint(len(prefix)),
-										}
-										root.suffix = root.prefix
-									} else {
-										if p.acceptedLength, err = regexanalysis.AcceptedLength(expr); err != nil {
-											return false, err
-										}
-										if p.suffix, err = regexanalysis.ConstantSuffix(expr); err != nil {
-											return false, err
-										}
-									}
-								}
-							}
-
-							buffer := buffers[dir][p.streamOffset[dir]:]
-							if uint(len(buffer)) < p.acceptedLength.MinLength {
-								continue
-							}
-
-							if len(p.prefix) != 0 {
-								//the regex has a prefix, find it
-								pos := bytes.Index(buffer, p.prefix)
-								if pos < 0 {
-									// the prefix is not in the string, we can discard part of the buffer
-									p.streamOffset[dir] = len(buffers[dir])
-									continue
-								}
-								//skip the part that doesn't have the prefix
-								p.streamOffset[dir] += pos
-								buffer = buffer[pos:]
-								if uint(len(buffer)) < p.acceptedLength.MinLength {
-									continue
-								}
-							}
-							if len(p.suffix) != 0 {
-								//the regex has a suffix, find it
-								pos := bytes.LastIndex(buffer, p.suffix)
-								if pos < 0 {
-									// the suffix is not in the string, we can discard part of the buffer
-									p.streamOffset[dir] = len(buffers[dir])
-									continue
-								}
-								//drop the part that doesn't have the suffix
-								buffer = buffer[:pos+len(p.suffix)]
-								if uint(len(buffer)) < p.acceptedLength.MinLength {
-									continue
-								}
-							}
-
-							var res []int
-							if p.acceptedLength.MinLength == p.acceptedLength.MaxLength && len(p.prefix) == 0 && len(p.suffix) != 0 {
-								beforeSuffixLen := int(p.acceptedLength.MinLength) - len(p.suffix)
-								for {
-									pos := bytes.Index(buffer[beforeSuffixLen:], p.suffix)
-									if pos < 0 {
-										p.streamOffset[dir] = len(buffers[dir])
-										continue outer2
-									}
-									p.streamOffset[dir] += pos
-									buffer = buffer[pos:]
-									res = p.regex.FindSubmatchIndex(buffer[:p.acceptedLength.MinLength])
-									if res != nil {
-										break
-									}
-									p.streamOffset[dir]++
-									buffer = buffer[1:]
-								}
-							} else {
-								res = p.regex.FindSubmatchIndex(buffer)
-							}
-
-							if res == nil {
-								p.streamOffset[dir] = len(buffers[dir])
-								continue
-							}
-							if p.flags&progressVariantFlagState == progressVariantFlagStatePrecondition {
-								recheckRegexes = true
-								p.regex = nil
-								p.flags += progressVariantFlagStatePreconditionMatched - progressVariantFlagStatePrecondition
-								continue
-							}
-							p.nSuccessful++
-							d := (*q)[o.condition].(*query.DataCondition)
-							if p.nSuccessful != len(d.Elements) {
-								// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
-								recheckRegexes = true
-							} else if d.Inverted {
-								return false, nil
-							}
-							variableNames := p.regex.SubexpNames()
-							p.regex = nil
-							p.flags = 0
-							for i := 2; i < len(res); i += 2 {
-								varName := variableNames[i/2]
-								if varName == "" {
-									continue
-								}
-								if _, ok := p.variables[varName]; ok {
-									return false, fmt.Errorf("variable %q already seen", varName)
-								}
-								if p.variables == nil {
-									p.variables = make(map[string]string)
-								}
-								p.variables[varName] = string(buffer[res[i]:res[i+1]])
-							}
-
-							if res[1] != 0 {
-								// update stream offsets: a follow up regex for the same direction
-								// may consume the byte following the match, a regex for the other
-								// direction may start reading from the next received packet,
-								// so everything read before is out-of reach.
-								p.streamOffset[dir] += res[1]
-								for i := len(bufferLengths) - 1; ; i-- {
-									if bufferLengths[i-1][dir] < p.streamOffset[dir] {
-										p.streamOffset[(C2S^S2C)-dir] = bufferLengths[i][(C2S^S2C)-dir]
-										break
-									}
-								}
-							}
-						}
-					}
-				}
-				if !recheckRegexes {
-					break
-				}
-			}
-
-			// check if any of the regexe's failed and collect variable contents
-			for _, cIdx := range regexConditions {
-				d := (*q)[cIdx].(*query.DataCondition)
-				pg := &progressGroups[cIdx]
-				for pIdx := range pg.variants {
-					p := &pg.variants[pIdx]
-					nUnsuccessful := len(d.Elements) - p.nSuccessful
-					if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
-						if len(p.variant) == 0 {
-							return false, nil
-						}
-						sqs := []string(nil)
-						forbidden := []*bitmask.ConnectedBitmask(nil)
-						for sq, v := range p.variant {
-							sqs = append(sqs, sq)
-							badSQR := &possibleSubQueries[sq].variableData[v].results
-							forbidden = append(forbidden, badSQR)
-
-						}
-						sc.allowedSubQueries.remove(sqs, forbidden)
-						if sc.allowedSubQueries.empty() {
-							return false, nil
-						}
-						continue
-					}
-					if p.variables == nil {
-						continue
-					}
-					if sc.outputVariables == nil {
-						sc.outputVariables = make(map[string][]string)
-					}
-				outer:
-					for n, v := range p.variables {
-						values := sc.outputVariables[n]
-						for _, on := range values {
-							if n == on {
-								continue outer
-							}
-						}
-						sc.outputVariables[n] = append(values, v)
-					}
-				}
-			}
-			return true, nil
+			return false, nil
 		})
 	}
 	return queryPart{
@@ -1595,7 +1658,7 @@ var (
 	}
 )
 
-func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails) ([]*Stream, bool, error) {
+func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails, converters map[string]ConverterAccess) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
@@ -1795,7 +1858,7 @@ func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime tim
 			queryParts := make([]queryPart, 0, len(qs))
 			for qID := range qs {
 				//build search structures
-				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails)
+				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails, converters)
 				if err != nil {
 					return nil, false, err
 				}

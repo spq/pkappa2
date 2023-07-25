@@ -49,7 +49,7 @@ type (
 		r     *Reader
 		index uint32
 	}
-	Direction = int
+	Direction int
 	Packet    struct {
 		Timestamp    time.Time
 		PcapFilename string
@@ -66,6 +66,13 @@ const (
 	DirectionClientToServer Direction = 0
 	DirectionServerToClient Direction = 1
 )
+
+func (dir Direction) Reverse() Direction {
+	if dir == DirectionClientToServer {
+		return DirectionServerToClient
+	}
+	return DirectionClientToServer
+}
 
 func (hg *readerHostGroup) get(id uint16) net.IP {
 	return net.IP(hg.hosts[hg.hostSize*int(id):][:hg.hostSize])
@@ -256,6 +263,10 @@ func (r *Reader) maxStream(lookup section) (*stream, error) {
 	return r.streamByIndex(i)
 }
 
+func (r *Reader) MinStreamID() uint64 {
+	return r.packetID.min
+}
+
 func (r *Reader) MaxStreamID() uint64 {
 	return r.packetID.max
 }
@@ -289,6 +300,9 @@ func (s stream) wrap(r *Reader, idx uint32) (*Stream, error) {
 }
 
 func (r *Reader) StreamByID(streamID uint64) (*Stream, error) {
+	if streamID < r.MinStreamID() || streamID > r.MaxStreamID() {
+		return nil, nil
+	}
 	streamIndex, ok := r.containedStreamIds[streamID]
 	if !ok {
 		return nil, nil
@@ -383,6 +397,24 @@ func (s *Stream) Index() uint32 {
 	return s.index
 }
 
+func (s *Stream) ClientHostIP() string {
+	return s.r.hostGroups[s.HostGroup].get(s.ClientHost).String()
+}
+
+func (s *Stream) ServerHostIP() string {
+	return s.r.hostGroups[s.HostGroup].get(s.ServerHost).String()
+}
+
+func (s *Stream) Protocol() string {
+	protocols := map[uint16]string{
+		flagsStreamProtocolOther: "Other",
+		flagsStreamProtocolTCP:   "TCP",
+		flagsStreamProtocolUDP:   "UDP",
+		flagsStreamProtocolSCTP:  "SCTP",
+	}
+	return protocols[s.Flags&flagsStreamProtocol]
+}
+
 func (s *Stream) Packets() ([]Packet, error) {
 	packets := []Packet{}
 	lastImportID, lastPacketIndex := -1, -1
@@ -475,12 +507,6 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 		Port  uint16
 		Bytes uint64
 	}
-	protocols := map[uint16]string{
-		flagsStreamProtocolOther: "Other",
-		flagsStreamProtocolTCP:   "TCP",
-		flagsStreamProtocolUDP:   "UDP",
-		flagsStreamProtocolSCTP:  "SCTP",
-	}
 	return json.Marshal(struct {
 		ID                      uint64
 		Protocol                string
@@ -501,7 +527,7 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 			Port:  s.ServerPort,
 			Bytes: s.ServerBytes,
 		},
-		Protocol: protocols[s.Flags&flagsStreamProtocol],
+		Protocol: s.Protocol(),
 		Index:    s.r.filename,
 	})
 }

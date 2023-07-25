@@ -1,15 +1,16 @@
 package tools
 
 import (
-	"golang.org/x/sys/unix"
-	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 func ListFiles(dir, extension string) ([]string, error) {
-	fs, err := ioutil.ReadDir(dir)
+	fs, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}

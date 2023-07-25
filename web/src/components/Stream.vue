@@ -19,7 +19,7 @@
       </v-tooltip>
       <v-tooltip bottom>
         <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="fetchStream()">
+          <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreamForId()">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -126,6 +126,25 @@
           <span>RAW</span>
         </v-tooltip>
       </v-btn-toggle>
+      <v-row>
+        <v-col cols="6">
+          <v-tooltip
+            v-if="stream.stream != null && selectableConverters.length > 1"
+            bottom
+          >
+            <template #activator="{ on, attrs }">
+              <v-select
+                v-bind="attrs"
+                :items="selectableConverters"
+                :value="activeConverter"
+                v-on="on"
+                @change="changeConverter"
+              />
+            </template>
+            <span>Select converter view</span>
+          </v-tooltip>
+        </v-col>
+      </v-row>
       <v-spacer />
       <div v-if="streamIndex != null">
         <span class="text-caption"
@@ -185,7 +204,7 @@
       </div>
     </ToolBar>
     <v-skeleton-loader
-      v-if="stream.running || !(stream.stream || stream.error)"
+      v-if="stream.running || !(stream.stream || stream.error) || null == tags"
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
     <v-alert v-else-if="stream.error" type="error" dense>{{
@@ -310,7 +329,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(["stream", "streams", "tags"]),
+    ...mapState(["stream", "streams", "tags", "converters"]),
     ...mapGetters(["groupedTags"]),
     streamTags() {
       let res = {
@@ -329,6 +348,31 @@ export default {
     },
     streamId() {
       return parseInt(this.$route.params.streamId, 10);
+    },
+    converter() {
+      return this.$route.query.converter ?? "auto";
+    },
+    activeConverter() {
+      if (this.stream.stream.ActiveConverter === "") {
+        return "none";
+      }
+      return "converter:" + this.stream.stream.ActiveConverter;
+    },
+    selectableConverters() {
+      return [
+        {
+          text: "* none",
+          value: "none",
+        },
+        ...this.stream.stream.Converters.map((converter) => ({
+          text: `* ${converter}`,
+          value: "converter:" + converter,
+        })),
+        ...this.converters.map((converter) => ({
+          text: converter.Name,
+          value: "converter:" + converter.Name,
+        })),
+      ];
     },
     streamIndex() {
       if (this.streams.result == null) return null;
@@ -395,9 +439,14 @@ export default {
   },
   methods: {
     ...mapActions(["fetchStream", "markTagAdd", "markTagDel"]),
+    changeConverter(converter) {
+      this.$router.push({
+        query: { converter, q: this.$route.query.q, p: this.$route.query.p },
+      });
+    },
     fetchStreamForId() {
       if (this.streamId != null) {
-        this.fetchStream({ id: this.streamId });
+        this.fetchStream({ id: this.streamId, converter: this.converter });
         document.getSelection().empty();
       }
     },

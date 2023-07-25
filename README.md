@@ -6,7 +6,7 @@ The received pcaps are processed and using the webinterface, users can run queri
 Streams matching the query are displayed and their content can be viewed in multiple formats.
 
 The tool is under development and might not work!
-See docs/TODO.txt for missing features.
+See [docs/TODO.md](docs/TODO.md) for missing features.
 
 Add pcaps using a POST to `/upload/filename.pcap`:
 ```
@@ -19,6 +19,7 @@ curl --data-binary @some-file.pcap http://localhost:8080/upload/some-file.pcap
     - libpcap (e.g. `apt install libpcap-dev`)
 - run `yarn install && yarn build` in `/web`
 - run `go run cmd/pkappa2/main.go` in `/`
+- optionally, install stock converter python dependencies: `pip install -r converters/pkappa2lib/requirements.txt`
 - visit `localhost:8080` in your web browser
 
 You likely want to add some arguments to the `go run` command, check `-help`
@@ -34,3 +35,6 @@ You likely want to add some arguments to the `go run` command, check `-help`
 - run `yarn serve` in `/web`
 - run `go run cmd/pkappa2/main.go -address :8081` in `/`
 - visit `localhost:8080` in your web browser
+
+You can import multiple .pcap files in the current folder using:
+`for f in *.pcap; do curl --data-binary "@$f" "http://localhost:8081/upload/$f"; done`

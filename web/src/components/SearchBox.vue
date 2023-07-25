@@ -65,7 +65,7 @@
             v-for="(item, index) in suggestionItems"
             :key="index"
             active-class="font-white"
-            :style="{ backgroundColor: tagColors[suggestionType][item] }"
+            :style="{ backgroundColor: suggestionColor(suggestionType, item) }"
             @click="applySuggestion(index)"
           >
             <v-list-item-title>{{ item }}</v-list-item-title>
@@ -79,7 +79,7 @@
 <script>
 import { EventBus } from "./EventBus";
 import { addSearch, getTermAt } from "./searchHistory";
-import { mapGetters, mapState } from "vuex";
+import { mapGetters, mapState, mapActions } from "vuex";
 import suggest from "../parser/suggest";
 
 export default {
@@ -101,7 +101,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(["tags"]),
+    ...mapState(["tags", "converters"]),
     ...mapGetters(["groupedTags"]),
     tagColors() {
       const tags = {};
@@ -137,6 +137,7 @@ export default {
     EventBus.$on("setSearchTerm", this.setSearchTerm);
   },
   mounted() {
+    this.updateConverters();
     this._keyListener = (e) => {
       if (["input", "textarea"].includes(e.target.tagName.toLowerCase()))
         return;
@@ -153,6 +154,7 @@ export default {
     document.body.removeEventListener("keydown", this._keyListener);
   },
   methods: {
+    ...mapActions(["updateConverters"]),
     onTab() {
       if (this.suggestionMenuOpen) {
         this.applySuggestion();
@@ -187,7 +189,12 @@ export default {
       const val = this.searchBox;
       this.typingDelay = setTimeout(() => {
         const cursorPosition = this.$refs.searchBox.$refs.input.selectionStart;
-        const suggestionResult = suggest(val, cursorPosition, this.groupedTags);
+        const suggestionResult = suggest(
+          val,
+          cursorPosition,
+          this.groupedTags,
+          this.converters
+        );
         this.suggestionItems = suggestionResult.suggestions;
         this.suggestionStart = suggestionResult.start;
         this.suggestionEnd = suggestionResult.end;
@@ -200,6 +207,12 @@ export default {
         this.suggestionItems = [];
         this.typingDelay = null;
       }
+    },
+    suggestionColor(type, item) {
+      if (type === "data") {
+        return "#ffffff";
+      }
+      return this.tagColors[type][item];
     },
     arrowUp() {
       if (this.suggestionMenuOpen) {

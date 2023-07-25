@@ -5,15 +5,16 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -28,11 +29,12 @@ import (
 )
 
 var (
-	baseDir     = flag.String("base_dir", "/tmp", "All paths are relative to this path")
-	pcapDir     = flag.String("pcap_dir", "", "Path where pcaps will be stored")
-	indexDir    = flag.String("index_dir", "", "Path where indexes will be stored")
-	snapshotDir = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
-	stateDir    = flag.String("state_dir", "", "Path where state files will be stored")
+	baseDir      = flag.String("base_dir", "/tmp", "All paths are relative to this path")
+	pcapDir      = flag.String("pcap_dir", "", "Path where pcaps will be stored")
+	indexDir     = flag.String("index_dir", "", "Path where indexes will be stored")
+	snapshotDir  = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
+	stateDir     = flag.String("state_dir", "", "Path where state files will be stored")
+	converterDir = flag.String("converter_dir", "./converters", "Path where converter executables are searched")
 
 	userPassword = flag.String("user_password", "", "HTTP auth password for users")
 	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
@@ -62,10 +64,22 @@ func main() {
 		filepath.Join(*baseDir, *indexDir),
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
+		*converterDir,
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)
 	}
+	defer mgr.Close()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-signals
+		log.Println("Interrupt received. Cleaning up...")
+		mgr.Close()
+		os.Exit(1)
+	}()
+
 	var server *http.Server
 
 	r := chi.NewRouter()
@@ -178,7 +192,7 @@ func main() {
 			http.Error(w, "`color` parameter missing or empty", http.StatusBadRequest)
 			return
 		}
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -229,6 +243,9 @@ func main() {
 				return
 			}
 			operation = manager.UpdateTagOperationUpdateColor(c[0])
+		case "converter_set":
+			c := r.URL.Query()["converters"]
+			operation = manager.UpdateTagOperationSetConverter(c)
 		default:
 			http.Error(w, fmt.Sprintf("unknown `method`: %q", m[0]), http.StatusBadRequest)
 			return
@@ -236,6 +253,38 @@ func main() {
 		if err := mgr.UpdateTag(n[0], operation); err != nil {
 			http.Error(w, fmt.Sprintf("update failed: %v", err), http.StatusBadRequest)
 			return
+		}
+	})
+	rUser.Get("/api/converters", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(mgr.ListConverters()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
+	rUser.Get(`/api/converters/stderr/{name:.+}/{pid:\d+}`, func(w http.ResponseWriter, r *http.Request) {
+		name := chi.URLParam(r, "name")
+		pidStr := chi.URLParam(r, "pid")
+		pid, err := strconv.ParseInt(pidStr, 10, 64)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid process id %q failed: %v", pidStr, err), http.StatusBadRequest)
+			return
+		}
+		converterDetails, err := mgr.ConverterStderr(name, int(pid))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("get converter stderr failed: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(converterDetails); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
+	rUser.Delete("/api/converters/{name:.+}", func(w http.ResponseWriter, r *http.Request) {
+		name := chi.URLParam(r, "name")
+		if err := mgr.ResetConverter(name); err != nil {
+			http.Error(w, fmt.Sprintf("reset failed: %v", err), http.StatusBadRequest)
 		}
 	})
 	rUser.Get(`/api/download/{stream:\d+}.pcap`, func(w http.ResponseWriter, r *http.Request) {
@@ -337,9 +386,33 @@ func main() {
 			http.Error(w, fmt.Sprintf("stream %d not found", streamID), http.StatusNotFound)
 			return
 		}
-		data, err := streamContext.Stream().Data()
+		converter := "auto"
+		if f := r.URL.Query()["converter"]; len(f) == 1 {
+			converter = f[0]
+		}
+		converters, err := streamContext.AllConverters()
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Stream(%d).Data() failed: %v", streamID, err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("AllConverters() failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if converter == "auto" {
+			if len(converters) == 1 {
+				converter = converters[0]
+			} else {
+				converter = ""
+			}
+		} else if converter == "none" {
+			converter = ""
+		} else {
+			if !strings.HasPrefix(converter, "converter:") {
+				http.Error(w, fmt.Sprintf("invalid converter %q", converter), http.StatusBadRequest)
+				return
+			}
+			converter = converter[len("converter:"):]
+		}
+		data, err := streamContext.Data(converter)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Data(%q) failed: %v", converter, err), http.StatusInternalServerError)
 			return
 		}
 		tags, err := streamContext.AllTags()
@@ -347,14 +420,19 @@ func main() {
 			http.Error(w, fmt.Sprintf("AllTags() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+		// TODO: Send correct ClientBytes and ServerBytes when sending converter output.
 		response := struct {
-			Stream *index.Stream
-			Data   []index.Data
-			Tags   []string
+			Stream          *index.Stream
+			Data            []index.Data
+			Tags            []string
+			Converters      []string
+			ActiveConverter string
 		}{
-			Stream: streamContext.Stream(),
-			Data:   data,
-			Tags:   tags,
+			Stream:          streamContext.Stream(),
+			Data:            data,
+			Tags:            tags,
+			Converters:      converters,
+			ActiveConverter: converter,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -364,7 +442,7 @@ func main() {
 		}
 	})
 	rUser.Post("/api/search.json", func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

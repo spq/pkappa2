@@ -18,7 +18,7 @@
     "vue-filter-pretty-bytes": "^0.1.6",
     "vue-moment": "^4.1.0",
     "vue-router": "^3.6.5",
-    "vuetify": "^2.6.12",
+    "vuetify": "^2.6.14",
     "vuex": "^3.6.2"
   },
   "devDependencies": {

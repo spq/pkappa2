@@ -96,10 +96,11 @@ type (
 		Name     string
 	}
 	DataConditionElement struct {
-		SubQuery  string
-		Regex     string
-		Variables []DataConditionElementVariable
-		Flags     uint8
+		SubQuery      string
+		Regex         string
+		Variables     []DataConditionElementVariable
+		Flags         uint8
+		ConverterName string
 	}
 	DataCondition struct {
 		Elements []DataConditionElement
@@ -292,6 +293,7 @@ func (c *NumberCondition) String() string {
 
 func (c *DataCondition) String() string {
 	res := []string(nil)
+
 	for i, e := range c.Elements {
 		inv := map[bool]string{false: "", true: "-"}[c.Inverted && (i == len(c.Elements)-1)]
 		who := map[uint8]string{
@@ -302,7 +304,12 @@ func (c *DataCondition) String() string {
 		if sq != "" {
 			sq += ":"
 		}
-		res = append(res, fmt.Sprintf("%s%s%s:%q", inv, sq, who, e.Regex))
+		fltr := e.ConverterName
+		if fltr != "" {
+			fltr = "." + fltr
+		}
+
+		res = append(res, fmt.Sprintf("%s%s%s%s:%q", inv, sq, who, fltr, e.Regex))
 	}
 	return strings.Join(res, " > ")
 }
@@ -411,7 +418,7 @@ func (c *DataCondition) equal(d Condition) bool {
 	}
 	for i := 0; i < len(c.Elements); i++ {
 		ce, oe := c.Elements[i], o.Elements[i]
-		if !(ce.Flags == oe.Flags && ce.Regex == oe.Regex && ce.SubQuery == oe.SubQuery && len(ce.Variables) == len(oe.Variables)) {
+		if !(ce.Flags == oe.Flags && ce.ConverterName == oe.ConverterName && ce.Regex == oe.Regex && ce.SubQuery == oe.SubQuery && len(ce.Variables) == len(oe.Variables)) {
 			return false
 		}
 		for j := 0; j < len(ce.Variables); j++ {
@@ -526,6 +533,10 @@ func (c *ImpossibleCondition) invert() ConditionsSet {
 }
 
 func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
+	if t.ConverterName != "" && t.Key != "data" && t.Key != "cdata" && t.Key != "sdata" {
+		return nil, fmt.Errorf("converter %q not allowed for %q", t.ConverterName, t.Key)
+	}
+
 	conds := ConditionsSet(nil)
 	switch t.Key {
 	case "tag", "service", "mark", "generated":
@@ -867,10 +878,11 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 				&DataCondition{
 					Elements: []DataConditionElement{
 						{
-							Regex:     content,
-							Variables: variables,
-							SubQuery:  t.SubQuery,
-							Flags:     f,
+							Regex:         content,
+							Variables:     variables,
+							SubQuery:      t.SubQuery,
+							Flags:         f,
+							ConverterName: t.ConverterName,
 						},
 					},
 				},

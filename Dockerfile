@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # Build frontend
 FROM node:18-alpine AS frontend_builder
 WORKDIR /app
@@ -7,7 +5,7 @@ COPY ./web/ /app
 RUN yarn install --frozen-lockfile && yarn build
 
 # Build backend
-FROM golang:1.18 AS backend_builder
+FROM golang:1.20 AS backend_builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev && rm -rf /var/lib/apt/lists/*
@@ -19,9 +17,12 @@ COPY --from=frontend_builder /app/dist ./web/dist
 RUN go build -o ./bin/pkappa2 ./cmd/pkappa2/main.go
 
 # Run
-FROM debian:latest
+FROM ubuntu:latest
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8 python3 python3-dev python3-pip && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --upgrade pip setuptools wheel
+COPY converters/pkappa2lib/requirements.txt requirements.txt
+RUN python3 -m pip install --upgrade -r requirements.txt
 
 COPY --from=backend_builder /app/bin/pkappa2 ./pkappa2
 COPY --from=backend_builder /app/web/dist ./web/dist
@@ -31,7 +32,7 @@ USER pkappa2
 
 EXPOSE 8080
 VOLUME /data
-VOLUME /app/filters
+VOLUME /app/converters
 
 ENV PKAPPA2_USER_PASSWORD ""
 ENV PKAPPA2_PCAP_PASSWORD ""
