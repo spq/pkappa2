@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 import re
 from io import BytesIO
-from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
+
 from protobuf_inspector.types import StandardParser
+
+from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
 
 
 class ProtobufConverter(Pkappa2Converter):
-
     def __init__(self):
         super().__init__()
-        self._ansi_escape = re.compile(
-            r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        self._ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
@@ -22,12 +22,16 @@ class ProtobufConverter(Pkappa2Converter):
                 result_data.append(
                     StreamChunk(
                         chunk.Direction,
-                        self._ansi_escape.sub('', protobuf_message).encode()))
+                        self._ansi_escape.sub("", protobuf_message).encode(),
+                    )
+                )
             except Exception as ex:
                 result_data.append(
                     StreamChunk(
-                        chunk.Direction, b'Protobuf ERROR: ' +
-                        str(ex).encode() + b'\n' + chunk.Content))
+                        chunk.Direction,
+                        b"Protobuf ERROR: " + str(ex).encode() + b"\n" + chunk.Content,
+                    )
+                )
         return Result(result_data)
 
 

@@ -2,21 +2,22 @@
 import base64
 import binascii
 import re
-from pkappa2lib import Pkappa2Converter, StreamChunk, Result, Stream
+
+from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
 
 
 class Base64DecodeConverter(Pkappa2Converter):
-
     def __init__(self):
         super().__init__()
         self._pattern = re.compile(
-            rb"([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?")
+            rb"([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?"
+        )
 
     def decode_possible_base64(self, data: bytes) -> bytes:
-        content = b''
+        content = b""
         pos = 0
         for match in self._pattern.finditer(data):
-            content += data[pos:match.start()]
+            content += data[pos : match.start()]
 
             # Some heuristics to determine if the data is base64 encoded
             chunk = match.group(0).decode()
@@ -28,9 +29,9 @@ class Base64DecodeConverter(Pkappa2Converter):
                 try:
                     content += base64.b64decode(match.group(0))
                 except binascii.Error:
-                    content += data[match.start():match.end()]
+                    content += data[match.start() : match.end()]
             else:
-                content += data[match.start():match.end()]
+                content += data[match.start() : match.end()]
             pos = match.end()
         content += data[pos:]
         return content

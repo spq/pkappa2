@@ -3,6 +3,8 @@
         "Vue.volar",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "golang.go"
+        "golang.go",
+        "ms-python.python",
+        "ms-python.black-formatter"
     ]
 }

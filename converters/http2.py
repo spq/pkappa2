@@ -2,18 +2,19 @@
 from base64 import urlsafe_b64decode
 from collections import defaultdict
 from typing import Dict, List, Optional
+
 import h2.frame_buffer
-from h2.exceptions import H2Error
 import hyperframe.frame
+from h2.exceptions import H2Error
 from hpack import Decoder, HeaderTuple
+
 from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
-from pkappa2lib import StreamChunk, Direction, Result, Stream
+from pkappa2lib import Direction, Result, Stream, StreamChunk
 
 # pip install h2
 
 
 class HTTP2Converter(HTTPConverter):
-
     SETTINGS_NAMES = {
         1: "HEADER_TABLE_SIZE",
         2: "ENABLE_PUSH",
@@ -31,27 +32,36 @@ class HTTP2Converter(HTTPConverter):
         self.h2_server_buffer = None
         self.h2_active = False
 
-    def handle_http2_event(self, direction: Direction,
-                           frame: hyperframe.frame.Frame) -> bytes:
+    def handle_http2_event(
+        self, direction: Direction, frame: hyperframe.frame.Frame
+    ) -> bytes:
         return self.format_http2_frame(direction, frame)
 
     # Avoid decoding the headers multiple times.
-    def handle_http2_headers(self, direction: Direction,
-                             frame: hyperframe.frame.Frame,
-                             headers: List[HeaderTuple]) -> None:
+    def handle_http2_headers(
+        self,
+        direction: Direction,
+        frame: hyperframe.frame.Frame,
+        headers: List[HeaderTuple],
+    ) -> None:
         pass
 
-    def format_http2_frame(self, direction: Direction,
-                           frame: hyperframe.frame.Frame) -> bytes:
+    def format_http2_frame(
+        self, direction: Direction, frame: hyperframe.frame.Frame
+    ) -> bytes:
         if isinstance(
-                frame,
-            (hyperframe.frame.HeadersFrame, hyperframe.frame.PushPromiseFrame,
-             hyperframe.frame.ContinuationFrame)):
-            if 'END_HEADERS' not in frame.flags:
-                raise Exception('TODO: Handle fragmented headers')
+            frame,
+            (
+                hyperframe.frame.HeadersFrame,
+                hyperframe.frame.PushPromiseFrame,
+                hyperframe.frame.ContinuationFrame,
+            ),
+        ):
+            if "END_HEADERS" not in frame.flags:
+                raise Exception("TODO: Handle fragmented headers")
             headers = self.hpack_decoder[direction].decode(frame.data)
             self.handle_http2_headers(direction, frame, headers)
-            output = ''
+            output = ""
             for header in headers:
                 output += f"{header[0]}: {header[1]}\n"
             return f"{frame}\n{output}".encode()
@@ -59,15 +69,13 @@ class HTTP2Converter(HTTPConverter):
             return str(frame).encode() + b"\n" + frame.data + b"\n"
         elif isinstance(frame, hyperframe.frame.SettingsFrame):
             settings = {
-                self.SETTINGS_NAMES.get(k, k): v
-                for k, v in frame.settings.items()
+                self.SETTINGS_NAMES.get(k, k): v for k, v in frame.settings.items()
             }
             # TODO: Update hpack decoder MAX_HEADER_LIST_SIZE with setting. The values only take effect after an ACK.
-            output = ''
+            output = ""
             for k, v in settings.items():
                 output += f"{k}: {v}\n"
-            return f"{type(frame).__name__}(stream_id={frame.stream_id}, flags={frame.flags!r}):\n{output}".encode(
-            )
+            return f"{type(frame).__name__}(stream_id={frame.stream_id}, flags={frame.flags!r}):\n{output}".encode()
         return (str(frame) + "\n").encode()
 
     def setup_http2_buffers(self):
@@ -85,8 +93,8 @@ class HTTP2Converter(HTTPConverter):
             return [
                 StreamChunk(
                     Direction.CLIENTTOSERVER,
-                    self.handle_http2_event(Direction.CLIENTTOSERVER, f) +
-                    b"\n")
+                    self.handle_http2_event(Direction.CLIENTTOSERVER, f) + b"\n",
+                )
             ]
         return []
 
@@ -105,8 +113,9 @@ class HTTP2Converter(HTTPConverter):
             events.append(
                 StreamChunk(
                     Direction.CLIENTTOSERVER,
-                    self.handle_http2_event(Direction.CLIENTTOSERVER, event) +
-                    b"\n"))
+                    self.handle_http2_event(Direction.CLIENTTOSERVER, event) + b"\n",
+                )
+            )
         return events
 
     def handle_http2_response(self, chunk: bytes) -> List[StreamChunk]:
@@ -119,12 +128,14 @@ class HTTP2Converter(HTTPConverter):
             events.append(
                 StreamChunk(
                     Direction.SERVERTOCLIENT,
-                    self.handle_http2_event(Direction.SERVERTOCLIENT, event) +
-                    b"\n"))
+                    self.handle_http2_event(Direction.SERVERTOCLIENT, event) + b"\n",
+                )
+            )
         return events
 
     def handle_raw_client_chunk(
-            self, chunk: StreamChunk) -> Optional[List[StreamChunk]]:
+        self, chunk: StreamChunk
+    ) -> Optional[List[StreamChunk]]:
         try:
             if self.h2_active:
                 return self.handle_http2_request(chunk.Content)
@@ -139,7 +150,8 @@ class HTTP2Converter(HTTPConverter):
         return super().handle_raw_client_chunk(chunk)
 
     def handle_raw_server_chunk(
-            self, chunk: StreamChunk) -> Optional[List[StreamChunk]]:
+        self, chunk: StreamChunk
+    ) -> Optional[List[StreamChunk]]:
         if self.h2_active:
             # HTTP/2
             try:
@@ -150,34 +162,36 @@ class HTTP2Converter(HTTPConverter):
         # continue parsing HTTP/1 response
         return super().handle_raw_server_chunk(chunk)
 
-    def handle_http1_request(self, chunk: StreamChunk,
-                             request: HTTPRequest) -> List[StreamChunk]:
-
+    def handle_http1_request(
+        self, chunk: StreamChunk, request: HTTPRequest
+    ) -> List[StreamChunk]:
         # https://httpwg.org/specs/rfc7540.html#discover-http
         connection = request.headers.get("Connection")
         if connection:
-            connection_headers = list(
-                map(lambda h: h.strip(), connection.split(",")))
-            if "Upgrade" in connection_headers and request.headers.get(
-                    "Upgrade") == "h2c":
+            connection_headers = list(map(lambda h: h.strip(), connection.split(",")))
+            if (
+                "Upgrade" in connection_headers
+                and request.headers.get("Upgrade") == "h2c"
+            ):
                 # HTTP/2
                 return [chunk] + self.handle_http2_upgrade(request)
 
         return super().handle_http1_request(chunk, request)
 
-    def handle_http1_response(self, header: bytes, body: bytes,
-                              chunk: StreamChunk,
-                              response: HTTPResponse) -> List[StreamChunk]:
-
-        if response.headers.get(
-                "Connection") == "Upgrade" and response.headers.get(
-                    "Upgrade") == "h2c":
+    def handle_http1_response(
+        self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
+    ) -> List[StreamChunk]:
+        if (
+            response.headers.get("Connection") == "Upgrade"
+            and response.headers.get("Upgrade") == "h2c"
+        ):
             # HTTP/2
             if self.h2_server_buffer is None:
                 raise Exception("HTTP/2 upgrade request not found")
 
-            return [StreamChunk(chunk.Direction, header + b'\r\n\r\n')
-                    ] + self.handle_http2_response(response.data)
+            return [
+                StreamChunk(chunk.Direction, header + b"\r\n\r\n")
+            ] + self.handle_http2_response(response.data)
 
         return super().handle_http1_response(header, body, chunk, response)
 
@@ -186,14 +200,18 @@ class HTTP2Converter(HTTPConverter):
         self.h2_client_buffer = None
         self.hpack_decoder = defaultdict(Decoder)
         self.h2_server_buffer = None
-        if len(stream.Chunks) > 1 and stream.Chunks[
-                0].Direction == Direction.SERVERTOCLIENT:
+        if (
+            len(stream.Chunks) > 1
+            and stream.Chunks[0].Direction == Direction.SERVERTOCLIENT
+        ):
             # the server send something before the request arrived?!
             # try to fix it by switching the first and second chunk transparently.
             return super().handle_stream(
                 Stream(
-                    stream.Metadata, stream.Chunks[1:2] + stream.Chunks[0:1] +
-                    stream.Chunks[2:]))
+                    stream.Metadata,
+                    stream.Chunks[1:2] + stream.Chunks[0:1] + stream.Chunks[2:],
+                )
+            )
         return super().handle_stream(stream)
 
 

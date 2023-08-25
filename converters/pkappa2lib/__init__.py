@@ -1,10 +1,10 @@
-from dataclasses import dataclass
-from enum import Enum
-from typing import List
 import base64
 import datetime
 import json
 import sys
+from dataclasses import dataclass
+from enum import Enum
+from typing import List
 
 
 class Protocol(Enum):
@@ -32,11 +32,8 @@ class StreamMetadata:
 
 
 class ConverterDecoder(json.JSONDecoder):
-
     def __init__(self, *args, **kwargs):
-        super().__init__(object_hook=self.converter_object_hook,
-                         *args,
-                         **kwargs)
+        super().__init__(object_hook=self.converter_object_hook, *args, **kwargs)
 
     @staticmethod
     def converter_object_hook(obj):
@@ -50,12 +47,11 @@ class ConverterDecoder(json.JSONDecoder):
 
 
 class ConverterEncoder(json.JSONEncoder):
-
     def default(self, o):
         if isinstance(o, StreamChunk):
             return {
                 "Content": base64.b64encode(o.Content).decode(),
-                "Direction": o.Direction.to_json()
+                "Direction": o.Direction.to_json(),
             }
 
         else:
@@ -120,18 +116,20 @@ class Pkappa2Converter:
 
         This method can be used to log messages to the UI. The message will be
         displayed in the stderr tab of the UI.
-        
+
         Can be used for debugging.
         """
         now = datetime.datetime.now().strftime("%d.%b %Y %H:%M:%S")
-        print(f'{now} (stream: {self.current_stream_id}): {message}',
-              flush=True,
-              file=sys.stderr)
+        print(
+            f"{now} (stream: {self.current_stream_id}): {message}",
+            flush=True,
+            file=sys.stderr,
+        )
 
     def run(self):
         """
         Run the converter.
-        
+
         This method goes into an endless loop that parses the input from
         pkappa2 and calls the handle_stream method for each stream. The
         result of the handle_stream method is then written to stdout.
@@ -140,7 +138,8 @@ class Pkappa2Converter:
         while True:
             try:
                 metadata_json = json.loads(
-                    sys.stdin.buffer.readline().decode(), cls=ConverterDecoder)
+                    sys.stdin.buffer.readline().decode(), cls=ConverterDecoder
+                )
                 metadata = StreamMetadata(**metadata_json)
                 self.current_stream_id = metadata.StreamID
                 stream_chunks = []

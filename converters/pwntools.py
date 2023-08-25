@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-from pkappa2lib import Pkappa2Converter, StreamChunk, Result, Stream, Direction, Protocol
+from pkappa2lib import (Direction, Pkappa2Converter, Protocol, Result, Stream,
+                        StreamChunk)
 
 
 class PwntoolsRemoteConverter(Pkappa2Converter):
-
     def handle_stream(self, stream: Stream) -> Result:
-        typ = ''
+        typ = ""
         if stream.Metadata.Protocol == Protocol.UDP:
             typ = ', typ = "udp"'
-        output = f'''#!/usr/bin/env python3
+        output = f"""#!/usr/bin/env python3
 from pwn import *
 import sys
 
 # Generated from stream {stream.Metadata.StreamID}
 # io = remote(sys.argv[1], {stream.Metadata.ServerPort}{typ})
 io = remote({stream.Metadata.ServerHost!r}, {stream.Metadata.ServerPort}{typ})
-'''
+"""
         for i, chunk in enumerate(stream.Chunks):
             if chunk.Direction == Direction.CLIENTTOSERVER:
-                if chunk.Content[-1:] == b'\n':
+                if chunk.Content[-1:] == b"\n":
                     output += f"io.sendline({chunk.Content[:-1]!r})\n"
                 else:
                     output += f"io.send({chunk.Content!r})\n"
@@ -27,8 +27,10 @@ io = remote({stream.Metadata.ServerHost!r}, {stream.Metadata.ServerPort}{typ})
                     output += "io.stream()\n"
                 else:
                     output += f"io.recvuntil({chunk.Content[-20:]!r})\n"
-        if len(stream.Chunks) > 0 and stream.Chunks[
-                -1].Direction == Direction.CLIENTTOSERVER:
+        if (
+            len(stream.Chunks) > 0
+            and stream.Chunks[-1].Direction == Direction.CLIENTTOSERVER
+        ):
             output += "io.interactive()\n"
         return Result([StreamChunk(Direction.CLIENTTOSERVER, output.encode())])
 

@@ -5,7 +5,7 @@
     }
   ],
   "eslint.validate": ["javascript", "javascriptreact", "vue"],
-  "editor.formatOnSave": true,
+  "editor.formatOnSave": false,
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": true,
     "source.fixAll.prettier": true
@@ -17,5 +17,8 @@
     "editor.defaultFormatter": "golang.go"
   },
   "prettier.ignorePath": "./web/.prettierignore",
-  "prettier.configPath": "./web/.prettierrc.json"
+  "prettier.configPath": "./web/.prettierrc.json",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
 }
