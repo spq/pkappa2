@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+import socket
+import traceback
+from http.client import HTTPResponse as HTTPResponseChunked
 from http.server import BaseHTTPRequestHandler
-from http.client import parse_headers
 from io import BytesIO
 from typing import List, Optional
-from urllib3 import HTTPResponse
-from pkappa2lib import Pkappa2Converter, StreamChunk, Direction, Result, Stream
+
+from pkappa2lib import Direction, Pkappa2Converter, Result, Stream, StreamChunk
+from urllib3.response import HTTPResponse
 
 
 # https://stackoverflow.com/questions/4685217/parse-raw-http-headers
@@ -19,6 +22,12 @@ class HTTPRequest(BaseHTTPRequestHandler):
     def send_error(self, code, message):
         self.error_code = code
         self.error_message = message
+
+
+class HTTPResponseBase(HTTPResponseChunked):
+    def __init__(self, data: bytes):
+        super().__init__(socket.socket())
+        self.fp = BytesIO(data)
 
 
 class HTTPConverter(Pkappa2Converter):
@@ -85,32 +94,20 @@ class HTTPConverter(Pkappa2Converter):
                         result_data.extend(raw_response)
                         continue
 
-                    # https://stackoverflow.com/a/52418392
                     header, body = chunk.Content.split(b"\r\n\r\n", 1)
-                    header_stream = BytesIO(header)
-                    requestline = header_stream.readline().strip().split(b' ')
-                    status = int(requestline[1])
-                    headers_parsed = parse_headers(header_stream)
-                    try:
-                        # See if iterator returns a tuple (required by HTTPResponse)
-                        for key, value in headers_parsed:
-                            break
-                        headers = headers_parsed
-                    except:
-                        # Otherwise assume dictionary (for newer Python stdlib versions)
-                        headers = {k:headers_parsed[k] for k in headers_parsed}
-
-                    body_stream = BytesIO(body)
+                    response_base = HTTPResponseBase(chunk.Content)
+                    response_base.begin()
                     response = HTTPResponse(
-                        body=body_stream,
-                        headers=headers,
-                        status=status,
+                        body=response_base,
+                        headers=response_base.getheaders(),
+                        status=response_base.status,
                     )
 
                     result_data.extend(
                         self.handle_http1_response(header, body, chunk,
                                                    response))
                 except Exception as ex:
+                    traceback.print_exc()
                     data = f"Unable to parse HTTP response: {ex}".encode()
                     result_data.append(StreamChunk(chunk.Direction, data))
         return Result(result_data)
