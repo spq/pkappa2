@@ -294,8 +294,8 @@ class WebsocketConverter(HTTP2Converter):
                              request: HTTPRequest) -> List[StreamChunk]:
 
         if request.headers.get(
-                "Connection").lower() == "upgrade" and request.headers.get(
-                    "Upgrade").lower() == "websocket":
+                "Connection", "").lower() == "upgrade" and request.headers.get(
+                    "Upgrade", "").lower() == "websocket":
             websocket_key = request.headers.get("Sec-WebSocket-Key", None)
             if websocket_key is None:
                 return [
@@ -310,9 +310,9 @@ class WebsocketConverter(HTTP2Converter):
                               response: HTTPResponse) -> List[StreamChunk]:
         try:
             if response.status == 101 and response.headers.get(
-                    "Connection").lower(
+                    "Connection", "").lower(
                     ) == "upgrade" and response.headers.get(
-                        "Upgrade").lower() == "websocket":
+                        "Upgrade", "").lower() == "websocket":
                 if not self.websocket_key:
                     raise Exception("No websocket key found")
                 expected_accept = b64encode(
