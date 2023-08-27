@@ -2,7 +2,8 @@
 node_modules
 /web/dist
 __pycache__
-docker_data
+docker_data/*
+tmp/*
 
 # local env files
 .env.local

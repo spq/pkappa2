@@ -90,6 +90,10 @@ func (process *Process) run() {
 	if err != nil {
 		log.Printf("Converter (%s): Failed to create stdout pipe: %q", process.converterName, err)
 		close(process.output)
+
+		// drain input channel to unblock caller
+		for range process.input {
+		}
 		return
 	}
 
@@ -110,6 +114,10 @@ func (process *Process) run() {
 	if err != nil {
 		log.Printf("Converter (%s): Failed to create stderr pipe: %q", process.converterName, err)
 		stdout.Close()
+
+		// drain input channel to unblock caller
+		for range process.input {
+		}
 		return
 	}
 
@@ -135,6 +143,10 @@ func (process *Process) run() {
 		log.Printf("Converter (%s): Failed to create stdin pipe: %q", process.converterName, err)
 		stdout.Close()
 		stderr.Close()
+
+		// drain input channel to unblock caller
+		for range process.input {
+		}
 		return
 	}
 
@@ -144,6 +156,10 @@ func (process *Process) run() {
 		stdout.Close()
 		stderr.Close()
 		stdin.Close()
+
+		// drain input channel to unblock caller
+		for range process.input {
+		}
 		return
 	}
 
