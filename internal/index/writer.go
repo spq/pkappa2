@@ -848,7 +848,7 @@ func (w *Writer) AddIndex(r *Reader) (bool, error) {
 	}
 	if newTimeDiffNS != 0 {
 		for sIdx := range w.streams[streamCountBefore:] {
-			s := &w.streams[sIdx]
+			s := &w.streams[sIdx+streamCountBefore]
 			s.FirstPacketTimeNS += newTimeDiffNS
 			s.LastPacketTimeNS += newTimeDiffNS
 		}
