@@ -1234,10 +1234,6 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 
 				if event.Has(fsnotify.Remove) {
 					mgr.jobs <- func() {
-						fileInfo, err := os.Stat(event.Name)
-						if err != nil || fileInfo.IsDir() {
-							return
-						}
 						if err := mgr.removeConverter(event.Name); err != nil {
 							log.Printf("error while removing converter: %v", err)
 						}
