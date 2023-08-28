@@ -310,8 +310,10 @@ class WebsocketConverter(HTTP2Converter):
     def handle_http1_request(
         self, chunk: StreamChunk, request: HTTPRequest
     ) -> List[StreamChunk]:
+        # Allow "Connection: keep-alive, Upgrade"
+        connection = request.headers.get("Connection", "").lower().replace(" ", "").split(",")
         if (
-            request.headers.get("Connection", "").lower() == "upgrade"
+            "upgrade" in connection
             and request.headers.get("Upgrade", "").lower() == "websocket"
         ):
             websocket_key = request.headers.get("Sec-WebSocket-Key", None)
@@ -325,9 +327,10 @@ class WebsocketConverter(HTTP2Converter):
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
     ) -> List[StreamChunk]:
         try:
+            connection = response.headers.get("Connection", "").lower().replace(" ", "").split(",")
             if (
                 response.status == 101
-                and response.headers.get("Connection", "").lower() == "upgrade"
+                and "upgrade" in connection
                 and response.headers.get("Upgrade", "").lower() == "websocket"
             ):
                 if not self.websocket_key:
