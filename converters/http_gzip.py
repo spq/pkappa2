@@ -25,8 +25,8 @@ class HTTPRequest(BaseHTTPRequestHandler):
 
 
 class HTTPResponseBase(HTTPResponseChunked):
-    def __init__(self, data: bytes):
-        super().__init__(socket.socket())
+    def __init__(self, data: bytes, method: str):
+        super().__init__(socket.socket(), method=method)
         self.fp = BytesIO(data)
 
 
@@ -64,6 +64,7 @@ class HTTPConverter(Pkappa2Converter):
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
+        last_request_method = None
         for chunk in stream.Chunks:
             if chunk.Direction == Direction.CLIENTTOSERVER:
                 raw_result: Optional[List[StreamChunk]] = self.handle_raw_client_chunk(
@@ -80,10 +81,14 @@ class HTTPConverter(Pkappa2Converter):
                             f"{request.error_code} {request.error_message}".encode()
                         )
 
+                    last_request_method = request.command
                     result_data.extend(self.handle_http1_request(chunk, request))
                 except Exception as ex:
-                    data = f"Unable to parse HTTP request: {ex}".encode()
-                    result_data.append(StreamChunk(chunk.Direction, data))
+                    last_request_method = None
+                    data = f"Unable to parse HTTP request: {ex}\n".encode()
+                    result_data.append(
+                        StreamChunk(chunk.Direction, data + chunk.Content)
+                    )
             else:
                 try:
                     raw_response: Optional[
@@ -94,7 +99,7 @@ class HTTPConverter(Pkappa2Converter):
                         continue
 
                     header, body = chunk.Content.split(b"\r\n\r\n", 1)
-                    response_base = HTTPResponseBase(chunk.Content)
+                    response_base = HTTPResponseBase(chunk.Content, last_request_method)
                     response_base.begin()
                     response = HTTPResponse(
                         body=response_base,
@@ -106,9 +111,12 @@ class HTTPConverter(Pkappa2Converter):
                         self.handle_http1_response(header, body, chunk, response)
                     )
                 except Exception as ex:
-                    traceback.print_exc()
-                    data = f"Unable to parse HTTP response: {ex}".encode()
-                    result_data.append(StreamChunk(chunk.Direction, data))
+                    data = f"Unable to parse HTTP response: {ex}\n".encode()
+                    self.log(f"Unable to parse HTTP response: {ex}")
+                    self.log(traceback.format_exc())
+                    result_data.append(
+                        StreamChunk(chunk.Direction, data + chunk.Content)
+                    )
         return Result(result_data)
 
 

@@ -144,8 +144,8 @@ class HTTP2Converter(HTTPConverter):
                 # HTTP/2
                 return self.handle_http2_init(chunk.Content)
         except H2Error as ex:
-            data = f"Unable to parse HTTP2 init request: {ex}".encode()
-            return [StreamChunk(chunk.Direction, data)]
+            data = f"Unable to parse HTTP2 init request: {ex}\n".encode()
+            return [StreamChunk(chunk.Direction, data + chunk.Content)]
         # continue parsing HTTP/1 request
         return super().handle_raw_client_chunk(chunk)
 
@@ -157,8 +157,8 @@ class HTTP2Converter(HTTPConverter):
             try:
                 return self.handle_http2_response(chunk.Content)
             except H2Error as ex:
-                data = f"Unable to parse HTTP2 response: {ex}".encode()
-                return [StreamChunk(chunk.Direction, data)]
+                data = f"Unable to parse HTTP2 response: {ex}\n".encode()
+                return [StreamChunk(chunk.Direction, data + chunk.Content)]
         # continue parsing HTTP/1 response
         return super().handle_raw_server_chunk(chunk)
 
