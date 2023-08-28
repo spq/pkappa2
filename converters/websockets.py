@@ -357,9 +357,9 @@ class WebsocketConverter(HTTP2Converter):
                 elif len(extensions) > 0:
                     self.log(f"Unsupported extensions: {extensions}")
 
-                data = response.data
-                if len(data) > 0:
-                    data = self.handle_websocket_frames(chunk.Direction, 0, data)
+                data = b""
+                if len(body) > 0:
+                    data = self.handle_websocket_frames(chunk.Direction, 0, body)
 
                 return [StreamChunk(chunk.Direction, header + b"\r\n\r\n" + data)]
 
