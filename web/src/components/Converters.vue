@@ -17,6 +17,7 @@
       single-expand
       show-expand
       dense
+      disable-pagination
       @click:row="rowClick"
     >
       <template #expanded-item="{ item }">
