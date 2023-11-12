@@ -250,13 +250,13 @@ func (cachefile *cacheFile) Data(streamID uint64) ([]index.Data, uint64, uint64,
 	return data, bytes[index.DirectionClientToServer], bytes[index.DirectionServerToClient], nil
 }
 
-func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error) {
+func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, bool, error) {
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
 
 	info, ok := cachefile.streamInfos[streamID]
 	if !ok {
-		return [2][]byte{}, [][2]int{}, 0, 0, nil
+		return [2][]byte{}, [][2]int{}, 0, 0, false, nil
 	}
 	buffer := bufio.NewReader(io.NewSectionReader(cachefile.file, info.offset, int64(info.size)))
 
@@ -270,7 +270,7 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 		last := dataSizes[len(dataSizes)-1]
 		sz, _, err := readVarInt(buffer)
 		if err != nil {
-			return [2][]byte{}, [][2]int{}, 0, 0, err
+			return [2][]byte{}, [][2]int{}, 0, 0, true, err
 		}
 		if sz == 0 {
 			if prevWasZero {
@@ -299,13 +299,13 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 	// Read data
 	clientData := make([]byte, clientBytes)
 	if _, err := io.ReadFull(buffer, clientData); err != nil {
-		return [2][]byte{}, [][2]int{}, 0, 0, err
+		return [2][]byte{}, [][2]int{}, 0, 0, true, err
 	}
 	serverData := make([]byte, serverBytes)
 	if _, err := io.ReadFull(buffer, serverData); err != nil {
-		return [2][]byte{}, [][2]int{}, 0, 0, err
+		return [2][]byte{}, [][2]int{}, 0, 0, true, err
 	}
-	return [2][]byte{clientData, serverData}, dataSizes, clientBytes, serverBytes, nil
+	return [2][]byte{clientData, serverData}, dataSizes, clientBytes, serverBytes, true, nil
 }
 
 func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Data) error {
