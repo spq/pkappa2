@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/spq/pkappa2/internal/index"
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 )
 
 type (
@@ -95,4 +96,8 @@ func (cache *CachedConverter) Data(stream *index.Stream) (data []index.Data, cli
 
 func (cache *CachedConverter) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error) {
 	return cache.cacheFile.DataForSearch(streamID)
+}
+
+func (cache *CachedConverter) InvalidateChangedStreams(streams *bitmask.LongBitmask) bitmask.LongBitmask {
+	return cache.cacheFile.InvalidateChangedStreams(streams)
 }

@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/spq/pkappa2/internal/index"
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 )
 
 type (
@@ -432,7 +433,7 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 
 	// Remember where to look for this stream.
 	cachefile.streamInfos[streamID] = streamInfo{
-		offset: cachefile.fileSize + int64(unsafe.Sizeof(streamSection)),
+		offset: cachefile.fileSize + headerSize,
 		size:   streamSize,
 	}
 
@@ -442,6 +443,38 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 	cachefile.fileSize += headerSize + int64(streamSize)
 
 	return nil
+}
+
+func (cachefile *cacheFile) InvalidateChangedStreams(streams *bitmask.LongBitmask) bitmask.LongBitmask {
+	invalidatedStreams := bitmask.LongBitmask{}
+
+	cachefile.rwmutex.RLock()
+	defer cachefile.rwmutex.RUnlock()
+
+	// see which of the streams are in the cache
+	nextStreamId := uint64(0)
+	for {
+		offset := streams.TrailingZerosFrom(uint(nextStreamId))
+		if offset == -1 {
+			break
+		}
+		nextStreamId += uint64(offset)
+
+		// delete the stream from the in-memory index
+		// it will be re-added when the stream is converted again
+		if info, ok := cachefile.streamInfos[nextStreamId]; ok {
+			cachefile.freeSize += int64(info.size) + headerSize
+			if cachefile.freeStart > info.offset-headerSize {
+				cachefile.freeStart = info.offset - headerSize
+			}
+			delete(cachefile.streamInfos, nextStreamId)
+			invalidatedStreams.Set(uint(nextStreamId))
+		}
+
+		nextStreamId++
+	}
+
+	return invalidatedStreams
 }
 
 // func (writer *writer) invalidateStream(stream *index.Stream) error {

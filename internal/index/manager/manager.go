@@ -501,6 +501,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 			mgr.addedStreamsDuringTaggingJob.Or(addedStreams)
 			mgr.updatedStreamsDuringTaggingJob.Or(updatedStreams)
 			mgr.invalidateTags(updatedStreams, addedStreams)
+			mgr.invalidateConverters(&updatedStreams)
 		}
 		// remove finished job from queue
 		mgr.importJobs = mgr.importJobs[processedFiles:]
@@ -510,7 +511,6 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 			go mgr.importPcapJob(mgr.importJobs[:], mgr.nextStreamID, idxs, rel)
 		}
 		mgr.startTaggingJobIfNeeded()
-		//TODO: this is not doing anything right now because we don't invalidate cached conversions, but we should
 		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
 		if err := mgr.saveState(); err != nil {
@@ -1205,6 +1205,13 @@ func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter
 		mgr.startTaggingJobIfNeeded()
 		mgr.startConverterJobIfNeeded()
 		releaser.release(mgr)
+	}
+}
+
+func (mgr *Manager) invalidateConverters(updatedStreams *bitmask.LongBitmask) {
+	for _, converter := range mgr.converters {
+		invalidatedStreams := converter.InvalidateChangedStreams(updatedStreams)
+		mgr.streamsToConvert[converter.Name()].Or(invalidatedStreams)
 	}
 }
 
