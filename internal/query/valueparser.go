@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/participle/v2"
-	"github.com/alecthomas/participle/v2/lexer/stateful"
+	"github.com/alecthomas/participle/v2/lexer"
 )
 
 type (
@@ -73,65 +73,86 @@ type (
 )
 
 var (
-	valueParserLexerRules = stateful.Rules{
-		"Global": []stateful.Rule{
-			stateful.Include("Variable"),
-			{
-				Name:    "whitespace",
-				Pattern: `[ \t\n\r]+`,
-			},
-		},
+	stringLexerRules = lexer.Rules{
 		"Variable": {
 			{
 				Name:    "Variable",
 				Pattern: `(?i)@(?:[a-z0-9]+:)?[a-z0-9]+@`,
 			},
 		},
-		"String": {
-			stateful.Include("Variable"),
+		"Root": {
+			lexer.Include("Variable"),
 			{
 				Name:    "Characters",
 				Pattern: `(?:[^@]|@@)+`,
 			},
 		},
-		"TokenList": {
-			stateful.Include("List"),
+	}
+	tokenListLexerRules = lexer.Rules{
+		"Global": []lexer.Rule{
+			lexer.Include("Variable"),
+			{
+				Name:    "whitespace",
+				Pattern: `[ \t\n\r]+`,
+			},
+		},
+		"Variable": stringLexerRules["Variable"],
+		"Root": {
+			lexer.Include("List"),
 			{
 				Name:    "Token",
 				Pattern: `[a-z]+`,
 			},
 		},
-		"List": []stateful.Rule{
-			stateful.Include("Global"),
+		"List": []lexer.Rule{
+			lexer.Include("Global"),
 			{
 				Name:    "GroupSeparator",
 				Pattern: `,`,
 			},
 		},
-		"RangeList": []stateful.Rule{
-			stateful.Include("List"),
+	}
+	rangeListLexerRules = lexer.Rules{
+		"Variable": tokenListLexerRules["Variable"],
+		"Global":   tokenListLexerRules["Global"],
+		"List":     tokenListLexerRules["List"],
+		"RangeList": []lexer.Rule{
+			lexer.Include("List"),
 			{
 				Name:    "RangeSeparator",
 				Pattern: `:`,
 			},
 		},
+	}
+	numberRangeListLexerRules = lexer.Rules{
+		"Variable":  tokenListLexerRules["Variable"],
+		"Global":    tokenListLexerRules["Global"],
+		"List":      tokenListLexerRules["List"],
+		"RangeList": rangeListLexerRules["RangeList"],
 		"Operator": {
 			{
 				Name:    "Operator",
 				Pattern: `[+-]`,
 			},
 		},
-		"NumberRangeList": []stateful.Rule{
-			stateful.Include("RangeList"),
-			stateful.Include("Operator"),
+		"Root": []lexer.Rule{
+			lexer.Include("RangeList"),
+			lexer.Include("Operator"),
 			{
 				Name:    "Number",
 				Pattern: `\d+`,
 			},
 		},
-		"TimeRangeList": []stateful.Rule{
-			stateful.Include("RangeList"),
-			stateful.Include("Operator"),
+	}
+	timeRangeListLexerRules = lexer.Rules{
+		"Variable":  tokenListLexerRules["Variable"],
+		"Global":    tokenListLexerRules["Global"],
+		"List":      tokenListLexerRules["List"],
+		"RangeList": rangeListLexerRules["RangeList"],
+		"Operator":  numberRangeListLexerRules["Operator"],
+		"Root": []lexer.Rule{
+			lexer.Include("RangeList"),
+			lexer.Include("Operator"),
 			{
 				Name:    "Duration",
 				Pattern: `(?i)((?:\d+[.]\d+|[.]?\d+)(?:[muµn]s|[hms]))+`,
@@ -140,8 +161,13 @@ var (
 				Pattern: `(?:\d{4}-\d\d-\d\d +)\d{4}(?:\d\d)?`,
 			},
 		},
-		"HostList": []stateful.Rule{
-			stateful.Include("List"),
+	}
+	hostListLexerRules = lexer.Rules{
+		"Variable": tokenListLexerRules["Variable"],
+		"Global":   tokenListLexerRules["Global"],
+		"List":     tokenListLexerRules["List"],
+		"Root": []lexer.Rule{
+			lexer.Include("List"),
 			{
 				Name:    "IP4",
 				Pattern: `\d+[.]\d+[.]\d+[.]\d+`,
@@ -154,25 +180,20 @@ var (
 			},
 		},
 	}
-	valueStringParser = participle.MustBuild(
-		&stringParser{},
-		participle.Lexer(stateful.Must(valueParserLexerRules, stateful.InitialState("String"))),
+	valueStringParser = participle.MustBuild[stringParser](
+		participle.Lexer(lexer.MustStateful(stringLexerRules)),
 	)
-	valueTokenListParser = participle.MustBuild(
-		&tokenListParser{},
-		participle.Lexer(stateful.Must(valueParserLexerRules, stateful.InitialState("TokenList"))),
+	valueTokenListParser = participle.MustBuild[tokenListParser](
+		participle.Lexer(lexer.MustStateful(tokenListLexerRules)),
 	)
-	valueNumberRangeListParser = participle.MustBuild(
-		&numberRangeListParser{},
-		participle.Lexer(stateful.Must(valueParserLexerRules, stateful.InitialState("NumberRangeList"))),
+	valueNumberRangeListParser = participle.MustBuild[numberRangeListParser](
+		participle.Lexer(lexer.MustStateful(numberRangeListLexerRules)),
 	)
-	valueTimeRangeListParser = participle.MustBuild(
-		&timeRangeListParser{},
-		participle.Lexer(stateful.Must(valueParserLexerRules, stateful.InitialState("TimeRangeList"))),
+	valueTimeRangeListParser = participle.MustBuild[timeRangeListParser](
+		participle.Lexer(lexer.MustStateful(timeRangeListLexerRules)),
 	)
-	valueHostListParser = participle.MustBuild(
-		&hostListParser{},
-		participle.Lexer(stateful.Must(valueParserLexerRules, stateful.InitialState("HostList"))),
+	valueHostListParser = participle.MustBuild[hostListParser](
+		participle.Lexer(lexer.MustStateful(hostListLexerRules)),
 	)
 )
 

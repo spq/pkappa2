@@ -550,8 +550,8 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 			})
 		}
 	case "protocol":
-		val := tokenListParser{}
-		if err := valueTokenListParser.ParseString("", t.Value, &val); err != nil {
+		val, err := valueTokenListParser.ParseString("", t.Value)
+		if err != nil {
 			return nil, err
 		}
 		for _, e := range val.List {
@@ -583,8 +583,8 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 			}).invert()...)
 		}
 	case "chost", "shost", "host":
-		val := hostListParser{}
-		if err := valueHostListParser.ParseString("", t.Value, &val); err != nil {
+		val, err := valueHostListParser.ParseString("", t.Value)
+		if err != nil {
 			return nil, err
 		}
 		fTypes := map[string][]HostConditionSourceType{
@@ -631,8 +631,8 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 			}
 		}
 	case "id", "cport", "sport", "port", "cbytes", "sbytes", "bytes":
-		val := numberRangeListParser{}
-		if err := valueNumberRangeListParser.ParseString("", t.Value, &val); err != nil {
+		val, err := valueNumberRangeListParser.ParseString("", t.Value)
+		if err != nil {
 			return nil, err
 		}
 		for _, e := range val.List {
@@ -735,8 +735,8 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 			}
 		}
 	case "ftime", "ltime", "time":
-		val := timeRangeListParser{}
-		if err := valueTimeRangeListParser.ParseString("", t.Value, &val); err != nil {
+		val, err := valueTimeRangeListParser.ParseString("", t.Value)
+		if err != nil {
 			return nil, err
 		}
 		for _, e := range val.List {
@@ -842,8 +842,8 @@ func (t *queryTerm) QueryConditions(pc *parserContext) (ConditionsSet, error) {
 			conds = append(conds, cond)
 		}
 	case "cdata", "sdata", "data":
-		val := stringParser{}
-		if err := valueStringParser.ParseString("", t.Value, &val); err != nil {
+		val, err := valueStringParser.ParseString("", t.Value)
+		if err != nil {
 			return nil, err
 		}
 		content := ""

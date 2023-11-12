@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/participle/v2"
-	"github.com/alecthomas/participle/v2/lexer/stateful"
+	"github.com/alecthomas/participle/v2/lexer"
 )
 
 const (
@@ -52,7 +52,9 @@ type (
 		ConverterName string
 		Value         string
 	}
-	sortTerm  []Sorting
+	sortTerm struct {
+		sorting []Sorting
+	}
 	limitTerm uint
 	groupTerm string
 
@@ -72,9 +74,8 @@ type (
 )
 
 var (
-	parser = participle.MustBuild(
-		&queryRoot{},
-		participle.Lexer(stateful.MustSimple([]stateful.Rule{
+	parser = participle.MustBuild[queryRoot](
+		participle.Lexer(lexer.MustSimple([]lexer.SimpleRule{
 			{
 				Name:    "whitespace",
 				Pattern: `[ \t\n\r]+`,
@@ -176,7 +177,7 @@ func (t *sortTerm) Capture(s []string) error {
 		if !ok {
 			return fmt.Errorf("invalid sort key %q", v)
 		}
-		*t = append(*t, Sorting{
+		t.sorting = append(t.sorting, Sorting{
 			Dir: dir,
 			Key: key,
 		})
@@ -255,8 +256,8 @@ func (r *queryRoot) String() string {
 }
 
 func Parse(q string) (*Query, error) {
-	root := &queryRoot{}
-	if err := parser.ParseString("", q, root); err != nil {
+	root, err := parser.ParseString("", q)
+	if err != nil {
 		return nil, err
 	}
 	pc := parserContext{
@@ -283,13 +284,13 @@ func Parse(q string) (*Query, error) {
 	}
 	sorting := []Sorting(nil)
 	if pc.sortTerm != nil {
-		sorting = *pc.sortTerm
+		sorting = pc.sortTerm.sorting
 	}
 	limit := (*uint)(pc.limitTerm)
 	grouping := (*Grouping)(nil)
 	if pc.groupTerm != nil {
-		val := stringParser{}
-		if err := valueStringParser.ParseString("", string(*pc.groupTerm), &val); err != nil {
+		val, err := valueStringParser.ParseString("", string(*pc.groupTerm))
+		if err != nil {
 			return nil, err
 		}
 		grouping = &Grouping{}
