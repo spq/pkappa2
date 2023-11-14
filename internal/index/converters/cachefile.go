@@ -78,7 +78,7 @@ func writeVarInt(writer io.Writer, number uint64) (int, error) {
 func NewCacheFile(cachePath string) (*cacheFile, error) {
 	file, err := os.OpenFile(cachePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open cache file: %w", err)
 	}
 
 	res := cacheFile{
@@ -131,11 +131,15 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 	}
 	if res.freeSize == 0 {
 		res.freeStart = res.fileSize
+	} else {
+		if err := res.truncateFile(); err != nil {
+			return nil, fmt.Errorf("failed to truncate file: %w", err)
+		}
 	}
 
 	// Keep the file pointer at the end of the file.
 	if _, err := file.Seek(0, io.SeekEnd); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to seek to end of file: %w", err)
 	}
 
 	return &res, nil
@@ -309,71 +313,79 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 	return [2][]byte{clientData, serverData}, dataSizes, clientBytes, serverBytes, nil
 }
 
+func (cachefile *cacheFile) truncateFile() error {
+	// cleanup the file by skipping all old streams
+	if _, err := cachefile.file.Seek(cachefile.freeStart, io.SeekStart); err != nil {
+		return err
+	}
+
+	reader := bufio.NewReader(io.NewSectionReader(cachefile.file, cachefile.freeStart, cachefile.fileSize-cachefile.freeStart))
+	writer := bufio.NewWriter(cachefile.file)
+
+	newFilesize := cachefile.freeStart
+	header := converterStreamSection{}
+	for oldFileOffset := cachefile.freeStart; ; {
+		if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		oldFileOffset += headerSize
+		// only copy the stream if we have the metadata for it
+		if info, ok := cachefile.streamInfos[header.StreamID]; ok && info.offset == oldFileOffset {
+			if err := binary.Write(writer, binary.LittleEndian, header); err != nil {
+				return err
+			}
+			if _, err := io.CopyN(writer, reader, int64(info.size)); err != nil {
+				return err
+			}
+			oldFileOffset += int64(info.size)
+			info.offset = newFilesize + headerSize
+			newFilesize += headerSize + int64(info.size)
+			continue
+		}
+		dataSize := 0
+		for nZeros := 0; nZeros < 2; {
+			sz, n, err := readVarInt(reader)
+			if err != nil {
+				return fmt.Errorf("failed to read varint: %w", err)
+			}
+			dataSize += int(sz)
+			oldFileOffset += int64(n)
+			if sz != 0 {
+				nZeros = 0
+			} else {
+				nZeros++
+			}
+		}
+		if _, err := reader.Discard(dataSize); err != nil {
+			return err
+		}
+		oldFileOffset += int64(dataSize)
+	}
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+	cachefile.fileSize = newFilesize
+	if _, err := cachefile.file.Seek(cachefile.fileSize, io.SeekStart); err != nil {
+		return err
+	}
+	if err := cachefile.file.Truncate(cachefile.fileSize); err != nil {
+		return err
+	}
+	cachefile.freeSize = 0
+	cachefile.freeStart = cachefile.fileSize
+	return nil
+}
+
 func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Data) error {
 	cachefile.rwmutex.Lock()
 	defer cachefile.rwmutex.Unlock()
 
-	if info, ok := cachefile.streamInfos[streamID]; ok {
-		cachefile.freeSize += int64(info.size) + headerSize
-		if cachefile.freeStart > info.offset-headerSize {
-			cachefile.freeStart = info.offset - headerSize
-		}
-		if cachefile.freeSize >= cleanupMinFreeSize && cachefile.freeSize >= int64(float64(cachefile.fileSize)*cleanupMinFreeFactor) {
-			delete(cachefile.streamInfos, streamID)
-			// cleanup the file
-			if _, err := cachefile.file.Seek(cachefile.freeStart, io.SeekStart); err != nil {
-				return err
-			}
-
-			reader := bufio.NewReader(io.NewSectionReader(cachefile.file, cachefile.freeStart, cachefile.fileSize-cachefile.freeStart))
-			writer := bufio.NewWriter(cachefile.file)
-
-			header := converterStreamSection{}
-			for pos := cachefile.freeStart; ; {
-				if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-					if err == io.EOF {
-						break
-					}
-					return err
-				}
-				pos += headerSize
-				if info := cachefile.streamInfos[streamID]; info.offset == pos {
-					if err := binary.Write(writer, binary.LittleEndian, header); err != nil {
-						return err
-					}
-					if _, err := io.CopyN(writer, reader, int64(info.size)); err != nil {
-						return err
-					}
-					pos += int64(info.size)
-					continue
-				}
-				dataSize := 0
-				for nZeros := 0; nZeros != 2; {
-					sz, n, err := readVarInt(reader)
-					if err != nil {
-						return err
-					}
-					dataSize += int(sz)
-					pos += int64(n)
-					if sz != 0 {
-						nZeros = 0
-					} else {
-						nZeros++
-					}
-				}
-				if _, err := reader.Discard(dataSize); err != nil {
-					return err
-				}
-				pos += int64(dataSize)
-			}
-
-			if _, err := cachefile.file.Seek(cachefile.fileSize, io.SeekStart); err != nil {
-				return err
-			}
-			if err := cachefile.file.Truncate(cachefile.fileSize); err != nil {
-				return err
-			}
-			cachefile.freeSize = 0
+	if cachefile.freeSize >= cleanupMinFreeSize && cachefile.freeSize >= int64(float64(cachefile.fileSize)*cleanupMinFreeFactor) {
+		if err := cachefile.truncateFile(); err != nil {
+			return err
 		}
 	}
 
