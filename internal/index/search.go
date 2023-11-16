@@ -20,7 +20,7 @@ import (
 type (
 	ConverterAccess interface {
 		Data(stream *Stream) (data []Data, clientBytes, serverBytes uint64, err error)
-		DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, error)
+		DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, bool, error)
 	}
 	subQuerySelection struct {
 		remaining []map[string]bitmask.ConnectedBitmask
@@ -1247,9 +1247,12 @@ conditions:
 					} else {
 						converter := converters[converterName]
 						// TODO: pass `buffers` through to DataForSearch to avoid re-allocating?
-						data, dataSizes, clientBytes, serverBytes, err := converter.DataForSearch(s.StreamID)
+						data, dataSizes, clientBytes, serverBytes, wasCached, err := converter.DataForSearch(s.StreamID)
 						if err != nil {
 							return false, fmt.Errorf("data for search %w", err)
+						}
+						if !wasCached {
+							return false, nil
 						}
 						streamLength[C2S] = int(clientBytes)
 						streamLength[S2C] = int(serverBytes)
