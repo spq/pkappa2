@@ -37,7 +37,7 @@
 - [ ] support showing sub query results
 - [x] add download button for generated python script that replays the stream (https://github.com/secgroup/flower/blob/master/services/flow2pwn.py https://github.com/secgroup/flower/blob/master/services/data2req.py)
 - [ ] optional search result snippets
-- [ ] support filters for search and display, see below for how
+- [x] support filters for search and display, see below for how
 - [ ] calculate levenshtein distance to all previous streams and save the stream id with least difference and the difference
 - [ ] add documentation
 
@@ -62,7 +62,7 @@ the converter feature will be implemented like this:
 - [x] whenever pkappa becomes aware of a stream matching a tag/mark/service that triggers a filter but the output of that filter for this stream is not yet cached, it will queue up a filtering processing
   - [ ] all matches are queued up whenever a tag update job finishes. this could be optimized to only queue new / updated matches
 - [ ] whenever pkappa becomes aware of a stream no longer matching any tag/mark/service that triggers a filter but there exists a cache for the output of the given filter for the stream, that cached info is invalidated
-- [ ] rerun the converter if a stream is updated through new pcaps
+- [x] rerun the converter if a stream is updated through new pcaps
 - [x] the stream request api will get a parameter for selecting the filter to apply, it will support auto, none, filter:<name>
   - [x] the mode auto is the default and will return the original stream data or the single cached filtered stream (if there is exactly one)
 - [x] there will be one cache file per active filter with this format:
