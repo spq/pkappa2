@@ -1017,7 +1017,7 @@ func (a Conditions) equal(b Conditions) bool {
 
 func (c ConditionsSet) cleanSimpleIDFilter() (ConditionsSet, bool) {
 	// auto generated id filters can become huge and the startup performance suffered because of this.
-	// this is an optimized version that only supports id:1,2,3 style filters but ist fast for them.
+	// this is an optimized version that only supports id:1,2,3 style filters but is fast for them.
 	if len(c) == 0 {
 		return nil, false
 	}
@@ -1974,8 +1974,11 @@ func (cs *ConditionsSet) StreamIDs(nextStreamID uint64) (bitmask.LongBitmask, bo
 		}
 		if max > uint(nextStreamID) {
 			max = uint(nextStreamID)
+			if max > 0 {
+				max--
+			}
 		}
-		for i := min; i < max; i++ {
+		for i := min; i <= max; i++ {
 			res.Set(uint(i))
 		}
 	}
