@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/spq/pkappa2/internal/index"
@@ -227,7 +228,7 @@ func (converter *Converter) releaseProcess(process *Process, reset_epoch int) bo
 	return true
 }
 
-func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clientBytes, serverBytes uint64, err error) {
+func (converter *Converter) Data(stream *index.Stream, moreDetails bool) (data []index.Data, clientBytes, serverBytes uint64, err error) {
 	// TODO: Start a timeout here, so that we don't wait forever for the converter to respond
 
 	// Grab stream data before getting any locks, since this can take a while.
@@ -261,11 +262,17 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 		var convertedPacket converterStreamChunk
 		if err := json.Unmarshal(line, &convertedPacket); err != nil {
 			converter.releaseProcess(process, -1)
+			if moreDetails {
+				return fmt.Errorf("converter (%s): Failed to read converted packet: %w. Line:\n%s", converter.name, err, line)
+			}
 			return fmt.Errorf("converter (%s): Failed to read converted packet: %w", converter.name, err)
 		}
 		decodedData, err := base64.StdEncoding.DecodeString(convertedPacket.Content)
 		if err != nil {
 			converter.releaseProcess(process, -1)
+			if moreDetails {
+				return fmt.Errorf("converter (%s): Failed to decode converted packet data: %w. Line:\n%s", converter.name, err, line)
+			}
 			return fmt.Errorf("converter (%s): Failed to decode converted packet data: %w", converter.name, err)
 		}
 
@@ -333,10 +340,19 @@ func (converter *Converter) Data(stream *index.Stream) (data []index.Data, clien
 	line, ok := <-process.output
 	if !ok {
 		converter.releaseProcess(process, -1)
-		return nil, 0, 0, fmt.Errorf("converter (%s): Converter process exited unexpectedly", converter.name)
+		if moreDetails {
+			stderr := process.Stderr()
+			if len(stderr) > 0 {
+				return nil, 0, 0, fmt.Errorf("converter (%s): Converter process exited unexpectedly (exitcode %d). Stderr:\n%s", converter.name, process.ExitCode(), strings.Join(stderr[:], "\n"))
+			}
+		}
+		return nil, 0, 0, fmt.Errorf("converter (%s): Converter process exited unexpectedly (exitcode %d)", converter.name, process.ExitCode())
 	}
 	if err := json.Unmarshal(line, &convertedMetadata); err != nil {
 		converter.releaseProcess(process, -1)
+		if moreDetails {
+			return nil, 0, 0, fmt.Errorf("converter (%s): Failed to read converted metadata: %w. Line:\n%s", converter.name, err, line)
+		}
 		return nil, 0, 0, fmt.Errorf("converter (%s): Failed to read converted metadata: %w", converter.name, err)
 	}
 

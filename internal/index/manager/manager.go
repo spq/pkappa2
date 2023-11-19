@@ -1139,7 +1139,7 @@ func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter
 					if stream == nil {
 						continue
 					}
-					_, _, _, err = converter.Data(stream)
+					_, _, _, err = converter.Data(stream, false)
 					results <- result{job, err}
 					return
 				}
@@ -1747,7 +1747,7 @@ func (c StreamContext) Data(converterName string) ([]index.Data, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid converter %q", converterName)
 	}
-	data, _, _, err := converter.Data(c.Stream())
+	data, _, _, err := converter.Data(c.Stream(), true)
 	return data, err
 }
 
