@@ -4,6 +4,7 @@ from scapy.layers.tls.all import (
     TLSApplicationData,
     Cert,
     PrivKey,
+    PrivKeyRSA,
     tlsSession,
     load_nss_keys,
 )
@@ -35,7 +36,9 @@ class TLSConverter(Pkappa2Converter):
         tls_session.ipdst = stream.Metadata.ServerHost
         if key_path.exists():
             key = PrivKey(key_path)
-            tls_session.server_rsa_key = key
+            tls_session.server_key = key
+            if isinstance(key, PrivKeyRSA):
+                tls_session.server_rsa_key = key
         if cert_path.exists():
             cert = Cert(cert_path)
             tls_session.server_certs = [cert]
