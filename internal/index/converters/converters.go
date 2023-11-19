@@ -162,6 +162,7 @@ func (converter *Converter) Reset() {
 		default:
 		}
 	}
+	converter.failed_processes = nil
 	converter.available_processes = nil
 }
 
@@ -216,8 +217,7 @@ func (converter *Converter) releaseProcess(process *Process, reset_epoch int) bo
 		for range process.output {
 		}
 		delete(converter.started_processes, process)
-		// TODO: Exitcode might not be set yet
-		if process.ExitCode() != 0 {
+		if process.ExitCode() != 0 || len(process.Stderr()) > 0 {
 			converter.failed_processes = append(converter.failed_processes, process)
 		}
 		return false
