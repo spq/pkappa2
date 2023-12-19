@@ -193,7 +193,8 @@
             <th class="text-left">Bytes</th>
             <th class="text-left">Server</th>
             <th class="text-left">Bytes</th>
-            <th class="text-right">Time</th>
+            <th class="text-right pr-0">Time</th>
+            <th style="width: 0" class="px-0"></th>
           </tr>
         </thead>
         <tbody>
@@ -252,10 +253,15 @@
                 }}</span>
               </td>
               <td
-                class="text-right"
+                class="text-right pr-0"
                 :title="stream.Stream.FirstPacket | formatDateLong"
               >
                 {{ stream.Stream.FirstPacket | formatDate }}
+              </td>
+              <td style="width: 0" class="px-0">
+                <v-btn :href="`/api/download/${stream.Stream.ID}.pcap`" icon @click.native.stop>
+                  <v-icon>mdi-download</v-icon>
+                </v-btn>
               </td>
             </tr>
           </router-link>
