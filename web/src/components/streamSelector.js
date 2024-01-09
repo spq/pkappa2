@@ -48,20 +48,20 @@ function escape(text) {
     .join("");
 }
 
-function chunkToQueryPart(chunk, start, length = undefined) {
-  return `${"cs"[chunk.Direction]}data:"${escape(
-    atob(chunk.Content).substring(start, length)
-  )}"`;
+function chunkToQueryPart(chunk, data) {
+  return `${"cs"[chunk.Direction]}data:"${escape(data)}"`;
 }
 
 function onSelectionChange() {
   const selection = document.getSelection();
   if (selection.type !== "Range" || selection.isCollapsed) {
+    this.selectionData = "";
     this.selectionQuery = "";
     return;
   }
   const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
   if (selection.rangeCount !== 1 || streamDataNode == null) {
+    this.selectionData = "";
     this.selectionQuery = "";
     return;
   }
@@ -83,6 +83,7 @@ function onSelectionChange() {
     !streamDataNode.contains(startContainer) ||
     !streamDataNode.contains(endContainer)
   ) {
+    this.selectionData = "";
     this.selectionQuery = "";
     return;
   }
@@ -104,28 +105,32 @@ function onSelectionChange() {
       (i) => i === null
     )
   ) {
+    this.selectionData = "";
     this.selectionQuery = "";
     return;
   }
 
   if (startChunkIdx >= chunks.length) {
+    this.selectionData = "";
     this.selectionQuery = "";
     return;
   }
 
+  let queryData = "";
   let queryParts = [];
   for (
     let currentChunkIdx = startChunkIdx;
     currentChunkIdx <= endChunkIdx;
     currentChunkIdx++
   ) {
-    queryParts.push(
-      chunkToQueryPart(
-        chunks[currentChunkIdx],
-        currentChunkIdx === startChunkIdx ? startChunkOffset : 0,
-        currentChunkIdx === endChunkIdx ? endChunkOffset + 1 : undefined
-      )
-    );
+    const chunk = chunks[currentChunkIdx];
+    const start = currentChunkIdx === startChunkIdx ? startChunkOffset : 0;
+    const end =
+      currentChunkIdx === endChunkIdx ? endChunkOffset + 1 : undefined;
+    const data = atob(chunk.Content).substring(start, end);
+    queryData += data;
+    queryParts.push(chunkToQueryPart(chunk, data));
   }
+  this.selectionData = queryData;
   this.selectionQuery = queryParts.join(" then ");
 }

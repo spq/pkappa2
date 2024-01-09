@@ -259,7 +259,11 @@
                 {{ stream.Stream.FirstPacket | formatDate }}
               </td>
               <td style="width: 0" class="px-0">
-                <v-btn :href="`/api/download/${stream.Stream.ID}.pcap`" icon @click.native.stop>
+                <v-btn
+                  :href="`/api/download/${stream.Stream.ID}.pcap`"
+                  icon
+                  @click.native.stop
+                >
                   <v-icon>mdi-download</v-icon>
                 </v-btn>
               </td>

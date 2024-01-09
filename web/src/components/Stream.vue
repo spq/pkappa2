@@ -45,6 +45,20 @@
         </template>
         <span>Search Selection</span>
       </v-tooltip>
+      <v-tooltip bottom>
+        <template #activator="{ on, attrs }">
+          <v-btn
+            link
+            exact
+            v-bind="attrs"
+            icon
+            @click="openInCyberChef()"
+            v-on="on"
+            ><v-icon>mdi-chef-hat</v-icon></v-btn
+          >
+        </template>
+        <span>Open in CyberChef</span>
+      </v-tooltip>
       <v-menu offset-y right bottom
         ><template #activator="{ on: onMenu, attrs }">
           <v-tooltip bottom>
@@ -315,6 +329,8 @@ import {
 import { mapActions, mapGetters, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
 
+const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
+
 export default {
   name: "Stream",
   components: { StreamData, ToolBar },
@@ -325,6 +341,7 @@ export default {
     }
     return {
       presentation: p,
+      selectionData: "",
       selectionQuery: "",
     };
   },
@@ -449,6 +466,16 @@ export default {
         this.fetchStream({ id: this.streamId, converter: this.converter });
         document.getSelection().empty();
       }
+    },
+    openInCyberChef() {
+      let data = this.selectionData;
+      if (data === "") {
+        for (const chunk of this.stream.stream.Data) {
+          data += atob(chunk.Content);
+        }
+      }
+      const encoded_data = btoa(data);
+      window.open(`${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`);
     },
     createMark() {
       EventBus.$emit("showCreateTagDialog", {
