@@ -475,11 +475,7 @@ export default {
         }
       }
       const encoded_data = btoa(data);
-      window.open(
-        `${CYBERCHEF_URL}#input=${encodeURIComponent(
-          encoded_data
-        )}`
-      );
+      window.open(`${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`);
     },
     createMark() {
       EventBus.$emit("showCreateTagDialog", {

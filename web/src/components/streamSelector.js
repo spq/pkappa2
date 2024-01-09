@@ -49,9 +49,7 @@ function escape(text) {
 }
 
 function chunkToQueryPart(chunk, data) {
-  return `${"cs"[chunk.Direction]}data:"${escape(
-    data
-  )}"`;
+  return `${"cs"[chunk.Direction]}data:"${escape(data)}"`;
 }
 
 function onSelectionChange() {
@@ -127,15 +125,11 @@ function onSelectionChange() {
   ) {
     const chunk = chunks[currentChunkIdx];
     const start = currentChunkIdx === startChunkIdx ? startChunkOffset : 0;
-    const end = currentChunkIdx === endChunkIdx ? endChunkOffset + 1 : undefined;
+    const end =
+      currentChunkIdx === endChunkIdx ? endChunkOffset + 1 : undefined;
     const data = atob(chunk.Content).substring(start, end);
     queryData += data;
-    queryParts.push(
-      chunkToQueryPart(
-        chunk,
-        data
-      )
-    );
+    queryParts.push(chunkToQueryPart(chunk, data));
   }
   this.selectionData = queryData;
   this.selectionQuery = queryParts.join(" then ");
