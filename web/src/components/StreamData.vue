@@ -6,22 +6,15 @@
         <span
           v-for="(chunk, index) in data"
           :key="index"
+          class="chunk"
           :data-chunk-idx="index"
           :style="
             chunk.Direction != 0
               ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
               : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
           "
+          v-html="$options.filters.inlineAscii(chunk.Content).join('')"
         >
-          <span
-            v-for="({ str, offset }, index2) in $options.filters.inlineAscii(
-              chunk.Content
-            )"
-            :key="index2"
-            :data-offset="offset"
-            v-html="str"
-          >
-          </span>
         </span>
       </template>
       <template v-else-if="presentation == 'hexdump'">
@@ -55,9 +48,9 @@
 
 <script>
 const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
-  if (i == 0x0a) return "<br/>";
-  if (i == 0x20) return "&nbsp;";
-  if (i >= 0x21 && i <= 0x7e) return `&#x${i.toString(16).padStart("2", "0")};`;
+  if (i === 0x0d) return "\r";
+  if (i === 0x0a) return "\n";
+  if (i >= 0x20 && i <= 0x7e) return `&#x${i.toString(16).padStart(2, "0")};`;
   return ".";
 });
 export default {
@@ -66,16 +59,7 @@ export default {
     inlineAscii(b64) {
       return atob(b64)
         .split("")
-        .flatMap((c, idx, arr) =>
-          c == "\r" && idx + 1 < arr.length && arr[idx + 1] == "\n"
-            ? []
-            : [
-                {
-                  str: asciiMap[c.charCodeAt(0)],
-                  offset: idx,
-                },
-              ]
-        );
+        .map((c) => asciiMap[c.charCodeAt(0)]);
     },
     inlineHex(b64) {
       const ui8 = Uint8Array.from(
@@ -138,3 +122,8 @@ export default {
   },
 };
 </script>
+<style scoped>
+.chunk {
+  white-space: pre-line;
+}
+</style>

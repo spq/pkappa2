@@ -20,11 +20,17 @@ function getFromDataSet(outerBound, container, data, fallback = null) {
   return node.dataset[data] ?? fallback;
 }
 
-function getDataSetContainer(outerBound, container, data, fallback = null) {
+/**
+ * @param {Node} outerBound The outer bound of the search
+ * @param {Node} container The current node to search
+ * @param {string} data The data attribute to search for
+ * @returns {Node|null} The closest parent with the given data attribute or null if none is found
+ **/
+function getDataSetContainer(outerBound, container, data) {
   let currentNode = container;
   while (currentNode?.dataset?.[data] == null) {
     if (!outerBound.contains(currentNode) || currentNode == null) {
-      return fallback;
+      return null;
     }
     currentNode = currentNode.parentNode;
   }
@@ -54,65 +60,45 @@ function chunkToQueryPart(chunk, data) {
 
 function onSelectionChange() {
   const selection = document.getSelection();
+  this.selectionData = "";
+  this.selectionQuery = "";
   if (selection.type !== "Range" || selection.isCollapsed) {
-    this.selectionData = "";
-    this.selectionQuery = "";
     return;
   }
   const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
+  // Do not support multi-range selection
   if (selection.rangeCount !== 1 || streamDataNode == null) {
-    this.selectionData = "";
-    this.selectionQuery = "";
     return;
   }
   let { startContainer, startOffset, endContainer, endOffset } =
     selection.getRangeAt(0);
-  if (startOffset != 0)
-    startContainer = getDataSetContainer(
-      streamDataNode,
-      startContainer,
-      "offset"
-    )?.nextSibling;
-  if (endOffset != 1)
-    endContainer = getDataSetContainer(
-      streamDataNode,
-      endContainer,
-      "offset"
-    )?.previousSibling;
+  endOffset--; // The last character is not selected
+  startContainer = getDataSetContainer(
+    streamDataNode,
+    startContainer,
+    "chunkIdx"
+  );
+  endContainer = getDataSetContainer(streamDataNode, endContainer, "chunkIdx");
   if (
     !streamDataNode.contains(startContainer) ||
     !streamDataNode.contains(endContainer)
   ) {
-    this.selectionData = "";
-    this.selectionQuery = "";
     return;
   }
   const chunks = this.stream.stream.Data;
   const startChunkIdx = parseInt(
     getFromDataSet(streamDataNode, startContainer, "chunkIdx")
   );
-  const startChunkOffset = parseInt(
-    getFromDataSet(streamDataNode, startContainer, "offset")
-  );
   const endChunkIdx = parseInt(
     getFromDataSet(streamDataNode, endContainer, "chunkIdx")
   );
-  const endChunkOffset = parseInt(
-    getFromDataSet(streamDataNode, endContainer, "offset")
-  );
   if (
-    [startChunkIdx, startChunkOffset, endChunkIdx, endChunkOffset].some(
-      (i) => i === null
-    )
+    [startChunkIdx, startOffset, endChunkIdx, endOffset].some((i) => i === null)
   ) {
-    this.selectionData = "";
-    this.selectionQuery = "";
     return;
   }
 
   if (startChunkIdx >= chunks.length) {
-    this.selectionData = "";
-    this.selectionQuery = "";
     return;
   }
 
@@ -124,9 +110,8 @@ function onSelectionChange() {
     currentChunkIdx++
   ) {
     const chunk = chunks[currentChunkIdx];
-    const start = currentChunkIdx === startChunkIdx ? startChunkOffset : 0;
-    const end =
-      currentChunkIdx === endChunkIdx ? endChunkOffset + 1 : undefined;
+    const start = currentChunkIdx === startChunkIdx ? startOffset : 0;
+    const end = currentChunkIdx === endChunkIdx ? endOffset + 1 : undefined;
     const data = atob(chunk.Content).substring(start, end);
     queryData += data;
     queryParts.push(chunkToQueryPart(chunk, data));
