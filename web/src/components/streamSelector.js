@@ -36,7 +36,7 @@ function escape(text) {
     .split("")
     .map((char) =>
       char.replace(
-        /[^ !#$%&',-/0123456789:;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz~]/,
+        /[^ !#%&',/0123456789:;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz~-]/,
         (match) =>
           `\\x{${match
             .charCodeAt(0)
