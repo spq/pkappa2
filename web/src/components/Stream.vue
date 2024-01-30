@@ -308,6 +308,18 @@
             ></v-col
           >
         </v-row>
+        <v-row v-if="streamTags.generated.length > 0">
+          <v-col cols="1" class="text-subtitle-2">Generated:</v-col>
+          <v-col cols="11" class="text-body-2"
+            ><v-chip
+              v-for="generated in streamTags.generated"
+              :key="`generated/${generated.name}`"
+              small
+              :color="generated.color"
+              >{{ generated.name }}</v-chip
+            ></v-col
+          >
+        </v-row>
       </v-container>
       <StreamData
         ref="streamData"
