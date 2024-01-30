@@ -48,8 +48,9 @@
 
 <script>
 const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
-  if (i == 0x0a) return "\n";
-  if (i >= 0x20 && i <= 0x7e) return `&#x${i.toString(16).padStart("2", "0")};`;
+  if (i === 0x0d) return "\r";
+  if (i === 0x0a) return "\n";
+  if (i >= 0x20 && i <= 0x7e) return `&#x${i.toString(16).padStart(2, "0")};`;
   return ".";
 });
 export default {
