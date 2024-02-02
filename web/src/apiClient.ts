@@ -26,6 +26,10 @@ export type Result = {
   Tags: string[];
 };
 
+export type Error = {
+  Error: string;
+};
+
 export type SearchResult = {
   Debug: string[];
   Results: Result[];
@@ -111,7 +115,9 @@ export type GraphResponse = {
 // TODO: Verify response types!
 const APIClient = {
   async searchStreams(query: string, page: number) {
-    return this.perform<SearchResult>("post", "/search.json", query, { page });
+    return this.perform<SearchResult | Error>("post", "/search.json", query, {
+      page,
+    });
   },
   async getStream(streamId: number, converter: string) {
     return this.perform<StreamData>("get", `/stream/${streamId}.json`, null, {
@@ -184,21 +190,21 @@ const APIClient = {
     }
     return this.perform("patch", `/tags`, null, params);
   },
-  async markTagAdd(name: string, streams: string[]) {
+  async markTagAdd(name: string, streams: number[]) {
     const params = new URLSearchParams();
     params.append("name", name);
     params.append("method", "mark_add");
     for (const s of streams) {
-      params.append("stream", s);
+      params.append("stream", s.toString());
     }
     return this.perform("patch", `/tags`, null, params);
   },
-  async markTagDel(name: string, streams: string[]) {
+  async markTagDel(name: string, streams: number[]) {
     const params = new URLSearchParams();
     params.append("name", name);
     params.append("method", "mark_del");
     for (const s of streams) {
-      params.append("stream", s);
+      params.append("stream", s.toString());
     }
     return this.perform("patch", `/tags`, null, params);
   },
