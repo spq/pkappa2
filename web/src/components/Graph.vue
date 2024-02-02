@@ -65,6 +65,7 @@
     }}</v-alert>
     <div v-else-if="chartData != null && chartOptions != null">
       <apexchart
+        ref="chart"
         type="area"
         :options="chartOptions"
         :series="chartData"
@@ -78,6 +79,7 @@
 <script>
 import { mapActions, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
+import { getColorScheme, onColorSchemeChange } from "../lib/darkmode";
 
 export default {
   name: "Graph",
@@ -552,6 +554,9 @@ export default {
         }
       };
       this.chartOptions = {
+        theme: {
+          mode: getColorScheme(),
+        },
         dataLabels: {
           enabled: false,
         },
@@ -589,6 +594,22 @@ export default {
           },
         },
       };
+      onColorSchemeChange(() => {
+        if (!this.$refs.chart) {
+          return;
+        }
+        this.$refs.chart.updateOptions({
+          theme: {
+            mode: getColorScheme(),
+          },
+          chart: {
+            foreColor: getColorScheme() === 'dark' ? '#f6f7f8' : '#373d3f'
+          },
+          tooltip: {
+            theme: getColorScheme()
+          }
+        });
+      });
       this.chartData = [];
       obj.build(this.chartData, this.chartOptions);
     },

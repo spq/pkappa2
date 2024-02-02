@@ -3,7 +3,6 @@
     <v-app-bar
       app
       clipped-left
-      color="white"
       flat
       style="border-bottom: 1px solid #eee !important"
     >

@@ -1,10 +1,12 @@
+import { getColorScheme } from "@/lib/darkmode";
 import Vue from "vue";
-import Vuetify from "vuetify";
-import App from "./App.vue";
-import store from "./store";
-import router from "./routes";
 import VueApexCharts from "vue-apexcharts";
 import vueFilterPrettyBytes from "vue-filter-pretty-bytes";
+import Vuetify from "vuetify";
+import App from "./App.vue";
+import { registerVuetifyTheme } from "./lib/darkmode";
+import router from "./routes";
+import store from "./store";
 
 Vue.config.productionTip = process.env.NODE_ENV == "production";
 
@@ -16,11 +18,13 @@ Vue.use(vueFilterPrettyBytes);
 Vue.component("Apexchart", VueApexCharts);
 
 const vue = new Vue({
-  vuetify: new Vuetify(),
+  vuetify: new Vuetify({theme: {dark: getColorScheme(),},}),
   store,
   router,
   render: (h) => h(App),
 });
+
+registerVuetifyTheme(vue.$vuetify);
 
 Vue.filter("capitalize", function (value) {
   if (!value) return "";
