@@ -67,12 +67,13 @@
       graphStore.error
     }}</v-alert>
     <div v-else-if="chartData != null && chartOptions != null">
-      <VueApexChartsComponent
+      <VueApexCharts
+        ref="chart"
         type="area"
         :options="chartOptions"
         :series="chartData"
         height="400px"
-      ></VueApexChartsComponent>
+      ></VueApexCharts>
       <v-text-field v-model="chartTimeFilter" disabled></v-text-field>
     </div>
   </div>
@@ -85,8 +86,12 @@ import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { GraphType, useGraphStore } from "@/stores/graph";
 import { useRoute, useRouter } from "vue-router/composables";
-import VueApexChartsComponent from "vue-apexcharts";
+import {
+  default as VueApexCharts,
+  VueApexChartsComponent,
+} from "vue-apexcharts";
 import * as ApexCharts from "apexcharts";
+import { getColorScheme, onColorSchemeChange } from "../lib/darkmode";
 
 const store = useRootStore();
 const graphStore = useGraphStore();
@@ -95,6 +100,7 @@ const router = useRouter();
 const chartOptions = ref<ApexCharts.ApexOptions | null>(null);
 const chartData = ref<ChartData[] | null>(null);
 const chartTimeFilter = ref("");
+const chart = ref<VueApexChartsComponent | null>(null);
 
 type Group = {
   tags: string[];
@@ -604,6 +610,9 @@ graphStore.$subscribe((_mutation, state) => {
     }
   };
   chartOptions.value = {
+    theme: {
+      mode: getColorScheme(),
+    },
     dataLabels: {
       enabled: false,
     },
@@ -641,6 +650,26 @@ graphStore.$subscribe((_mutation, state) => {
       },
     },
   };
+  onColorSchemeChange(() => {
+    if (chart.value === null) {
+      return;
+    }
+    chart.value
+      .updateOptions({
+        theme: {
+          mode: getColorScheme(),
+        },
+        chart: {
+          foreColor: getColorScheme() === "dark" ? "#f6f7f8" : "#373d3f",
+        },
+        tooltip: {
+          theme: getColorScheme(),
+        },
+      })
+      .catch((err: string) => {
+        EventBus.emit("showError", `Failed to update graph: ${err}`);
+      });
+  });
   chartData.value = [];
   obj.build(chartData.value, chartOptions.value);
 });

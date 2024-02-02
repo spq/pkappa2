@@ -2,42 +2,30 @@
 <template>
   <v-card>
     <v-card-text>
-      <template v-if="presentation == 'ascii'">
+      <template v-if="presentation === 'ascii'">
         <span
           v-for="(chunk, index) in data"
           :key="index"
           class="chunk"
           :data-chunk-idx="index"
-          :style="
-            chunk.Direction != 0
-              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-          "
+          :class="[classes(chunk)]"
           v-html="inlineAscii(chunk.Content)"
         >
         </span>
       </template>
-      <template v-else-if="presentation == 'hexdump'">
+      <template v-else-if="presentation === 'hexdump'">
         <pre
           v-for="(chunk, index) in data"
           :key="index"
-          :style="
-            chunk.Direction != 0
-              ? 'margin-left: 2em; color: #000080; background-color: #eeedfc;'
-              : 'color: #800000; background-color: #faeeed;'
-          "
+          :class="[classes(chunk), 'hexdump']"
           >{{ hexdump(chunk.Content) }}</pre
         >
       </template>
       <template v-else>
         <span
-          v-for="(chunk, index) in data"
-          :key="index"
-          :style="
-            chunk.Direction != 0
-              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-          "
+            v-for="(chunk, index) in data"
+            :key="index"
+            :class="[classes(chunk)]"
         >
           {{ inlineHex(chunk.Content) }}<br
         /></span>
@@ -74,6 +62,12 @@ const inlineAscii = (b64: string) => {
     .map((c) => asciiMap[c.charCodeAt(0)])
     .join("");
 };
+
+const classes = (chunk: Data) => ({
+  chunk: true,
+  client: chunk.Direction === 0,
+  server: chunk.Direction === 1,
+});
 
 const inlineHex = (b64: string) => {
   const ui8 = Uint8Array.from(
@@ -129,5 +123,25 @@ const hexdump = (b64: string) => {
 <style scoped>
 .chunk {
   white-space: break-spaces;
+  font-family: monospace, monospace;
+}
+.server {
+  color: #000080;
+  background-color: #eeedfc;
+  @media (prefers-color-scheme: dark) {
+    color: #ffffff;
+    background-color: #261858;
+  }
+  &.hexdump {
+    margin-left: 2em;
+  }
+}
+.client {
+  color: #800000;
+  background-color: #faeeed;
+  @media (prefers-color-scheme: dark) {
+    color: #ffffff;
+    background-color: #561919;
+  }
 }
 </style>

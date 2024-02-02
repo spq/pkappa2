@@ -189,18 +189,44 @@
           <v-list-item-title>Manage Converters</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+
+      <v-btn-toggle
+        v-model="colorscheme"
+        mandatory
+        background-color="transparent"
+        class="pl-9 pt-2"
+      >
+        <v-btn>
+          <v-icon>mdi-weather-sunny</v-icon>
+        </v-btn>
+        <v-btn>
+          <v-icon>mdi-cog-outline</v-icon>
+        </v-btn>
+        <v-btn>
+          <v-icon>mdi-weather-night</v-icon>
+        </v-btn>
+      </v-btn-toggle>
     </v-list-group>
   </v-list>
 </template>
 
 <script lang="ts" setup>
 import { useRoute } from "vue-router/composables";
+import { setColorScheme, getColorSchemeFromStorage } from "@/lib/darkmode";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 const store = useRootStore();
 const route = useRoute();
+const schemeInitialisations: Record<"light" | "system" | "dark", 0 | 1 | 2> = {
+  light: 0,
+  system: 1,
+  dark: 2,
+};
+const colorscheme = ref<0 | 1 | 2>(
+  schemeInitialisations[getColorSchemeFromStorage()]
+);
 const tagTypes = [
   {
     title: "Services",
@@ -230,6 +256,15 @@ const moreOpen =
   ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
+
+watch(colorscheme, () => {
+  const schemes: Record<0 | 1 | 2, "light" | "system" | "dark"> = {
+    0: "light",
+    1: "system",
+    2: "dark",
+  };
+  setColorScheme(schemes[colorscheme.value]);
+});
 
 onMounted(() => {
   store.updateTags().catch((err: string) => {
