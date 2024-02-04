@@ -2,3 +2,4 @@ dist/
 *.md
 src/parser/query.js
 components.d.ts
+*.guard.ts
