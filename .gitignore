@@ -5,6 +5,10 @@ __pycache__
 docker_data/*
 tmp/*
 
+# python venv
+.venv
+venv
+
 # local env files
 .env.local
 .env.*.local

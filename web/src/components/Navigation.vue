@@ -190,23 +190,23 @@
         </v-list-item-content>
       </v-list-item>
 
-        <v-btn-toggle
-            v-model="colorscheme"
-            mandatory
-            background-color="transparent"
-            class="pl-9 pt-2"
-        >
-          <v-btn>
-            <v-icon>mdi-weather-sunny</v-icon>
-          </v-btn>
-          <v-btn>
-            <v-icon>mdi-cog-outline</v-icon>
-          </v-btn>
-          <v-btn>
-            <v-icon>mdi-weather-night</v-icon>
-          </v-btn>
-        </v-btn-toggle>
-      </v-list-group>
+      <v-btn-toggle
+        v-model="colorscheme"
+        mandatory
+        background-color="transparent"
+        class="pl-9 pt-2"
+      >
+        <v-btn>
+          <v-icon>mdi-weather-sunny</v-icon>
+        </v-btn>
+        <v-btn>
+          <v-icon>mdi-cog-outline</v-icon>
+        </v-btn>
+        <v-btn>
+          <v-icon>mdi-weather-night</v-icon>
+        </v-btn>
+      </v-btn-toggle>
+    </v-list-group>
   </v-list>
 </template>
 

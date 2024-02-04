@@ -52,7 +52,7 @@ export default {
       const ui8 = Uint8Array.from(
         atob(b64)
           .split("")
-          .map((char) => char.charCodeAt(0)),
+          .map((char) => char.charCodeAt(0))
       );
       var str = [].slice
         .call(ui8)
@@ -64,7 +64,7 @@ export default {
       const ui8 = Uint8Array.from(
         atob(b64)
           .split("")
-          .map((char) => char.charCodeAt(0)),
+          .map((char) => char.charCodeAt(0))
       );
       var str = [].slice
         .call(ui8)

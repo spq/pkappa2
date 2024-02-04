@@ -603,11 +603,11 @@ export default {
             mode: getColorScheme(),
           },
           chart: {
-            foreColor: getColorScheme() === 'dark' ? '#f6f7f8' : '#373d3f'
+            foreColor: getColorScheme() === "dark" ? "#f6f7f8" : "#373d3f",
           },
           tooltip: {
-            theme: getColorScheme()
-          }
+            theme: getColorScheme(),
+          },
         });
       });
       this.chartData = [];

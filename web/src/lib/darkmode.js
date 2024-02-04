@@ -17,16 +17,18 @@ export function registerVuetifyTheme(vuetify) {
 }
 
 export function onSystemColorSchemeChange(callback) {
-  window.matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => {
+  window
+    .matchMedia("(prefers-color-scheme: dark)")
+    .addEventListener("change", () => {
       callback(getColorScheme());
     });
 }
 
 export function onColorSchemeChange(callback) {
   colorSchemeChangeListeners.push(callback);
-  window.matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => {
+  window
+    .matchMedia("(prefers-color-scheme: dark)")
+    .addEventListener("change", () => {
       callback(getColorScheme());
     });
 }
@@ -35,7 +37,9 @@ export function onColorSchemeChange(callback) {
  * @returns {"dark"|"light"}
  */
 export function getSystemColorScheme() {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 }
 
 /**
@@ -43,8 +47,8 @@ export function getSystemColorScheme() {
  */
 export function getColorSchemeFromStorage() {
   const scheme = localStorage.getItem(STORAGE_KEY);
-  if (!['dark', 'light', 'system'].includes(scheme)) {
-    return 'system';
+  if (!["dark", "light", "system"].includes(scheme)) {
+    return "system";
   }
   return scheme;
 }
@@ -54,7 +58,7 @@ export function getColorSchemeFromStorage() {
  */
 export function getColorScheme() {
   const scheme = getColorSchemeFromStorage();
-  if (scheme === 'system') {
+  if (scheme === "system") {
     return getSystemColorScheme();
   }
   return scheme;
@@ -64,7 +68,7 @@ export function getColorScheme() {
  * @param {"dark"|"light"|"system"} scheme
  */
 export function setColorScheme(scheme) {
-  if (!['dark', 'light', 'system'].includes(scheme)) {
+  if (!["dark", "light", "system"].includes(scheme)) {
     throw new Error(`Invalid color scheme: ${scheme}`);
   }
   localStorage.setItem(STORAGE_KEY, scheme);
