@@ -1,10 +1,14 @@
 {
     "recommendations": [
         "Vue.volar",
+        "vue.vscode-typescript-vue-plugin",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "golang.go",
         "ms-python.python",
         "ms-python.black-formatter"
+    ],
+    "unwantedRecommendations": [
+        "vscode.typescript-language-features",
     ]
 }
