@@ -4,12 +4,4 @@
   </v-app>
 </template>
 
-<script>
-export default {
-  name: "App",
-  components: {},
-  data() {
-    return {};
-  },
-};
-</script>
+<script lang="ts" setup></script>

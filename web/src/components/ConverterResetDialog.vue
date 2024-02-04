@@ -28,46 +28,43 @@
   </v-dialog>
 </template>
 
-<script>
-import { mapActions } from "vuex";
+<script lang="ts" setup>
+import { ref } from "vue";
 import { EventBus } from "./EventBus";
+import { ConverterStatistics } from "@/apiClient";
+import { useStore } from "@/store";
 
-export default {
-  name: "ConverterResetDialog",
-  data() {
-    return {
-      visible: false,
-      loading: false,
-      error: false,
-      converterName: "",
-      converterStreamCount: 0,
-    };
-  },
-  created() {
-    EventBus.$on("showConverterResetDialog", this.openDialog);
-  },
-  methods: {
-    ...mapActions(["resetConverter"]),
-    openDialog({ converter }) {
-      this.converterName = converter.Name;
-      this.converterStreamCount = converter.CachedStreamCount;
-      this.visible = true;
-      this.loading = false;
-      this.error = false;
-    },
-    resetConverterAction() {
-      this.loading = true;
-      this.error = false;
-      this.resetConverter(this.converterName)
-        .then(() => {
-          this.visible = false;
-        })
-        .catch((err) => {
-          this.error = true;
-          this.loading = false;
-          EventBus.$emit("showError", { message: err });
-        });
-    },
-  },
-};
+const visible = ref(false);
+const loading = ref(false);
+const error = ref(false);
+const converterName = ref("");
+const converterStreamCount = ref(0);
+
+const store = useStore();
+
+EventBus.on("showConverterResetDialog", openDialog);
+
+function openDialog(converter: ConverterStatistics) {
+  converterName.value = converter.Name;
+  converterStreamCount.value = converter.CachedStreamCount;
+  visible.value = true;
+  loading.value = false;
+  error.value = false;
+}
+
+function resetConverterAction() {
+  loading.value = true;
+  error.value = false;
+  const converterNameValue = converterName.value;
+  store
+    .dispatch("resetConverter", { name: converterNameValue })
+    .then(() => {
+      visible.value = false;
+    })
+    .catch((err: string) => {
+      error.value = true;
+      loading.value = false;
+      EventBus.emit("showError", err);
+    });
+}
 </script>

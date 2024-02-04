@@ -88,98 +88,95 @@
   </div>
 </template>
 
-<script>
-import { mapActions, mapState } from "vuex";
+<script lang="ts" setup>
 import { EventBus } from "./EventBus";
-import APIClient from "../apiClient";
+import APIClient, {
+  ConverterStatistics,
+  ProcessStats,
+  ProcessStderr,
+} from "@/apiClient";
 import ToolBar from "./ToolBar.vue";
+import { computed, onMounted, ref } from "vue";
+import { useStore } from "@/store";
+import { DataTableItemProps } from "vuetify/types";
 
-export default {
-  name: "Converters",
-  components: {
-    ToolBar,
+const store = useStore();
+const headers = [
+  { text: "Name", value: "name", cellClass: "cursor-pointer" },
+  {
+    text: "Cached Stream Count",
+    value: "cachedStreamCount",
+    cellClass: "cursor-pointer",
   },
-  data: () => ({
-    headers: [
-      { text: "Name", value: "name", cellClass: "cursor-pointer" },
-      {
-        text: "Cached Stream Count",
-        value: "cachedStreamCount",
-        cellClass: "cursor-pointer",
-      },
-      {
-        text: "Running Processes",
-        value: "runningProcesses",
-        cellClass: "cursor-pointer",
-      },
-      {
-        text: "Failed Processes",
-        value: "failedProcesses",
-        cellClass: "cursor-pointer",
-      },
-    ],
-    shownProcess: null,
-    loadingStderr: false,
-    fetchStderrError: null,
-    shownProcessErrors: null,
-  }),
-  computed: {
-    ...mapState(["tags", "converters", "convertersStderr"]),
-    items() {
-      return (
-        this.converters?.map((converter) => ({
-          name: converter.Name,
-          cachedStreamCount: converter.CachedStreamCount,
-          runningProcesses: converter.Processes.filter(
-            (process) => process.Running
-          ).length,
-          failedProcesses: converter.Processes.filter(
-            (process) => !process.Running
-          ).length,
-          converter,
-        })) ?? []
-      );
-    },
+  {
+    text: "Running Processes",
+    value: "runningProcesses",
+    cellClass: "cursor-pointer",
   },
-  mounted() {
-    this.refreshConverters();
+  {
+    text: "Failed Processes",
+    value: "failedProcesses",
+    cellClass: "cursor-pointer",
   },
-  methods: {
-    ...mapActions(["updateTags", "updateConverters", "fetchConverterStderrs"]),
-    refreshConverters() {
-      this.updateTags();
-      this.updateConverters();
-    },
-    rowClick(item, handler) {
-      handler.expand(!handler.isExpanded);
-    },
-    confirmConverterReset(converter) {
-      EventBus.$emit("showConverterResetDialog", { converter });
-    },
-    async showErrorLog(process, converter) {
-      if (process.Errors === 0) return;
-      this.loadingStderr = true;
-      this.shownProcess = process;
-      try {
-        this.shownProcessErrors = await APIClient.getConverterStderrs(
-          converter.Name,
-          process.Pid
-        );
-        if (this.shownProcessErrors === null) {
-          this.fetchStderrError = "Stderr is empty";
-        }
-      } catch (err) {
-        this.fetchStderrError = err.toString();
-      } finally {
-        this.loadingStderr = false;
+];
+const shownProcess = ref<ProcessStats | null>(null);
+const loadingStderr = ref(false);
+const fetchStderrError = ref<string | null>(null);
+const shownProcessErrors = ref<ProcessStderr | null>(null);
+
+const items = computed(() => {
+  return (
+    store.state.converters?.map((converter) => ({
+      name: converter.Name,
+      cachedStreamCount: converter.CachedStreamCount,
+      runningProcesses: converter.Processes.filter((process) => process.Running)
+        .length,
+      failedProcesses: converter.Processes.filter((process) => !process.Running)
+        .length,
+      converter,
+    })) ?? []
+  );
+});
+
+onMounted(() => {
+  refreshConverters();
+});
+
+function refreshConverters() {
+  store.dispatch("updateTags").catch((err: string) => {
+    EventBus.emit("showError", `Failed to update tags: ${err}`);
+  });
+  store.dispatch("updateConverters").catch((err: string) => {
+    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  });
+}
+
+function rowClick(item: unknown, handler: DataTableItemProps) {
+  handler.expand(!handler.isExpanded);
+}
+
+function confirmConverterReset(converter: ConverterStatistics) {
+  EventBus.emit("showConverterResetDialog", converter);
+}
+
+function showErrorLog(process: ProcessStats, converter: ConverterStatistics) {
+  if (process.Errors === 0) return;
+  loadingStderr.value = true;
+  shownProcess.value = process;
+  APIClient.getConverterStderrs(converter.Name, process.Pid)
+    .then((res) => {
+      shownProcessErrors.value = res;
+      if (shownProcessErrors.value === null) {
+        fetchStderrError.value = "Stderr is empty";
       }
-      console.log(
-        this.shownProcessErrors,
-        this.shownProcessErrors?.Stderr?.join("\n")
-      );
-    },
-  },
-};
+    })
+    .catch((err: string | Error) => {
+      fetchStderrError.value = err.toString();
+    })
+    .finally(() => {
+      loadingStderr.value = false;
+    });
+}
 </script>
 <style lang="css">
 .cursor-pointer {

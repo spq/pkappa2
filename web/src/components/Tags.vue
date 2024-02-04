@@ -58,7 +58,7 @@
                     :to="{
                       name: 'search',
                       query: {
-                        q: $options.filters.tagForURI(tag.Name),
+                        q: $options.filters?.tagForURI(tag.Name),
                       },
                     }"
                     v-on="on"
@@ -124,71 +124,70 @@
   </div>
 </template>
 
-<script>
-import { mapActions, mapGetters, mapState } from "vuex";
+<script lang="ts" setup>
+import { computed, onMounted } from "vue";
 import { EventBus } from "./EventBus";
+import { useStore } from "@/store";
 import ToolBar from "./ToolBar.vue";
 
-export default {
-  name: "Tags",
-  components: {
-    ToolBar,
+const tagTypes = [
+  {
+    title: "Services",
+    icon: "cloud-outline",
+    key: "service",
   },
-  data() {
-    return {
-      tagTypes: [
-        {
-          title: "Services",
-          icon: "cloud-outline",
-          key: "service",
-        },
-        {
-          title: "Tags",
-          icon: "tag-multiple-outline",
-          key: "tag",
-        },
-        {
-          title: "Marks",
-          icon: "checkbox-multiple-outline",
-          key: "mark",
-        },
-        {
-          title: "Generated",
-          icon: "robot-outline",
-          key: "generated",
-        },
-      ],
-    };
+  {
+    title: "Tags",
+    icon: "tag-multiple-outline",
+    key: "tag",
   },
-  computed: {
-    ...mapState(["tags"]),
-    ...mapGetters(["groupedTags"]),
-    converterList() {
-      return this.tags.reduce((acc, tag) => {
-        acc[tag.Name] = tag.Converters.join(", ");
-        return acc;
-      }, {});
-    },
+  {
+    title: "Marks",
+    icon: "checkbox-multiple-outline",
+    key: "mark",
   },
-  mounted() {
-    this.updateTags();
+  {
+    title: "Generated",
+    icon: "robot-outline",
+    key: "generated",
   },
-  methods: {
-    ...mapActions(["updateTags"]),
-    showTagSetConvertersDialog(tagId) {
-      EventBus.$emit("showTagSetConvertersDialog", { tagId });
-    },
-    confirmTagDeletion(tagId) {
-      EventBus.$emit("showTagDeleteDialog", { tagId });
-    },
-    setQuery(query) {
-      EventBus.$emit("setSearchTerm", { searchTerm: query });
-    },
-    showTagColorChangeDialog(tagId) {
-      EventBus.$emit("showTagColorChangeDialog", { tagId });
-    },
-  },
-};
+];
+const store = useStore();
+const groupedTags = computed(() => store.getters.groupedTags);
+const tags = computed(() => store.state.tags);
+const converterList = computed(() => {
+  if (tags.value === null) return {};
+  return tags.value.reduce((acc: { [key: string]: string }, tag) => {
+    acc[tag.Name] = tag.Converters.join(", ");
+    return acc;
+  }, {});
+});
+
+onMounted(() => {
+  updateTags();
+});
+
+function updateTags() {
+  store.dispatch("updateTags").catch((err: string) => {
+    EventBus.emit("showError", `Failed to update tags: ${err}`);
+  });
+}
+
+function showTagSetConvertersDialog(tagId: string) {
+  EventBus.emit("showTagSetConvertersDialog", tagId);
+}
+
+function confirmTagDeletion(tagId: string) {
+  EventBus.emit("showTagDeleteDialog", tagId);
+}
+
+function setQuery(query: string) {
+  EventBus.emit("setSearchTerm", query);
+}
+
+function showTagColorChangeDialog(tagId: string) {
+  EventBus.emit("showTagColorChangeDialog", tagId);
+}
 </script>
 
 <style scoped>

@@ -15,78 +15,69 @@
           'PacketTimestampMax',
         ]"
         #[`item.${field}`]="{ index, value }"
-        ><span :key="`${field}/${index}`" :title="value | formatDateLong">{{
-          value | formatDate
-        }}</span></template
+        ><span
+          :key="`${field}/${index}`"
+          :title="$options.filters?.formatDateLong(value)"
+          >{{ $options.filters?.formatDate(value) }}</span
+        ></template
       >
       <template #[`item.Filesize`]="{ value }"
         ><span :title="`${value} Bytes`">{{
-          value | prettyBytes(1, true)
+          $options.filters?.prettyBytes(value, 1, true)
         }}</span></template
       >
     </v-data-table>
   </div>
 </template>
 
-<script>
-import { mapActions, mapState } from "vuex";
+<script lang="ts" setup>
+import { computed, onMounted } from "vue";
+import { useStore } from "@/store";
+import { EventBus } from "./EventBus";
+import { PcapInfo } from "@/apiClient";
 
-export default {
-  name: "Pcaps",
-  data() {
-    return {
-      headers: [
-        {
-          text: "File Name",
-          value: "Filename",
-        },
-        {
-          text: "First Packet Time",
-          value: "PacketTimestampMin",
-        },
-        {
-          text: "Last Packet Time",
-          value: "PacketTimestampMax",
-        },
-        {
-          text: "Packet Count",
-          value: "PacketCount",
-        },
-        {
-          text: "File Size",
-          value: "Filesize",
-        },
-        {
-          text: "Parse Time",
-          value: "ParseTime",
-        },
-      ],
-    };
+const store = useStore();
+const headers = [
+  {
+    text: "File Name",
+    value: "Filename",
   },
-  computed: {
-    ...mapState(["pcaps"]),
-    pcapsPretty() {
-      if (this.pcaps == null) return [];
-      return this.pcaps.map((i) => {
-        const res = { ...i };
-        for (const k of [
-          "ParseTime",
-          "PacketTimestampMin",
-          "PacketTimestampMax",
-        ]) {
-          let v = new Date(res[k]);
-          if (v < 0) v = null;
-          res[k] = v;
-        }
-        return res;
-      });
-    },
+  {
+    text: "First Packet Time",
+    value: "PacketTimestampMin",
   },
-  mounted() {
-    this.updatePcaps();
+  {
+    text: "Last Packet Time",
+    value: "PacketTimestampMax",
   },
-  methods: {
-    ...mapActions(["updatePcaps"]),
+  {
+    text: "Packet Count",
+    value: "PacketCount",
   },
-};
+  {
+    text: "File Size",
+    value: "Filesize",
+  },
+  {
+    text: "Parse Time",
+    value: "ParseTime",
+  },
+];
+const pcaps = computed(() => store.state.pcaps);
+const pcapsPretty = computed(() => {
+  if (pcaps.value == null) return [];
+  return pcaps.value.map((i) => {
+    const res: { [key: string]: string | number | Date } = { ...i };
+    for (const k of ["ParseTime", "PacketTimestampMin", "PacketTimestampMax"]) {
+      res[k] = new Date(res[k]);
+    }
+    return res as PcapInfo;
+  });
+});
+
+onMounted(() => {
+  store.dispatch("updatePcaps").catch((err: string) => {
+    EventBus.emit("showError", `Failed to update pcaps: ${err}`);
+  });
+});
 </script>

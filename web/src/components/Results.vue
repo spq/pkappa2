@@ -72,7 +72,7 @@
               </v-list-item-action>
               <v-list-item-content>
                 <v-list-item-title>{{
-                  tag.Name | tagify("name")
+                  $options.filters?.tagify(tag.Name, "name")
                 }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -116,7 +116,7 @@
                   name: 'search',
                   query: {
                     q: $route.query.q,
-                    p: ($route.query.p | 0) - 1,
+                    p: (+$route.query.p - 1).toString(),
                   },
                 })
               "
@@ -138,7 +138,7 @@
                   name: 'search',
                   query: {
                     q: $route.query.q,
-                    p: ($route.query.p | 0) + 1,
+                    p: (+$route.query.p + 1).toString(),
                   },
                 })
               "
@@ -167,7 +167,7 @@
                 $router.push({
                   name: 'search',
                   query: {
-                    q: `data:\x22${$options.filters.regexEscape(
+                    q: `data:\x22${$options.filters?.regexEscape(
                       $route.query.q
                     )}\x22`,
                   },
@@ -179,7 +179,9 @@
         ></v-alert
       >
     </div>
-    <center v-else-if="streams.result.Results.length == 0">
+    <center
+      v-else-if="streams.result === null || streams.result.Results.length === 0"
+    >
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </center>
@@ -205,7 +207,7 @@
             :to="{
               name: 'stream',
               query: { q: $route.query.q, p: $route.query.p },
-              params: { streamId: stream.Stream.ID },
+              params: { streamId: stream.Stream.ID.toString() },
             }"
             custom
             style="cursor: pointer"
@@ -228,10 +230,14 @@
                   :key="tag"
                   ><v-chip small :color="tagColors[tag]"
                     ><template v-if="hover"
-                      >{{ tag | tagify("type") | capitalize }}
-                      {{ tag | tagify("name") }}</template
+                      >{{
+                        $options.filters?.capitalize(
+                          $options.filters?.tagify(tag, "type")
+                        )
+                      }}
+                      {{ $options.filters?.tagify(tag, "name") }}</template
                     ><template v-else>{{
-                      tag | tagify("name")
+                      $options.filters?.tagify(tag, "name")
                     }}</template></v-chip
                   ></v-hover
                 >
@@ -241,7 +247,11 @@
               </td>
               <td>
                 <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
-                  stream.Stream.Client.Bytes | prettyBytes(1, true)
+                  $options.filters?.prettyBytes(
+                    stream.Stream.Client.Bytes,
+                    1,
+                    true
+                  )
                 }}</span>
               </td>
               <td>
@@ -249,14 +259,20 @@
               </td>
               <td>
                 <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
-                  stream.Stream.Server.Bytes | prettyBytes(1, true)
+                  $options.filters?.prettyBytes(
+                    stream.Stream.Server.Bytes,
+                    1,
+                    true
+                  )
                 }}</span>
               </td>
               <td
                 class="text-right pr-0"
-                :title="stream.Stream.FirstPacket | formatDateLong"
+                :title="
+                  $options.filters?.formatDateLong(stream.Stream.FirstPacket)
+                "
               >
-                {{ stream.Stream.FirstPacket | formatDate }}
+                {{ $options.filters?.formatDate(stream.Stream.FirstPacket) }}
               </td>
               <td style="width: 0" class="px-0">
                 <v-btn
@@ -275,139 +291,146 @@
   </div>
 </template>
 
-<script>
+<script lang="ts" setup>
 import { EventBus } from "./EventBus";
-import { mapActions, mapGetters, mapState } from "vuex";
 import ToolBar from "./ToolBar.vue";
+import { useStore } from "@/store";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
+import { useRoute, useRouter } from "vue-router/composables";
+import { Result } from "@/apiClient";
 
-export default {
-  name: "Results",
-  components: {
-    ToolBar,
-  },
-  data() {
-    return {
-      selected: [],
-    };
-  },
-  computed: {
-    ...mapState(["streams", "tags"]),
-    ...mapGetters(["groupedTags"]),
-    selectedCount() {
-      return this.selected.filter((i) => i === true).length;
-    },
-    noneSelected() {
-      return this.selectedCount == 0;
-    },
-    allSelected() {
-      if (this.selectedCount == 0) return false;
-      return this.selectedCount == this.streams.result.Results.length;
-    },
-    selectedStreams() {
-      let res = [];
-      for (const [index, value] of Object.entries(this.selected)) {
-        if (value) res.push(this.streams.result.Results[index]);
-      }
-      return res;
-    },
-    tagStatusForSelection() {
-      let res = {};
-      for (const s of this.selectedStreams) {
-        for (const t of s.Tags) {
-          if (!(t in res)) res[t] = 0;
-          res[t]++;
-        }
-      }
-      for (const [k, v] of Object.entries(res)) {
-        res[k] = v == this.selectedStreams.length;
-      }
-      return res;
-    },
-    tagColors() {
-      const colors = {};
-      this.tags?.forEach((t) => (colors[t.Name] = t.Color));
-      return colors;
-    },
-  },
-  watch: {
-    $route: "fetchStreams",
-  },
-  mounted() {
-    this.fetchStreams();
+const store = useStore();
+const route = useRoute();
+const router = useRouter();
+const selected = ref<boolean[]>([]);
+const streams = computed(() => store.state.streams);
+const tags = computed(() => store.state.tags);
+const groupedTags = computed(() => store.getters.groupedTags);
+const selectedCount = computed(
+  () => selected.value.filter((i) => i === true).length
+);
+const noneSelected = computed(() => selectedCount.value === 0);
+const allSelected = computed(() => {
+  if (selectedCount.value === 0) return false;
+  return selectedCount.value === streams.value.result?.Results.length;
+});
+const selectedStreams = computed(() => {
+  if (streams.value.result == null) return [];
+  const res: Result[] = [];
+  for (const [index, value] of Object.entries(selected.value)) {
+    if (value) res.push(streams.value.result.Results[+index]);
+  }
+  return res;
+});
+const tagStatusForSelection = computed(() => {
+  const counts: { [key: string]: number } = {};
+  for (const s of selectedStreams.value) {
+    for (const t of s.Tags) {
+      if (!(t in counts)) counts[t] = 0;
+      counts[t]++;
+    }
+  }
+  const res: { [key: string]: boolean } = {};
+  for (const [k, v] of Object.entries(counts)) {
+    res[k] = v === selectedStreams.value.length;
+  }
+  return res;
+});
+const tagColors = computed(() => {
+  const colors: { [key: string]: string } = {};
+  tags.value?.forEach((t) => (colors[t.Name] = t.Color));
+  return colors;
+});
 
-    const handle = (e, pageOffset) => {
-      if (pageOffset >= 1 && !this.streams.result.MoreResults) return;
-      let p = this.$route.query.p | 0;
-      p += pageOffset;
-      if (p < 0) return;
-      e.preventDefault();
-      this.$router.push({
-        name: "search",
-        query: { q: this.$route.query.q, p },
-      });
-    };
-    const handlers = {
-      j: (e) => {
-        handle(e, -1);
-      },
-      k: (e) => {
-        handle(e, 1);
-      },
-    };
-    this._keyListener = function (e) {
-      if (["input", "textarea"].includes(e.target.tagName.toLowerCase()))
-        return;
+watch(route, () => {
+  fetchStreams();
+});
 
-      if (!Object.keys(handlers).includes(e.key)) return;
-      handlers[e.key](e);
-    }.bind(this);
-    window.addEventListener("keydown", this._keyListener);
-  },
-  beforeDestroy() {
-    window.removeEventListener("keydown", this._keyListener);
-  },
-  methods: {
-    ...mapActions(["searchStreams", "markTagAdd", "markTagDel"]),
-    checkboxAction() {
-      let tmp = [];
-      const v = this.noneSelected;
-      for (let i = 0; i < this.streams.result.Results.length; i++) tmp[i] = v;
-      this.selected = tmp;
+onMounted(() => {
+  fetchStreams();
+
+  const handle = (e: KeyboardEvent, pageOffset: number) => {
+    if (pageOffset >= 1 && !streams.value?.result?.MoreResults) return;
+    let p = +route.query.p;
+    p += pageOffset;
+    if (p < 0) return;
+    e.preventDefault();
+    void router.push({
+      name: "search",
+      query: { q: route.query.q, p: p.toString() },
+    });
+  };
+  const handlers: { [key: string]: (e: KeyboardEvent) => void } = {
+    j: (e: KeyboardEvent) => {
+      handle(e, -1);
     },
-    fetchStreams() {
-      this.searchStreams({
-        query: this.$route.query.q,
-        page: this.$route.query.p | 0,
+    k: (e: KeyboardEvent) => {
+      handle(e, 1);
+    },
+  };
+  const keyListener = (e: KeyboardEvent) => {
+    if (e.target === null || !(e.target instanceof Element)) return;
+    if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
+
+    if (!Object.keys(handlers).includes(e.key)) return;
+    handlers[e.key](e);
+  };
+  window.addEventListener("keydown", keyListener);
+  onBeforeUnmount(() => {
+    window.removeEventListener("keydown", keyListener);
+  });
+});
+
+function checkboxAction() {
+  let tmp: boolean[] = [];
+  const v = noneSelected.value;
+  for (let i = 0; i < (streams.value.result?.Results.length || 0); i++) {
+    tmp[i] = v;
+  }
+  selected.value = tmp;
+}
+
+function fetchStreams() {
+  store
+    .dispatch("searchStreams", {
+      query: route.query.q as string,
+      page: +route.query.p,
+    })
+    .catch((err: string) => {
+      EventBus.emit("showError", `Failed to fetch streams: ${err}`);
+    });
+  selected.value = [];
+}
+
+function createMarkFromSelection() {
+  let ids: number[] = [];
+  for (const s of selectedStreams.value) {
+    ids.push(s.Stream.ID);
+  }
+  EventBus.emit("showCreateTagDialog", "mark", "", ids);
+}
+
+function markSelectedStreams(tagId: string, value: boolean) {
+  let ids: number[] = [];
+  for (const s of selectedStreams.value) {
+    ids.push(s.Stream.ID);
+  }
+  if (value)
+    store
+      .dispatch("markTagAdd", { name: tagId, streams: ids })
+      .catch((err: string) => {
+        EventBus.emit("showError", `Failed to add streams to tag: ${err}`);
       });
-      this.selected = [];
-    },
-    createMarkFromSelection() {
-      let ids = [];
-      for (const s of this.selectedStreams) {
-        ids.push(s.Stream.ID);
-      }
-      EventBus.$emit("showCreateTagDialog", {
-        tagType: "mark",
-        tagStreams: ids,
+  else
+    store
+      .dispatch("markTagDel", { name: tagId, streams: ids })
+      .catch((err: string) => {
+        EventBus.emit("showError", `Failed to remove streams from tag: ${err}`);
       });
-    },
-    markSelectedStreams(tagId, value) {
-      let ids = [];
-      for (const s of this.selectedStreams) {
-        ids.push(s.Stream.ID);
-      }
-      if (value)
-        this.markTagAdd({ name: tagId, streams: ids }).catch((err) => {
-          EventBus.$emit("showError", { message: err });
-        });
-      else
-        this.markTagDel({ name: tagId, streams: ids }).catch((err) => {
-          EventBus.$emit("showError", { message: err });
-        });
-    },
-    isTextSelected() {
-      return window.getSelection().type == "Range";
-    },
-  },
-};
+}
+
+function isTextSelected() {
+  return window?.getSelection()?.type === "Range";
+}
 </script>

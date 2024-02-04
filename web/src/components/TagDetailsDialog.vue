@@ -3,7 +3,8 @@
     <v-card>
       <v-card-title>
         <span class="text-h5"
-          >{{ tagType | capitalize }} <code>{{ tagName }}</code> details</span
+          >{{ $options.filters?.capitalize(tagType) }}
+          <code>{{ tagName }}</code> details</span
         >
       </v-card-title>
       <v-card-text v-if="tag != null">
@@ -44,40 +45,27 @@
   </v-dialog>
 </template>
 
-<script>
+<script lang="ts" setup>
+import { computed, ref } from "vue";
+import { useStore } from "@/store";
 import { EventBus } from "./EventBus";
-import { mapState } from "vuex";
 
-export default {
-  name: "TagDetailsDialog",
-  data() {
-    return {
-      visible: false,
-      tagId: "",
-      tagType: "",
-      tagName: "",
-    };
-  },
-  computed: {
-    ...mapState(["tags"]),
-    tag() {
-      if (this.tags == null) return null;
-      for (const t of this.tags) {
-        if (t.Name == this.tagId) return t;
-      }
-      return null;
-    },
-  },
-  created() {
-    EventBus.$on("showTagDetailsDialog", this.openDialog);
-  },
-  methods: {
-    openDialog({ tagId }) {
-      this.tagId = tagId;
-      this.tagType = tagId.split("/", 1)[0];
-      this.tagName = this.tagId.substr(this.tagType.length + 1);
-      this.visible = true;
-    },
-  },
-};
+const store = useStore();
+const visible = ref(false);
+const tagId = ref<string>("");
+const tagType = ref<string>("");
+const tagName = ref<string>("");
+const tag = computed(() => {
+  if (store.state.tags == null) return null;
+  return store.state.tags.find((t) => t.Name === tagId.value);
+});
+
+EventBus.on("showTagDetailsDialog", openDialog);
+
+function openDialog(tagIdValue: string) {
+  tagId.value = tagIdValue;
+  tagType.value = tagIdValue.split("/")[0];
+  tagName.value = tagIdValue.substr(tagType.value.length + 1);
+  visible.value = true;
+}
 </script>

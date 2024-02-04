@@ -30,7 +30,7 @@
   </v-app>
 </template>
 
-<script>
+<script lang="ts" setup>
 import Navigation from "./Navigation.vue";
 import SearchBox from "./SearchBox.vue";
 import ConverterResetDialog from "./ConverterResetDialog.vue";
@@ -40,24 +40,7 @@ import TagCreateDialog from "./TagCreateDialog.vue";
 import TagDetailsDialog from "./TagDetailsDialog.vue";
 import TagColorChangeDialog from "./TagColorChangeDialog.vue";
 import ErrorBanner from "./ErrorBanner.vue";
+import { ref } from "vue";
 
-export default {
-  name: "Base",
-  components: {
-    Navigation,
-    SearchBox,
-    ConverterResetDialog,
-    TagDeleteDialog,
-    TagCreateDialog,
-    TagSetConverterDialog,
-    TagDetailsDialog,
-    TagColorChangeDialog,
-    ErrorBanner,
-  },
-  data() {
-    return {
-      showNavigation: true,
-    };
-  },
-};
+const showNavigation = ref(true);
 </script>

@@ -4,11 +4,11 @@
       <v-card>
         <v-card-title>
           <span class="text-h5"
-            >Confirm {{ tagType | capitalize }} deletion</span
+            >Confirm {{ $options.filters?.capitalize(tagType) }} deletion</span
           >
         </v-card-title>
         <v-card-text>
-          Do you want to delete the {{ tagType | capitalize }}
+          Do you want to delete the {{ $options.filters?.capitalize(tagType) }}
           <code>{{ tagName }}</code
           >?
         </v-card-text>
@@ -29,47 +29,42 @@
   </v-dialog>
 </template>
 
-<script>
-import { mapActions } from "vuex";
+<script lang="ts" setup>
 import { EventBus } from "./EventBus";
+import { ref } from "vue";
+import { useStore } from "@/store";
 
-export default {
-  name: "TagDeleteDialog",
-  data() {
-    return {
-      visible: false,
-      loading: false,
-      error: false,
-      tagType: "",
-      tagName: "",
-    };
-  },
-  created() {
-    EventBus.$on("showTagDeleteDialog", this.openDialog);
-  },
-  methods: {
-    ...mapActions(["delTag"]),
-    openDialog({ tagId }) {
-      this.tagId = tagId;
-      this.tagType = tagId.split("/", 1)[0];
-      this.tagName = tagId.substr(this.tagType.length + 1);
-      this.visible = true;
-      this.loading = false;
-      this.error = false;
-    },
-    deleteTag() {
-      this.loading = true;
-      this.error = false;
-      this.delTag(this.tagId)
-        .then(() => {
-          this.visible = false;
-        })
-        .catch((err) => {
-          this.error = true;
-          this.loading = false;
-          EventBus.$emit("showError", { message: err });
-        });
-    },
-  },
-};
+const store = useStore();
+const visible = ref(false);
+const loading = ref(false);
+const error = ref(false);
+const tagId = ref("");
+const tagType = ref("");
+const tagName = ref("");
+
+EventBus.on("showTagDeleteDialog", openDialog);
+
+function openDialog(tagIdValue: string) {
+  tagId.value = tagIdValue;
+  tagType.value = tagIdValue.split("/")[0];
+  tagName.value = tagIdValue.substr(tagType.value.length + 1);
+  visible.value = true;
+  loading.value = false;
+  error.value = false;
+}
+
+function deleteTag() {
+  loading.value = true;
+  error.value = false;
+  store
+    .dispatch("delTag", { name: tagId.value })
+    .then(() => {
+      visible.value = false;
+    })
+    .catch((err: string) => {
+      error.value = true;
+      loading.value = false;
+      EventBus.emit("showError", err);
+    });
+}
 </script>

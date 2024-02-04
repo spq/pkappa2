@@ -4,7 +4,7 @@
       <v-card>
         <v-card-title>
           <span class="text-h5"
-            >Change Color of {{ tagType | capitalize }}
+            >Change Color of {{ $options.filters?.capitalize(tagType) }}
             <v-chip :color="tagColor">{{ tagName }}</v-chip></span
           >
         </v-card-title>
@@ -56,75 +56,68 @@
   </v-dialog>
 </template>
 
-<script>
-import { mapActions, mapState } from "vuex";
+<script lang="ts" setup>
 import { EventBus } from "./EventBus";
+import { ref, computed, watch } from "vue";
+import { useStore } from "@/store";
 
-export default {
-  name: "TagColorChangeDialog",
-  data() {
-    return {
-      visible: false,
-      loading: false,
-      error: false,
-      tagType: "",
-      tagName: "",
-      tagColor: "",
-      colorPickerOpen: false,
-      colorPickerValue: "",
-    };
-  },
-  computed: {
-    ...mapState(["tags"]),
-    // https://codepen.io/JamieCurnow/pen/KKPjraK
-    swatchStyle() {
-      const { tagColor, tagColorPickerOpen } = this;
-      return {
-        backgroundColor: tagColor,
-        cursor: "pointer",
-        height: "30px",
-        width: "30px",
-        borderRadius: tagColorPickerOpen ? "50%" : "4px",
-        transition: "border-radius 200ms ease-in-out",
-      };
-    },
-  },
-  watch: {
-    colorPickerOpen(val, old) {
-      if (val && !old) this.colorPickerValue = this.tagColor;
-    },
-  },
-  created() {
-    EventBus.$on("showTagColorChangeDialog", this.openDialog);
-  },
-  methods: {
-    ...mapActions(["changeTagColor"]),
-    openDialog({ tagId }) {
-      this.tagId = tagId;
-      this.tagType = tagId.split("/", 1)[0];
-      this.tagName = tagId.substr(this.tagType.length + 1);
-      this.tagColor = this.tags.filter((e) => e.Name == tagId)[0].Color;
-      this.colorPickerOpen = false;
-      this.visible = true;
-      this.loading = false;
-      this.error = false;
-    },
-    colorPickerValueUpdate(color) {
-      if (this.colorPickerOpen) this.tagColor = color.hex;
-    },
-    updateColor() {
-      this.loading = true;
-      this.error = false;
-      this.changeTagColor({ name: this.tagId, color: this.tagColor })
-        .then(() => {
-          this.visible = false;
-        })
-        .catch((err) => {
-          this.error = true;
-          this.loading = false;
-          EventBus.$emit("showError", { message: err });
-        });
-    },
-  },
-};
+const store = useStore();
+const visible = ref(false);
+const loading = ref(false);
+const error = ref(false);
+const tagId = ref("");
+const tagType = ref("");
+const tagName = ref("");
+const tagColor = ref("");
+const colorPickerOpen = ref(false);
+const colorPickerValue = ref("");
+
+// https://codepen.io/JamieCurnow/pen/KKPjraK
+const swatchStyle = computed(() => {
+  return {
+    backgroundColor: tagColor.value,
+    cursor: "pointer",
+    height: "30px",
+    width: "30px",
+    borderRadius: colorPickerOpen.value ? "50%" : "4px",
+    transition: "border-radius 200ms ease-in-out",
+  };
+});
+
+watch(colorPickerOpen, (val, old) => {
+  if (val && !old) colorPickerValue.value = tagColor.value;
+});
+
+EventBus.on("showTagColorChangeDialog", openDialog);
+
+function openDialog(tagIdValue: string) {
+  tagId.value = tagIdValue;
+  tagType.value = tagIdValue.split("/")[0];
+  tagName.value = tagIdValue.substr(tagType.value.length + 1);
+  tagColor.value =
+    store.state.tags?.find((e) => e.Name == tagIdValue)?.Color ?? "#000000";
+  colorPickerOpen.value = false;
+  visible.value = true;
+  loading.value = false;
+  error.value = false;
+}
+
+function colorPickerValueUpdate(color: { hex: string }) {
+  if (colorPickerOpen.value) tagColor.value = color.hex;
+}
+
+function updateColor() {
+  loading.value = true;
+  error.value = false;
+  store
+    .dispatch("changeTagColor", { name: tagId.value, color: tagColor.value })
+    .then(() => {
+      visible.value = false;
+    })
+    .catch((err: string) => {
+      error.value = true;
+      loading.value = false;
+      EventBus.emit("showError", err);
+    });
+}
 </script>

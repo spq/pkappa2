@@ -6,6 +6,8 @@ import router from "./routes";
 import VueApexCharts from "vue-apexcharts";
 import VueFilterPrettyBytes from "vue-filter-pretty-bytes";
 import * as VueMoment from "vue-moment";
+import { tagForURI } from "./filters/tagForURI";
+import { tagNameForURI } from "./filters/tagNameForURI";
 
 Vue.config.productionTip = process.env.NODE_ENV == "production";
 
@@ -57,21 +59,8 @@ Vue.filter("formatDateLong", function (time: string | null) {
   const moment = vue.$moment(time).local();
   return moment.format("YYYY-MM-DD HH:mm:ss.SSS ZZ");
 });
-Vue.filter("tagForURI", function (this: Vue, tagId: string) {
-  const type = tagId.split("/", 1)[0];
-  const name = this.tagNameForURI(tagId.substr(type.length + 1));
-  return `${type}:${name}`;
-});
-Vue.filter("tagNameForURI", function (tagName: string) {
-  if (tagName.includes('"')) {
-    tagName = tagName.replaceAll('"', '""');
-  }
-  if (/[ "]/.test(tagName)) {
-    tagName = `"${tagName}"`;
-  }
-
-  return tagName;
-});
+Vue.filter("tagForURI", tagForURI);
+Vue.filter("tagNameForURI", tagNameForURI);
 Vue.filter("regexEscape", function (text: string) {
   return text
     .split("")

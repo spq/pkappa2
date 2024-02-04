@@ -378,7 +378,7 @@ const store = new Vuex.Store({
         })
         .catch(handleAxiosDefaultError);
     },
-    async delTag({ commit, dispatch }, name: string) {
+    async delTag({ commit, dispatch }, { name }: { name: string }) {
       return APIClient.delTag(name)
         .then(() => {
           commit("updateMark", { name, value: false });
@@ -409,7 +409,7 @@ const store = new Vuex.Store({
         })
         .catch(handleAxiosDefaultError);
     },
-    async resetConverter({ dispatch }, name: string) {
+    async resetConverter({ dispatch }, { name }: { name: string }) {
       return APIClient.resetConverter(name)
         .then(() => {
           dispatch("updateConverters").catch((err) => {

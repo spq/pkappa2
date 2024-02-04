@@ -70,7 +70,7 @@
             <span>Marks</span>
           </v-tooltip>
         </template>
-        <v-list v-if="stream.stream != null" dense>
+        <v-list v-if="stream.stream !== null" dense>
           <template v-for="tag of groupedTags.mark">
             <v-list-item
               :key="tag.Name"
@@ -90,7 +90,7 @@
               </v-list-item-action>
               <v-list-item-content>
                 <v-list-item-title>{{
-                  tag.Name | tagify("name")
+                  $options.filters?.tagify(tag.Name, "name")
                 }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -143,7 +143,7 @@
       <v-row>
         <v-col cols="6">
           <v-tooltip
-            v-if="stream.stream != null && selectableConverters.length > 1"
+            v-if="stream.stream !== null && selectableConverters.length > 1"
             bottom
           >
             <template #activator="{ on, attrs }">
@@ -160,7 +160,7 @@
         </v-col>
       </v-row>
       <v-spacer />
-      <div v-if="streamIndex != null">
+      <div v-if="streamIndex !== null && streams.result !== null">
         <span class="text-caption"
           >{{ streams.result.Offset + streamIndex + 1 }} of
           {{
@@ -218,13 +218,17 @@
       </div>
     </ToolBar>
     <v-skeleton-loader
-      v-if="stream.running || !(stream.stream || stream.error) || null == tags"
+      v-if="
+        stream.running ||
+        (stream.stream === null && stream.error === null) ||
+        null === tags
+      "
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
-    <v-alert v-else-if="stream.error" type="error" dense>{{
+    <v-alert v-else-if="stream.error !== null" type="error" dense>{{
       stream.error
     }}</v-alert>
-    <div v-else>
+    <div v-else-if="stream.stream !== null">
       <v-container fluid>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Client:</v-col>
@@ -236,15 +240,23 @@
               stream.stream.Stream.Client.Port
             }}
             ({{
-              stream.stream.Stream.Client.Bytes | prettyBytes(1, true)
+              $options.filters?.prettyBytes(
+                stream.stream.Stream.Client.Bytes,
+                1,
+                true
+              )
             }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
           <v-col
             cols="3"
             class="text-body-2"
-            :title="stream.stream.Stream.FirstPacket | formatDateLong"
-            >{{ stream.stream.Stream.FirstPacket | formatDate }}</v-col
+            :title="
+              $options.filters?.formatDateLong(stream.stream.Stream.FirstPacket)
+            "
+            >{{
+              $options.filters?.formatDate(stream.stream.Stream.FirstPacket)
+            }}</v-col
           >
           <v-col cols="1" class="text-subtitle-2"
             >{{
@@ -272,15 +284,23 @@
               stream.stream.Stream.Server.Port
             }}
             ({{
-              stream.stream.Stream.Server.Bytes | prettyBytes(1, true)
+              $options.filters?.prettyBytes(
+                stream.stream.Stream.Server.Bytes,
+                1,
+                true
+              )
             }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
           <v-col
             cols="3"
             class="text-body-2"
-            :title="stream.stream.Stream.LastPacket | formatDateLong"
-            >{{ stream.stream.Stream.LastPacket | formatDate }}</v-col
+            :title="
+              $options.filters?.formatDateLong(stream.stream.Stream.LastPacket)
+            "
+            >{{
+              $options.filters?.formatDate(stream.stream.Stream.LastPacket)
+            }}</v-col
           >
           <v-col cols="1" class="text-body-2"
             ><span v-if="streamTags.service.length == 0">{{
@@ -330,185 +350,219 @@
   </div>
 </template>
 
-<script>
+<script lang="ts" setup>
 import { EventBus } from "./EventBus";
+import { useStore } from "@/store";
+import {
+  computed,
+  getCurrentInstance,
+  ref,
+  onBeforeUnmount,
+  onMounted,
+  watch,
+} from "vue";
+import { useRoute, useRouter } from "vue-router/composables";
 import StreamData from "./StreamData.vue";
+import ToolBar from "./ToolBar.vue";
 import {
   registerSelectionListener,
   destroySelectionListener,
 } from "./streamSelector";
 
-import { mapActions, mapGetters, mapState } from "vuex";
-import ToolBar from "./ToolBar.vue";
-
 const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
 
-export default {
-  name: "Stream",
-  components: { StreamData, ToolBar },
-  data() {
-    let p = "ascii";
-    if (localStorage.streamPresentation) {
-      p = localStorage.streamPresentation;
-    }
-    return {
-      presentation: p,
-      selectionData: "",
-      selectionQuery: "",
-    };
-  },
-  computed: {
-    ...mapState(["stream", "streams", "tags", "converters"]),
-    ...mapGetters(["groupedTags"]),
-    streamTags() {
-      let res = {
-        service: [],
-        tag: [],
-        mark: [],
-        generated: [],
-      };
-      for (const tag of this.stream.stream.Tags) {
-        const type = tag.split("/", 1)[0];
-        const name = tag.substr(type.length + 1);
-        const color = this.tags.filter((e) => e.Name == tag)[0]?.Color;
-        res[type].push({ name, color });
-      }
-      return res;
-    },
-    streamId() {
-      return parseInt(this.$route.params.streamId, 10);
-    },
-    converter() {
-      return this.$route.query.converter ?? "auto";
-    },
-    activeConverter() {
-      if (this.stream.stream.ActiveConverter === "") {
-        return "none";
-      }
-      return "converter:" + this.stream.stream.ActiveConverter;
-    },
-    selectableConverters() {
-      return [
-        {
-          text: "* none",
-          value: "none",
-        },
-        ...this.stream.stream.Converters.map((converter) => ({
-          text: `* ${converter}`,
-          value: "converter:" + converter,
-        })),
-        ...this.converters.map((converter) => ({
-          text: converter.Name,
-          value: "converter:" + converter.Name,
-        })),
-      ];
-    },
-    streamIndex() {
-      if (this.streams.result == null) return null;
-      const id = this.streamId;
-      let i = 0;
-      for (let r of this.streams.result.Results) {
-        if (r.Stream.ID == id) return i;
-        i++;
-      }
-      return null;
-    },
-    nextStreamId() {
-      const index = this.streamIndex;
-      if (index == null) return null;
-      if (index + 1 >= this.streams.result.Results.length) return null;
-      return this.streams.result.Results[index + 1].Stream.ID;
-    },
-    prevStreamId() {
-      const index = this.streamIndex;
-      if (index == null || index == 0) return null;
-      return this.streams.result.Results[index - 1].Stream.ID;
-    },
-  },
-  watch: {
-    $route: "fetchStreamForId",
-    presentation(v) {
-      localStorage.streamPresentation = v;
-      document.getSelection().empty();
-    },
-  },
-  mounted() {
-    this.fetchStreamForId();
-    registerSelectionListener(this);
+const store = useStore();
+const route = useRoute();
+const router = useRouter();
+const presentation = ref("ascii");
+const selectionData = ref("");
+const selectionQuery = ref("");
 
-    const handle = (e, streamId) => {
-      if (streamId == null) return;
-      e.preventDefault();
-      this.$router.push({
-        name: "stream",
-        query: { q: this.$route.query.q, p: this.$route.query.p },
-        params: { streamId },
-      });
-    };
-    const handlers = {
-      j: (e) => {
-        handle(e, this.prevStreamId);
-      },
-      k: (e) => {
-        handle(e, this.nextStreamId);
-      },
-    };
-    this._keyListener = function (e) {
-      if (["input", "textarea"].includes(e.target.tagName.toLowerCase()))
-        return;
+if (localStorage.streamPresentation) {
+  presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";
+}
 
-      if (!Object.keys(handlers).includes(e.key)) return;
-      handlers[e.key](e);
-    }.bind(this);
-    window.addEventListener("keydown", this._keyListener);
-  },
-  beforeDestroy() {
-    window.removeEventListener("keydown", this._keyListener);
+const stream = computed(() => store.state.stream);
+const streams = computed(() => store.state.streams);
+const tags = computed(() => store.state.tags);
+const converters = computed(() => store.state.converters);
+const groupedTags = computed(() => store.getters.groupedTags);
+const streamTags = computed(() => {
+  if (stream.value.stream == null) return {};
+  let res: { [key: string]: { name: string; color: string }[] } = {
+    service: [],
+    tag: [],
+    mark: [],
+    generated: [],
+  };
+  for (const tag of stream.value.stream.Tags) {
+    const type = tag.split("/", 1)[0];
+    const name = tag.substr(type.length + 1);
+    const color = tags.value?.filter((e) => e.Name == tag)[0]?.Color ?? "";
+    res[type].push({ name, color });
+  }
+  return res;
+});
+
+const streamId = computed(() => {
+  return parseInt(route.params.streamId, 10);
+});
+
+const converter = computed(() => {
+  return route.query.converter ?? "auto";
+});
+
+const activeConverter = computed(() => {
+  if (
+    stream.value.stream === null ||
+    stream.value.stream.ActiveConverter === ""
+  ) {
+    return "none";
+  }
+  return "converter:" + stream.value.stream.ActiveConverter;
+});
+
+const selectableConverters = computed(() => {
+  if (stream.value.stream === null) return [];
+  const availableConverters =
+    converters.value?.map((converter) => ({
+      text: converter.Name,
+      value: "converter:" + converter.Name,
+    })) ?? [];
+  return [
+    {
+      text: "* none",
+      value: "none",
+    },
+    ...stream.value.stream.Converters.map((converter) => ({
+      text: `* ${converter}`,
+      value: "converter:" + converter,
+    })),
+    ...availableConverters,
+  ];
+});
+
+const streamIndex = computed(() => {
+  if (streams.value.result == null) return null;
+  const id = streamId.value;
+  let i = 0;
+  for (let r of streams.value.result.Results) {
+    if (r.Stream.ID == id) return i;
+    i++;
+  }
+  return null;
+});
+
+const nextStreamId = computed(() => {
+  if (streams.value.result === null) return null;
+  const index = streamIndex.value;
+  if (index === null) return null;
+  if (index + 1 >= streams.value.result.Results.length) return null;
+  return streams.value.result.Results[index + 1].Stream.ID;
+});
+
+const prevStreamId = computed(() => {
+  if (streams.value.result === null) return null;
+  const index = streamIndex.value;
+  if (index === null || index === 0) return null;
+  return streams.value.result.Results[index - 1].Stream.ID;
+});
+
+watch(route, fetchStreamForId);
+watch(presentation, (v) => {
+  localStorage.streamPresentation = v;
+  document.getSelection()?.empty();
+});
+
+onMounted(() => {
+  fetchStreamForId();
+  const proxy = {
+    proxy: getCurrentInstance()?.proxy,
+    stream,
+    selectionData,
+    selectionQuery,
+  };
+  registerSelectionListener(proxy);
+
+  const handle = (e: KeyboardEvent, streamId: number | null) => {
+    if (streamId == null) return;
+    e.preventDefault();
+    void router.push({
+      name: "stream",
+      query: { q: route.query.q, p: route.query.p },
+      params: { streamId: streamId.toString() },
+    });
+  };
+  const handlers: { [key: string]: (e: KeyboardEvent) => void } = {
+    j: (e: KeyboardEvent) => {
+      handle(e, prevStreamId.value);
+    },
+    k: (e: KeyboardEvent) => {
+      handle(e, nextStreamId.value);
+    },
+  };
+  const keyListener = (e: KeyboardEvent) => {
+    if (e.target === null || !(e.target instanceof Element)) return;
+    if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
+
+    if (!Object.keys(handlers).includes(e.key)) return;
+    handlers[e.key](e);
+  };
+  window.addEventListener("keydown", keyListener);
+  onBeforeUnmount(() => {
+    window.removeEventListener("keydown", keyListener);
     destroySelectionListener();
-  },
-  methods: {
-    ...mapActions(["fetchStream", "markTagAdd", "markTagDel"]),
-    changeConverter(converter) {
-      this.$router.push({
-        query: { converter, q: this.$route.query.q, p: this.$route.query.p },
+  });
+});
+
+function changeConverter(converter: string) {
+  void router.push({
+    query: { converter, q: route.query.q, p: route.query.p },
+  });
+}
+
+function fetchStreamForId() {
+  if (streamId.value !== null) {
+    store
+      .dispatch("fetchStream", {
+        id: streamId.value,
+        converter: converter.value,
+      })
+      .catch((err: string) => {
+        EventBus.emit("showError", `Failed to fetch stream: ${err}`);
       });
-    },
-    fetchStreamForId() {
-      if (this.streamId != null) {
-        this.fetchStream({ id: this.streamId, converter: this.converter });
-        document.getSelection().empty();
-      }
-    },
-    openInCyberChef() {
-      let data = this.selectionData;
-      if (data === "") {
-        for (const chunk of this.stream.stream.Data) {
-          data += atob(chunk.Content);
-        }
-      }
-      const encoded_data = btoa(data);
-      window.open(`${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`);
-    },
-    createMark() {
-      EventBus.$emit("showCreateTagDialog", {
-        tagType: "mark",
-        tagStreams: [this.streamId],
+    document.getSelection()?.empty();
+  }
+}
+
+function openInCyberChef() {
+  let data = selectionData.value;
+  if (data === "" && stream.value.stream !== null) {
+    for (const chunk of stream.value.stream.Data) {
+      data += atob(chunk.Content);
+    }
+  }
+  const encoded_data = btoa(data);
+  window.open(`${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`);
+}
+
+function createMark() {
+  EventBus.emit("showCreateTagDialog", "mark", "", [streamId.value]);
+}
+
+function markStream(tagId: string, value: boolean) {
+  if (value) {
+    store
+      .dispatch("markTagAdd", { name: tagId, streams: [streamId.value] })
+      .catch((err: string) => {
+        EventBus.emit("showError", `Failed to add stream to mark: ${err}`);
       });
-    },
-    markStream(tagId, value) {
-      if (value)
-        this.markTagAdd({ name: tagId, streams: [this.streamId] }).catch(
-          (err) => {
-            EventBus.$emit("showError", { message: err });
-          }
-        );
-      else
-        this.markTagDel({ name: tagId, streams: [this.streamId] }).catch(
-          (err) => {
-            EventBus.$emit("showError", { message: err });
-          }
-        );
-    },
-  },
-};
+  } else {
+    store
+      .dispatch("markTagDel", { name: tagId, streams: [streamId.value] })
+      .catch((err: string) => {
+        EventBus.emit("showError", `Failed to remove stream from mark: ${err}`);
+      });
+  }
+}
 </script>

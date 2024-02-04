@@ -46,7 +46,6 @@ fn CountBytes(u8 type, VarInt sizes) {
 
 struct Stream {
     u64 StreamID;
-    u64 PacketCount;
     VarInt sizes[while(addressof(PacketCount)+8 == $ || std::mem::read_unsigned($-1, 1) != 0 || std::mem::read_unsigned($-2, 1) != 0)];
     u8 ClientData[CountBytes(0, sizes)];
     u8 ServerData[CountBytes(1, sizes)];

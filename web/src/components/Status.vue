@@ -24,23 +24,22 @@
   </div>
 </template>
 
-<script>
-import { mapActions, mapState } from "vuex";
+<script lang="ts" setup>
 import ToolBar from "./ToolBar.vue";
+import { computed, onMounted } from "vue";
+import { useStore } from "@/store";
+import { EventBus } from "./EventBus";
 
-export default {
-  name: "Status",
-  components: {
-    ToolBar,
-  },
-  computed: {
-    ...mapState(["status"]),
-  },
-  mounted() {
-    this.updateStatus();
-  },
-  methods: {
-    ...mapActions(["updateStatus"]),
-  },
-};
+const store = useStore();
+const status = computed(() => store.state.status);
+
+onMounted(() => {
+  updateStatus();
+});
+
+function updateStatus() {
+  store.dispatch("updateStatus").catch((err: string) => {
+    EventBus.emit("showError", `Failed to update status: ${err}`);
+  });
+}
 </script>

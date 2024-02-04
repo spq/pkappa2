@@ -50,7 +50,7 @@
             :to="{
               name: 'search',
               query: {
-                q: $options.filters.tagForURI(tag.Name),
+                q: $options.filters?.tagForURI(tag.Name),
               },
             }"
           >
@@ -83,7 +83,7 @@
                   :to="{
                     name: 'search',
                     query: {
-                      q: $options.filters.tagForURI(tag.Name),
+                      q: $options.filters?.tagForURI(tag.Name),
                     },
                   }"
                 >
@@ -193,66 +193,72 @@
   </v-list>
 </template>
 
-<script>
+<script lang="ts" setup>
+import { useRoute } from "vue-router/composables";
 import { EventBus } from "./EventBus";
-import { mapActions, mapGetters, mapState } from "vuex";
+import { useStore } from "@/store";
+import { computed, onMounted } from "vue";
 
-export default {
-  name: "Navigation",
-  data() {
-    return {
-      tagTypes: [
-        {
-          title: "Services",
-          icon: "cloud-outline",
-          key: "service",
-        },
-        {
-          title: "Tags",
-          icon: "tag-multiple-outline",
-          key: "tag",
-        },
-        {
-          title: "Marks",
-          icon: "checkbox-multiple-outline",
-          key: "mark",
-        },
-        {
-          title: "Generated",
-          icon: "robot-outline",
-          key: "generated",
-        },
-      ],
-      moreOpen: ["status", "tags", "pcaps"].includes(this.$route.name),
-    };
+const store = useStore();
+const route = useRoute();
+const tagTypes = [
+  {
+    title: "Services",
+    icon: "cloud-outline",
+    key: "service",
   },
-  computed: {
-    ...mapGetters(["groupedTags"]),
-    ...mapState(["status"]),
+  {
+    title: "Tags",
+    icon: "tag-multiple-outline",
+    key: "tag",
   },
-  mounted() {
-    this.updateTags();
-    this.updateStatus();
+  {
+    title: "Marks",
+    icon: "checkbox-multiple-outline",
+    key: "mark",
   },
-  methods: {
-    ...mapActions(["updateTags", "updateStatus"]),
-    showTagSetConvertersDialog(tagId) {
-      EventBus.$emit("showTagSetConvertersDialog", { tagId });
-    },
-    confirmTagDeletion(tagId) {
-      EventBus.$emit("showTagDeleteDialog", { tagId });
-    },
-    showTagDetailsDialog(tagId) {
-      EventBus.$emit("showTagDetailsDialog", { tagId });
-    },
-    setQuery(query) {
-      EventBus.$emit("setSearchTerm", { searchTerm: query });
-    },
-    showTagColorChangeDialog(tagId) {
-      EventBus.$emit("showTagColorChangeDialog", { tagId });
-    },
+  {
+    title: "Generated",
+    icon: "robot-outline",
+    key: "generated",
   },
-};
+];
+
+const moreOpen =
+  route.name !== null &&
+  route.name !== undefined &&
+  ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
+const groupedTags = computed(() => store.getters.groupedTags);
+const status = computed(() => store.state.status);
+
+onMounted(() => {
+  store.dispatch("updateTags").catch((err: string) => {
+    EventBus.emit("showError", `Failed to update tags: ${err}`);
+  });
+  store.dispatch("updateStatus").catch((err: string) => {
+    EventBus.emit("showError", `Failed to update status: ${err}`);
+  });
+});
+
+function showTagSetConvertersDialog(tagId: string) {
+  EventBus.emit("showTagSetConvertersDialog", tagId);
+}
+
+function confirmTagDeletion(tagId: string) {
+  EventBus.emit("showTagDeleteDialog", tagId);
+}
+
+function showTagDetailsDialog(tagId: string) {
+  EventBus.emit("showTagDetailsDialog", tagId);
+}
+
+function setQuery(query: string) {
+  EventBus.emit("setSearchTerm", query);
+}
+
+function showTagColorChangeDialog(tagId: string) {
+  EventBus.emit("showTagColorChangeDialog", tagId);
+}
 </script>
 
 <style>
