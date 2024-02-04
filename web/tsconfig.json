@@ -5,7 +5,7 @@
     "strict": true,
     "jsx": "preserve",
     "moduleResolution": "node",
-    "allowJs": true,
+    "allowJs": false,
     "sourceMap": true,
     "baseUrl": ".",
     "types": ["webpack-env"],
@@ -23,8 +23,7 @@
     "src/**/*.tsx",
     //"src/**/*.vue",
     "tests/**/*.ts",
-    "tests/**/*.tsx",
-    ".eslintrc.js"
+    "tests/**/*.tsx"
   ],
   "exclude": ["node_modules"]
 }
