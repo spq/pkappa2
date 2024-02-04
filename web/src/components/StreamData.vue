@@ -23,9 +23,9 @@
       </template>
       <template v-else>
         <span
-            v-for="(chunk, index) in data"
-            :key="index"
-            :class="[classes(chunk)]"
+          v-for="(chunk, index) in data"
+          :key="index"
+          :class="[classes(chunk)]"
         >
           {{ inlineHex(chunk.Content) }}<br
         /></span>
@@ -128,10 +128,7 @@ const hexdump = (b64: string) => {
 .server {
   color: #000080;
   background-color: #eeedfc;
-  @media (prefers-color-scheme: dark) {
-    color: #ffffff;
-    background-color: #261858;
-  }
+  
   &.hexdump {
     margin-left: 2em;
   }
@@ -139,7 +136,15 @@ const hexdump = (b64: string) => {
 .client {
   color: #800000;
   background-color: #faeeed;
-  @media (prefers-color-scheme: dark) {
+}
+
+.theme--dark {
+  .server {
+    color: #ffffff;
+    background-color: #261858;
+  }
+
+  .client {
     color: #ffffff;
     background-color: #561919;
   }
