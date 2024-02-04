@@ -4,27 +4,27 @@
     <v-card-text>
       <template v-if="presentation === 'ascii'">
         <span
-            v-for="(chunk, index) in data"
-            :key="index"
-            :class="classes(chunk)"
-            :data-chunk-idx="index"
-            v-html="$options.filters.inlineAscii(chunk.Content).join('')"
+          v-for="(chunk, index) in data"
+          :key="index"
+          :class="classes(chunk)"
+          :data-chunk-idx="index"
+          v-html="$options.filters.inlineAscii(chunk.Content).join('')"
         >
         </span>
       </template>
       <template v-else-if="presentation === 'hexdump'">
         <pre
-            v-for="(chunk, index) in data"
-            :key="index"
-            :class="[classes(chunk), 'hexdump']"
-        >{{ chunk.Content | hexdump }}
+          v-for="(chunk, index) in data"
+          :key="index"
+          :class="[classes(chunk), 'hexdump']"
+          >{{ chunk.Content | hexdump }}
         </pre>
       </template>
       <template v-else>
         <span
-            v-for="(chunk, index) in data"
-            :key="index"
-            :class="[classes(chunk)]"
+          v-for="(chunk, index) in data"
+          :key="index"
+          :class="[classes(chunk)]"
         >
           {{ chunk.Content | inlineHex }}<br
         /></span>
@@ -34,7 +34,7 @@
 </template>
 
 <script>
-const asciiMap = Array.from({length: 0x100}, (_, i) => {
+const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
   if (i === 0x0d) return "\r";
   if (i === 0x0a) return "\n";
   if (i >= 0x20 && i <= 0x7e) return `&#x${i.toString(16).padStart(2, "0")};`;
@@ -45,55 +45,55 @@ export default {
   filters: {
     inlineAscii(b64) {
       return atob(b64)
-          .split("")
-          .map((c) => asciiMap[c.charCodeAt(0)]);
+        .split("")
+        .map((c) => asciiMap[c.charCodeAt(0)]);
     },
     inlineHex(b64) {
       const ui8 = Uint8Array.from(
-          atob(b64)
-              .split("")
-              .map((char) => char.charCodeAt(0))
+        atob(b64)
+          .split("")
+          .map((char) => char.charCodeAt(0)),
       );
       var str = [].slice
-          .call(ui8)
-          .map((i) => i.toString(16).padStart(2, "0"))
-          .join("");
+        .call(ui8)
+        .map((i) => i.toString(16).padStart(2, "0"))
+        .join("");
       return str;
     },
     hexdump(b64) {
       const ui8 = Uint8Array.from(
-          atob(b64)
-              .split("")
-              .map((char) => char.charCodeAt(0))
+        atob(b64)
+          .split("")
+          .map((char) => char.charCodeAt(0)),
       );
       var str = [].slice
-          .call(ui8)
-          .map((i) => i.toString(16).padStart(2, "0"))
-          .join("")
-          .match(/.{1,2}/g)
-          .join(" ")
-          .match(/.{1,48}/g)
-          .map(function (str) {
-            while (str.length < 48) {
-              str += " ";
-            }
-            var ascii = str
-                .replace(/ /g, "")
-                .match(/.{1,2}/g)
-                .map(function (ch) {
-                  var c = String.fromCharCode(parseInt(ch, 16));
-                  if (!/[ -~]/.test(c)) {
-                    c = ".";
-                  }
-                  return c;
-                })
-                .join("");
-            while (ascii.length < 16) {
-              ascii += " ";
-            }
-            return str + " |" + ascii + "|";
-          })
-          .join("\n");
+        .call(ui8)
+        .map((i) => i.toString(16).padStart(2, "0"))
+        .join("")
+        .match(/.{1,2}/g)
+        .join(" ")
+        .match(/.{1,48}/g)
+        .map(function (str) {
+          while (str.length < 48) {
+            str += " ";
+          }
+          var ascii = str
+            .replace(/ /g, "")
+            .match(/.{1,2}/g)
+            .map(function (ch) {
+              var c = String.fromCharCode(parseInt(ch, 16));
+              if (!/[ -~]/.test(c)) {
+                c = ".";
+              }
+              return c;
+            })
+            .join("");
+          while (ascii.length < 16) {
+            ascii += " ";
+          }
+          return str + " |" + ascii + "|";
+        })
+        .join("\n");
       return str;
     },
   },
@@ -114,8 +114,8 @@ export default {
         client: chunk.Direction === 0,
         server: chunk.Direction === 1,
       };
-    }
-  }
+    },
+  },
 };
 </script>
 <style scoped>
@@ -127,10 +127,6 @@ export default {
 .server {
   color: #000080;
   background-color: #eeedfc;
-  @media (prefers-color-scheme: dark) {
-    color: #ffffff;
-    background-color: #261858;
-  }
 
   &.hexdump {
     margin-left: 2em;
@@ -140,7 +136,15 @@ export default {
 .client {
   color: #800000;
   background-color: #faeeed;
-  @media (prefers-color-scheme: dark) {
+}
+
+.theme--dark {
+  .server {
+    color: #ffffff;
+    background-color: #261858;
+  }
+
+  .client {
     color: #ffffff;
     background-color: #561919;
   }
