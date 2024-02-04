@@ -2,42 +2,29 @@
 <template>
   <v-card>
     <v-card-text>
-      <template v-if="presentation == 'ascii'">
+      <template v-if="presentation === 'ascii'">
         <span
           v-for="(chunk, index) in data"
           :key="index"
-          class="chunk"
+          :class="classes(chunk)"
           :data-chunk-idx="index"
-          :style="
-            chunk.Direction != 0
-              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-          "
           v-html="$options.filters.inlineAscii(chunk.Content).join('')"
         >
         </span>
       </template>
-      <template v-else-if="presentation == 'hexdump'">
+      <template v-else-if="presentation === 'hexdump'">
         <pre
           v-for="(chunk, index) in data"
           :key="index"
-          :style="
-            chunk.Direction != 0
-              ? 'margin-left: 2em; color: #000080; background-color: #eeedfc;'
-              : 'color: #800000; background-color: #faeeed;'
-          "
-          >{{ chunk.Content | hexdump }}</pre
-        >
+          :class="[classes(chunk), 'hexdump']"
+          >{{ chunk.Content | hexdump }}
+        </pre>
       </template>
       <template v-else>
         <span
           v-for="(chunk, index) in data"
           :key="index"
-          :style="
-            chunk.Direction != 0
-              ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
-              : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
-          "
+          :class="[classes(chunk)]"
         >
           {{ chunk.Content | inlineHex }}<br
         /></span>
@@ -69,7 +56,7 @@ export default {
       );
       var str = [].slice
         .call(ui8)
-        .map((i) => i.toString(16).padStart("2", "0"))
+        .map((i) => i.toString(16).padStart(2, "0"))
         .join("");
       return str;
     },
@@ -81,7 +68,7 @@ export default {
       );
       var str = [].slice
         .call(ui8)
-        .map((i) => i.toString(16).padStart("2", "0"))
+        .map((i) => i.toString(16).padStart(2, "0"))
         .join("")
         .match(/.{1,2}/g)
         .join(" ")
@@ -120,10 +107,46 @@ export default {
       required: true,
     },
   },
+  methods: {
+    classes(chunk) {
+      return {
+        chunk: true,
+        client: chunk.Direction === 0,
+        server: chunk.Direction === 1,
+      };
+    },
+  },
 };
 </script>
 <style scoped>
 .chunk {
   white-space: pre-line;
+  font-family: monospace, monospace;
+}
+
+.server {
+  color: #000080;
+  background-color: #eeedfc;
+
+  &.hexdump {
+    margin-left: 2em;
+  }
+}
+
+.client {
+  color: #800000;
+  background-color: #faeeed;
+}
+
+.theme--dark {
+  .server {
+    color: #ffffff;
+    background-color: #261858;
+  }
+
+  .client {
+    color: #ffffff;
+    background-color: #561919;
+  }
 }
 </style>

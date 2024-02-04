@@ -189,11 +189,29 @@
           <v-list-item-title>Manage Converters</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+
+      <v-btn-toggle
+        v-model="colorscheme"
+        mandatory
+        background-color="transparent"
+        class="pl-9 pt-2"
+      >
+        <v-btn>
+          <v-icon>mdi-weather-sunny</v-icon>
+        </v-btn>
+        <v-btn>
+          <v-icon>mdi-cog-outline</v-icon>
+        </v-btn>
+        <v-btn>
+          <v-icon>mdi-weather-night</v-icon>
+        </v-btn>
+      </v-btn-toggle>
     </v-list-group>
   </v-list>
 </template>
 
 <script>
+import { setColorScheme, getColorSchemeFromStorage } from "@/lib/darkmode";
 import { EventBus } from "./EventBus";
 import { mapActions, mapGetters, mapState } from "vuex";
 
@@ -201,6 +219,7 @@ export default {
   name: "Navigation",
   data() {
     return {
+      colorscheme: 0,
       tagTypes: [
         {
           title: "Services",
@@ -229,6 +248,24 @@ export default {
   computed: {
     ...mapGetters(["groupedTags"]),
     ...mapState(["status"]),
+  },
+  watch: {
+    colorscheme() {
+      const schemes = {
+        0: "light",
+        1: "system",
+        2: "dark",
+      };
+      setColorScheme(schemes[this.colorscheme]);
+    },
+  },
+  beforeMount() {
+    const schemeInitialisations = {
+      light: 0,
+      system: 1,
+      dark: 2,
+    };
+    this.colorscheme = schemeInitialisations[getColorSchemeFromStorage()];
   },
   mounted() {
     this.updateTags();

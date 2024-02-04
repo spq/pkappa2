@@ -1,11 +1,13 @@
+import { getColorScheme } from "@/lib/darkmode";
 import Vue from "vue";
-import Vuetify from "vuetify";
-import App from "./App.vue";
-import store from "./store";
-import router from "./routes";
 import VueApexCharts from "vue-apexcharts";
 import VueFilterPrettyBytes from "vue-filter-pretty-bytes";
 import * as VueMoment from "vue-moment";
+import Vuetify from "vuetify";
+import App from "./App.vue";
+import { registerVuetifyTheme } from "./lib/darkmode";
+import router from "./routes";
+import store from "./store";
 
 Vue.config.productionTip = process.env.NODE_ENV == "production";
 
@@ -17,11 +19,13 @@ Vue.use(VueFilterPrettyBytes);
 Vue.component("Apexchart", VueApexCharts);
 
 const vue = new Vue({
-  vuetify: new Vuetify(),
+  vuetify: new Vuetify({ theme: { dark: getColorScheme() === "dark" } }),
   store,
   router,
   render: (h) => h(App),
 });
+
+registerVuetifyTheme(vue.$vuetify);
 
 declare module "vue/types/vue" {
   interface Vue {

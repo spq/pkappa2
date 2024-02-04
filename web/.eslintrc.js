@@ -9,13 +9,14 @@ module.exports = {
     project: "./tsconfig.json",
     parser: "@typescript-eslint/parser",
   },
-  ignorePatterns: ["**/*.js", "**/*.vue"],
+  ignorePatterns: ["**/*.js", "**/*.vue", "**/*.guard.ts"],
   plugins: ["@typescript-eslint", "@typescript-eslint/eslint-plugin"],
   parser: "vue-eslint-parser",
   extends: [
     // add more generic rulesets here, such as:
     "eslint:recommended",
     // 'plugin:vue/vue3-recommended',
+    "plugin:prettier/recommended",
     "plugin:vue/recommended", // Use this if you are using Vue.js 2.x.
     "prettier",
     "@vue/typescript",

@@ -7,8 +7,8 @@
   "eslint.validate": ["javascript", "javascriptreact", "vue"],
   "editor.formatOnSave": false,
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
-    "source.fixAll.prettier": true
+    "source.fixAll.eslint": "explicit",
+    "source.fixAll.prettier": "explicit"
   },
   "[vue][javascript][javascriptreact][html]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
