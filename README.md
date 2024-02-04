@@ -38,3 +38,10 @@ You likely want to add some arguments to the `go run` command, check `-help`
 
 You can import multiple .pcap files in the current folder using:
 `for f in *.pcap; do curl --data-binary "@$f" "http://localhost:8081/upload/$f"; done`
+
+## Generating type guards
+
+In order to generate all the typeguards, go to `web/` and call
+```
+npx ts-auto-guard
+```

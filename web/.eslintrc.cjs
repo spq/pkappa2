@@ -21,6 +21,7 @@ module.exports = {
   overrides: [
     {
       files: ["**/*.ts", "**/*.vue"],
+      ignorePatterns: ["**/*.guard.ts"],
       parser: "vue-eslint-parser",
       env: {
         es2021: true,

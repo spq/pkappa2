@@ -6,7 +6,7 @@
     "strict": true,
     "jsx": "preserve",
     "moduleResolution": "node",
-    "allowJs": true,
+    "allowJs": false,
     "sourceMap": true,
     "baseUrl": ".",
     "types": ["webpack-env", "node", "vuetify"],
@@ -25,7 +25,7 @@
     "src/**/*.vue",
     "tests/**/*.ts",
     "tests/**/*.tsx",
-    ".eslintrc.js",
+    ".eslintrc.cjs",
     "components.d.ts",
     "src/plugins/vuetify.js"
   ],
