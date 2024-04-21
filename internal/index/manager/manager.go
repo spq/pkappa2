@@ -1061,15 +1061,8 @@ func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter
 	}
 	jobs := []job(nil)
 	for i, streamIDs := range allStreamIDs {
-		nextStreamId := uint64(0)
-		for {
-			offset := streamIDs.TrailingZerosFrom(uint(nextStreamId))
-			if offset == -1 {
-				break
-			}
-			nextStreamId += uint64(offset)
-			jobs = append(jobs, job{nextStreamId, i})
-			nextStreamId++
+		for streamID := uint(0); streamIDs.Next(&streamID); streamID++ {
+			jobs = append(jobs, job{uint64(streamID), i})
 		}
 	}
 	sort.Slice(jobs, func(i, j int) bool {

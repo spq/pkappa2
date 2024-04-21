@@ -179,3 +179,12 @@ func (bm *LongBitmask) Shrink() {
 		bm.mask = bm.mask[:len(bm.mask)-1]
 	}
 }
+
+func (bm LongBitmask) Next(bit *uint) bool {
+	res := bm.TrailingZerosFrom(*bit)
+	if res != -1 {
+		*bit += uint(res)
+		return true
+	}
+	return false
+}

@@ -464,26 +464,17 @@ func (cachefile *cacheFile) InvalidateChangedStreams(streams *bitmask.LongBitmas
 	defer cachefile.rwmutex.RUnlock()
 
 	// see which of the streams are in the cache
-	nextStreamId := uint64(0)
-	for {
-		offset := streams.TrailingZerosFrom(uint(nextStreamId))
-		if offset == -1 {
-			break
-		}
-		nextStreamId += uint64(offset)
-
+	for streamID := uint(0); streams.Next(&streamID); streamID++ {
 		// delete the stream from the in-memory index
 		// it will be re-added when the stream is converted again
-		if info, ok := cachefile.streamInfos[nextStreamId]; ok {
+		if info, ok := cachefile.streamInfos[uint64(streamID)]; ok {
 			cachefile.freeSize += int64(info.size) + headerSize
 			if cachefile.freeStart > info.offset-headerSize {
 				cachefile.freeStart = info.offset - headerSize
 			}
-			delete(cachefile.streamInfos, nextStreamId)
-			invalidatedStreams.Set(uint(nextStreamId))
+			delete(cachefile.streamInfos, uint64(streamID))
+			invalidatedStreams.Set(streamID)
 		}
-
-		nextStreamId++
 	}
 
 	return invalidatedStreams
