@@ -969,29 +969,27 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					}
 				}
 				if len(info.markTagDelStreams) != 0 {
-					b := strings.Builder{}
-					b.WriteString("!id:")
-					newDefinition := fmt.Sprintf(",%s,", newTag.definition[3:])
 					for _, s := range info.markTagDelStreams {
 						if !newTag.Matches.IsSet(uint(s)) {
 							continue
 						}
 						newTag.Matches.Unset(uint(s))
 						newTag.Uncertain.Set(uint(s))
-						b.WriteString(fmt.Sprintf("%d,", s))
-						newDefinition = strings.Replace(newDefinition, fmt.Sprintf(",%d,", s), ",", 1)
 						// TODO: invalidate converter cache for this stream
 					}
-					if b.Len() != len("!id:") {
+					b := strings.Builder{}
+					b.WriteString("id:")
+					for i := uint(0); newTag.Matches.Next(&i); i++ {
+						b.WriteString(fmt.Sprintf("%d,", i))
+					}
+					if b.Len() == len("id:") {
+						newTag.definition = "id:-1"
+						newTag.Conditions = nil
+					} else {
 						markQuery := b.String()
 						markQuery = markQuery[:len(markQuery)-1]
 						if q, err := query.Parse(markQuery); err == nil {
-							newTag.Conditions = newTag.Conditions.And(q.Conditions).Clean()
-						}
-						if newDefinition == "," {
-							newTag.definition = "id:-1"
-						} else {
-							newTag.definition = fmt.Sprintf("id:%s", newDefinition[1:len(newDefinition)-1])
+							newTag.Conditions = q.Conditions
 						}
 					}
 				}
