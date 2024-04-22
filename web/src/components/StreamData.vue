@@ -13,7 +13,7 @@
               ? 'font-family: monospace,monospace; color: #000080; background-color: #eeedfc;'
               : 'font-family: monospace,monospace; color: #800000; background-color: #faeeed;'
           "
-          v-html="$options.filters.inlineAscii(chunk.Content).join('')"
+          v-html="$options.filters.inlineAscii(chunk.Content)"
         >
         </span>
       </template>
@@ -48,10 +48,8 @@
 
 <script>
 const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
-  if (i === 0x0d) return "\r";
-  if (i === 0x0a) return "\n";
-  if (i >= 0x20 && i <= 0x7e) return `&#x${i.toString(16).padStart(2, "0")};`;
-  return ".";
+  if (i != 0x0d && i != 0x0a && (i < 0x20 || i > 0x7e)) return ".";
+  return `&#x${i.toString(16).padStart(2, "0")};`;
 });
 export default {
   name: "StreamData",
@@ -59,7 +57,8 @@ export default {
     inlineAscii(b64) {
       return atob(b64)
         .split("")
-        .map((c) => asciiMap[c.charCodeAt(0)]);
+        .map((c) => asciiMap[c.charCodeAt(0)])
+        .join("");
     },
     inlineHex(b64) {
       const ui8 = Uint8Array.from(
