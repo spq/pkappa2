@@ -123,6 +123,6 @@ export default {
 </script>
 <style scoped>
 .chunk {
-  white-space: pre-line;
+  white-space: break-spaces;
 }
 </style>
