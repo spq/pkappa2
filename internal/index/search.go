@@ -2,6 +2,7 @@ package index
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -1661,7 +1662,7 @@ var (
 	}
 )
 
-func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails, converters map[string]ConverterAccess) ([]*Stream, bool, error) {
+func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails, converters map[string]ConverterAccess) ([]*Stream, bool, error) {
 	if len(qs) == 0 {
 		return nil, false, nil
 	}
@@ -1870,7 +1871,7 @@ func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime tim
 				}
 				queryParts = append(queryParts, queryPart)
 			}
-			err := idx.searchStreams(&results, allResults, queryParts, groupingData, sorter, resultLimit)
+			err := idx.searchStreams(ctx, &results, allResults, queryParts, groupingData, sorter, resultLimit)
 			if err != nil {
 				return nil, false, err
 			}
@@ -1887,7 +1888,7 @@ func SearchStreams(indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime tim
 	return results.streams[skip:], results.resultDropped != 0, nil
 }
 
-func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
+func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
 	allImpossible := true
@@ -1969,6 +1970,9 @@ func (r *Reader) searchStreams(result *resultData, subQueryResults map[string]re
 
 	// apply filters to lookup results or all streams, if no lookups could be used
 	filterAndAddToResult := func(activeQueryParts bitmask.ShortBitmask, si uint32) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		s, err := r.streamByIndex(si)
 		if err != nil {
 			return err

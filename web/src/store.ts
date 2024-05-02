@@ -257,6 +257,8 @@ const store = new Vuex.Store({
             });
         })
         .catch((err) => {
+          if (axios.isCancel(err))
+            return;
           if (
             axios.isAxiosError<string, unknown>(err) &&
             err.response !== undefined
@@ -324,6 +326,8 @@ const store = new Vuex.Store({
           });
         })
         .catch((err) => {
+          if (axios.isCancel(err))
+            return;
           if (
             axios.isAxiosError<string, unknown>(err) &&
             err.response !== undefined

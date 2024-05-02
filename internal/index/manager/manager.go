@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -616,7 +617,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters)
+		streams, _, err := index.SearchStreams(context.Background(), indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters)
 		if err != nil {
 			return err
 		}
@@ -1530,7 +1531,7 @@ func Limit(defaultLimit, page uint) StreamsOption {
 	}
 }
 
-func (v *View) prefetchTags(tags []string, bm bitmask.LongBitmask) error {
+func (v *View) prefetchTags(ctx context.Context, tags []string, bm bitmask.LongBitmask) error {
 	if len(tags) == 0 {
 		return nil
 	}
@@ -1588,7 +1589,7 @@ func (v *View) prefetchTags(tags []string, bm bitmask.LongBitmask) error {
 					continue outer
 				}
 			}
-			matches, _, err := index.SearchStreams(v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters)
+			matches, _, err := index.SearchStreams(ctx, v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters)
 			if err != nil {
 				return err
 			}
@@ -1606,7 +1607,7 @@ func (v *View) prefetchTags(tags []string, bm bitmask.LongBitmask) error {
 	return nil
 }
 
-func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption) error {
+func (v *View) AllStreams(ctx context.Context, f func(StreamContext) error, options ...StreamsOption) error {
 	opts := streamsOptions{}
 	for _, o := range options {
 		o(&opts)
@@ -1622,7 +1623,7 @@ func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption)
 			opts.prefetchTags = append(opts.prefetchTags, tn)
 		}
 	}
-	if err := v.prefetchTags(opts.prefetchTags, bitmask.LongBitmask{}); err != nil {
+	if err := v.prefetchTags(ctx, opts.prefetchTags, bitmask.LongBitmask{}); err != nil {
 		return err
 	}
 	for i := len(v.indexes); i > 0; i-- {
@@ -1644,7 +1645,7 @@ func (v *View) AllStreams(f func(StreamContext) error, options ...StreamsOption)
 	return nil
 }
 
-func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, uint, error) {
+func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, uint, error) {
 	opts := streamsOptions{}
 	for _, o := range options {
 		o(&opts)
@@ -1662,7 +1663,7 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 		limit = *filter.Limit
 	}
 	offset := opts.page * limit
-	res, hasMore, err := index.SearchStreams(v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters)
+	res, hasMore, err := index.SearchStreams(ctx, v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters)
 	if err != nil {
 		return false, 0, err
 	}
@@ -1674,7 +1675,7 @@ func (v *View) SearchStreams(filter *query.Query, f func(StreamContext) error, o
 		for _, s := range res {
 			searchedStreams.Set(uint(s.StreamID))
 		}
-		if err := v.prefetchTags(opts.prefetchTags, searchedStreams); err != nil {
+		if err := v.prefetchTags(ctx, opts.prefetchTags, searchedStreams); err != nil {
 			return false, 0, err
 		}
 	}

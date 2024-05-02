@@ -209,18 +209,27 @@ const APIClient = {
     return this.perform("patch", `/tags`, null, params);
   },
 
+  _abort: null as null | (() => void),
   async perform<ResponseData = unknown>(
     method: string,
     resource: string,
     data?: string | null,
     params?: object | URLSearchParams
   ) {
+    let signal: AbortSignal | undefined;
+    if (resource == "/search.json" || resource == "/graph.json") {
+      this._abort?.();
+      const controller = new AbortController();
+      this._abort = controller.abort.bind(controller);
+      signal = controller.signal;
+    }
     return client
       .request<ResponseData>({
         method,
         url: resource,
         data,
         params,
+        signal,
       })
       .then((req) => {
         return req.data;

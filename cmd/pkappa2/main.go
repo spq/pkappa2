@@ -488,7 +488,7 @@ func main() {
 		}
 		v := mgr.GetView()
 		defer v.Release()
-		hasMore, offset, err := v.SearchStreams(qq, func(c manager.StreamContext) error {
+		hasMore, offset, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
 			tags, err := c.AllTags()
 			if err != nil {
 				return err
@@ -515,6 +515,7 @@ func main() {
 		}
 	})
 	rUser.Get("/api/graph.json", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		var min, max time.Time
 		delta := 1 * time.Minute
 		if s := r.URL.Query()["delta"]; len(s) == 1 {
@@ -719,13 +720,13 @@ func main() {
 		}
 
 		if filter != nil {
-			_, _, err := v.SearchStreams(filter, handleStream, manager.PrefetchTags(groupingTags))
+			_, _, err := v.SearchStreams(ctx, filter, handleStream, manager.PrefetchTags(groupingTags))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 				return
 			}
 		} else {
-			err := v.AllStreams(handleStream, manager.PrefetchTags(groupingTags))
+			err := v.AllStreams(ctx, handleStream, manager.PrefetchTags(groupingTags))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("AllStreams failed: %v", err), http.StatusInternalServerError)
 				return
