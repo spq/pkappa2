@@ -3,7 +3,9 @@
     <v-form>
       <v-card>
         <v-card-title>
-          <span class="text-h5">Create {{ tagType | capitalize }}</span>
+          <span class="text-h5"
+            >Create {{ $options.filters?.capitalize(tagType) }}</span
+          >
         </v-card-title>
         <v-card-text>
           <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
@@ -54,125 +56,121 @@
   </v-dialog>
 </template>
 
-<script>
+<script lang="ts" setup>
 import { EventBus } from "./EventBus";
-import { mapActions } from "vuex";
+import { computed, ref, watch } from "vue";
+import { useStore } from "@/store";
 
-export default {
-  name: "TagCreateDialog",
-  data() {
-    return {
-      visible: false,
-      loading: false,
-      error: false,
-      tagQuery: "",
-      tagStreams: [],
-      tagType: "",
-      tagName: "",
-      tagColor: "",
-      colorPickerOpen: false,
-      colorPickerValue: "",
-    };
-  },
-  computed: {
-    // https://codepen.io/JamieCurnow/pen/KKPjraK
-    swatchStyle() {
-      const { tagColor, colorPickerOpen } = this;
-      return {
-        backgroundColor: tagColor,
-        cursor: "pointer",
-        height: "30px",
-        width: "30px",
-        borderRadius: colorPickerOpen ? "50%" : "4px",
-        transition: "border-radius 200ms ease-in-out",
-      };
-    },
-  },
-  watch: {
-    colorPickerOpen(val, old) {
-      if (val && !old) this.colorPickerValue = this.tagColor;
-    },
-  },
-  created() {
-    EventBus.$on("showCreateTagDialog", this.openDialog);
-  },
-  methods: {
-    ...mapActions(["addTag", "markTagNew"]),
-    openDialog({ tagType, tagQuery, tagStreams }) {
-      this.tagType = tagType;
-      this.tagQuery = tagQuery;
-      this.tagStreams = tagStreams;
-      this.tagName = "";
-      this.tagColor = this.randomColor();
-      this.colorPickerOpen = false;
-      this.visible = true;
-      this.loading = false;
-      this.error = false;
-    },
-    colorPickerValueUpdate(color) {
-      if (this.colorPickerOpen) this.tagColor = color.hex;
-    },
-    createTag() {
-      this.loading = true;
-      this.error = false;
-      (this.tagType == "mark"
-        ? this.markTagNew({
-            name: `${this.tagType}/${this.tagName}`,
-            streams: this.tagStreams,
-            color: this.tagColor,
-          })
-        : this.addTag({
-            name: `${this.tagType}/${this.tagName}`,
-            query: this.tagQuery,
-            color: this.tagColor,
-          })
-      )
-        .then(() => {
-          this.visible = false;
-        })
-        .catch((err) => {
-          this.error = true;
-          this.loading = false;
-          EventBus.$emit("showError", { message: err });
-        });
-    },
-    // https://stackoverflow.com/a/17243070
-    randomColor() {
-      const h = Math.random(),
-        s = 0.6,
-        v = 1.0;
-      var r, g, b, i, f, p, q, t;
-      i = Math.floor(h * 6);
-      f = h * 6 - i;
-      p = v * (1 - s);
-      q = v * (1 - f * s);
-      t = v * (1 - (1 - f) * s);
-      switch (i % 6) {
-        case 0:
-          (r = v), (g = t), (b = p);
-          break;
-        case 1:
-          (r = q), (g = v), (b = p);
-          break;
-        case 2:
-          (r = p), (g = v), (b = t);
-          break;
-        case 3:
-          (r = p), (g = q), (b = v);
-          break;
-        case 4:
-          (r = t), (g = p), (b = v);
-          break;
-        case 5:
-          (r = v), (g = p), (b = q);
-          break;
-      }
-      const toHex = (i) =>
-        Math.round(i * 255)
-          .toString(16)
-          .padStart(2, "0");
-      return "#" + toHex(r) + toHex(g) + toHex(b);
-    },
-  },
-};
+const store = useStore();
+const visible = ref(false);
+const loading = ref(false);
+const error = ref(false);
+const tagQuery = ref("");
+const tagStreams = ref<number[]>([]);
+const tagType = ref("");
+const tagName = ref("");
+const tagColor = ref("");
+const colorPickerOpen = ref(false);
+const colorPickerValue = ref("");
+
+// https://codepen.io/JamieCurnow/pen/KKPjraK
+const swatchStyle = computed(() => {
+  return {
+    backgroundColor: tagColor.value,
+    cursor: "pointer",
+    height: "30px",
+    width: "30px",
+    borderRadius: colorPickerOpen.value ? "50%" : "4px",
+    transition: "border-radius 200ms ease-in-out",
+  };
+});
+
+watch(colorPickerOpen, (val, old) => {
+  if (val && !old) colorPickerValue.value = tagColor.value;
+});
+
+EventBus.on("showCreateTagDialog", openDialog);
+
+function openDialog(
+  tagTypeValue: string,
+  tagQueryValue: string,
+  tagStreamsValue: number[]
+) {
+  tagType.value = tagTypeValue;
+  tagQuery.value = tagQueryValue;
+  tagStreams.value = tagStreamsValue;
+  tagName.value = "";
+  tagColor.value = randomColor();
+  colorPickerOpen.value = false;
+  visible.value = true;
+  loading.value = false;
+  error.value = false;
+}
+
+function colorPickerValueUpdate(color: { hex: string }) {
+  if (colorPickerOpen.value) tagColor.value = color.hex;
+}
+
+function createTag() {
+  loading.value = true;
+  error.value = false;
+  (tagType.value == "mark"
+    ? store.dispatch("markTagNew", {
+        name: `${tagType.value}/${tagName.value}`,
+        streams: tagStreams.value,
+        color: tagColor.value,
+      })
+    : store.dispatch("addTag", {
+        name: `${tagType.value}/${tagName.value}`,
+        query: tagQuery.value,
+        color: tagColor.value,
+      })
+  )
+    .then(() => {
+      visible.value = false;
+    })
+    .catch((err: string) => {
+      error.value = true;
+      loading.value = false;
+      EventBus.emit("showError", err);
+    });
+}
+
+// https://stackoverflow.com/a/17243070
+function randomColor() {
+  const h = Math.random(),
+    s = 0.6,
+    v = 1.0;
+  let { r, g, b } = { r: 0, g: 0, b: 0 };
+  const i = Math.floor(h * 6);
+  const f = h * 6 - i;
+  const p = v * (1 - s);
+  const q = v * (1 - f * s);
+  const t = v * (1 - (1 - f) * s);
+  switch (i % 6) {
+    case 0:
+      (r = v), (g = t), (b = p);
+      break;
+    case 1:
+      (r = q), (g = v), (b = p);
+      break;
+    case 2:
+      (r = p), (g = v), (b = t);
+      break;
+    case 3:
+      (r = p), (g = q), (b = v);
+      break;
+    case 4:
+      (r = t), (g = p), (b = v);
+      break;
+    case 5:
+      (r = v), (g = p), (b = q);
+      break;
+  }
+  const toHex = (i: number) =>
+    Math.round(i * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return "#" + toHex(r) + toHex(g) + toHex(b);
+}
 </script>

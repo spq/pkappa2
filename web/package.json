@@ -13,6 +13,7 @@
     "core-js": "^3.26.0",
     "moo": "^0.5.2",
     "nearley": "^2.20.1",
+    "tiny-typed-emitter": "^2.1.0",
     "vue": "^2.7.14",
     "vue-apexcharts": "^1.6.2",
     "vue-filter-pretty-bytes": "^0.1.6",

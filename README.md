@@ -32,7 +32,6 @@ You likely want to add some arguments to the `go run` command, check `-help`
 ## UI Development
 
 - make sure you can run Pkappa2
-- for development with vscode: disable `@builtin typescript` extension and let [Volar takeover](https://vuejs.org/guide/typescript/overview.html#volar-takeover-mode) for full typescript support in Vue files
 - run `yarn serve` in `/web`
 - run `go run cmd/pkappa2/main.go -address :8081` in `/`
 - visit `localhost:8080` in your web browser

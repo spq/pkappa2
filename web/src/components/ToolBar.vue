@@ -23,28 +23,26 @@
   </div>
 </template>
 
-<script>
-export default {
-  data() {
-    return {
-      toolbarWidth: 0,
-      toolbarHeight: 0,
-      toolbarResizeObserver: null,
-    };
-  },
-  mounted() {
-    this.toolbarResizeObserver = new ResizeObserver(this.onToolbarResize);
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarReal"));
-    this.toolbarResizeObserver.observe(document.getElementById("toolbarDummy"));
-    this.onToolbarResize();
-  },
-  methods: {
-    onToolbarResize() {
-      const tbd = document.getElementById("toolbarDummy");
-      if (tbd) this.toolbarWidth = tbd.offsetWidth;
-      const tbr = document.getElementById("toolbarReal");
-      if (tbr) this.toolbarHeight = tbr.offsetHeight;
-    },
-  },
-};
+<script lang="ts" setup>
+import { ref, onMounted } from "vue";
+
+const toolbarWidth = ref(0);
+const toolbarHeight = ref(0);
+const toolbarResizeObserver = ref<ResizeObserver | null>(null);
+
+onMounted(() => {
+  toolbarResizeObserver.value = new ResizeObserver(onToolbarResize);
+  const tbr = document.getElementById("toolbarReal");
+  if (tbr) toolbarResizeObserver.value.observe(tbr);
+  const tbd = document.getElementById("toolbarDummy");
+  if (tbd) toolbarResizeObserver.value.observe(tbd);
+  onToolbarResize();
+});
+
+function onToolbarResize() {
+  const tbd = document.getElementById("toolbarDummy");
+  if (tbd) toolbarWidth.value = tbd.offsetWidth;
+  const tbr = document.getElementById("toolbarReal");
+  if (tbr) toolbarHeight.value = tbr.offsetHeight;
+}
 </script>

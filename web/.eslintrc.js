@@ -9,7 +9,7 @@ module.exports = {
     project: "./tsconfig.json",
     parser: "@typescript-eslint/parser",
   },
-  ignorePatterns: ["**/*.js", "**/*.vue"],
+  ignorePatterns: ["**/*.js"],
   plugins: ["@typescript-eslint", "@typescript-eslint/eslint-plugin"],
   parser: "vue-eslint-parser",
   extends: [

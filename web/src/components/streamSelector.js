@@ -60,12 +60,13 @@ function chunkToQueryPart(chunk, data) {
 
 function onSelectionChange() {
   const selection = document.getSelection();
-  this.selectionData = "";
-  this.selectionQuery = "";
+  this.selectionData.value = "";
+  this.selectionQuery.value = "";
   if (selection.type !== "Range" || selection.isCollapsed) {
     return;
   }
-  const streamDataNode = this.$refs.streamData?.$el ?? this.$refs.streamData;
+  const streamDataNode =
+    this.proxy.$refs.streamData?.$el ?? this.proxy.$refs.streamData;
   // Do not support multi-range selection
   if (selection.rangeCount !== 1 || streamDataNode == null) {
     return;
@@ -85,7 +86,7 @@ function onSelectionChange() {
   ) {
     return;
   }
-  const chunks = this.stream.stream.Data;
+  const chunks = this.stream.value.stream.Data;
   const startChunkIdx = parseInt(
     getFromDataSet(streamDataNode, startContainer, "chunkIdx")
   );
@@ -116,6 +117,6 @@ function onSelectionChange() {
     queryData += data;
     queryParts.push(chunkToQueryPart(chunk, data));
   }
-  this.selectionData = queryData;
-  this.selectionQuery = queryParts.join(" then ");
+  this.selectionData.value = queryData;
+  this.selectionQuery.value = queryParts.join(" then ");
 }

@@ -1,15 +1,15 @@
 import Vue from "vue";
 import VueRouter from "vue-router";
 
-import Base from "./components/Base";
-import Converters from "./components/Converters";
-import Home from "./components/Home";
-import Status from "./components/Status";
-import Pcaps from "./components/Pcaps";
-import Tags from "./components/Tags";
-import Graph from "./components/Graph";
-import Results from "./components/Results";
-import Stream from "./components/Stream";
+import Base from "./components/Base.vue";
+import Converters from "./components/Converters.vue";
+import Home from "./components/Home.vue";
+import Status from "./components/Status.vue";
+import Pcaps from "./components/Pcaps.vue";
+import Tags from "./components/Tags.vue";
+import Graph from "./components/Graph.vue";
+import Results from "./components/Results.vue";
+import Stream from "./components/Stream.vue";
 
 Vue.use(VueRouter);
 

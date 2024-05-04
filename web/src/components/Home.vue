@@ -213,8 +213,4 @@
   </v-card>
 </template>
 
-<script>
-export default {
-  name: "Home",
-};
-</script>
+<script lang="ts" setup></script>

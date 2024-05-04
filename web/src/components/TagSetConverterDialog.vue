@@ -41,62 +41,57 @@
   </v-dialog>
 </template>
 
-<script>
-import { mapActions, mapState } from "vuex";
+<script lang="ts" setup>
+import { computed, ref } from "vue";
+import { useStore } from "@/store";
 import { EventBus } from "./EventBus";
 
-export default {
-  name: "TagSetConverterDialog",
-  data() {
-    return {
-      visible: false,
-      loading: false,
-      error: false,
-      tagType: "",
-      tagName: "",
-      tagId: null,
-      checkedConverters: [],
-    };
-  },
-  computed: {
-    ...mapState(["tags", "converters"]),
-    tag() {
-      return this.tags.find((tag) => tag.Name === this.tagId);
-    },
-  },
-  created() {
-    EventBus.$on("showTagSetConvertersDialog", this.openDialog);
-  },
-  methods: {
-    ...mapActions(["setTagConverters"]),
-    openDialog({ tagId }) {
-      this.tagId = tagId;
-      this.tagType = tagId.split("/", 1)[0];
-      this.tagName = tagId.substr(this.tagType.length + 1);
-      this.visible = true;
-      this.loading = false;
-      this.error = false;
-      this.getConvertersFromTag();
-    },
-    getConvertersFromTag() {
-      this.checkedConverters = this.tag.Converters.concat();
-    },
-    submitTagConverters() {
-      this.loading = true;
-      this.error = false;
-      this.setTagConverters({
-        name: this.tagId,
-        converters: this.checkedConverters,
-      })
-        .then(() => {
-          this.visible = false;
-        })
-        .catch((err) => {
-          this.error = true;
-          this.loading = false;
-          EventBus.$emit("showError", { message: err });
-        });
-    },
-  },
-};
+const visible = ref(false);
+const loading = ref(false);
+const error = ref(false);
+const tagType = ref("");
+const tagName = ref("");
+const tagId = ref<string | null>(null);
+const checkedConverters = ref<string[]>([]);
+
+const store = useStore();
+const tag = computed(() => {
+  if (store.state.tags === null || tagId.value === null) return undefined;
+  return store.state.tags.find((tag) => tag.Name === tagId.value);
+});
+const converters = computed(() => store.state.converters);
+
+EventBus.on("showTagSetConvertersDialog", openDialog);
+
+function openDialog(tagIdValue: string) {
+  tagId.value = tagIdValue;
+  tagType.value = tagIdValue.split("/")[0];
+  tagName.value = tagIdValue.substr(tagType.value.length + 1);
+  visible.value = true;
+  loading.value = false;
+  error.value = false;
+  getConvertersFromTag();
+}
+
+function getConvertersFromTag() {
+  checkedConverters.value = tag.value?.Converters.concat() || [];
+}
+
+function submitTagConverters() {
+  loading.value = true;
+  error.value = false;
+  store
+    .dispatch("setTagConverters", {
+      name: tagId.value,
+      converters: checkedConverters.value,
+    })
+    .then(() => {
+      visible.value = false;
+    })
+    .catch((err: string) => {
+      error.value = true;
+      loading.value = false;
+      EventBus.emit("showError", err);
+    });
+}
 </script>
