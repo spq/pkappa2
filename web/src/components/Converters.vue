@@ -98,7 +98,7 @@ import APIClient, {
 import ToolBar from "./ToolBar.vue";
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "@/store";
-import { DataTableItemProps } from "vuetify/types";
+import { DataTableItemProps } from "vuetify";
 
 const store = useStore();
 const headers = [

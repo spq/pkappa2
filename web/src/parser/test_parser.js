@@ -1,5 +1,5 @@
-const nearley = require("nearley");
-const grammar = require("./query.js");
+import nearley from "nearley";
+import grammar from "./query.js";
 
 const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
 try {

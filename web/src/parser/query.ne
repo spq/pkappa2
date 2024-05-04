@@ -1,8 +1,9 @@
 # nearleyc query.ne -o query.js
+@preprocessor esmodule
 @{%
 /* eslint-disable */
 /* prettier-ignore */
-const moo = require("moo");
+import moo from "moo"
 
 const lexer = moo.compile({
     ws: {match: /[ \t\n\r]+/, lineBreaks: true},

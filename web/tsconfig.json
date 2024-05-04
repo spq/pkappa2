@@ -8,7 +8,7 @@
     "allowJs": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "types": ["webpack-env", "vuetify"],
+    "types": ["webpack-env", "node", "vuetify"],
     "paths": {
       "@/*": ["src/*"]
     },
@@ -25,6 +25,7 @@
     "tests/**/*.ts",
     "tests/**/*.tsx",
     ".eslintrc.js",
+    "components.d.ts",
     "src/plugins/vuetify.js"
   ],
   "exclude": ["node_modules"]
