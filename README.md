@@ -32,7 +32,7 @@ You likely want to add some arguments to the `go run` command, check `-help`
 ## UI Development
 
 - make sure you can run Pkappa2
-- run `yarn serve` in `/web`
+- run `yarn dev` in `/web`
 - run `go run cmd/pkappa2/main.go -address :8081` in `/`
 - visit `localhost:8080` in your web browser
 

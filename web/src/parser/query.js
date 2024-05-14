@@ -1,11 +1,10 @@
 // Generated automatically by nearley, version 2.20.1
 // http://github.com/Hardmath123/nearley
-(function () {
 function id(x) { return x[0]; }
 
 /* eslint-disable */
 /* prettier-ignore */
-const moo = require("moo");
+import moo from "moo"
 
 const lexer = moo.compile({
     ws: {match: /[ \t\n\r]+/, lineBreaks: true},
@@ -27,9 +26,8 @@ const lexer = moo.compile({
         'kw_then': 'then',
     })},
 });
-var grammar = {
-    Lexer: lexer,
-    ParserRules: [
+let Lexer = lexer;
+let ParserRules = [
     {"name": "queryRoot$ebnf$1", "symbols": [(lexer.has("ws") ? {type: "ws"} : ws)], "postprocess": id},
     {"name": "queryRoot$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "queryRoot", "symbols": ["queryOrCondition", "queryRoot$ebnf$1"], "postprocess": id},
@@ -62,12 +60,6 @@ var grammar = {
     {"name": "queryCondition$ebnf$8", "symbols": [(lexer.has("ws") ? {type: "ws"} : ws)], "postprocess": id},
     {"name": "queryCondition$ebnf$8", "symbols": [], "postprocess": function(d) {return null;}},
     {"name": "queryCondition", "symbols": [(lexer.has("keyword_or_error") ? {type: "keyword_or_error"} : keyword_or_error), "queryCondition$ebnf$6", "queryCondition$ebnf$7", "queryCondition$ebnf$8"], "postprocess": function(d) {return {'type': 'error', 'expression': d[0]};}}
-]
-  , ParserStart: "queryRoot"
-}
-if (typeof module !== 'undefined'&& typeof module.exports !== 'undefined') {
-   module.exports = grammar;
-} else {
-   window.grammar = grammar;
-}
-})();
+];
+let ParserStart = "queryRoot";
+export default { Lexer, ParserRules, ParserStart };
