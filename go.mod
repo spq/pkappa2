@@ -12,4 +12,7 @@ require (
 	rsc.io/binaryregexp v0.2.0
 )
 
-require golang.org/x/net v0.23.0 // indirect
+require (
+	github.com/gorilla/websocket v1.5.1 // indirect
+	golang.org/x/net v0.23.0 // indirect
+)

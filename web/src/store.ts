@@ -112,6 +112,11 @@ type ChangeMarkTagParam = {
   streams: number[];
 };
 
+type Event = {
+  Type: string;
+  Tag: TagInfo | null;
+};
+
 export interface Getters {
   groupedTags: { [key: string]: TagInfo[] };
 }
@@ -143,6 +148,54 @@ export const getters: GettersDefinition = {
     }
     return res;
   },
+};
+
+const ws = (store: MyStore) => {
+  let reconnectTimeout = 125;
+  const connect = () => {
+    const l = window.location;
+    const url = `ws${l.protocol.slice(4)}//${l.host}/ws`;
+    const ws = new WebSocket(url);
+    ws.onopen = () => {
+      reconnectTimeout = 125;
+    };
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+      ws.close();
+    };
+    ws.onclose = () => {
+      console.log(
+        `WebSocket closed, reconnecting in ${
+          reconnectTimeout < 1000
+            ? `1/${1000 / reconnectTimeout}`
+            : reconnectTimeout / 1000.0
+        }s`
+      );
+      setTimeout(() => {
+        if (reconnectTimeout < 10000) reconnectTimeout *= 2;
+        connect();
+      }, reconnectTimeout);
+    };
+    ws.onmessage = (event) => {
+      const e: Event = JSON.parse(event.data as string) as Event;
+      switch (e.Type) {
+        case "tagAdded":
+          store.commit("addTag", e.Tag);
+          break;
+        case "tagDeleted":
+          store.commit("delTag", e.Tag?.Name);
+          break;
+        case "tagUpdated":
+        case "tagEvaluated":
+          store.commit("updateTag", e.Tag);
+          break;
+        default:
+          console.log(`Unhandled event type: ${e.Type}`);
+          break;
+      }
+    };
+  };
+  connect();
 };
 
 const store = new Vuex.Store({
@@ -218,6 +271,17 @@ const store = new Vuex.Store({
     },
     setTags(state: State, tags: TagInfo[]) {
       state.tags = tags;
+    },
+    addTag(state: State, tag: TagInfo) {
+      if (state.tags != null) state.tags.push(tag);
+    },
+    delTag(state: State, tagName: string) {
+      if (state.tags != null)
+        state.tags = state.tags.filter((tag) => tag.Name != tagName);
+    },
+    updateTag(state: State, tag: TagInfo) {
+      if (state.tags != null)
+        state.tags = state.tags.map((t) => (t.Name == tag.Name ? tag : t));
     },
     setConverters(state: State, converters: ConverterStatistics[]) {
       state.converters = converters;
@@ -460,6 +524,7 @@ const store = new Vuex.Store({
         .catch(handleAxiosDefaultError);
     },
   },
+  plugins: [ws],
 });
 
 export default store;

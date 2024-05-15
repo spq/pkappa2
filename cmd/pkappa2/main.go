@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/pcapgo"
+	"github.com/gorilla/websocket"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/manager"
 	"github.com/spq/pkappa2/internal/query"
@@ -79,8 +80,6 @@ func main() {
 		mgr.Close()
 		os.Exit(1)
 	}()
-
-	var server *http.Server
 
 	r := chi.NewRouter()
 	r.Use(middleware.SetHeader("Access-Control-Allow-Origin", "*"))
@@ -798,8 +797,34 @@ func main() {
 		}
 	})
 	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
+	u := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+	rUser.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%v", r.Header)
+		c, err := u.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("Upgrade failed: %v", err)
+			return
+		}
+		defer c.Close()
+		log.Println("Client connected")
 
-	server = &http.Server{
+		ch, closer := mgr.Listen()
+		defer closer()
+		for msg := range ch {
+			err := c.WriteJSON(msg)
+			if err != nil {
+				log.Printf("WriteJSON failed: %v", err)
+				break
+			}
+		}
+		log.Println("Client disconnected")
+	})
+
+	server := &http.Server{
 		Addr:    *listenAddress,
 		Handler: r,
 	}
