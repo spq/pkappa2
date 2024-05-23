@@ -834,22 +834,27 @@ func (mgr *Manager) AddTag(name, color, queryString string) error {
 					return fmt.Errorf("unknown referenced tag %q", t)
 				}
 			}
+			mgr.tags[name] = nt
 			if isMark {
 				nt.Matches, _ = q.Conditions.StreamIDs(mgr.nextStreamID)
 			} else {
 				nt.Uncertain = mgr.allStreams
-			}
-			for _, t := range nt.referencedTags() {
-				mgr.tags[t].referencedBy[name] = struct{}{}
-			}
-			mgr.tags[name] = nt
-			if !isMark {
 				mgr.startTaggingJobIfNeeded()
 			}
 			mgr.event(Event{
 				Type: "tagAdded",
 				Tag:  makeTagInfo(name, nt),
 			})
+			for _, tn := range nt.referencedTags() {
+				t := mgr.tags[tn]
+				t.referencedBy[name] = struct{}{}
+				if len(t.referencedBy) == 1 {
+					mgr.event(Event{
+						Type: "tagUpdated",
+						Tag:  makeTagInfo(tn, t),
+					})
+				}
+			}
 			return mgr.saveState()
 		}()
 		c <- err
@@ -877,10 +882,6 @@ func (mgr *Manager) DelTag(name string) error {
 					}
 				}
 			}
-			// remove tag from referenced tags
-			for _, t := range tag.referencedTags() {
-				delete(mgr.tags[t].referencedBy, name)
-			}
 			delete(mgr.tags, name)
 			mgr.event(Event{
 				Type: "tagDeleted",
@@ -888,6 +889,17 @@ func (mgr *Manager) DelTag(name string) error {
 					Name: name,
 				},
 			})
+			for _, tn := range tag.referencedTags() {
+				t := mgr.tags[tn]
+				delete(t.referencedBy, name)
+				if len(t.referencedBy) != 0 {
+					continue
+				}
+				mgr.event(Event{
+					Type: "tagUpdated",
+					Tag:  makeTagInfo(tn, t),
+				})
+			}
 			return mgr.saveState()
 		}()
 		c <- err
