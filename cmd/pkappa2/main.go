@@ -797,20 +797,14 @@ func main() {
 		}
 	})
 	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
-	u := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
 	rUser.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%v", r.Header)
-		c, err := u.Upgrade(w, r, nil)
+		c, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("Upgrade failed: %v", err)
 			return
 		}
 		defer c.Close()
-		log.Println("Client connected")
+		log.Printf("Client %q connected", c.RemoteAddr().String())
 
 		ch, closer := mgr.Listen()
 		defer closer()
@@ -821,7 +815,7 @@ func main() {
 				break
 			}
 		}
-		log.Println("Client disconnected")
+		log.Printf("Client %q disconnected", c.RemoteAddr().String())
 	})
 
 	server := &http.Server{
