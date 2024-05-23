@@ -12,6 +12,7 @@
     "nearley": "nearleyc src/parser/query.ne -o src/parser/query.js"
   },
   "dependencies": {
+    "@types/webpack-env": "^1.18.5",
     "@types/ws": "^8.5.10",
     "apexcharts": "^3.36.3",
     "axios": "^1.1.3",

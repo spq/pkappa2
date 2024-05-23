@@ -866,7 +866,7 @@ func (mgr *Manager) DelTag(name string) error {
 			// remove converter results of attached converters from cache
 			if len(tag.converters) > 0 {
 				for _, converter := range tag.converters {
-					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
+					if err := mgr.detachConverterFromTag(tag, converter); err != nil {
 						return err
 					}
 				}
@@ -959,7 +959,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					if slices.Contains(info.setConverterNames, converter.Name()) {
 						continue
 					}
-					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
+					if err := mgr.detachConverterFromTag(tag, converter); err != nil {
 						return fmt.Errorf("failed to detach converter %q from tag %q: %w", converter.Name(), name, err)
 					}
 				}
@@ -1400,7 +1400,7 @@ func (mgr *Manager) removeConverter(path string) error {
 
 	// remove converter from all tags
 	for _, t := range mgr.tags {
-		if err := mgr.detachConverterFromTag(t, name, converter); err != nil {
+		if err := mgr.detachConverterFromTag(t, converter); err != nil {
 			return err
 		}
 	}
@@ -1461,7 +1461,7 @@ func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *co
 	return nil
 }
 
-func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *converters.CachedConverter) error {
+func (mgr *Manager) detachConverterFromTag(tag *tag, converter *converters.CachedConverter) error {
 	for i, c := range tag.converters {
 		if c == converter {
 			tag.converters = append(tag.converters[:i], tag.converters[i+1:]...)
