@@ -32,3 +32,4 @@ pnpm-debug.log*
 
 __pycache__
 *.py[cod]
+cmd/pkappa2/__debug_bin*
