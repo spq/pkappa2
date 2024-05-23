@@ -348,7 +348,13 @@ nextStateFile:
 }
 
 func (t tag) referencedTags() []string {
-	return append(append([]string(nil), t.features.MainTags...), t.features.SubQueryTags...)
+	m := map[string]struct{}{}
+	for _, i := range [2][]string{t.features.MainTags, t.features.SubQueryTags} {
+		for _, v := range i {
+			m[v] = struct{}{}
+		}
+	}
+	return maps.Keys(m)
 }
 
 func (t tag) converterNames() []string {

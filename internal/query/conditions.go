@@ -2038,7 +2038,7 @@ func (cs *ConditionsSet) Features() FeatureSet {
 					mainTags[ccc.TagName] = struct{}{}
 					fs.MainTags = append(fs.MainTags, ccc.TagName)
 				}
-				if _, ok := subQueryTags[ccc.TagName]; mq && !ok {
+				if _, ok := subQueryTags[ccc.TagName]; sq && !ok {
 					subQueryTags[ccc.TagName] = struct{}{}
 					fs.SubQueryTags = append(fs.SubQueryTags, ccc.TagName)
 				}
