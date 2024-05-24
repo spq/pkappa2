@@ -127,7 +127,7 @@
 <script lang="ts" setup>
 import { computed, onMounted } from "vue";
 import { EventBus } from "./EventBus";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import ToolBar from "./ToolBar.vue";
 
 const tagTypes = [
@@ -152,9 +152,9 @@ const tagTypes = [
     key: "generated",
   },
 ];
-const store = useStore();
-const groupedTags = computed(() => store.getters.groupedTags);
-const tags = computed(() => store.state.tags);
+const store = useRootStore();
+const groupedTags = computed(() => store.groupedTags);
+const tags = computed(() => store.tags);
 const converterList = computed(() => {
   if (tags.value === null) return {};
   return tags.value.reduce((acc: { [key: string]: string }, tag) => {
@@ -168,7 +168,7 @@ onMounted(() => {
 });
 
 function updateTags() {
-  store.dispatch("updateTags").catch((err: string) => {
+  store.updateTags().catch((err: string) => {
     EventBus.emit("showError", `Failed to update tags: ${err}`);
   });
 }

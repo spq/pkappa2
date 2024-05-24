@@ -59,9 +59,9 @@
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
 import { ref, computed, watch } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 
-const store = useStore();
+const store = useRootStore();
 const visible = ref(false);
 const loading = ref(false);
 const error = ref(false);
@@ -95,7 +95,7 @@ function openDialog(tagIdValue: string) {
   tagType.value = tagIdValue.split("/")[0];
   tagName.value = tagIdValue.substr(tagType.value.length + 1);
   tagColor.value =
-    store.state.tags?.find((e) => e.Name == tagIdValue)?.Color ?? "#000000";
+    store.tags?.find((e) => e.Name == tagIdValue)?.Color ?? "#000000";
   colorPickerOpen.value = false;
   visible.value = true;
   loading.value = false;
@@ -110,7 +110,7 @@ function updateColor() {
   loading.value = true;
   error.value = false;
   store
-    .dispatch("changeTagColor", { name: tagId.value, color: tagColor.value })
+    .changeTagColor(tagId.value, tagColor.value)
     .then(() => {
       visible.value = false;
     })

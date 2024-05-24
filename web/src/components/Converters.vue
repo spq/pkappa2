@@ -97,10 +97,10 @@ import APIClient, {
 } from "@/apiClient";
 import ToolBar from "./ToolBar.vue";
 import { computed, onMounted, ref } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import { DataTableItemProps } from "vuetify";
 
-const store = useStore();
+const store = useRootStore();
 const headers = [
   { text: "Name", value: "name", cellClass: "cursor-pointer" },
   {
@@ -126,7 +126,7 @@ const shownProcessErrors = ref<ProcessStderr | null>(null);
 
 const items = computed(() => {
   return (
-    store.state.converters?.map((converter) => ({
+    store.converters?.map((converter) => ({
       name: converter.Name,
       cachedStreamCount: converter.CachedStreamCount,
       runningProcesses: converter.Processes.filter((process) => process.Running)
@@ -143,10 +143,10 @@ onMounted(() => {
 });
 
 function refreshConverters() {
-  store.dispatch("updateTags").catch((err: string) => {
+  store.updateTags().catch((err: string) => {
     EventBus.emit("showError", `Failed to update tags: ${err}`);
   });
-  store.dispatch("updateConverters").catch((err: string) => {
+  store.updateConverters().catch((err: string) => {
     EventBus.emit("showError", `Failed to update converters: ${err}`);
   });
 }

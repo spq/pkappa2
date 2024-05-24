@@ -352,7 +352,9 @@
 
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
+import { useStreamStore } from "@/stores/stream";
+import { useStreamsStore } from "@/stores/streams";
 import {
   computed,
   getCurrentInstance,
@@ -371,7 +373,7 @@ import {
 
 const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
 
-const store = useStore();
+const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
 const presentation = ref("ascii");
@@ -382,20 +384,20 @@ if (localStorage.streamPresentation) {
   presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";
 }
 
-const stream = computed(() => store.state.stream);
-const streams = computed(() => store.state.streams);
-const tags = computed(() => store.state.tags);
-const converters = computed(() => store.state.converters);
-const groupedTags = computed(() => store.getters.groupedTags);
+const stream = useStreamStore();
+const streams = useStreamsStore();
+const tags = computed(() => store.tags);
+const converters = computed(() => store.converters);
+const groupedTags = computed(() => store.groupedTags);
 const streamTags = computed(() => {
-  if (stream.value.stream == null) return {};
+  if (stream.stream == null) return {};
   let res: { [key: string]: { name: string; color: string }[] } = {
     service: [],
     tag: [],
     mark: [],
     generated: [],
   };
-  for (const tag of stream.value.stream.Tags) {
+  for (const tag of stream.stream.Tags) {
     const type = tag.split("/", 1)[0];
     const name = tag.substr(type.length + 1);
     const color = tags.value?.filter((e) => e.Name == tag)[0]?.Color ?? "";
@@ -409,21 +411,18 @@ const streamId = computed(() => {
 });
 
 const converter = computed(() => {
-  return route.query.converter ?? "auto";
+  return (route.query.converter as string) ?? "auto";
 });
 
 const activeConverter = computed(() => {
-  if (
-    stream.value.stream === null ||
-    stream.value.stream.ActiveConverter === ""
-  ) {
+  if (stream.stream === null || stream.stream.ActiveConverter === "") {
     return "none";
   }
-  return "converter:" + stream.value.stream.ActiveConverter;
+  return "converter:" + stream.stream.ActiveConverter;
 });
 
 const selectableConverters = computed(() => {
-  if (stream.value.stream === null) return [];
+  if (stream.stream === null) return [];
   const availableConverters =
     converters.value?.map((converter) => ({
       text: converter.Name,
@@ -434,7 +433,7 @@ const selectableConverters = computed(() => {
       text: "* none",
       value: "none",
     },
-    ...stream.value.stream.Converters.map((converter) => ({
+    ...stream.stream.Converters.map((converter) => ({
       text: `* ${converter}`,
       value: "converter:" + converter,
     })),
@@ -443,10 +442,10 @@ const selectableConverters = computed(() => {
 });
 
 const streamIndex = computed(() => {
-  if (streams.value.result == null) return null;
+  if (streams.result == null) return null;
   const id = streamId.value;
   let i = 0;
-  for (let r of streams.value.result.Results) {
+  for (let r of streams.result.Results) {
     if (r.Stream.ID == id) return i;
     i++;
   }
@@ -454,18 +453,18 @@ const streamIndex = computed(() => {
 });
 
 const nextStreamId = computed(() => {
-  if (streams.value.result === null) return null;
+  if (streams.result === null) return null;
   const index = streamIndex.value;
   if (index === null) return null;
-  if (index + 1 >= streams.value.result.Results.length) return null;
-  return streams.value.result.Results[index + 1].Stream.ID;
+  if (index + 1 >= streams.result.Results.length) return null;
+  return streams.result.Results[index + 1].Stream.ID;
 });
 
 const prevStreamId = computed(() => {
-  if (streams.value.result === null) return null;
+  if (streams.result === null) return null;
   const index = streamIndex.value;
   if (index === null || index === 0) return null;
-  return streams.value.result.Results[index - 1].Stream.ID;
+  return streams.result.Results[index - 1].Stream.ID;
 });
 
 watch(route, fetchStreamForId);
@@ -523,22 +522,17 @@ function changeConverter(converter: string) {
 
 function fetchStreamForId() {
   if (streamId.value !== null) {
-    store
-      .dispatch("fetchStream", {
-        id: streamId.value,
-        converter: converter.value,
-      })
-      .catch((err: string) => {
-        EventBus.emit("showError", `Failed to fetch stream: ${err}`);
-      });
+    stream.fetchStream(streamId.value, converter.value).catch((err: string) => {
+      EventBus.emit("showError", `Failed to fetch stream: ${err}`);
+    });
     document.getSelection()?.empty();
   }
 }
 
 function openInCyberChef() {
   let data = selectionData.value;
-  if (data === "" && stream.value.stream !== null) {
-    for (const chunk of stream.value.stream.Data) {
+  if (data === "" && stream.stream !== null) {
+    for (const chunk of stream.stream.Data) {
       data += atob(chunk.Content);
     }
   }
@@ -552,17 +546,13 @@ function createMark() {
 
 function markStream(tagId: string, value: boolean) {
   if (value) {
-    store
-      .dispatch("markTagAdd", { name: tagId, streams: [streamId.value] })
-      .catch((err: string) => {
-        EventBus.emit("showError", `Failed to add stream to mark: ${err}`);
-      });
+    store.markTagAdd(tagId, [streamId.value]).catch((err: string) => {
+      EventBus.emit("showError", `Failed to add stream to mark: ${err}`);
+    });
   } else {
-    store
-      .dispatch("markTagDel", { name: tagId, streams: [streamId.value] })
-      .catch((err: string) => {
-        EventBus.emit("showError", `Failed to remove stream from mark: ${err}`);
-      });
+    store.markTagDel(tagId, [streamId.value]).catch((err: string) => {
+      EventBus.emit("showError", `Failed to remove stream from mark: ${err}`);
+    });
   }
 }
 </script>

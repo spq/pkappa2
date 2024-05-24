@@ -32,7 +32,7 @@
 import { ref } from "vue";
 import { EventBus } from "./EventBus";
 import { ConverterStatistics } from "@/apiClient";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 
 const visible = ref(false);
 const loading = ref(false);
@@ -40,7 +40,7 @@ const error = ref(false);
 const converterName = ref("");
 const converterStreamCount = ref(0);
 
-const store = useStore();
+const store = useRootStore();
 
 EventBus.on("showConverterResetDialog", openDialog);
 
@@ -57,7 +57,7 @@ function resetConverterAction() {
   error.value = false;
   const converterNameValue = converterName.value;
   store
-    .dispatch("resetConverter", { name: converterNameValue })
+    .resetConverter(converterNameValue)
     .then(() => {
       visible.value = false;
     })

@@ -82,11 +82,11 @@ import { addSearch, getTermAt } from "./searchHistory";
 import suggest from "@/parser/suggest";
 import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router/composables";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import { tagNameForURI } from "@/filters/tagNameForURI";
 import { VTextField } from "vuetify/lib";
 
-const store = useStore();
+const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
 const searchBoxField = ref<InstanceType<typeof VTextField> | null>(null);
@@ -104,8 +104,8 @@ const suggestionMenuPosX = ref(0);
 const suggestionMenuPosY = ref(0);
 const tagColors = computed(() => {
   const tags: { [key: string]: { [key: string]: string } } = {};
-  if (store.state.tags == null) return tags;
-  store.state.tags.forEach((tag) => {
+  if (store.tags == null) return tags;
+  store.tags.forEach((tag) => {
     const type = tag.Name.split("/", 1)[0];
     const name = tag.Name.substr(type.length + 1);
     if (!(type in tags)) {
@@ -145,7 +145,7 @@ watch(
 );
 
 onMounted(() => {
-  store.dispatch("updateConverters").catch((err: string) => {
+  store.updateConverters().catch((err: string) => {
     EventBus.emit("showError", `Failed to update converters: ${err}`);
   });
   const keyListener = (e: KeyboardEvent) => {
@@ -215,14 +215,14 @@ type SuggestionResults = {
 
 function startSuggestionSearch() {
   const val = searchBox.value;
-  typingDelay.value = setTimeout(() => {
+  typingDelay.value = window.setTimeout(() => {
     const cursorPosition =
       searchBoxField.value?.$el.querySelector("input")?.selectionStart ?? 0;
     const suggestionResult: SuggestionResults = suggest(
       val,
       cursorPosition,
-      store.getters.groupedTags,
-      store.state.converters
+      store.groupedTags,
+      store.converters
     ) as SuggestionResults; // trust me bro
     suggestionItems.value = suggestionResult.suggestions;
     suggestionStart.value = suggestionResult.start;

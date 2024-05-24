@@ -27,18 +27,18 @@
 <script lang="ts" setup>
 import ToolBar from "./ToolBar.vue";
 import { computed, onMounted } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 
-const store = useStore();
-const status = computed(() => store.state.status);
+const store = useRootStore();
+const status = computed(() => store.status);
 
 onMounted(() => {
   updateStatus();
 });
 
 function updateStatus() {
-  store.dispatch("updateStatus").catch((err: string) => {
+  store.updateStatus().catch((err: string) => {
     EventBus.emit("showError", `Failed to update status: ${err}`);
   });
 }

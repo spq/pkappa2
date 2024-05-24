@@ -32,9 +32,9 @@
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
 import { ref } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 
-const store = useStore();
+const store = useRootStore();
 const visible = ref(false);
 const loading = ref(false);
 const error = ref(false);
@@ -57,7 +57,7 @@ function deleteTag() {
   loading.value = true;
   error.value = false;
   store
-    .dispatch("delTag", { name: tagId.value })
+    .delTag(tagId.value)
     .then(() => {
       visible.value = false;
     })
