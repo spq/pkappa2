@@ -825,8 +825,19 @@ func main() {
 		clientClosed := make(chan struct{})
 		go func() {
 			c.SetReadLimit(512)
-			c.SetReadDeadline(time.Now().Add(pongWait))
-			c.SetPongHandler(func(string) error { c.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+			if err := c.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+				log.Printf("WebSocket SetReadDeadline failed: %v", err)
+				close(clientClosed)
+				return
+			}
+			c.SetPongHandler(func(string) error {
+				if err := c.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+					log.Printf("WebSocket SetReadDeadline failed: %v", err)
+					close(clientClosed)
+					return err
+				}
+				return nil
+			})
 			for {
 				_, _, err := c.ReadMessage()
 				if err != nil {
@@ -846,13 +857,19 @@ func main() {
 		for {
 			select {
 			case msg := <-ch:
-				c.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := c.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+					log.Printf("WebSocket SetWriteDeadline failed: %v", err)
+					break outer
+				}
 				if err := c.WriteJSON(msg); err != nil {
 					log.Printf("WebSocket WriteJSON failed: %v", err)
 					break outer
 				}
 			case <-pingTicker.C:
-				c.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := c.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+					log.Printf("WebSocket SetWriteDeadline failed: %v", err)
+					break outer
+				}
 				if err := c.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 					log.Printf("WebSocket Ping failed: %v", err)
 					break outer
