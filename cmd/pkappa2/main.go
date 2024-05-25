@@ -833,7 +833,6 @@ func main() {
 			c.SetPongHandler(func(string) error {
 				if err := c.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
 					log.Printf("WebSocket SetReadDeadline failed: %v", err)
-					close(clientClosed)
 					return err
 				}
 				return nil
