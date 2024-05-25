@@ -29,6 +29,18 @@ import (
 	"github.com/spq/pkappa2/web"
 )
 
+const (
+	// WebSocket timings
+	// Time allowed to write a message to the client.
+	writeWait = 5 * time.Second
+
+	// Time allowed to read the next pong message from the client.
+	pongWait = 60 * time.Second
+
+	// Send pings to client with this period. Must be less than pongWait.
+	pingPeriod = (pongWait * 9) / 10
+)
+
 var (
 	baseDir      = flag.String("base_dir", "/tmp", "All paths are relative to this path")
 	pcapDir      = flag.String("pcap_dir", "", "Path where pcaps will be stored")
@@ -800,22 +812,56 @@ func main() {
 	rUser.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("Upgrade failed: %v", err)
+			log.Printf("WebSocket Upgrade failed: %v", err)
 			return
 		}
 		defer c.Close()
-		log.Printf("Client %q connected", c.RemoteAddr().String())
+		log.Printf("WebSocket Client %q connected", c.RemoteAddr().String())
 
 		ch, closer := mgr.Listen()
 		defer closer()
-		for msg := range ch {
-			err := c.WriteJSON(msg)
-			if err != nil {
-				log.Printf("WriteJSON failed: %v", err)
-				break
+
+		// Read from websocket to process control messages
+		clientClosed := make(chan struct{})
+		go func() {
+			c.SetReadLimit(512)
+			c.SetReadDeadline(time.Now().Add(pongWait))
+			c.SetPongHandler(func(string) error { c.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+			for {
+				_, _, err := c.ReadMessage()
+				if err != nil {
+					if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+						log.Printf("WebSocket ReadMessage failed: %v", err)
+					}
+					close(clientClosed)
+					return
+				}
+			}
+		}()
+		// Write to websocket to send updates
+		pingTicker := time.NewTicker(pingPeriod)
+		defer pingTicker.Stop()
+
+	outer:
+		for {
+			select {
+			case msg := <-ch:
+				c.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := c.WriteJSON(msg); err != nil {
+					log.Printf("WebSocket WriteJSON failed: %v", err)
+					break outer
+				}
+			case <-pingTicker.C:
+				c.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := c.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+					log.Printf("WebSocket Ping failed: %v", err)
+					break outer
+				}
+			case <-clientClosed:
+				break outer
 			}
 		}
-		log.Printf("Client %q disconnected", c.RemoteAddr().String())
+		log.Printf("WebSocket Client %q disconnected", c.RemoteAddr().String())
 	})
 
 	server := &http.Server{
