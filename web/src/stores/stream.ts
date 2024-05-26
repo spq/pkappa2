@@ -31,11 +31,12 @@ export const useStreamStore = defineStore("stream", {
           this.running = false;
         })
         .catch((err) => {
-          if (
-            axios.isAxiosError<string, unknown>(err)
-          ) {
+          if (axios.isAxiosError<string, unknown>(err)) {
             this.id = id;
-            this.error = err.response !== undefined && err.response.data !== "" ? err.response.data : err.message;
+            this.error =
+              err.response !== undefined && err.response.data !== ""
+                ? err.response.data
+                : err.message;
             this.stream = null;
             this.running = false;
           } else throw err;
