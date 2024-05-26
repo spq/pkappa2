@@ -21,5 +21,6 @@ EventBus.on("showError", showError);
 function showError(msg: string) {
   message.value = msg;
   visible.value = true;
+  console.error(msg);
 }
 </script>

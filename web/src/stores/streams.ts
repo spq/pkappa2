@@ -43,13 +43,12 @@ export const useStreamsStore = defineStore("streams", {
         .catch((err) => {
           if (axios.isCancel(err)) return;
           if (
-            axios.isAxiosError<string, unknown>(err) &&
-            err.response !== undefined
+            axios.isAxiosError<string, unknown>(err)
           ) {
             this.query = query;
             this.page = page;
             this.running = false;
-            this.error = err.response.data;
+            this.error = err.response !== undefined && err.response.data !== "" ? err.response.data : err.message;
             this.result = null;
           } else throw err;
         });

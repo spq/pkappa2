@@ -64,15 +64,14 @@ export const useGraphStore = defineStore("graph", {
         .catch((err) => {
           if (axios.isCancel(err)) return;
           if (
-            axios.isAxiosError<string, unknown>(err) &&
-            err.response !== undefined
+            axios.isAxiosError<string, unknown>(err)
           ) {
             this.delta = delta;
             this.aspects = aspects;
             this.tags = tags;
             this.query = query;
             this.type = type;
-            this.error = err.response.data;
+            this.error = err.response !== undefined && err.response.data !== "" ? err.response.data : err.message;
             this.graph = null;
             this.running = false;
           } else throw err;

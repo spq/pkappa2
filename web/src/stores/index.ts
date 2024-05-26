@@ -157,7 +157,7 @@ export const useRootStore = defineStore("root", {
 });
 
 export function handleAxiosDefaultError(err: unknown) {
-  if (axios.isAxiosError<string, unknown>(err) && err.response !== undefined)
-    throw err.response.data;
+  if (axios.isAxiosError<string, unknown>(err))
+    throw err.response !== undefined && err.response.data !== "" ? err.response.data : err.message;
   else throw err;
 }

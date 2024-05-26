@@ -138,7 +138,6 @@ export type GraphResponse = {
   Data: GraphData[];
 };
 
-// TODO: Verify response types!
 const APIClient = {
   async searchStreams(query: string, page: number) {
     return this.perform("post", "/search.json", isSearchResponse, query, {
