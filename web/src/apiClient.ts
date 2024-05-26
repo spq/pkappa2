@@ -1,5 +1,15 @@
 import axios from "axios";
 import type { Base64, DateTimeString } from "@/types/common";
+import {
+  isConvertersResponse,
+  isGraphResponse,
+  isPcapsResponse,
+  isProcessStderr,
+  isSearchResponse,
+  isStatistics,
+  isStreamData,
+  isTagsResponse,
+} from "./apiClient.guard";
 
 const client = axios.create({
   baseURL: "/api/",
@@ -37,11 +47,15 @@ export type SearchResult = {
   MoreResults: boolean;
 };
 
+/** @see {isSearchResponse} ts-auto-guard:type-guard */
+export type SearchResponse = SearchResult | Error;
+
 export type Data = {
   Direction: number;
   Content: Base64;
 };
 
+/** @see {isStreamData} ts-auto-guard:type-guard */
 export type StreamData = {
   Stream: Stream;
   Data: Data[];
@@ -50,6 +64,7 @@ export type StreamData = {
   ActiveConverter: string;
 };
 
+/** @see {isStatistics} ts-auto-guard:type-guard */
 export type Statistics = {
   IndexCount: number;
   IndexLockCount: number;
@@ -71,6 +86,9 @@ export type PcapInfo = {
   PacketCount: number;
 };
 
+/** @see {isPcapsResponse} ts-auto-guard:type-guard */
+export type PcapsResponse = PcapInfo[];
+
 export type ProcessStats = {
   Running: boolean;
   ExitCode: number;
@@ -84,6 +102,10 @@ export type ConverterStatistics = {
   Processes: ProcessStats[];
 };
 
+/** @see {isConvertersResponse} ts-auto-guard:type-guard */
+export type ConvertersResponse = ConverterStatistics[];
+
+/** @see {isProcessStderr} ts-auto-guard:type-guard */
 export type ProcessStderr = {
   Pid: number;
   Stderr: string[];
@@ -99,11 +121,15 @@ export type TagInfo = {
   Converters: string[];
 };
 
+/** @see {isTagsResponse} ts-auto-guard:type-guard */
+export type TagsResponse = TagInfo[];
+
 type GraphData = {
   Tags: string[];
   Data: number[][];
 };
 
+/** @see {isGraphResponse} ts-auto-guard:type-guard */
 export type GraphResponse = {
   Min: DateTimeString; // TODO: use moment
   Max: DateTimeString;
@@ -115,48 +141,49 @@ export type GraphResponse = {
 // TODO: Verify response types!
 const APIClient = {
   async searchStreams(query: string, page: number) {
-    return this.perform<SearchResult | Error>("post", "/search.json", query, {
+    return this.perform("post", "/search.json", isSearchResponse, query, {
       page,
     });
   },
   async getStream(streamId: number, converter: string) {
-    return this.perform<StreamData>("get", `/stream/${streamId}.json`, null, {
+    return this.perform("get", `/stream/${streamId}.json`, isStreamData, null, {
       converter,
     });
   },
   async getStatus() {
-    return this.perform<Statistics>("get", `/status.json`);
+    return this.perform("get", `/status.json`, isStatistics);
   },
   async getPcaps() {
-    return this.perform<PcapInfo[]>("get", `/pcaps.json`);
+    return this.perform("get", `/pcaps.json`, isPcapsResponse);
   },
   async getConverters() {
-    return this.perform<ConverterStatistics[]>("get", `/converters`);
+    return this.perform("get", `/converters`, isConvertersResponse);
   },
   async getConverterStderrs(converter: string, pid: number) {
-    return this.perform<ProcessStderr>(
+    return this.perform(
       "get",
-      `/converters/stderr/${converter}/${pid}`
+      `/converters/stderr/${converter}/${pid}`,
+      isProcessStderr
     );
   },
   async resetConverter(converter: string) {
     return this.perform("delete", `/converters/${converter}`);
   },
   async getTags() {
-    return this.perform<TagInfo[]>("get", `/tags`);
+    return this.perform("get", `/tags`, isTagsResponse);
   },
   async addTag(name: string, query: string, color: string) {
-    return this.perform("put", `/tags`, query, { name, color });
+    return this.perform("put", `/tags`, undefined, query, { name, color });
   },
   async delTag(name: string) {
-    return this.perform("delete", `/tags`, null, { name });
+    return this.perform("delete", `/tags`, undefined, null, { name });
   },
   async changeTagColor(name: string, color: string) {
     const params = new URLSearchParams();
     params.append("name", name);
     params.append("method", "change_color");
     params.append("color", color);
-    return this.perform("patch", `/tags`, null, params);
+    return this.perform("patch", `/tags`, undefined, null, params);
   },
   async getGraph(
     delta: string,
@@ -175,7 +202,7 @@ const APIClient = {
     if (query) {
       params.append("query", query);
     }
-    return this.perform<GraphResponse>("get", "/graph.json", null, params);
+    return this.perform("get", "/graph.json", isGraphResponse, null, params);
   },
   async markTagNew(name: string, streams: number[], color: string) {
     if (streams.length == 0) streams = [-1];
@@ -188,7 +215,7 @@ const APIClient = {
     for (const c of converters) {
       params.append("converters", c);
     }
-    return this.perform("patch", `/tags`, null, params);
+    return this.perform("patch", `/tags`, undefined, null, params);
   },
   async markTagAdd(name: string, streams: number[]) {
     const params = new URLSearchParams();
@@ -197,7 +224,7 @@ const APIClient = {
     for (const s of streams) {
       params.append("stream", s.toString());
     }
-    return this.perform("patch", `/tags`, null, params);
+    return this.perform("patch", `/tags`, undefined, null, params);
   },
   async markTagDel(name: string, streams: number[]) {
     const params = new URLSearchParams();
@@ -206,13 +233,14 @@ const APIClient = {
     for (const s of streams) {
       params.append("stream", s.toString());
     }
-    return this.perform("patch", `/tags`, null, params);
+    return this.perform("patch", `/tags`, undefined, null, params);
   },
 
   _abort: null as null | (() => void),
-  async perform<ResponseData = unknown>(
+  async perform<ResponseData>(
     method: string,
     resource: string,
+    guard?: (obj: unknown) => obj is ResponseData,
     data?: string | null,
     params?: object | URLSearchParams
   ) {
@@ -223,17 +251,20 @@ const APIClient = {
       this._abort = controller.abort.bind(controller);
       signal = controller.signal;
     }
-    return client
-      .request<ResponseData>({
-        method,
-        url: resource,
-        data,
-        params,
-        signal,
-      })
-      .then((req) => {
-        return req.data;
-      });
+    const response = await client.request({
+      method,
+      url: resource,
+      data,
+      params,
+      signal,
+    });
+    if (guard === undefined) {
+      return;
+    }
+    if (guard(response.data)) {
+      return response.data;
+    }
+    throw "Unexpected response, types mismatch";
   },
 };
 

@@ -26,7 +26,7 @@
           v-for="(chunk, index) in data"
           :key="index"
           :class="[classes(chunk)]"
-        >{{ inlineHex(chunk.Content) }}<br
+          >{{ inlineHex(chunk.Content) }}<br
         /></span>
       </template>
     </v-card-text>

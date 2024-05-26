@@ -45,3 +45,8 @@ In order to generate all the typeguards, go to `web/` and call
 ```
 npx ts-auto-guard
 ```
+
+When getting api-responses about types mismatching, you can debug the typeguards via
+```
+npx ts-auto-guard --debug
+```
