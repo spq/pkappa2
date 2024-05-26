@@ -294,32 +294,33 @@
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
 import ToolBar from "./ToolBar.vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
+import { useStreamsStore } from "@/stores/streams";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router/composables";
 import { Result } from "@/apiClient";
 
-const store = useStore();
+const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
+const streams = useStreamsStore();
 const selected = ref<boolean[]>([]);
-const streams = computed(() => store.state.streams);
-const tags = computed(() => store.state.tags);
-const groupedTags = computed(() => store.getters.groupedTags);
+const tags = computed(() => store.tags);
+const groupedTags = computed(() => store.groupedTags);
 const selectedCount = computed(
   () => selected.value.filter((i) => i === true).length
 );
 const noneSelected = computed(() => selectedCount.value === 0);
 const allSelected = computed(() => {
   if (selectedCount.value === 0) return false;
-  return selectedCount.value === streams.value.result?.Results.length;
+  return selectedCount.value === streams.result?.Results.length;
 });
 const selectedStreams = computed(() => {
-  if (streams.value.result == null) return [];
+  if (streams.result == null) return [];
   const res: Result[] = [];
   for (const [index, value] of Object.entries(selected.value)) {
-    if (value) res.push(streams.value.result.Results[+index]);
+    if (value) res.push(streams.result.Results[+index]);
   }
   return res;
 });
@@ -351,7 +352,7 @@ onMounted(() => {
   fetchStreams();
 
   const handle = (e: KeyboardEvent, pageOffset: number) => {
-    if (pageOffset >= 1 && !streams.value?.result?.MoreResults) return;
+    if (pageOffset >= 1 && !streams.result?.MoreResults) return;
     let p = +route.query.p;
     p += pageOffset;
     if (p < 0) return;
@@ -385,18 +386,15 @@ onMounted(() => {
 function checkboxAction() {
   let tmp: boolean[] = [];
   const v = noneSelected.value;
-  for (let i = 0; i < (streams.value.result?.Results.length || 0); i++) {
+  for (let i = 0; i < (streams.result?.Results.length || 0); i++) {
     tmp[i] = v;
   }
   selected.value = tmp;
 }
 
 function fetchStreams() {
-  store
-    .dispatch("searchStreams", {
-      query: route.query.q as string,
-      page: +route.query.p,
-    })
+  streams
+    .searchStreams(route.query.q as string, +route.query.p)
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to fetch streams: ${err}`);
     });
@@ -417,17 +415,13 @@ function markSelectedStreams(tagId: string, value: boolean) {
     ids.push(s.Stream.ID);
   }
   if (value)
-    store
-      .dispatch("markTagAdd", { name: tagId, streams: ids })
-      .catch((err: string) => {
-        EventBus.emit("showError", `Failed to add streams to tag: ${err}`);
-      });
+    store.markTagAdd(tagId, ids).catch((err: string) => {
+      EventBus.emit("showError", `Failed to add streams to tag: ${err}`);
+    });
   else
-    store
-      .dispatch("markTagDel", { name: tagId, streams: ids })
-      .catch((err: string) => {
-        EventBus.emit("showError", `Failed to remove streams from tag: ${err}`);
-      });
+    store.markTagDel(tagId, ids).catch((err: string) => {
+      EventBus.emit("showError", `Failed to remove streams from tag: ${err}`);
+    });
 }
 
 function isTextSelected() {

@@ -59,9 +59,9 @@
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
 import { computed, ref, watch } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 
-const store = useStore();
+const store = useRootStore();
 const visible = ref(false);
 const loading = ref(false);
 const error = ref(false);
@@ -115,16 +115,16 @@ function createTag() {
   loading.value = true;
   error.value = false;
   (tagType.value == "mark"
-    ? store.dispatch("markTagNew", {
-        name: `${tagType.value}/${tagName.value}`,
-        streams: tagStreams.value,
-        color: tagColor.value,
-      })
-    : store.dispatch("addTag", {
-        name: `${tagType.value}/${tagName.value}`,
-        query: tagQuery.value,
-        color: tagColor.value,
-      })
+    ? store.markTagNew(
+        `${tagType.value}/${tagName.value}`,
+        tagStreams.value,
+        tagColor.value
+      )
+    : store.addTag(
+        `${tagType.value}/${tagName.value}`,
+        tagQuery.value,
+        tagColor.value
+      )
   )
     .then(() => {
       visible.value = false;

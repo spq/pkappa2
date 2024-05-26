@@ -59,9 +59,12 @@
         </v-select>
       </v-toolbar-items>
     </ToolBar>
-    <v-skeleton-loader v-if="graph.running" type="image"></v-skeleton-loader>
-    <v-alert v-else-if="graph.error" type="error" dense>{{
-      graph.error
+    <v-skeleton-loader
+      v-if="graphStore.running"
+      type="image"
+    ></v-skeleton-loader>
+    <v-alert v-else-if="graphStore.error" type="error" dense>{{
+      graphStore.error
     }}</v-alert>
     <div v-else-if="chartData != null && chartOptions != null">
       <VueApexChartsComponent
@@ -79,12 +82,14 @@
 import ToolBar from "./ToolBar.vue";
 import { computed, nextTick, ref, onMounted, watch } from "vue";
 import { EventBus } from "./EventBus";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
+import { GraphType, useGraphStore } from "@/stores/graph";
 import { useRoute, useRouter } from "vue-router/composables";
 import VueApexChartsComponent from "vue-apexcharts";
 import * as ApexCharts from "apexcharts";
 
-const store = useStore();
+const store = useRootStore();
+const graphStore = useGraphStore();
 const route = useRoute();
 const router = useRouter();
 const chartOptions = ref<ApexCharts.ApexOptions | null>(null);
@@ -464,7 +469,6 @@ const chartTypes: { [key: string]: ChartType } = {
   },
 };
 
-const graph = computed(() => store.state.graph);
 const chartType = computed({
   get: () => {
     return route.query.t as string;
@@ -498,12 +502,12 @@ const chartTags = computed({
   },
 });
 const chartTagOptions = computed(() => {
-  if (store.state.tags === null) return [];
+  if (store.tags === null) return [];
   const options = [];
   const types = ["tag", "service", "mark", "generated"];
   for (const typ of types) {
     let first = true;
-    for (const t of store.state.tags) {
+    for (const t of store.tags) {
       if (t.Name.startsWith(typ.toLowerCase() + "/")) {
         if (first) {
           first = false;
@@ -525,14 +529,14 @@ const chartTagOptions = computed(() => {
 watch(route, () => {
   fetchGraphLocal();
 });
-watch(graph, (val) => {
-  if (val.type === null) {
+graphStore.$subscribe((_mutation, state) => {
+  if (state === null || state.type === null) {
     chartData.value = null;
     chartOptions.value = null;
     return;
   }
-  const type = chartTypes[val.type];
-  const graphVal = val.graph;
+  const type = chartTypes[state.type];
+  const graphVal = state.graph;
   if (graphVal == null) {
     chartData.value = null;
     chartOptions.value = null;
@@ -673,14 +677,14 @@ function fetchGraphLocal() {
   if (!query) query = null;
 
   chartData.value = null;
-  store
-    .dispatch("fetchGraph", {
-      delta: "1m",
-      aspects: chartTypes[type].aspects,
-      tags: tags,
-      query: query,
-      type,
-    })
+  graphStore
+    .fetchGraph(
+      "1m",
+      chartTypes[type].aspects,
+      tags,
+      query as string,
+      type as GraphType
+    )
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to update graph: ${err}`);
     });

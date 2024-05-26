@@ -47,17 +47,17 @@
 
 <script lang="ts" setup>
 import { computed, ref } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 
-const store = useStore();
+const store = useRootStore();
 const visible = ref(false);
 const tagId = ref<string>("");
 const tagType = ref<string>("");
 const tagName = ref<string>("");
 const tag = computed(() => {
-  if (store.state.tags == null) return null;
-  return store.state.tags.find((t) => t.Name === tagId.value);
+  if (store.tags == null) return null;
+  return store.tags.find((t) => t.Name === tagId.value);
 });
 
 EventBus.on("showTagDetailsDialog", openDialog);

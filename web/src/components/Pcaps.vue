@@ -32,11 +32,11 @@
 
 <script lang="ts" setup>
 import { computed, onMounted } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 import { PcapInfo } from "@/apiClient";
 
-const store = useStore();
+const store = useRootStore();
 const headers = [
   {
     text: "File Name",
@@ -63,7 +63,7 @@ const headers = [
     value: "ParseTime",
   },
 ];
-const pcaps = computed(() => store.state.pcaps);
+const pcaps = computed(() => store.pcaps);
 const pcapsPretty = computed(() => {
   if (pcaps.value == null) return [];
   return pcaps.value.map((i) => {
@@ -76,7 +76,7 @@ const pcapsPretty = computed(() => {
 });
 
 onMounted(() => {
-  store.dispatch("updatePcaps").catch((err: string) => {
+  store.updatePcaps().catch((err: string) => {
     EventBus.emit("showError", `Failed to update pcaps: ${err}`);
   });
 });

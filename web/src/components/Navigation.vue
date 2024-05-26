@@ -196,10 +196,10 @@
 <script lang="ts" setup>
 import { useRoute } from "vue-router/composables";
 import { EventBus } from "./EventBus";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import { computed, onMounted } from "vue";
 
-const store = useStore();
+const store = useRootStore();
 const route = useRoute();
 const tagTypes = [
   {
@@ -228,14 +228,14 @@ const moreOpen =
   route.name !== null &&
   route.name !== undefined &&
   ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
-const groupedTags = computed(() => store.getters.groupedTags);
-const status = computed(() => store.state.status);
+const groupedTags = computed(() => store.groupedTags);
+const status = computed(() => store.status);
 
 onMounted(() => {
-  store.dispatch("updateTags").catch((err: string) => {
+  store.updateTags().catch((err: string) => {
     EventBus.emit("showError", `Failed to update tags: ${err}`);
   });
-  store.dispatch("updateStatus").catch((err: string) => {
+  store.updateStatus().catch((err: string) => {
     EventBus.emit("showError", `Failed to update status: ${err}`);
   });
 });

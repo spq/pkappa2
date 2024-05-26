@@ -43,7 +43,7 @@
 
 <script lang="ts" setup>
 import { computed, ref } from "vue";
-import { useStore } from "@/store";
+import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 
 const visible = ref(false);
@@ -54,12 +54,12 @@ const tagName = ref("");
 const tagId = ref<string | null>(null);
 const checkedConverters = ref<string[]>([]);
 
-const store = useStore();
+const store = useRootStore();
 const tag = computed(() => {
-  if (store.state.tags === null || tagId.value === null) return undefined;
-  return store.state.tags.find((tag) => tag.Name === tagId.value);
+  if (store.tags === null || tagId.value === null) return undefined;
+  return store.tags.find((tag) => tag.Name === tagId.value);
 });
-const converters = computed(() => store.state.converters);
+const converters = computed(() => store.converters);
 
 EventBus.on("showTagSetConvertersDialog", openDialog);
 
@@ -78,13 +78,11 @@ function getConvertersFromTag() {
 }
 
 function submitTagConverters() {
+  if (tagId.value === null) return;
   loading.value = true;
   error.value = false;
   store
-    .dispatch("setTagConverters", {
-      name: tagId.value,
-      converters: checkedConverters.value,
-    })
+    .setTagConverters(tagId.value, checkedConverters.value)
     .then(() => {
       visible.value = false;
     })
