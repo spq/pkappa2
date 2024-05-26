@@ -1873,10 +1873,6 @@ func (mgr *Manager) event(e Event) {
 	for ch, l := range mgr.listeners {
 		if l.active == 0 {
 			select {
-			case <-l.close:
-				delete(mgr.listeners, ch)
-				close(ch)
-				continue
 			case ch <- e:
 				continue
 			default:
@@ -1901,13 +1897,13 @@ func (mgr *Manager) event(e Event) {
 			case <-cl:
 				mgr.jobs <- func() {
 					l := mgr.listeners[ch]
-					l.active--
-					if l.active != 0 {
+					if l.active == 1 {
+						delete(mgr.listeners, ch)
+						close(ch)
+					} else {
+						l.active--
 						mgr.listeners[ch] = l
-						return
 					}
-					delete(mgr.listeners, ch)
-					close(ch)
 				}
 			}
 		}(ch, l.close)
@@ -1916,13 +1912,22 @@ func (mgr *Manager) event(e Event) {
 
 func (mgr *Manager) Listen() (chan Event, func()) {
 	ch := make(chan Event)
-	cl := make(chan struct{})
 	mgr.jobs <- func() {
 		mgr.listeners[ch] = listener{
-			close: cl,
+			close: make(chan struct{}),
 		}
 	}
 	return ch, func() {
-		close(cl)
+		mgr.jobs <- func() {
+			l, ok := mgr.listeners[ch]
+			if !ok {
+				return
+			}
+			if l.active == 0 {
+				delete(mgr.listeners, ch)
+				close(ch)
+			}
+			close(l.close)
+		}
 	}
 }
