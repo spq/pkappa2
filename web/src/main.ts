@@ -1,3 +1,4 @@
+import { getColorScheme, registerVuetifyTheme } from "@/lib/darkmode";
 import Vue from "vue";
 import Vuetify from "vuetify";
 import { createPinia, PiniaVuePlugin } from "pinia";
@@ -21,11 +22,13 @@ Vue.component("Apexchart", VueApexCharts);
 
 const pinia = createPinia();
 const vue = new Vue({
-  vuetify: new Vuetify(),
+  vuetify: new Vuetify({ theme: { dark: getColorScheme() } }),
   router,
   render: (h) => h(App),
   pinia,
 });
+
+registerVuetifyTheme(vue.$vuetify);
 
 declare module "vue/types/vue" {
   interface Vue {
