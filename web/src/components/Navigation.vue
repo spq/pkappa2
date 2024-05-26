@@ -212,19 +212,28 @@
 
 <script lang="ts" setup>
 import { useRoute } from "vue-router/composables";
-import { setColorScheme, getColorSchemeFromStorage } from "@/lib/darkmode";
+import {
+  setColorScheme,
+  getColorSchemeFromStorage,
+  ColorSchemeConfiguration,
+} from "@/lib/darkmode";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { computed, onMounted, ref, watch } from "vue";
 
+type ColorSchemeButtonTriState = 0 | 1 | 2;
+
 const store = useRootStore();
 const route = useRoute();
-const schemeInitialisations: Record<"light" | "system" | "dark", 0 | 1 | 2> = {
+const schemeInitialisations: Record<
+  ColorSchemeConfiguration,
+  ColorSchemeButtonTriState
+> = {
   light: 0,
   system: 1,
   dark: 2,
 };
-const colorscheme = ref<0 | 1 | 2>(
+const colorscheme = ref<ColorSchemeButtonTriState>(
   schemeInitialisations[getColorSchemeFromStorage()]
 );
 const tagTypes = [
@@ -258,7 +267,7 @@ const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
 
 watch(colorscheme, () => {
-  const schemes: Record<0 | 1 | 2, "light" | "system" | "dark"> = {
+  const schemes: Record<ColorSchemeButtonTriState, ColorSchemeConfiguration> = {
     0: "light",
     1: "system",
     2: "dark",

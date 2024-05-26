@@ -636,6 +636,7 @@ graphStore.$subscribe((_mutation, state) => {
       },
     },
     chart: {
+      background: "rgba(0,0,0,0)",
       stacked: true,
       events: {
         mounted() {
@@ -654,18 +655,19 @@ graphStore.$subscribe((_mutation, state) => {
     if (chart.value === null) {
       return;
     }
+    const colorscheme = getColorScheme();
     chart.value
       .updateOptions({
         theme: {
-          mode: getColorScheme(),
+          mode: colorscheme,
         },
         chart: {
-          foreColor: getColorScheme() === "dark" ? "#f6f7f8" : "#373d3f",
+          foreColor: colorscheme === "dark" ? "#f6f7f8" : "#373d3f",
         },
         tooltip: {
-          theme: getColorScheme(),
+          theme: colorscheme,
         },
-      })
+      } as ApexCharts.ApexOptions)
       .catch((err: string) => {
         EventBus.emit("showError", `Failed to update graph: ${err}`);
       });

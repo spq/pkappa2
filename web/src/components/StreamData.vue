@@ -128,7 +128,7 @@ const hexdump = (b64: string) => {
 .server {
   color: #000080;
   background-color: #eeedfc;
-  
+
   &.hexdump {
     margin-left: 2em;
   }

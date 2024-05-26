@@ -18,10 +18,10 @@ module.exports = {
     "vue/multi-word-component-names": "off",
     "vue/no-reserved-component-names": "off",
   },
+  ignorePatterns: ["**/*.guard.ts"],
   overrides: [
     {
       files: ["**/*.ts", "**/*.vue"],
-      ignorePatterns: ["**/*.guard.ts"],
       parser: "vue-eslint-parser",
       env: {
         es2021: true,
