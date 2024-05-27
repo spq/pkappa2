@@ -6,10 +6,12 @@
     "strict": true,
     "jsx": "preserve",
     "moduleResolution": "node",
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
     "allowJs": false,
     "sourceMap": true,
     "baseUrl": ".",
-    "types": ["webpack-env", "node", "vuetify"],
+    "types": ["node", "vuetify"],
     "paths": {
       "@/*": ["src/*"]
     },

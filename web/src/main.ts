@@ -20,7 +20,7 @@ Vue.component("Apexchart", VueApexCharts);
 
 const pinia = createPinia();
 const vue = new Vue({
-  vuetify: new Vuetify({ theme: { dark: getColorScheme() } }),
+  vuetify: new Vuetify({ theme: { dark: getColorScheme() === "dark" } }),
   router,
   render: (h) => h(App),
   pinia,

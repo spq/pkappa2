@@ -36,10 +36,12 @@ export type Result = {
   Tags: string[];
 };
 
+/** @see {isError} ts-auto-guard:type-guard */
 export type Error = {
   Error: string;
 };
 
+/** @see {isSearchResult} ts-auto-guard:type-guard */
 export type SearchResult = {
   Debug: string[];
   Results: Result[];

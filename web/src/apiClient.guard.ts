@@ -2,54 +2,68 @@
  * Generated type guards for "apiClient.ts".
  * WARNING: Do not manually change this file.
  */
-import { SearchResponse, StreamData, Statistics, PcapsResponse, ConvertersResponse, ProcessStderr, TagsResponse, GraphResponse } from "./apiClient";
+import { Error, SearchResult, SearchResponse, StreamData, Statistics, PcapsResponse, ConvertersResponse, ProcessStderr, TagsResponse, GraphResponse } from "./apiClient";
+
+export function isError(obj: unknown): obj is Error {
+    const typedObj = obj as Error
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typeof typedObj["Error"] === "string"
+    )
+}
+
+export function isSearchResult(obj: unknown): obj is SearchResult {
+    const typedObj = obj as SearchResult
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        Array.isArray(typedObj["Debug"]) &&
+        typedObj["Debug"].every((e: any) =>
+            typeof e === "string"
+        ) &&
+        Array.isArray(typedObj["Results"]) &&
+        typedObj["Results"].every((e: any) =>
+            (e !== null &&
+                typeof e === "object" ||
+                typeof e === "function") &&
+            (e["Stream"] !== null &&
+                typeof e["Stream"] === "object" ||
+                typeof e["Stream"] === "function") &&
+            typeof e["Stream"]["ID"] === "number" &&
+            typeof e["Stream"]["Protocol"] === "string" &&
+            (e["Stream"]["Client"] !== null &&
+                typeof e["Stream"]["Client"] === "object" ||
+                typeof e["Stream"]["Client"] === "function") &&
+            typeof e["Stream"]["Client"]["Host"] === "string" &&
+            typeof e["Stream"]["Client"]["Port"] === "number" &&
+            typeof e["Stream"]["Client"]["Bytes"] === "number" &&
+            (e["Stream"]["Server"] !== null &&
+                typeof e["Stream"]["Server"] === "object" ||
+                typeof e["Stream"]["Server"] === "function") &&
+            typeof e["Stream"]["Server"]["Host"] === "string" &&
+            typeof e["Stream"]["Server"]["Port"] === "number" &&
+            typeof e["Stream"]["Server"]["Bytes"] === "number" &&
+            typeof e["Stream"]["FirstPacket"] === "string" &&
+            typeof e["Stream"]["LastPacket"] === "string" &&
+            typeof e["Stream"]["Index"] === "string" &&
+            Array.isArray(e["Tags"]) &&
+            e["Tags"].every((e: any) =>
+                typeof e === "string"
+            )
+        ) &&
+        typeof typedObj["Offset"] === "number" &&
+        typeof typedObj["MoreResults"] === "boolean"
+    )
+}
 
 export function isSearchResponse(obj: unknown): obj is SearchResponse {
     const typedObj = obj as SearchResponse
     return (
-        ((typedObj !== null &&
-            typeof typedObj === "object" ||
-            typeof typedObj === "function") &&
-            Array.isArray(typedObj["Debug"]) &&
-            typedObj["Debug"].every((e: any) =>
-                typeof e === "string"
-            ) &&
-            Array.isArray(typedObj["Results"]) &&
-            typedObj["Results"].every((e: any) =>
-                (e !== null &&
-                    typeof e === "object" ||
-                    typeof e === "function") &&
-                (e["Stream"] !== null &&
-                    typeof e["Stream"] === "object" ||
-                    typeof e["Stream"] === "function") &&
-                typeof e["Stream"]["ID"] === "number" &&
-                typeof e["Stream"]["Protocol"] === "string" &&
-                (e["Stream"]["Client"] !== null &&
-                    typeof e["Stream"]["Client"] === "object" ||
-                    typeof e["Stream"]["Client"] === "function") &&
-                typeof e["Stream"]["Client"]["Host"] === "string" &&
-                typeof e["Stream"]["Client"]["Port"] === "number" &&
-                typeof e["Stream"]["Client"]["Bytes"] === "number" &&
-                (e["Stream"]["Server"] !== null &&
-                    typeof e["Stream"]["Server"] === "object" ||
-                    typeof e["Stream"]["Server"] === "function") &&
-                typeof e["Stream"]["Server"]["Host"] === "string" &&
-                typeof e["Stream"]["Server"]["Port"] === "number" &&
-                typeof e["Stream"]["Server"]["Bytes"] === "number" &&
-                typeof e["Stream"]["FirstPacket"] === "string" &&
-                typeof e["Stream"]["LastPacket"] === "string" &&
-                typeof e["Stream"]["Index"] === "string" &&
-                Array.isArray(e["Tags"]) &&
-                e["Tags"].every((e: any) =>
-                    typeof e === "string"
-                )
-            ) &&
-            typeof typedObj["Offset"] === "number" &&
-            typeof typedObj["MoreResults"] === "boolean" ||
-            (typedObj !== null &&
-                typeof typedObj === "object" ||
-                typeof typedObj === "function") &&
-            typeof typedObj["Error"] === "string")
+        (isError(typedObj) as boolean ||
+            isSearchResult(typedObj) as boolean)
     )
 }
 

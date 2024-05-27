@@ -5,6 +5,7 @@ import Components from "unplugin-vue-components/vite";
 import { VuetifyResolver } from "unplugin-vue-components/resolvers";
 import { fileURLToPath } from "url";
 import path from "path";
+import checker from "vite-plugin-checker";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -16,6 +17,12 @@ export default defineConfig({
     }),
     nodePolyfills({
       include: ["events"], // tiny-typed-emitter
+    }),
+    checker({
+      typescript: true,
+      eslint: {
+        lintCommand: "eslint --ext .js,.ts,.vue .",
+      },
     }),
   ],
   resolve: {
