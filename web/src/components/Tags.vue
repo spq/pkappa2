@@ -58,7 +58,7 @@
                     :to="{
                       name: 'search',
                       query: {
-                        q: $options.filters?.tagForURI(tag.Name),
+                        q: tagForURI(tag.Name),
                       },
                     }"
                     v-on="on"
@@ -128,6 +128,7 @@
 import { computed, onMounted } from "vue";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
+import { tagForURI } from "@/filters";
 import ToolBar from "./ToolBar.vue";
 
 const tagTypes = [

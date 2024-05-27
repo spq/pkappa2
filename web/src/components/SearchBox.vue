@@ -83,7 +83,7 @@ import suggest from "@/parser/suggest";
 import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router/composables";
 import { useRootStore } from "@/stores";
-import { tagNameForURI } from "@/filters/tagNameForURI";
+import { tagNameForURI } from "@/filters";
 import { VTextField } from "vuetify/lib";
 
 const store = useRootStore();

@@ -3,9 +3,7 @@
     <v-form>
       <v-card>
         <v-card-title>
-          <span class="text-h5"
-            >Create {{ $options.filters?.capitalize(tagType) }}</span
-          >
+          <span class="text-h5">Create {{ capitalize(tagType) }}</span>
         </v-card-title>
         <v-card-text>
           <v-text-field v-model="tagName" label="Name" autofocus></v-text-field>
@@ -60,6 +58,7 @@
 import { EventBus } from "./EventBus";
 import { computed, ref, watch } from "vue";
 import { useRootStore } from "@/stores";
+import { capitalize } from "@/filters";
 
 const store = useRootStore();
 const visible = ref(false);

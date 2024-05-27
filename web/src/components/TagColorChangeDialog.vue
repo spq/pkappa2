@@ -4,7 +4,7 @@
       <v-card>
         <v-card-title>
           <span class="text-h5"
-            >Change Color of {{ $options.filters?.capitalize(tagType) }}
+            >Change Color of {{ capitalize(tagType) }}
             <v-chip :color="tagColor">{{ tagName }}</v-chip></span
           >
         </v-card-title>
@@ -60,6 +60,7 @@
 import { EventBus } from "./EventBus";
 import { ref, computed, watch } from "vue";
 import { useRootStore } from "@/stores";
+import { capitalize } from "@/filters";
 
 const store = useRootStore();
 const visible = ref(false);

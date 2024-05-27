@@ -15,11 +15,9 @@
           'PacketTimestampMax',
         ]"
         #[`item.${field}`]="{ index, value }"
-        ><span
-          :key="`${field}/${index}`"
-          :title="$options.filters?.formatDateLong(value)"
-          >{{ $options.filters?.formatDate(value) }}</span
-        ></template
+        ><span :key="`${field}/${index}`" :title="formatDateLong(value)">{{
+          formatDate(value)
+        }}</span></template
       >
       <template #[`item.Filesize`]="{ value }"
         ><span :title="`${value} Bytes`">{{
@@ -35,6 +33,7 @@ import { computed, onMounted } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 import { PcapInfo } from "@/apiClient";
+import { formatDate, formatDateLong } from "@/filters";
 
 const store = useRootStore();
 const headers = [

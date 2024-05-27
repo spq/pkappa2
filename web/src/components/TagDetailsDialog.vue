@@ -3,8 +3,7 @@
     <v-card>
       <v-card-title>
         <span class="text-h5"
-          >{{ $options.filters?.capitalize(tagType) }}
-          <code>{{ tagName }}</code> details</span
+          >{{ capitalize(tagType) }} <code>{{ tagName }}</code> details</span
         >
       </v-card-title>
       <v-card-text v-if="tag != null">
@@ -49,6 +48,7 @@
 import { computed, ref } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
+import { capitalize } from "@/filters";
 
 const store = useRootStore();
 const visible = ref(false);

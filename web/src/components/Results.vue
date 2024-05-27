@@ -72,7 +72,7 @@
               </v-list-item-action>
               <v-list-item-content>
                 <v-list-item-title>{{
-                  $options.filters?.tagify(tag.Name, "name")
+                  tagify(tag.Name, "name")
                 }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
@@ -167,9 +167,7 @@
                 $router.push({
                   name: 'search',
                   query: {
-                    q: `data:\x22${$options.filters?.regexEscape(
-                      $route.query.q
-                    )}\x22`,
+                    q: `data:\x22${regexEscape($route.query.q)}\x22`,
                   },
                 })
               "
@@ -230,14 +228,10 @@
                   :key="tag"
                   ><v-chip small :color="tagColors[tag]"
                     ><template v-if="hover"
-                      >{{
-                        $options.filters?.capitalize(
-                          $options.filters?.tagify(tag, "type")
-                        )
-                      }}
-                      {{ $options.filters?.tagify(tag, "name") }}</template
+                      >{{ capitalize(tagify(tag, "type")) }}
+                      {{ tagify(tag, "name") }}</template
                     ><template v-else>{{
-                      $options.filters?.tagify(tag, "name")
+                      tagify(tag, "name")
                     }}</template></v-chip
                   ></v-hover
                 >
@@ -268,11 +262,9 @@
               </td>
               <td
                 class="text-right pr-0"
-                :title="
-                  $options.filters?.formatDateLong(stream.Stream.FirstPacket)
-                "
+                :title="formatDateLong(stream.Stream.FirstPacket)"
               >
-                {{ $options.filters?.formatDate(stream.Stream.FirstPacket) }}
+                {{ formatDate(stream.Stream.FirstPacket) }}
               </td>
               <td style="width: 0" class="px-0">
                 <v-btn
@@ -300,6 +292,7 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router/composables";
 import { Result } from "@/apiClient";
+import { capitalize, formatDate, formatDateLong, tagify } from "@/filters";
 
 const store = useRootStore();
 const route = useRoute();
@@ -426,5 +419,22 @@ function markSelectedStreams(tagId: string, value: boolean) {
 
 function isTextSelected() {
   return window?.getSelection()?.type === "Range";
+}
+
+function regexEscape(text: string) {
+  return text
+    .split("")
+    .map((char) =>
+      char.replace(
+        /[^ !#$%&',-/0123456789:;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz~]/,
+        (match) =>
+          `\\x{${match
+            .charCodeAt(0)
+            .toString(16)
+            .toUpperCase()
+            .padStart(2, "0")}}`
+      )
+    )
+    .join("");
 }
 </script>

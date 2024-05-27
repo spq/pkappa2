@@ -50,7 +50,7 @@
             :to="{
               name: 'search',
               query: {
-                q: $options.filters?.tagForURI(tag.Name),
+                q: tagForURI(tag.Name),
               },
             }"
           >
@@ -83,7 +83,7 @@
                   :to="{
                     name: 'search',
                     query: {
-                      q: $options.filters?.tagForURI(tag.Name),
+                      q: tagForURI(tag.Name),
                     },
                   }"
                 >
@@ -219,6 +219,7 @@ import {
 } from "@/lib/darkmode";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
+import { tagForURI } from "@/filters";
 import { computed, onMounted, ref, watch } from "vue";
 
 type ColorSchemeButtonTriState = 0 | 1 | 2;

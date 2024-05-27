@@ -4,11 +4,11 @@
       <v-card>
         <v-card-title>
           <span class="text-h5"
-            >Confirm {{ $options.filters?.capitalize(tagType) }} deletion</span
+            >Confirm {{ capitalize(tagType) }} deletion</span
           >
         </v-card-title>
         <v-card-text>
-          Do you want to delete the {{ $options.filters?.capitalize(tagType) }}
+          Do you want to delete the {{ capitalize(tagType) }}
           <code>{{ tagName }}</code
           >?
         </v-card-text>
@@ -33,6 +33,7 @@
 import { EventBus } from "./EventBus";
 import { ref } from "vue";
 import { useRootStore } from "@/stores";
+import { capitalize } from "@/filters";
 
 const store = useRootStore();
 const visible = ref(false);
