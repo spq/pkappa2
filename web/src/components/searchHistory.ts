@@ -13,8 +13,7 @@ function isSearches(obj: unknown): obj is Searches {
   return (
     typeof typedObj === "object" &&
     Object.entries(typedObj).every(
-      ([key, value]) =>
-        typeof key === "string" && typeof value === "number"
+      ([key, value]) => typeof key === "string" && typeof value === "number"
     )
   );
 }
