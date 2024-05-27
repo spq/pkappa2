@@ -140,26 +140,38 @@ export type GraphResponse = {
 
 const APIClient = {
   async searchStreams(query: string, page: number) {
-    return this.perform("post", "/search.json", isSearchResponse, query, {
-      page,
-    });
+    return this.performGuarded(
+      "post",
+      "/search.json",
+      isSearchResponse,
+      query,
+      {
+        page,
+      }
+    );
   },
   async getStream(streamId: number, converter: string) {
-    return this.perform("get", `/stream/${streamId}.json`, isStreamData, null, {
-      converter,
-    });
+    return this.performGuarded(
+      "get",
+      `/stream/${streamId}.json`,
+      isStreamData,
+      null,
+      {
+        converter,
+      }
+    );
   },
   async getStatus() {
-    return this.perform("get", `/status.json`, isStatistics);
+    return this.performGuarded("get", `/status.json`, isStatistics);
   },
   async getPcaps() {
-    return this.perform("get", `/pcaps.json`, isPcapsResponse);
+    return this.performGuarded("get", `/pcaps.json`, isPcapsResponse);
   },
   async getConverters() {
-    return this.perform("get", `/converters`, isConvertersResponse);
+    return this.performGuarded("get", `/converters`, isConvertersResponse);
   },
   async getConverterStderrs(converter: string, pid: number) {
-    return this.perform(
+    return this.performGuarded(
       "get",
       `/converters/stderr/${converter}/${pid}`,
       isProcessStderr
@@ -169,20 +181,20 @@ const APIClient = {
     return this.perform("delete", `/converters/${converter}`);
   },
   async getTags() {
-    return this.perform("get", `/tags`, isTagsResponse);
+    return this.performGuarded("get", `/tags`, isTagsResponse);
   },
   async addTag(name: string, query: string, color: string) {
-    return this.perform("put", `/tags`, undefined, query, { name, color });
+    return this.perform("put", `/tags`, query, { name, color });
   },
   async delTag(name: string) {
-    return this.perform("delete", `/tags`, undefined, null, { name });
+    return this.perform("delete", `/tags`, null, { name });
   },
   async changeTagColor(name: string, color: string) {
     const params = new URLSearchParams();
     params.append("name", name);
     params.append("method", "change_color");
     params.append("color", color);
-    return this.perform("patch", `/tags`, undefined, null, params);
+    return this.perform("patch", `/tags`, null, params);
   },
   async getGraph(
     delta: string,
@@ -201,7 +213,13 @@ const APIClient = {
     if (query) {
       params.append("query", query);
     }
-    return this.perform("get", "/graph.json", isGraphResponse, null, params);
+    return this.performGuarded(
+      "get",
+      "/graph.json",
+      isGraphResponse,
+      null,
+      params
+    );
   },
   async markTagNew(name: string, streams: number[], color: string) {
     if (streams.length == 0) streams = [-1];
@@ -214,7 +232,7 @@ const APIClient = {
     for (const c of converters) {
       params.append("converters", c);
     }
-    return this.perform("patch", `/tags`, undefined, null, params);
+    return this.perform("patch", `/tags`, null, params);
   },
   async markTagAdd(name: string, streams: number[]) {
     const params = new URLSearchParams();
@@ -223,7 +241,7 @@ const APIClient = {
     for (const s of streams) {
       params.append("stream", s.toString());
     }
-    return this.perform("patch", `/tags`, undefined, null, params);
+    return this.perform("patch", `/tags`, null, params);
   },
   async markTagDel(name: string, streams: number[]) {
     const params = new URLSearchParams();
@@ -232,14 +250,13 @@ const APIClient = {
     for (const s of streams) {
       params.append("stream", s.toString());
     }
-    return this.perform("patch", `/tags`, undefined, null, params);
+    return this.perform("patch", `/tags`, null, params);
   },
 
   _abort: null as null | (() => void),
-  async perform<ResponseData>(
+  async perform(
     method: string,
     resource: string,
-    guard?: (obj: unknown) => obj is ResponseData,
     data?: string | null,
     params?: object | URLSearchParams
   ) {
@@ -250,16 +267,22 @@ const APIClient = {
       this._abort = controller.abort.bind(controller);
       signal = controller.signal;
     }
-    const response = await client.request({
+    return client.request({
       method,
       url: resource,
       data,
       params,
       signal,
     });
-    if (guard === undefined) {
-      return;
-    }
+  },
+  async performGuarded<ResponseData>(
+    method: string,
+    resource: string,
+    guard: (obj: unknown) => obj is ResponseData,
+    data?: string | null,
+    params?: object | URLSearchParams
+  ) {
+    const response = await this.perform(method, resource, data, params);
     if (guard(response.data)) {
       return response.data;
     }
