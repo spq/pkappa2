@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 import socket
 import traceback
-from http.client import HTTPResponse as HTTPResponseChunked
+from http.client import HTTPResponse as HTTPResponseChunked, IncompleteRead
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from typing import List, Optional
 
-from urllib3.response import HTTPResponse
+from urllib3.response import HTTPResponse, ProtocolError
 
 from pkappa2lib import Direction, Pkappa2Converter, Result, Stream, StreamChunk
 
 
 # https://stackoverflow.com/questions/4685217/parse-raw-http-headers
 class HTTPRequest(BaseHTTPRequestHandler):
-    def __init__(self, request_text: str):
+    def __init__(self, request_text: bytes):
         self.rfile = BytesIO(request_text)
         self.raw_requestline = self.rfile.readline()
         self.error_code = self.error_message = None
@@ -110,6 +110,14 @@ class HTTPConverter(Pkappa2Converter):
                     result_data.extend(
                         self.handle_http1_response(header, body, chunk, response)
                     )
+                except ProtocolError as ex:
+                    if isinstance(ex.__cause__, IncompleteRead):
+                        data = f"Incomplete read: {ex}\n".encode()
+                        result_data.append(
+                            StreamChunk(chunk.Direction, data + chunk.Content)
+                        )
+                    else:
+                        raise
                 except Exception as ex:
                     data = f"Unable to parse HTTP response: {ex}\n".encode()
                     self.log(f"Unable to parse HTTP response: {ex}")
