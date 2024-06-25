@@ -46,6 +46,7 @@
 import { computed, ref } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
+import { TagInfo } from "@/apiClient";
 
 const visible = ref(false);
 const loading = ref(false);
@@ -58,7 +59,7 @@ const checkedConverters = ref<string[]>([]);
 const store = useRootStore();
 const tag = computed(() => {
   if (store.tags === null || tagId.value === null) return undefined;
-  return store.tags.find((tag) => tag.Name === tagId.value);
+  return store.tags.find((tag: TagInfo) => tag.Name === tagId.value);
 });
 const converters = computed(() => store.converters);
 
