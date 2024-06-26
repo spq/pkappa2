@@ -133,7 +133,7 @@ func main() {
 		tools.AssertFolderRWXPermissions("pcap_dir", filepath.Join(*baseDir, *pcapDir))
 		fullFilename := filepath.Join(*baseDir, *pcapDir, filename)
 
-		dst, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, 0666)
+		dst, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 		if err != nil {
 			http.Error(w, "File already exists", http.StatusInternalServerError)
 			return
