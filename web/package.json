@@ -9,9 +9,10 @@
     "serve": "vite preview",
     "lint": "eslint --ext .js,.ts,.vue --fix .",
     "format": "prettier --check --write .",
-    "nearley": "nearleyc src/parser/query.ne -o src/parser/query.js"
+    "nearley": "nearleyc src/parser/query.ne -o src/parser/query.ts"
   },
   "dependencies": {
+    "@types/nearley": "^2.11.5",
     "@types/webpack-env": "^1.18.5",
     "apexcharts": "^3.36.3",
     "axios": "^1.1.3",

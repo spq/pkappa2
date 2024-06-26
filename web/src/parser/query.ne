@@ -1,5 +1,6 @@
-# nearleyc query.ne -o query.js
+# nearleyc query.ne -o query.ts
 @preprocessor esmodule
+@preprocessor typescript
 @{%
 /* eslint-disable */
 /* prettier-ignore */

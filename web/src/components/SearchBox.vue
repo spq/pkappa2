@@ -130,22 +130,22 @@ const suggestionMenuPosX = ref(0);
 const suggestionMenuPosY = ref(0);
 const queryTimeLimit = computed({
   get(): string | undefined {
-    const res = analyze(searchBox.value);
-    const v: string | undefined = res?.ltime?.value;
-    if (typeof v === "string" && ["-5m:", "-1h:"].includes(v)) return v;
+    const ltime = analyze(searchBox.value).ltime;
+    const v = ltime?.pieces?.value;
+    if (v !== undefined && ["-5m:", "-1h:"].includes(v)) return v;
     return undefined;
   },
   set(val: string | undefined) {
     const q = searchBox.value;
-    const res = analyze(q);
-    let old: string | undefined = res?.ltime?.value;
+    const ltime = analyze(q).ltime;
+    let old = ltime?.pieces?.value;
     if (old === val) return;
     const infix = `ltime:${val ?? ":"}`;
     if (old === undefined) {
       searchBox.value = `${q} ${infix}`;
     } else {
-      const prefix = q.slice(0, res?.ltime?.start);
-      const suffix = q.slice(res?.ltime?.start + res?.ltime?.len);
+      const prefix = q.slice(0, ltime.start);
+      const suffix = q.slice(ltime.start + ltime.len);
       searchBox.value = `${prefix}${infix}${suffix}`;
     }
   },
