@@ -23,6 +23,7 @@ class WebsocketFrame:
 class WebsocketConverter(HTTP2Converter):
     websocket_key: Union[bytes, None]
     switched_protocols: bool
+    websocket_remaining_data: Dict[int, Dict[Direction, bytes]]
     websocket_deflate: Dict[int, bool]
     websocket_deflate_decompressor: Dict[int, Dict[Direction, Any]]
     websocket_message_fragmented_frames: Dict[int, List[WebsocketFrame]]
@@ -120,39 +121,59 @@ class WebsocketConverter(HTTP2Converter):
     ) -> bytes:
         try:
             frames: List[bytes] = []
-            frame = bytearray(content)
-            while len(frame) > 0:
-                data_length = frame[1] & 0x7F
-                mask_offset = 2
-                if data_length == 126:
-                    mask_offset = 4
-                    data_length = int.from_bytes(frame[2:4], byteorder="big")
-                elif data_length == 127:
-                    mask_offset = 10
-                    data_length = int.from_bytes(frame[2:10], byteorder="big")
+            frame = bytearray(self.websocket_remaining_data[stream_id][direction] + content)
+            del self.websocket_remaining_data[stream_id][direction]
+            while len(frame) > 1:
+                try:
+                    data_length = frame[1] & 0x7F
+                    mask_offset = 2
+                    if data_length == 126:
+                        mask_offset = 4
+                    elif data_length == 127:
+                        mask_offset = 10
 
-                data_offset = mask_offset
-                # frame masked?
-                if frame[1] & 0x80 != 0:
-                    data_offset += 4
+                    if len(frame) < mask_offset:
+                        raise IndexError("Not enough data for a full frame")
+                    if mask_offset > 2:
+                        data_length = int.from_bytes(
+                            frame[2:mask_offset], byteorder="big"
+                        )
 
-                websocket_frame = WebsocketFrame(
-                    Direction=direction,
-                    Header=frame[:mask_offset],
-                    Data=frame[mask_offset : data_offset + data_length],
-                )
-                websocket_frame = self.unmask_websocket_frames(websocket_frame)
-                if self.websocket_deflate:
-                    websocket_frame = self.handle_websocket_permessage_deflate(
-                        stream_id, websocket_frame
+                    data_offset = mask_offset
+                    # frame masked?
+                    if frame[1] & 0x80 != 0:
+                        data_offset += 4
+
+                    if len(frame) < data_offset + data_length:
+                        raise IndexError("Not enough data for a full frame")
+
+                    websocket_frame = WebsocketFrame(
+                        Direction=direction,
+                        Header=frame[:mask_offset],
+                        Data=frame[mask_offset : data_offset + data_length],
                     )
-                    if websocket_frame is None:
-                        continue
+                    websocket_frame = self.unmask_websocket_frames(websocket_frame)
+                    if self.websocket_deflate:
+                        websocket_frame = self.handle_websocket_permessage_deflate(
+                            stream_id, websocket_frame
+                        )
+                        if websocket_frame is None:
+                            break
+                    websocket_frame = self.handle_websocket_frame(websocket_frame)
 
-                websocket_frame = self.handle_websocket_frame(websocket_frame)
-
-                frames.append(websocket_frame.Header + bytes(websocket_frame.Data))
-                frame = frame[data_offset + data_length :]
+                    frames.append(websocket_frame.Header + bytes(websocket_frame.Data))
+                    frame = frame[data_offset + data_length :]
+                except IndexError:
+                    # not enough data for a full frame
+                    break
+            if len(frame) > 0:
+                # TODO: For http/2 the last chunk doesn't necessarily have to contain
+                #       data for a websocket frame, so remaining data could be silently
+                #       hidden. This is a general problem with truncated http/2 traffic.
+                if self.is_last_chunk:
+                    frames.append(frame)
+                else:
+                    self.websocket_remaining_data[stream_id][direction] = frame
             return b"".join(frames)
         except Exception as ex:
             self.log(f"Error while handling websocket frame: {ex}")
@@ -385,6 +406,8 @@ class WebsocketConverter(HTTP2Converter):
         self.websocket_deflate = defaultdict(bool)
         self.websocket_deflate_decompressor = defaultdict(dict)
         self.websocket_message_fragmented_frames = defaultdict(list)
+
+        self.websocket_remaining_data = defaultdict(lambda: defaultdict(bytes))
         return super().handle_stream(stream)
 
 
