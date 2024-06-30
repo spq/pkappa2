@@ -167,7 +167,13 @@ class WebsocketConverter(HTTP2Converter):
                     # not enough data for a full frame
                     break
             if len(frame) > 0:
-                self.websocket_remaining_data[stream_id][direction] = frame
+                # TODO: For http/2 the last chunk doesn't necessarily have to contain
+                #       data for a websocket frame, so remaining data could be silently
+                #       hidden. This is a general problem with truncated http/2 traffic.
+                if self.is_last_chunk:
+                    frames.append(frame)
+                else:
+                    self.websocket_remaining_data[stream_id][direction] = frame
             return b"".join(frames)
         except Exception as ex:
             self.log(f"Error while handling websocket frame: {ex}")

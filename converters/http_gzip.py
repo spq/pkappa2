@@ -31,6 +31,8 @@ class HTTPResponseBase(HTTPResponseChunked):
 
 
 class HTTPConverter(Pkappa2Converter):
+    is_last_chunk: bool
+
     def handle_raw_client_chunk(
         self, chunk: StreamChunk
     ) -> Optional[List[StreamChunk]]:
@@ -65,7 +67,11 @@ class HTTPConverter(Pkappa2Converter):
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
         last_request_method = None
-        for chunk in stream.Chunks:
+        self.is_last_chunk = False
+        for chunk_idx, chunk in enumerate(stream.Chunks):
+            if chunk_idx == len(stream.Chunks) - 1:
+                self.is_last_chunk = True
+
             if chunk.Direction == Direction.CLIENTTOSERVER:
                 raw_result: Optional[List[StreamChunk]] = self.handle_raw_client_chunk(
                     chunk
