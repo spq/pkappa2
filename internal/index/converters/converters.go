@@ -57,8 +57,9 @@ type (
 		Protocol   string
 	}
 	converterStreamChunk struct {
-		Direction string
-		Content   string
+		Direction   string
+		Content     string
+		ContentType string `json:"ContentType,omitempty"`
 	}
 )
 
@@ -282,11 +283,12 @@ func (converter *Converter) Data(stream *index.Stream, moreDetails bool) (data [
 			return fmt.Errorf("converter (%s): Invalid direction: %q", converter.name, convertedPacket.Direction)
 		}
 
-		// Merge with previous packet if both are in the same direction.
-		if len(data) > 0 && data[len(data)-1].Direction == direction {
+		// Two packets in the same direction right after each other
+		if len(data) > 0 && data[len(data)-1].Direction == direction && len(data[len(data)-1].ContentType) == 0 && len(convertedPacket.ContentType) == 0 {
+			// Merge with previous packet if both don't have a content type.
 			data[len(data)-1].Content = append(data[len(data)-1].Content, decodedData...)
 		} else {
-			data = append(data, index.Data{Content: decodedData, Direction: direction})
+			data = append(data, index.Data{Content: decodedData, Direction: direction, ContentType: convertedPacket.ContentType})
 		}
 		if direction == index.DirectionClientToServer {
 			clientBytes += uint64(len(decodedData))

@@ -9,7 +9,7 @@
           class="chunk"
           :data-chunk-idx="index"
           :class="[classes(chunk)]"
-          v-html="inlineAscii(chunk.Content)"
+          v-html="inlineAscii(chunk)"
         >
         </span>
       </template>
@@ -55,8 +55,17 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
   return `&#x${i.toString(16).padStart(2, "0")};`;
 });
 
-const inlineAscii = (b64: string) => {
-  return atob(b64)
+const inlineAscii = (chunk: Data) => {
+  if (chunk.ContentType?.startsWith("text/html")) {
+    return `<iframe src="data:text/html;base64,${chunk.Content}" width="100%" height="300px" sandbox="" csp="default-src 'none'"></iframe>`;
+  }
+  const imageTypes = ["image/png", "image/x-icon"];
+  for (const type of imageTypes) {
+    if (chunk.ContentType?.startsWith(type)) {
+      return `<img src="data:${type};base64,${chunk.Content}" />`;
+    }
+  }
+  return atob(chunk.Content)
     .split("")
     .map((c) => asciiMap[c.charCodeAt(0)])
     .join("");

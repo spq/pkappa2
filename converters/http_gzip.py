@@ -59,8 +59,17 @@ class HTTPConverter(Pkappa2Converter):
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
     ) -> List[StreamChunk]:
-        data = header + b"\r\n\r\n" + response.data
-        return [StreamChunk(chunk.Direction, data)]
+        content_type = response.headers.get("Content-Type")
+        if content_type:
+            chunks = [
+                StreamChunk(chunk.Direction, header + b"\r\n\r\n"),
+                StreamChunk(chunk.Direction, response.data, content_type),
+            ]
+        else:
+            chunks = [
+                StreamChunk(chunk.Direction, header + b"\r\n\r\n" + response.data)
+            ]
+        return chunks
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
@@ -91,9 +100,9 @@ class HTTPConverter(Pkappa2Converter):
                     )
             else:
                 try:
-                    raw_response: Optional[
-                        List[StreamChunk]
-                    ] = self.handle_raw_server_chunk(chunk)
+                    raw_response: Optional[List[StreamChunk]] = (
+                        self.handle_raw_server_chunk(chunk)
+                    )
                     if raw_response is not None:
                         result_data.extend(raw_response)
                         continue
@@ -112,7 +121,7 @@ class HTTPConverter(Pkappa2Converter):
                     )
                 except ProtocolError as ex:
                     if isinstance(ex.__cause__, IncompleteRead):
-                        data = f"Incomplete read: {ex}\n".encode()
+                        data = f"Unable to parse HTTP response: {ex}\n".encode()
                         result_data.append(
                             StreamChunk(chunk.Direction, data + chunk.Content)
                         )

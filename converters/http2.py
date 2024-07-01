@@ -32,11 +32,6 @@ class HTTP2Converter(HTTPConverter):
         self.h2_server_buffer = None
         self.h2_active = False
 
-    def handle_http2_event(
-        self, direction: Direction, frame: hyperframe.frame.Frame
-    ) -> bytes:
-        return self.format_http2_frame(direction, frame)
-
     # Avoid decoding the headers multiple times.
     def handle_http2_headers(
         self,
@@ -46,7 +41,7 @@ class HTTP2Converter(HTTPConverter):
     ) -> None:
         pass
 
-    def format_http2_frame(
+    def handle_http2_event(
         self, direction: Direction, frame: hyperframe.frame.Frame
     ) -> bytes:
         if isinstance(

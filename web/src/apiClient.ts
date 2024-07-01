@@ -55,6 +55,7 @@ export type SearchResponse = SearchResult | Error;
 export type Data = {
   Direction: number;
   Content: Base64;
+  ContentType: string | undefined;
 };
 
 /** @see {isStreamData} ts-auto-guard:type-guard */

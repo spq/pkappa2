@@ -49,10 +49,13 @@ class ConverterDecoder(json.JSONDecoder):
 class ConverterEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, StreamChunk):
-            return {
+            json_streamchunk = {
                 "Content": base64.b64encode(o.Content).decode(),
                 "Direction": o.Direction.to_json(),
             }
+            if o.ContentType:
+                json_streamchunk["ContentType"] = o.ContentType
+            return json_streamchunk
 
         else:
             return super().default(o)
@@ -84,6 +87,7 @@ class Direction(Enum):
 class StreamChunk:
     Direction: Direction
     Content: bytes
+    ContentType: str = ""
 
 
 @dataclass

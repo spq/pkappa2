@@ -57,8 +57,9 @@ type (
 		Direction    Direction
 	}
 	Data struct {
-		Direction Direction
-		Content   []byte
+		Direction   Direction
+		Content     []byte
+		ContentType string `json:"ContentType,omitempty"`
 	}
 )
 
