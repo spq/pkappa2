@@ -60,11 +60,14 @@ class ConverterDecoder(json.JSONDecoder):
 class ConverterEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, StreamChunk):
-            return {
+            json_streamchunk = {
                 "Content": base64.b64encode(o.Content).decode(),
                 "Direction": o.Direction.to_json(),
                 "Time": o.Time.strftime("%Y-%m-%dT%H:%M:%S.%f"),
             }
+            if o.ContentType:
+                json_streamchunk["ContentType"] = o.ContentType
+            return json_streamchunk
 
         else:
             return super().default(o)
@@ -97,6 +100,7 @@ class StreamChunk:
     Direction: Direction
     Content: bytes
     Time: datetime.datetime
+    ContentType: str = ""
 
     def derive(
         self,
@@ -104,6 +108,7 @@ class StreamChunk:
         direction: Direction | None = None,
         content: bytes | None = None,
         time: datetime.datetime | None = None,
+        content_type: str | None = None,
     ) -> "StreamChunk":
         """
         Derive a new StreamChunk with the given parameters.
@@ -113,6 +118,7 @@ class StreamChunk:
             Direction=direction if direction is not None else self.Direction,
             Content=content if content is not None else self.Content,
             Time=time if time is not None else self.Time,
+            ContentType=content_type if content_type is not None else self.ContentType,
         )
 
 

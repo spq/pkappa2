@@ -333,6 +333,15 @@ const inlineUnicode = (chunk: Data) => {
 };
 
 const inlineAscii = (chunk: Data) => {
+  if (chunk.ContentType?.startsWith("text/html")) {
+    return `<iframe src="data:text/html;base64,${chunk.Content}" width="100%" height="300px" sandbox="" csp="default-src 'none'"></iframe>`;
+  }
+  const imageTypes = ["image/png", "image/x-icon"];
+  for (const type of imageTypes) {
+    if (chunk.ContentType?.startsWith(type)) {
+      return `<img src="data:${type};base64,${chunk.Content}" />`;
+    }
+  }
   const chunkData = tryURLDecodeIfEnabled(atob(chunk.Content), props.urlDecode);
   const asciiEscaped = chunkData
     .split("")

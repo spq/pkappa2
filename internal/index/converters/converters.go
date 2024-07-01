@@ -58,9 +58,10 @@ type (
 		Protocol   string
 	}
 	converterStreamChunk struct {
-		Direction string
-		Content   string
-		Time      string
+		Direction   string
+		Content     string
+		Time        string
+		ContentType string `json:",omitempty"`
 	}
 )
 
@@ -294,10 +295,11 @@ func (converter *Converter) Data(stream *index.Stream, moreDetails bool) (data [
 		// Discard the time of this packet in the process.
 		// We don't support two consecutive packets in the same direction in the cache file format.
 		// Would need to inject an empty chunk in the opposite direction to make it work if desired.
-		if len(data) > 0 && data[len(data)-1].Direction == direction {
+		if len(data) > 0 && data[len(data)-1].Direction == direction && len(data[len(data)-1].ContentType) == 0 && len(convertedPacket.ContentType) == 0 {
+			// Merge with previous packet if both don't have a content type.
 			data[len(data)-1].Content = append(data[len(data)-1].Content, decodedData...)
 		} else {
-			data = append(data, index.Data{Content: decodedData, Direction: direction, Time: time})
+			data = append(data, index.Data{Content: decodedData, Direction: direction, Time: time, ContentType: convertedPacket.ContentType})
 		}
 		if direction == index.DirectionClientToServer {
 			clientBytes += uint64(len(decodedData))
