@@ -267,24 +267,17 @@ function applySuggestion(index: number | null = null) {
   suggestionMenuOpen.value = false;
 }
 
-type SuggestionResults = {
-  suggestions: string[];
-  start: number;
-  end: number;
-  type: string;
-};
-
 function startSuggestionSearch() {
   const val = searchBox.value;
   typingDelay.value = window.setTimeout(() => {
     const cursorPosition =
       searchBoxField.value?.$el.querySelector("input")?.selectionStart ?? 0;
-    const suggestionResult: SuggestionResults = suggest(
+    const suggestionResult = suggest(
       val,
       cursorPosition,
       store.groupedTags,
       store.converters
-    ) as SuggestionResults; // trust me bro
+    );
     suggestionItems.value = suggestionResult.suggestions;
     suggestionStart.value = suggestionResult.start;
     suggestionEnd.value = suggestionResult.end;

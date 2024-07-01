@@ -1,16 +1,5 @@
 import nearley from "nearley";
-import grammar from "./query";
-
-type QueryElement = {
-  type: string;
-  op?: string;
-  expressions?: QueryElement[];
-  expression?: QueryElement;
-  subquery_var?: moo.Token;
-  keyword?: moo.Token;
-  converter?: moo.Token;
-  value?: moo.Token;
-};
+import grammar, { QueryElement, isExpression, isLogicExpression } from "./query";
 
 interface QueryElementValue {
   pieces: { [key: string]: string };
@@ -39,21 +28,20 @@ export default function analyze(query: string): {
     const elem = elements.pop();
     if (elem === undefined) break;
     if (
-      elem.type == "logic" &&
-      elem.op == "and" &&
-      elem.expressions !== undefined
+      isLogicExpression(elem) &&
+      elem.op == "and"
     ) {
       elements.push(...elem.expressions);
       continue;
     }
-    if (elem.type !== "expression" || elem.keyword === undefined) continue;
+    if (!isExpression(elem)) continue;
     if (!["sort", "limit", "ltime"].includes(elem.keyword.value)) continue;
     const pieces: { [key: string]: string } = {};
     let start: number | null = null;
     let end: number | null = null;
     for (const [k, v] of Object.entries(elem)) {
-      if (k == "type") continue;
-      if (v == null) continue;
+      if (k === "type") continue;
+      if (v === null) continue;
       const v2 = v as moo.Token;
       pieces[k] = v2.value;
       if (start == null || start > v2.offset) {

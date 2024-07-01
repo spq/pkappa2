@@ -41,6 +41,41 @@ const lexer = moo.compile({
     })},
 });
 
+export interface QueryElement {
+  type: string;
+};
+
+export interface LogicQueryElement extends QueryElement {
+  type: "logic";
+  op: "or" | "and" | "sequence";
+  expressions: QueryElement[];
+}
+
+export interface SubexpressionQueryElement extends QueryElement {
+  type: "not" | "subquery" | "error";
+  expression: QueryElement;
+}
+
+export interface ExpressionQueryElement extends QueryElement {
+  type: "expression";
+  subquery_var?: moo.Token;
+  keyword: moo.Token;
+  converter?: moo.Token;
+  value?: moo.Token;
+}
+
+export function isLogicExpression(obj: QueryElement): obj is LogicQueryElement {
+  return obj.type === "logic";
+}
+
+export function isSubExpression(obj: QueryElement): obj is SubexpressionQueryElement {
+  return ["not", "subquery", "error"].includes(obj.type);
+}
+
+export function isExpression(obj: QueryElement): obj is ExpressionQueryElement {
+  return obj.type === "expression";
+}
+
 interface NearleyToken {
   value: any;
   [key: string]: any;
