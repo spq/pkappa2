@@ -1,4 +1,4 @@
-import nearley, { Parser } from "nearley";
+import nearley from "nearley";
 import grammar from "./query";
 
 type QueryElement = {
@@ -10,7 +10,7 @@ type QueryElement = {
   keyword?: moo.Token;
   converter?: moo.Token;
   value?: moo.Token;
-}
+};
 
 interface QueryElementValue {
   pieces: { [key: string]: string };
@@ -23,7 +23,7 @@ const queryGrammar: nearley.Grammar = nearley.Grammar.fromCompiled(grammar);
 export default function analyze(query: string): {
   [key: string]: QueryElementValue;
 } {
-  const parser: Parser = new nearley.Parser(queryGrammar);
+  const parser: nearley.Parser = new nearley.Parser(queryGrammar);
   try {
     parser.feed(query);
   } catch (parseError) {
@@ -46,7 +46,7 @@ export default function analyze(query: string): {
       elements.push(...elem.expressions);
       continue;
     }
-    if (elem.type == "expression" || elem.keyword === undefined) continue;
+    if (elem.type !== "expression" || elem.keyword === undefined) continue;
     if (!["sort", "limit", "ltime"].includes(elem.keyword.value)) continue;
     const pieces: { [key: string]: string } = {};
     let start: number | null = null;
@@ -54,13 +54,13 @@ export default function analyze(query: string): {
     for (const [k, v] of Object.entries(elem)) {
       if (k == "type") continue;
       if (v == null) continue;
-      const v2 = v as { value: string; col: number; text: string };
+      const v2 = v as moo.Token;
       pieces[k] = v2.value;
-      if (start == null || start > v2.col) {
-        start = v2.col;
+      if (start == null || start > v2.offset) {
+        start = v2.offset;
       }
-      if (end == null || end < v2.col + v2.text.length) {
-        end = v2.col + v2.text.length;
+      if (end == null || end < v2.offset + v2.text.length) {
+        end = v2.offset + v2.text.length;
       }
     }
     if (start == null || end == null) continue;

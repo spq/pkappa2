@@ -26,7 +26,7 @@ const lexer = moo.compile({
         {match: /[:=]"(?:[^"]*|"")*"/, value: x => x.slice(2, -1)},
         {match: /[:=]"(?:[^"]*|"")*/, value: x => x.slice(2)},
         {match: /[:=](?:(?:[^"\\ \t\n\r]|\\.)(?:[^\\ \t\n\r]|\\.)*)?(?:[^)\\ \t\n\r]|\\.)/, value: x => x.slice(1)},
-        {match: /[:=]/, value: () => null},
+        {match: /[:=]/, value: _ => ""},
     ],
     lparen: '(',
     rparen: ')',
