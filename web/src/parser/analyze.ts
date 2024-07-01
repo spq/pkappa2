@@ -1,5 +1,9 @@
 import nearley from "nearley";
-import grammar, { QueryElement, isExpression, isLogicExpression } from "./query";
+import grammar, {
+  QueryElement,
+  isExpression,
+  isLogicExpression,
+} from "./query";
 
 interface QueryElementValue {
   pieces: { [key: string]: string };
@@ -27,10 +31,7 @@ export default function analyze(query: string): {
   for (;;) {
     const elem = elements.pop();
     if (elem === undefined) break;
-    if (
-      isLogicExpression(elem) &&
-      elem.op == "and"
-    ) {
+    if (isLogicExpression(elem) && elem.op == "and") {
       elements.push(...elem.expressions);
       continue;
     }

@@ -1,5 +1,11 @@
 import nearley from "nearley";
-import grammar, { ExpressionQueryElement, QueryElement, isExpression, isLogicExpression, isSubExpression } from "./query";
+import grammar, {
+  ExpressionQueryElement,
+  QueryElement,
+  isExpression,
+  isLogicExpression,
+  isSubExpression,
+} from "./query";
 import { ConverterStatistics, TagInfo } from "@/apiClient";
 
 type SuggestionResults = {
@@ -11,7 +17,12 @@ type SuggestionResults = {
 
 const queryGrammar = nearley.Grammar.fromCompiled(grammar);
 
-export default function suggest(query: string, cursorOffset: number, groupedTags: { [key: string]: TagInfo[]; }, converters: ConverterStatistics[] | null): SuggestionResults {
+export default function suggest(
+  query: string,
+  cursorOffset: number,
+  groupedTags: { [key: string]: TagInfo[] },
+  converters: ConverterStatistics[] | null
+): SuggestionResults {
   const parser = new nearley.Parser(queryGrammar);
   try {
     parser.feed(query);
@@ -22,7 +33,10 @@ export default function suggest(query: string, cursorOffset: number, groupedTags
   }
 
   // Find element at cursor
-  const targetElem = _findElementAtCursor(parser.results as QueryElement[], cursorOffset);
+  const targetElem = _findElementAtCursor(
+    parser.results as QueryElement[],
+    cursorOffset
+  );
   if (!targetElem) return { suggestions: [], start: 0, end: 0, type: "tag" };
 
   const keyword = targetElem.keyword.value;
@@ -44,15 +58,17 @@ export default function suggest(query: string, cursorOffset: number, groupedTags
       end,
       type: keyword,
     };
-  } else if (keyword.endsWith("data") && targetElem.converter !== undefined && converters !== null) {
+  } else if (
+    keyword.endsWith("data") &&
+    targetElem.converter !== undefined &&
+    converters !== null
+  ) {
     const value = targetElem.converter.value;
     const text = targetElem.converter.text;
     const start = targetElem.converter.col;
     const end = start + (text.length ?? 0) - 1;
     const suggestions = converters
-      .filter(
-        (c) => c.Name.startsWith(value) && c.Name !== value
-      )
+      .filter((c) => c.Name.startsWith(value) && c.Name !== value)
       .map((c) => c.Name);
     return {
       suggestions,
@@ -64,9 +80,15 @@ export default function suggest(query: string, cursorOffset: number, groupedTags
   return { suggestions: [], start: 0, end: 0, type: "tag" };
 }
 
-function _findElementAtCursor(results: QueryElement[], cursorOffset: number): ExpressionQueryElement | null {
+function _findElementAtCursor(
+  results: QueryElement[],
+  cursorOffset: number
+): ExpressionQueryElement | null {
   const elements = [...results];
-  const isCursorInsideElement = (elem: ExpressionQueryElement, part: "value" | "converter") => {
+  const isCursorInsideElement = (
+    elem: ExpressionQueryElement,
+    part: "value" | "converter"
+  ) => {
     const partValue = elem[part];
     if (!partValue) return false;
     const valueStartOffset = partValue.col;
@@ -79,8 +101,12 @@ function _findElementAtCursor(results: QueryElement[], cursorOffset: number): Ex
     const elem = elements.pop();
     if (elem === undefined) break;
     if (isExpression(elem)) {
-      if (elem.value !== undefined && isCursorInsideElement(elem, "value")) return elem;
-      if (elem.converter !== undefined && isCursorInsideElement(elem, "converter"))
+      if (elem.value !== undefined && isCursorInsideElement(elem, "value"))
+        return elem;
+      if (
+        elem.converter !== undefined &&
+        isCursorInsideElement(elem, "converter")
+      )
         return elem;
     } else if (isLogicExpression(elem)) {
       elements.push(...elem.expressions);
