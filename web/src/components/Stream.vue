@@ -372,6 +372,7 @@ const router = useRouter();
 const presentation = ref("ascii");
 const selectionData = ref("");
 const selectionQuery = ref("");
+const streamData = ref<HTMLElement | null>(null);
 
 if (localStorage.streamPresentation) {
   presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";
@@ -469,8 +470,7 @@ watch(presentation, (v) => {
 onMounted(() => {
   fetchStreamForId();
   const proxy = {
-    proxy: getCurrentInstance()?.proxy,
-    stream,
+    proxy: getCurrentInstance()!.proxy,
     selectionData,
     selectionQuery,
   };
