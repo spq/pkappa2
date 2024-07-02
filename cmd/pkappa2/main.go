@@ -41,13 +41,25 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 )
 
+type webhookUrls []string
+
+func (l *webhookUrls) String() string {
+	return ""
+}
+
+func (l *webhookUrls) Set(value string) error {
+	*l = append(*l, value)
+	return nil
+}
+
 var (
-	baseDir      = flag.String("base_dir", "/tmp", "All paths are relative to this path")
-	pcapDir      = flag.String("pcap_dir", "", "Path where pcaps will be stored")
-	indexDir     = flag.String("index_dir", "", "Path where indexes will be stored")
-	snapshotDir  = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
-	stateDir     = flag.String("state_dir", "", "Path where state files will be stored")
-	converterDir = flag.String("converter_dir", "./converters", "Path where converter executables are searched")
+	baseDir                  = flag.String("base_dir", "/tmp", "All paths are relative to this path")
+	pcapDir                  = flag.String("pcap_dir", "", "Path where pcaps will be stored")
+	indexDir                 = flag.String("index_dir", "", "Path where indexes will be stored")
+	snapshotDir              = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
+	stateDir                 = flag.String("state_dir", "", "Path where state files will be stored")
+	converterDir             = flag.String("converter_dir", "./converters", "Path where converter executables are searched")
+	pcapProcessorWebhookUrls webhookUrls
 
 	userPassword = flag.String("user_password", "", "HTTP auth password for users")
 	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
@@ -58,6 +70,7 @@ var (
 )
 
 func main() {
+	flag.Var(&pcapProcessorWebhookUrls, "pcap_processor_url", "Webhook URL to POST a JSON array of newly processed pcap paths to. Can be passed multiple times.")
 	flag.Parse()
 
 	if *startupCpuprofile != "" {
@@ -78,6 +91,7 @@ func main() {
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
 		*converterDir,
+		pcapProcessorWebhookUrls,
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)

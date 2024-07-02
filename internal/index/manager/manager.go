@@ -1,12 +1,14 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -28,6 +30,11 @@ import (
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
+)
+
+const (
+	// Request timeout for webhooks
+	pcapProcessorWebhookTimeout = time.Second * 5
 )
 
 type (
@@ -81,7 +88,8 @@ type (
 		updatedStreamsDuringTaggingJob bitmask.LongBitmask
 		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
-		streamsToConvert map[string]*bitmask.LongBitmask
+		streamsToConvert         map[string]*bitmask.LongBitmask
+		pcapProcessorWebhookUrls []string
 
 		tags       map[string]*tag
 		converters map[string]*converters.CachedConverter
@@ -151,13 +159,14 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string, pcapProcessorWebhookUrls []string) (*Manager, error) {
 	mgr := Manager{
-		PcapDir:      pcapDir,
-		IndexDir:     indexDir,
-		SnapshotDir:  snapshotDir,
-		StateDir:     stateDir,
-		ConverterDir: converterDir,
+		PcapDir:                  pcapDir,
+		IndexDir:                 indexDir,
+		SnapshotDir:              snapshotDir,
+		StateDir:                 stateDir,
+		ConverterDir:             converterDir,
+		pcapProcessorWebhookUrls: pcapProcessorWebhookUrls,
 
 		usedIndexes:      make(map[*index.Reader]uint),
 		tags:             make(map[string]*tag),
@@ -549,6 +558,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		mgr.event(Event{
 			Type: "pcapProcessed",
 		})
+		mgr.triggerPcapProcessedWebhooks(filenames[:processedFiles])
 	}
 }
 
@@ -1555,6 +1565,45 @@ func (mgr *Manager) ConverterStderr(converterName string, pid int) (*converters.
 		return nil, fmt.Errorf("error: converter %s or process with pid %d does not exist", converterName, pid)
 	}
 	return stderr, nil
+}
+
+func (mgr *Manager) triggerPcapProcessedWebhooks(filenames []string) {
+	jsonBody, err := json.Marshal(filenames)
+	if err != nil {
+		fmt.Printf("error: webhook body json encode failed: %v\n", err)
+		return
+	}
+	for _, webhookUrl := range mgr.pcapProcessorWebhookUrls {
+		go mgr.triggerPcapProcessedWebhook(webhookUrl, jsonBody)
+	}
+}
+
+func (mgr *Manager) triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
+	err := func() error {
+		bodyReader := bytes.NewReader(jsonBody)
+
+		ctx, cncl := context.WithTimeout(context.Background(), pcapProcessorWebhookTimeout)
+		defer cncl()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookUrl, bodyReader)
+		if err != nil {
+			return fmt.Errorf("failed to create webhook request for processed pcap: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to making webhook request for processed pcap: %w", err)
+		}
+
+		if res.StatusCode != 200 {
+			return fmt.Errorf("webhook request for processed pcap failed: %q", res.Status)
+		}
+		return nil
+	}()
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+	}
 }
 
 func (mgr *Manager) GetView() View {
