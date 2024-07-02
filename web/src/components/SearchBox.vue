@@ -105,7 +105,7 @@ import { EventBus } from "./EventBus";
 import { addSearch, getTermAt } from "./searchHistory";
 import suggest from "@/parser/suggest";
 import analyze from "@/parser/analyze";
-import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
+import { computed, nextTick, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router/composables";
 import { useRootStore } from "@/stores";
 import { tagNameForURI } from "@/filters";
@@ -148,6 +148,10 @@ const queryTimeLimit = computed({
       const suffix = q.slice(ltime.start + ltime.len);
       searchBox.value = `${prefix}${infix}${suffix}`;
     }
+    searchBoxField.value?.$el.querySelector("input")?.focus();
+    nextTick(() => {
+      searchBoxOptionsMenuOpen.value = true;
+    });
   },
 });
 const tagColors = computed(() => {
