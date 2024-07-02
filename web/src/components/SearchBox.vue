@@ -33,41 +33,6 @@
           @keydown.esc.exact="suggestionMenuOpen = false"
           v-on="on"
         >
-          <template #append>
-            <v-menu offset-y right bottom>
-              <template #activator="{ on: on2, attrs }">
-                <v-btn small icon v-bind="attrs" v-on="on2"
-                  ><v-icon>mdi-dots-vertical</v-icon></v-btn
-                >
-              </template>
-              <v-list dense>
-                <v-list-item link @click="search('search')">
-                  <v-list-item-icon
-                    ><v-icon>mdi-magnify</v-icon></v-list-item-icon
-                  >
-                  <v-list-item-title>Search</v-list-item-title>
-                </v-list-item>
-                <v-list-item link @click="search('graph')">
-                  <v-list-item-icon
-                    ><v-icon>mdi-finance</v-icon></v-list-item-icon
-                  >
-                  <v-list-item-title>Graph</v-list-item-title>
-                </v-list-item>
-                <v-list-item link @click="createTag('service', searchBox)">
-                  <v-list-item-icon
-                    ><v-icon>mdi-cloud-outline</v-icon></v-list-item-icon
-                  >
-                  <v-list-item-title>Save as Service</v-list-item-title>
-                </v-list-item>
-                <v-list-item link @click="createTag('tag', searchBox)">
-                  <v-list-item-icon
-                    ><v-icon>mdi-tag-multiple-outline</v-icon></v-list-item-icon
-                  >
-                  <v-list-item-title>Save as Tag</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
-          </template>
         </v-text-field>
       </template>
     </v-menu>
@@ -95,6 +60,39 @@
             <v-list-item-title>{{ item }}</v-list-item-title>
           </v-list-item>
         </v-list-item-group>
+      </v-list>
+    </v-menu>
+    <v-menu offset-y right bottom>
+      <template #activator="{ on: on2, attrs }">
+        <v-btn class="textfield-overlay" small icon v-bind="attrs" v-on="on2"
+          ><v-icon>mdi-dots-vertical</v-icon></v-btn
+        >
+      </template>
+      <v-list dense>
+        <v-list-item link @click="search('search')">
+          <v-list-item-icon
+            ><v-icon>mdi-magnify</v-icon></v-list-item-icon
+          >
+          <v-list-item-title>Search</v-list-item-title>
+        </v-list-item>
+        <v-list-item link @click="search('graph')">
+          <v-list-item-icon
+            ><v-icon>mdi-finance</v-icon></v-list-item-icon
+          >
+          <v-list-item-title>Graph</v-list-item-title>
+        </v-list-item>
+        <v-list-item link @click="createTag('service', searchBox)">
+          <v-list-item-icon
+            ><v-icon>mdi-cloud-outline</v-icon></v-list-item-icon
+          >
+          <v-list-item-title>Save as Service</v-list-item-title>
+        </v-list-item>
+        <v-list-item link @click="createTag('tag', searchBox)">
+          <v-list-item-icon
+            ><v-icon>mdi-tag-multiple-outline</v-icon></v-list-item-icon
+          >
+          <v-list-item-title>Save as Tag</v-list-item-title>
+        </v-list-item>
       </v-list>
     </v-menu>
   </div>
@@ -392,5 +390,10 @@ function createTag(tagType: string, tagQuery: string) {
 .font-white {
   color: black;
   font-weight: bold;
+}
+.textfield-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 </style>
