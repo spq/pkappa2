@@ -60,7 +60,7 @@ export default function suggest(
     };
   } else if (
     keyword.endsWith("data") &&
-    targetElem.converter !== undefined &&
+    targetElem.converter != null &&
     converters !== null
   ) {
     const value = targetElem.converter.value;
