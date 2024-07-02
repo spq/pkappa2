@@ -136,13 +136,17 @@ const queryTimeLimit = computed({
     return undefined;
   },
   set(val: string | undefined) {
-    const q = searchBox.value;
+    const q = searchBox.value ?? '';
     const ltime = analyze(q).ltime;
     let old = ltime?.pieces?.value;
     if (old === val) return;
-    const infix = `ltime:${val ?? ":"}`;
+    const infix = val ? `ltime:${val}` : "";
     if (old === undefined) {
-      searchBox.value = `${q} ${infix}`;
+      if (q === '' || q.endsWith(' ')) {
+        searchBox.value = `${q}${infix}`;
+      } else {
+        searchBox.value = `${q} ${infix}`;
+      }
     } else {
       const prefix = q.slice(0, ltime.start);
       const suffix = q.slice(ltime.start + ltime.len);
