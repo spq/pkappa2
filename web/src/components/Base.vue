@@ -42,7 +42,7 @@ import ErrorBanner from "./ErrorBanner.vue";
 import { ref } from "vue";
 
 /** @TODO: Only show navigation on larger screens.
- * The navigation overlays on smaller screens. 
+ * The navigation overlays on smaller screens.
  * An overlay on first site visit is very disrupting. */
 const showNavigation = ref(true);
 </script>

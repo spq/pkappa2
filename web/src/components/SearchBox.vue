@@ -70,15 +70,11 @@
       </template>
       <v-list dense>
         <v-list-item link @click="search('search')">
-          <v-list-item-icon
-            ><v-icon>mdi-magnify</v-icon></v-list-item-icon
-          >
+          <v-list-item-icon><v-icon>mdi-magnify</v-icon></v-list-item-icon>
           <v-list-item-title>Search</v-list-item-title>
         </v-list-item>
         <v-list-item link @click="search('graph')">
-          <v-list-item-icon
-            ><v-icon>mdi-finance</v-icon></v-list-item-icon
-          >
+          <v-list-item-icon><v-icon>mdi-finance</v-icon></v-list-item-icon>
           <v-list-item-title>Graph</v-list-item-title>
         </v-list-item>
         <v-list-item link @click="createTag('service', searchBox)">
@@ -103,7 +99,14 @@ import { EventBus } from "./EventBus";
 import { addSearch, getTermAt } from "./searchHistory";
 import suggest from "@/parser/suggest";
 import analyze from "@/parser/analyze";
-import { computed, nextTick, ref, onMounted, onBeforeUnmount, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router/composables";
 import { useRootStore } from "@/stores";
 import { tagNameForURI } from "@/filters";
@@ -134,13 +137,13 @@ const queryTimeLimit = computed({
     return undefined;
   },
   set(val: string | undefined) {
-    const q = searchBox.value ?? '';
+    const q = searchBox.value ?? "";
     const ltime = analyze(q).ltime;
     let old = ltime?.pieces?.value;
     if (old === val) return;
     const infix = val ? `ltime:${val}` : "";
     if (old === undefined) {
-      if (q === '' || q.endsWith(' ')) {
+      if (q === "" || q.endsWith(" ")) {
         searchBox.value = `${q}${infix}`;
       } else {
         searchBox.value = `${q} ${infix}`;
