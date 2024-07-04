@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	baseDir      = flag.String("base_dir", "/tmp", "All paths are relative to this path")
+	baseDir      = flag.String("base_dir", os.TempDir(), "All paths are relative to this path")
 	pcapDir      = flag.String("pcap_dir", "", "Path where pcaps will be stored")
 	indexDir     = flag.String("index_dir", "", "Path where indexes will be stored")
 	snapshotDir  = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
