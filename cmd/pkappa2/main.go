@@ -135,7 +135,7 @@ func main() {
 
 		dst, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 		if err != nil {
-			http.Error(w, "File already exists", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("File already exists: %v", err), http.StatusInternalServerError)
 			return
 		}
 

@@ -24,6 +24,6 @@ func MakeFilename(dir, extension string) string {
 	}
 	curID := lastID
 	mtx.Unlock()
-	fn := filepath.Join(dir, fmt.Sprintf("%s.%d.%s", t.Format("2006-01-02_15:04:05.000"), curID, extension))
+	fn := filepath.Join(dir, fmt.Sprintf("%s.%d.%s", t.Format("2006-01-02_150405.000"), curID, extension))
 	return fn
 }
