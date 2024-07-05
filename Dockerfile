@@ -5,7 +5,7 @@ COPY ./web/ /app
 RUN yarn install --frozen-lockfile && yarn build
 
 # Build backend
-FROM golang:1.21 AS backend_builder
+FROM golang:1.22 AS backend_builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev && rm -rf /var/lib/apt/lists/*
