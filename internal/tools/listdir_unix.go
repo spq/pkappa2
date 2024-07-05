@@ -4,8 +4,9 @@
 package tools
 
 import (
-	"golang.org/x/sys/unix"
 	"log"
+
+	"golang.org/x/sys/unix"
 )
 
 func AssertFolderRWXPermissions(name, dir string) {
@@ -16,7 +17,7 @@ func AssertFolderRWXPermissions(name, dir string) {
 }
 
 func IsFileExecutable(name string) bool {
-	if err := unix.Access(path, unix.X_OK); err != nil {
+	if err := unix.Access(name, unix.X_OK); err != nil {
 		return false
 	}
 	return true
