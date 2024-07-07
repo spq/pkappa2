@@ -30,8 +30,9 @@ import (
 
 type (
 	Event struct {
-		Type string
-		Tag  *TagInfo `json:",omitempty"`
+		Type      string
+		Tag       *TagInfo               `json:",omitempty"`
+		Converter *converters.Statistics `json:",omitempty"`
 	}
 	listener struct {
 		close  chan struct{}
@@ -875,7 +876,7 @@ func (mgr *Manager) DelTag(name string) error {
 			// remove converter results of attached converters from cache
 			if len(tag.converters) > 0 {
 				for _, converter := range tag.converters {
-					if err := mgr.detachConverterFromTag(tag, converter); err != nil {
+					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
 						return err
 					}
 				}
@@ -976,7 +977,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					if slices.Contains(info.setConverterNames, converter.Name()) {
 						continue
 					}
-					if err := mgr.detachConverterFromTag(tag, converter); err != nil {
+					if err := mgr.detachConverterFromTag(tag, name, converter); err != nil {
 						return fmt.Errorf("failed to detach converter %q from tag %q: %w", converter.Name(), name, err)
 					}
 				}
@@ -1261,14 +1262,15 @@ func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter
 				tag.Uncertain.Or(*allStreamIDs[i])
 			}
 			mgr.updatedStreamsDuringTaggingJob.Or(*allStreamIDs[i])
+			mgr.event(Event{
+				Type:      "converterCompleted",
+				Converter: converter.Statistics(),
+			})
 		}
 		mgr.inheritTagUncertainty()
 		mgr.startTaggingJobIfNeeded()
 		mgr.startConverterJobIfNeeded()
 		releaser.release(mgr)
-		mgr.event(Event{
-			Type: "converterCompleted",
-		})
 	}
 }
 
@@ -1308,8 +1310,13 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 						if err := mgr.removeConverter(event.Name); err != nil {
 							log.Printf("error while removing converter: %v", err)
 						}
+						name := strings.TrimSuffix(filepath.Base(event.Name), filepath.Ext(event.Name))
 						mgr.event(Event{
 							Type: "converterDeleted",
+							Converter: &converters.Statistics{
+								Name:      name,
+								Processes: []converters.ProcessStats{},
+							},
 						})
 					}
 				}
@@ -1338,8 +1345,11 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 								if err := mgr.addConverter(event.Name); err != nil {
 									log.Printf("error while adding converter: %v", err)
 								}
+								name := strings.TrimSuffix(filepath.Base(event.Name), filepath.Ext(event.Name))
+								converter := mgr.converters[name]
 								mgr.event(Event{
-									Type: "converterAdded",
+									Type:      "converterAdded",
+									Converter: converter.Statistics(),
 								})
 							}
 							if event.Has(fsnotify.Chmod) {
@@ -1415,8 +1425,8 @@ func (mgr *Manager) removeConverter(path string) error {
 	}
 
 	// remove converter from all tags
-	for _, t := range mgr.tags {
-		if err := mgr.detachConverterFromTag(t, converter); err != nil {
+	for tagName, tag := range mgr.tags {
+		if err := mgr.detachConverterFromTag(tag, tagName, converter); err != nil {
 			return err
 		}
 	}
@@ -1439,6 +1449,10 @@ func (mgr *Manager) restartConverterProcess(path string) error {
 			return err
 		}
 		converter = mgr.converters[name]
+		mgr.event(Event{
+			Type:      "converterAdded",
+			Converter: converter.Statistics(),
+		})
 	}
 	// Stop the process if it is running and restart it
 	if err := converter.Reset(); err != nil {
@@ -1454,7 +1468,8 @@ func (mgr *Manager) restartConverterProcess(path string) error {
 	mgr.startConverterJobIfNeeded()
 
 	mgr.event(Event{
-		Type: "converterRestarted",
+		Type:      "converterRestarted",
+		Converter: converter.Statistics(),
 	})
 	return nil
 }
@@ -1474,16 +1489,24 @@ func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *co
 
 	tag.converters = append(tag.converters, converter)
 	mgr.streamsToConvert[converter.Name()].Or(tag.Matches)
+	mgr.event(Event{
+		Type: "tagUpdated",
+		Tag:  makeTagInfo(tagName, tag),
+	})
 	return nil
 }
 
-func (mgr *Manager) detachConverterFromTag(tag *tag, converter *converters.CachedConverter) error {
+func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *converters.CachedConverter) error {
 	for i, c := range tag.converters {
 		if c == converter {
 			tag.converters = append(tag.converters[:i], tag.converters[i+1:]...)
 			break
 		}
 	}
+	mgr.event(Event{
+		Type: "tagUpdated",
+		Tag:  makeTagInfo(tagName, tag),
+	})
 	// delete/invalidate converter results for all matching streams now
 	// but only if they aren't matches of other tags the converter is attached to.
 	matchingStreams := bitmask.LongBitmask{}
@@ -1820,6 +1843,18 @@ func (c StreamContext) Data(converterName string) ([]index.Data, error) {
 		return nil, fmt.Errorf("invalid converter %q", converterName)
 	}
 	data, _, _, err := converter.Data(c.Stream(), true)
+	// TODO: only send event if the data wasn't cached before
+	if err == nil {
+		c.v.mgr.jobs <- func() {
+			converter, ok := c.v.mgr.converters[converterName]
+			if ok {
+				c.v.mgr.event(Event{
+					Type:      "converterCompleted",
+					Converter: converter.Statistics(),
+				})
+			}
+		}
+	}
 	return data, err
 }
 

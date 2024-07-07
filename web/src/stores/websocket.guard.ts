@@ -2,7 +2,7 @@
  * Generated type guards for "websocket.ts".
  * WARNING: Do not manually change this file.
  */
-import { Event, TagEvent } from "./websocket";
+import { Event, TagEvent, ConverterEvent } from "./websocket";
 
 export function isEvent(obj: unknown): obj is Event {
     const typedObj = obj as Event
@@ -36,6 +36,34 @@ export function isTagEvent(obj: unknown): obj is TagEvent {
         Array.isArray(typedObj["Tag"]["Converters"]) &&
         typedObj["Tag"]["Converters"].every((e: any) =>
             typeof e === "string"
+        )
+    )
+}
+
+export function isConverterEvent(obj: unknown): obj is ConverterEvent {
+    const typedObj = obj as ConverterEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        (typedObj["Type"] === "converterCompleted" ||
+            typedObj["Type"] === "converterDeleted" ||
+            typedObj["Type"] === "converterAdded" ||
+            typedObj["Type"] === "converterRestarted") &&
+        (typedObj["Converter"] !== null &&
+            typeof typedObj["Converter"] === "object" ||
+            typeof typedObj["Converter"] === "function") &&
+        typeof typedObj["Converter"]["Name"] === "string" &&
+        typeof typedObj["Converter"]["CachedStreamCount"] === "number" &&
+        Array.isArray(typedObj["Converter"]["Processes"]) &&
+        typedObj["Converter"]["Processes"].every((e: any) =>
+            (e !== null &&
+                typeof e === "object" ||
+                typeof e === "function") &&
+            typeof e["Running"] === "boolean" &&
+            typeof e["ExitCode"] === "number" &&
+            typeof e["Pid"] === "number" &&
+            typeof e["Errors"] === "number"
         )
     )
 }

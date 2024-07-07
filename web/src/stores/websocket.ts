@@ -1,8 +1,8 @@
-import { TagInfo } from "@/apiClient";
+import { ConverterStatistics, TagInfo } from "@/apiClient";
 import { useRootStore } from ".";
 import { useStreamStore } from "./stream";
 import { useStreamsStore } from "./streams";
-import { isEvent, isTagEvent } from "./websocket.guard";
+import { isConverterEvent, isEvent, isTagEvent } from "./websocket.guard";
 
 type EventTypes =
   | "converterCompleted"
@@ -26,6 +26,12 @@ export type Event = {
 export type TagEvent = {
   Type: "tagAdded" | "tagDeleted" | "tagUpdated" | "tagEvaluated";
   Tag: TagInfo;
+};
+
+/** @see {isConverterEvent} ts-auto-guard:type-guard */
+export type ConverterEvent = {
+  Type: "converterCompleted" | "converterDeleted" | "converterAdded" | "converterRestarted";
+  Converter: ConverterStatistics;
 };
 
 export function setupWebsocket() {
@@ -107,6 +113,38 @@ export function setupWebsocket() {
             store.tags = store.tags.map((t) =>
               t.Name == e.Tag.Name ? e.Tag : t
             );
+          break;
+        case "converterAdded":
+          if (!isConverterEvent(e)) {
+            console.error("Invalid converter event:", e);
+            return;
+          }
+          if (store.converters != null &&
+            !store.converters.find((c) => c.Name == e.Converter.Name)
+          )
+            store.converters.push(e.Converter);
+          break;
+        case "converterDeleted":
+          if (!isConverterEvent(e)) {
+            console.error("Invalid converter event:", e);
+            return;
+          }
+          if (store.converters != null)
+            store.converters = store.converters.filter(
+              (c) => c.Name != e.Converter.Name
+            );
+          break;
+        case "converterCompleted":
+        case "converterRestarted":
+          if (!isConverterEvent(e)) {
+            console.error("Invalid converter event:", e);
+            return;
+          }
+          if (store.converters != null) {
+            store.converters = store.converters.map((c) =>
+              c.Name == e.Converter.Name ? e.Converter : c
+            );
+          }
           break;
         default:
           console.log(`Unhandled event type: ${e.Type}`);
