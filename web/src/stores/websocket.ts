@@ -30,7 +30,11 @@ export type TagEvent = {
 
 /** @see {isConverterEvent} ts-auto-guard:type-guard */
 export type ConverterEvent = {
-  Type: "converterCompleted" | "converterDeleted" | "converterAdded" | "converterRestarted";
+  Type:
+    | "converterCompleted"
+    | "converterDeleted"
+    | "converterAdded"
+    | "converterRestarted";
   Converter: ConverterStatistics;
 };
 
@@ -119,7 +123,8 @@ export function setupWebsocket() {
             console.error("Invalid converter event:", e);
             return;
           }
-          if (store.converters != null &&
+          if (
+            store.converters != null &&
             !store.converters.find((c) => c.Name == e.Converter.Name)
           )
             store.converters.push(e.Converter);
