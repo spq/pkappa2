@@ -124,7 +124,8 @@ type (
 			Color      string
 			Converters []string
 		}
-		Pcaps []*pcapmetadata.PcapInfo
+		Pcaps                    []*pcapmetadata.PcapInfo
+		PcapProcessorWebhookUrls []string
 	}
 
 	updateTagOperationInfo struct {
@@ -159,14 +160,13 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string, pcapProcessorWebhookUrls []string) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
 	mgr := Manager{
-		PcapDir:                  pcapDir,
-		IndexDir:                 indexDir,
-		SnapshotDir:              snapshotDir,
-		StateDir:                 stateDir,
-		ConverterDir:             converterDir,
-		pcapProcessorWebhookUrls: pcapProcessorWebhookUrls,
+		PcapDir:      pcapDir,
+		IndexDir:     indexDir,
+		SnapshotDir:  snapshotDir,
+		StateDir:     stateDir,
+		ConverterDir: converterDir,
 
 		usedIndexes:      make(map[*index.Reader]uint),
 		tags:             make(map[string]*tag),
@@ -328,6 +328,7 @@ nextStateFile:
 			break
 		}
 		mgr.tags = newTags
+		mgr.pcapProcessorWebhookUrls = s.PcapProcessorWebhookUrls
 		mgr.stateFilename = fn
 		stateTimestamp = s.Saved
 		cachedKnownPcapData = s.Pcaps
@@ -401,8 +402,9 @@ func (mgr *Manager) Close() {
 
 func (mgr *Manager) saveState() error {
 	j := stateFile{
-		Saved: time.Now(),
-		Pcaps: mgr.builder.KnownPcaps(),
+		Saved:                    time.Now(),
+		Pcaps:                    mgr.builder.KnownPcaps(),
+		PcapProcessorWebhookUrls: mgr.pcapProcessorWebhookUrls,
 	}
 	for n, t := range mgr.tags {
 		j.Tags = append(j.Tags, struct {
@@ -1565,6 +1567,53 @@ func (mgr *Manager) ConverterStderr(converterName string, pid int) (*converters.
 		return nil, fmt.Errorf("error: converter %s or process with pid %d does not exist", converterName, pid)
 	}
 	return stderr, nil
+}
+
+func (mgr *Manager) ListPcapProcessorWebhooks() []string {
+	c := make(chan []string)
+	mgr.jobs <- func() {
+		if mgr.pcapProcessorWebhookUrls == nil {
+			c <- []string{}
+		} else {
+			c <- mgr.pcapProcessorWebhookUrls
+		}
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) AddPcapProcessorWebhook(url string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		for _, u := range mgr.pcapProcessorWebhookUrls {
+			if u == url {
+				c <- fmt.Errorf("error: url %q already exists", url)
+				close(c)
+				return
+			}
+		}
+		mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls, url)
+		c <- mgr.saveState()
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) DelPcapProcessorWebhook(url string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		for i, u := range mgr.pcapProcessorWebhookUrls {
+			if u == url {
+				mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls[:i], mgr.pcapProcessorWebhookUrls[i+1:]...)
+				c <- mgr.saveState()
+				close(c)
+				return
+			}
+		}
+		c <- fmt.Errorf("error: url %q does not exist", url)
+		close(c)
+	}
+	return <-c
 }
 
 func (mgr *Manager) triggerPcapProcessedWebhooks(filenames []string) {
