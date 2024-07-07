@@ -1,5 +1,7 @@
 import { TagInfo } from "@/apiClient";
 import { useRootStore } from ".";
+import { useStreamStore } from "./stream";
+import { useStreamsStore } from "./streams";
 
 type Event = {
   Type: string;
@@ -35,6 +37,8 @@ export function setupWebsocket() {
     };
     ws.onmessage = (event) => {
       const store = useRootStore();
+      const streamStore = useStreamStore();
+      const streamsStore = useStreamsStore();
       const e: Event = JSON.parse(event.data as string) as Event;
       switch (e.Type) {
         case "tagAdded":
@@ -47,6 +51,17 @@ export function setupWebsocket() {
         case "tagDeleted":
           if (store.tags != null)
             store.tags = store.tags.filter((tag) => tag.Name != e.Tag?.Name);
+          if (streamStore.stream != null)
+            streamStore.stream.Tags = streamStore.stream.Tags.filter(
+              (tag) => tag !== e.Tag?.Name
+            );
+          if (streamsStore.result != null)
+            streamsStore.result.Results = streamsStore.result.Results.map(
+              (result) => {
+                result.Tags = result.Tags.filter((tag) => tag !== e.Tag?.Name);
+                return result;
+              }
+            );
           break;
         case "tagUpdated":
         case "tagEvaluated":
