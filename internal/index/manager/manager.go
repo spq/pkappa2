@@ -31,7 +31,7 @@ import (
 type (
 	Event struct {
 		Type string
-		Tag  *TagInfo
+		Tag  *TagInfo `json:",omitempty"`
 	}
 	listener struct {
 		close  chan struct{}
@@ -884,7 +884,8 @@ func (mgr *Manager) DelTag(name string) error {
 			mgr.event(Event{
 				Type: "tagDeleted",
 				Tag: &TagInfo{
-					Name: name,
+					Name:       name,
+					Converters: []string{},
 				},
 			})
 			for _, tn := range tag.referencedTags() {

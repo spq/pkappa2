@@ -2,10 +2,30 @@ import { TagInfo } from "@/apiClient";
 import { useRootStore } from ".";
 import { useStreamStore } from "./stream";
 import { useStreamsStore } from "./streams";
+import { isEvent, isTagEvent } from "./websocket.guard";
 
-type Event = {
-  Type: string;
-  Tag: TagInfo | null;
+type EventTypes =
+  | "converterCompleted"
+  | "converterDeleted"
+  | "converterAdded"
+  | "converterRestarted"
+  | "indexesMerged"
+  | "pcapArrived"
+  | "pcapProcessed"
+  | "tagAdded"
+  | "tagDeleted"
+  | "tagUpdated"
+  | "tagEvaluated";
+
+/** @see {isEvent} ts-auto-guard:type-guard */
+export type Event = {
+  Type: EventTypes | string;
+};
+
+/** @see {isTagEvent} ts-auto-guard:type-guard */
+export type TagEvent = {
+  Type: "tagAdded" | "tagDeleted" | "tagUpdated" | "tagEvaluated";
+  Tag: TagInfo;
 };
 
 export function setupWebsocket() {
@@ -36,38 +56,56 @@ export function setupWebsocket() {
       }, reconnectTimeout);
     };
     ws.onmessage = (event) => {
+      if (typeof event.data !== "string") return;
       const store = useRootStore();
       const streamStore = useStreamStore();
       const streamsStore = useStreamsStore();
-      const e: Event = JSON.parse(event.data as string) as Event;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const e = JSON.parse(event.data);
+      if (!isEvent(e)) {
+        console.error("Invalid event:", event.data);
+        return;
+      }
       switch (e.Type) {
         case "tagAdded":
+          if (!isTagEvent(e)) {
+            console.error("Invalid tag event:", e);
+            return;
+          }
           if (
             store.tags != null &&
-            !store.tags.find((tag) => tag.Name == e.Tag?.Name)
+            !store.tags.find((tag) => tag.Name == e.Tag.Name)
           )
-            store.tags.push(e.Tag!);
+            store.tags.push(e.Tag);
           break;
         case "tagDeleted":
+          if (!isTagEvent(e)) {
+            console.error("Invalid tag event:", e);
+            return;
+          }
           if (store.tags != null)
-            store.tags = store.tags.filter((tag) => tag.Name != e.Tag?.Name);
+            store.tags = store.tags.filter((tag) => tag.Name != e.Tag.Name);
           if (streamStore.stream != null)
             streamStore.stream.Tags = streamStore.stream.Tags.filter(
-              (tag) => tag !== e.Tag?.Name
+              (tag) => tag !== e.Tag.Name
             );
           if (streamsStore.result != null)
             streamsStore.result.Results = streamsStore.result.Results.map(
               (result) => {
-                result.Tags = result.Tags.filter((tag) => tag !== e.Tag?.Name);
+                result.Tags = result.Tags.filter((tag) => tag !== e.Tag.Name);
                 return result;
               }
             );
           break;
         case "tagUpdated":
         case "tagEvaluated":
+          if (!isTagEvent(e)) {
+            console.error("Invalid tag event:", e);
+            return;
+          }
           if (store.tags != null)
             store.tags = store.tags.map((t) =>
-              t.Name == e.Tag!.Name ? e.Tag! : t
+              t.Name == e.Tag.Name ? e.Tag : t
             );
           break;
         default:
