@@ -809,14 +809,14 @@ func main() {
 		}
 	})
 	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
-	rUser.Get("/api/pcap_processors", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Get("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if err := json.NewEncoder(w).Encode(mgr.ListPcapProcessorWebhooks()); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
-	rUser.Delete("/api/pcap_processors", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Delete("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
 		u := r.URL.Query()["url"]
 		if len(u) != 1 || u[0] == "" {
 			http.Error(w, "`url` parameter missing", http.StatusBadRequest)
@@ -827,7 +827,7 @@ func main() {
 			return
 		}
 	})
-	rUser.Put("/api/pcap_processors", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Put("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
 		u := r.URL.Query()["url"]
 		if len(u) != 1 || u[0] == "" {
 			http.Error(w, "`url` parameter missing or empty", http.StatusBadRequest)
