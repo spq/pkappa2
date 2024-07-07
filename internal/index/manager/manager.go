@@ -16,10 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-	"golang.org/x/sys/unix"
-
 	"github.com/fsnotify/fsnotify"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
@@ -28,6 +24,8 @@ import (
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 type (
@@ -1384,8 +1382,7 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 
 func (mgr *Manager) addConverter(path string) error {
 	// TODO: Do we want to check this now or when we start the converter?
-	err := unix.Access(path, unix.X_OK)
-	if err != nil {
+	if !tools.IsFileExecutable(path) {
 		return fmt.Errorf("error: converter %s is not executable", path)
 	}
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))

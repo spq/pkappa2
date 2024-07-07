@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	baseDir      = flag.String("base_dir", "/tmp", "All paths are relative to this path")
+	baseDir      = flag.String("base_dir", os.TempDir(), "All paths are relative to this path")
 	pcapDir      = flag.String("pcap_dir", "", "Path where pcaps will be stored")
 	indexDir     = flag.String("index_dir", "", "Path where indexes will be stored")
 	snapshotDir  = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
@@ -135,7 +135,7 @@ func main() {
 
 		dst, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 		if err != nil {
-			http.Error(w, "File already exists", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("File already exists: %v", err), http.StatusInternalServerError)
 			return
 		}
 
