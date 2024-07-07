@@ -38,7 +38,11 @@ export function setupWebsocket() {
       const e: Event = JSON.parse(event.data as string) as Event;
       switch (e.Type) {
         case "tagAdded":
-          if (store.tags != null) store.tags.push(e.Tag!);
+          if (
+            store.tags != null &&
+            !store.tags.find((tag) => tag.Name == e.Tag?.Name)
+          )
+            store.tags.push(e.Tag!);
           break;
         case "tagDeleted":
           if (store.tags != null)
