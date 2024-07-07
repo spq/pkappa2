@@ -29,10 +29,17 @@ import (
 )
 
 type (
+	PcapStatistics struct {
+		PcapCount      int
+		ImportJobCount int
+		StreamCount    int
+		PacketCount    int
+	}
 	Event struct {
 		Type      string
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
+		PcapStats PcapStatistics         `json:",omitempty"`
 	}
 	listener struct {
 		close  chan struct{}
@@ -547,6 +554,12 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		}
 		mgr.event(Event{
 			Type: "pcapProcessed",
+			PcapStats: PcapStatistics{
+				PcapCount:      len(mgr.builder.KnownPcaps()),
+				ImportJobCount: len(mgr.importJobs),
+				StreamCount:    mgr.nStreams,
+				PacketCount:    mgr.nPackets,
+			},
 		})
 	}
 }

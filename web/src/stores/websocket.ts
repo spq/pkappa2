@@ -2,7 +2,12 @@ import { ConverterStatistics, TagInfo } from "@/apiClient";
 import { useRootStore } from ".";
 import { useStreamStore } from "./stream";
 import { useStreamsStore } from "./streams";
-import { isConverterEvent, isEvent, isTagEvent } from "./websocket.guard";
+import {
+  isConverterEvent,
+  isEvent,
+  isPcapProcessedEvent,
+  isTagEvent,
+} from "./websocket.guard";
 
 type EventTypes =
   | "converterCompleted"
@@ -36,6 +41,19 @@ export type ConverterEvent = {
     | "converterAdded"
     | "converterRestarted";
   Converter: ConverterStatistics;
+};
+
+export type PcapStats = {
+  PcapCount: number;
+  ImportJobCount: number;
+  StreamCount: number;
+  PacketCount: number;
+};
+
+/** @see {isPcapProcessedEvent} ts-auto-guard:type-guard */
+export type PcapProcessedEvent = {
+  Type: "pcapProcessed";
+  PcapStats: PcapStats;
 };
 
 export function setupWebsocket() {
@@ -149,6 +167,18 @@ export function setupWebsocket() {
             store.converters = store.converters.map((c) =>
               c.Name == e.Converter.Name ? e.Converter : c
             );
+          }
+          break;
+        case "pcapProcessed":
+          if (!isPcapProcessedEvent(e)) {
+            console.error("Invalid pcap processed event:", e);
+            return;
+          }
+          if (store.status != null) {
+            store.status.PcapCount = e.PcapStats.PcapCount;
+            store.status.ImportJobCount = e.PcapStats.ImportJobCount;
+            store.status.StreamCount = e.PcapStats.StreamCount;
+            store.status.PacketCount = e.PcapStats.PacketCount;
           }
           break;
         default:
