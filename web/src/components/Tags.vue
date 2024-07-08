@@ -1,16 +1,16 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="updateTags">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="updateTags">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
         <span>Refresh</span>
       </v-tooltip>
     </ToolBar>
-    <v-simple-table dense>
+    <v-table dense>
       <thead>
         <tr>
           <th class="text-left" width="20%">Name</th>
@@ -30,7 +30,7 @@
           <tr v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
             <td>
               <v-icon>mdi-circle-small</v-icon
-              ><v-chip :color="tag.Color" small>{{
+              ><v-chip :color="tag.Color" size="small">{{
                 tag.Name.substring(1 + tagType.key.length)
               }}</v-chip>
             </td>
@@ -49,10 +49,10 @@
               <span>{{ converterList[tag.Name] }}</span>
             </td>
             <td style="text-align: right">
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                   
                     icon
                     exact
                     :to="{
@@ -61,55 +61,55 @@
                         q: tagForURI(tag.Name),
                       },
                     }"
-                    v-on="on"
+                    v-bind="props"
                     ><v-icon>mdi-magnify</v-icon></v-btn
                   >
                 </template>
                 <span>Show Streams</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                   
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="setQuery(tag.Definition)"
                     ><v-icon>mdi-form-textbox</v-icon></v-btn
                   >
                 </template>
                 <span>Use Query</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                   
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="showTagColorChangeDialog(tag.Name)"
                     ><v-icon>mdi-palette</v-icon></v-btn
                   >
                 </template>
                 <span>Change Color</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                   
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="showTagSetConvertersDialog(tag.Name)"
                     ><v-icon>mdi-file-replace-outline</v-icon></v-btn
                   >
                 </template>
                 <span>Attach Converter</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                   
                     :disabled="tag.Referenced"
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="confirmTagDeletion(tag.Name)"
                     ><v-icon>mdi-delete</v-icon></v-btn
                   >
@@ -120,7 +120,7 @@
           </tr>
         </template>
       </tbody>
-    </v-simple-table>
+    </v-table>
   </div>
 </template>
 

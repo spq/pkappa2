@@ -6,8 +6,8 @@
       hide-details
       flat
       prepend-inner-icon="mdi-magnify"
-      :value="searchBox"
-      @input="onInput"
+      :model-value="searchBox"
+      @update:model-value="onInput"
       @click.stop
       @keyup.enter="onEnter"
       @keydown.up.prevent="arrowUp"
@@ -16,31 +16,23 @@
       @keydown.esc.exact="suggestionMenuOpen = false"
     >
       <template #append>
-        <v-menu offset-y right bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn small icon v-bind="attrs" v-on="on"
+        <v-menu offset-y location="right bottom" >
+          <template #activator="{ props }">
+            <v-btn size="small" icon v-bind="props"
               ><v-icon>mdi-dots-vertical</v-icon></v-btn
             >
           </template>
-          <v-list dense>
-            <v-list-item link @click="search('search')">
-              <v-list-item-icon><v-icon>mdi-magnify</v-icon></v-list-item-icon>
+          <v-list density="compact">
+            <v-list-item prepend-icon="mdi-magnify" link @click="search('search')">
               <v-list-item-title>Search</v-list-item-title>
             </v-list-item>
-            <v-list-item link @click="search('graph')">
-              <v-list-item-icon><v-icon>mdi-finance</v-icon></v-list-item-icon>
+            <v-list-item prepend-icon="mdi-finance" link @click="search('graph')">
               <v-list-item-title>Graph</v-list-item-title>
             </v-list-item>
-            <v-list-item link @click="createTag('service', searchBox)">
-              <v-list-item-icon
-                ><v-icon>mdi-cloud-outline</v-icon></v-list-item-icon
-              >
+            <v-list-item prepend-icon="mdi-cloud-outline" link @click="createTag('service', searchBox)">
               <v-list-item-title>Save as Service</v-list-item-title>
             </v-list-item>
-            <v-list-item link @click="createTag('tag', searchBox)">
-              <v-list-item-icon
-                ><v-icon>mdi-tag-multiple-outline</v-icon></v-list-item-icon
-              >
+            <v-list-item prepend-icon="mdi-tag-multiple-outline" link @click="createTag('tag', searchBox)">
               <v-list-item-title>Save as Tag</v-list-item-title>
             </v-list-item>
           </v-list>

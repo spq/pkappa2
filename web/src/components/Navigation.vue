@@ -1,24 +1,19 @@
 <template>
-  <v-list dense nav>
-    <v-list-item link dense exact :to="{ name: 'home' }">
-      <v-list-item-icon></v-list-item-icon>
-      <v-list-item-icon>
-        <v-icon dense>mdi-help-circle-outline</v-icon>
-      </v-list-item-icon>
-      <v-list-item-content>
-        <v-list-item-title>Help</v-list-item-title>
-      </v-list-item-content>
+  <v-list density="compact" nav>
+    <v-list-item link density="compact" exact :to="{ name: 'home' }">
+      <template #prepend>
+        <v-icon size="small">mdi-help-circle-outline</v-icon>
+      </template>
+      <v-list-item-title>Help</v-list-item-title>
     </v-list-item>
-    <v-list-item link dense exact :to="{ name: 'search', query: { q: '' } }">
-      <v-list-item-icon></v-list-item-icon>
-      <v-list-item-icon>
-        <v-icon dense>mdi-all-inclusive</v-icon>
-      </v-list-item-icon>
-      <v-list-item-content>
-        <v-list-item-title>All Streams</v-list-item-title>
-      </v-list-item-content>
+    <v-list-item link density="compact" exact :to="{ name: 'search', query: { q: '' } }">
+      <template #prepend>
+        <v-icon size="small">mdi-all-inclusive</v-icon>
+      </template>
+      <v-list-item-title>All Streams</v-list-item-title>
+      
       <v-list-item-action v-if="status != null"
-        ><v-chip x-small>{{ status.StreamCount }}</v-chip></v-list-item-action
+        ><v-chip size="x-small">{{ status.StreamCount }}</v-chip></v-list-item-action
       >
     </v-list-item>
     <v-list-group
@@ -29,13 +24,13 @@
       :value="true"
       sub-group
     >
-      <template #activator>
-        <v-list-item-icon>
-          <v-icon dense>mdi-{{ tagType.icon }}</v-icon>
-        </v-list-item-icon>
-        <v-list-item-content>
+    <template #activator="{ props }">
+      <v-list-item v-bind="props" link>
+          <template #prepend>
+            <v-icon size="small">mdi-{{ tagType.icon }}</v-icon>
+          </template>
           <v-list-item-title>{{ tagType.title }}</v-list-item-title>
-        </v-list-item-content>
+        </v-list-item>
       </template>
       <template v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
         <v-hover
@@ -44,7 +39,7 @@
         >
           <v-list-item
             link
-            dense
+            density="compact"
             exact
             :to="{
               name: 'search',
@@ -53,29 +48,29 @@
               },
             }"
           >
-            <v-list-item-content>
+            
               <v-list-item-title
                 class="text-truncate"
                 style="max-width: 110px"
-                :title="tag.Name.substr(tagType.key.length + 1)"
+                :title="tag.Name.substring(tagType.key.length + 1)"
                 >{{
-                  tag.Name.substr(tagType.key.length + 1)
+                  tag.Name.substring(tagType.key.length + 1)
                 }}</v-list-item-title
               >
-            </v-list-item-content>
-            <v-menu offset-y bottom open-on-hover right>
-              <template #activator="{ on, attrs }">
-                <v-list-item-action v-bind="attrs" v-on="on">
-                  <v-btn v-if="hover" icon x-small>
+            
+            <v-menu offset-y location="bottom right" open-on-hover >
+              <template #activator="{ props }">
+                <v-list-item-action v-bind="props">
+                  <v-btn v-if="hover" icon size="x-small">
                     <v-icon>mdi-dots-vertical</v-icon>
                   </v-btn>
-                  <v-chip v-else x-small
+                  <v-chip v-else size="x-small"
                     >{{ tag.MatchingCount
                     }}{{ tag.UncertainCount != 0 ? "+" : "" }}</v-chip
                   >
                 </v-list-item-action>
               </template>
-              <v-list dense>
+              <v-list density="compact">
                 <v-list-item
                   link
                   exact
@@ -85,44 +80,28 @@
                       q: tagForURI(tag.Name),
                     },
                   }"
+                  prepend-icon="mdi-magnify"
                 >
-                  <v-list-item-icon>
-                    <v-icon>mdi-magnify</v-icon>
-                  </v-list-item-icon>
                   <v-list-item-title>Show Streams</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagDetailsDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-clipboard-list-outline</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-clipboard-list-outline" link @click="showTagDetailsDialog(tag.Name)">
                   <v-list-item-title>Details</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="setQuery(tag.Definition)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-form-textbox</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-form-textbox" link @click="setQuery(tag.Definition)">
                   <v-list-item-title>Use Query</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagColorChangeDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-palette</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-palette" link @click="showTagColorChangeDialog(tag.Name)">
                   <v-list-item-title>Change Color</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagSetConvertersDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-file-replace-outline</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-file-replace-outline" link @click="showTagSetConvertersDialog(tag.Name)">
                   <v-list-item-title>Attach converter</v-list-item-title>
                 </v-list-item>
                 <v-list-item
+                  prepend-icon="mdi-delete-outline"
                   link
                   :disabled="tag.Referenced"
                   @click="confirmTagDeletion(tag.Name)"
                 >
-                  <v-list-item-icon>
-                    <v-icon>mdi-delete-outline</v-icon>
-                  </v-list-item-icon>
                   <v-list-item-title>Delete</v-list-item-title>
                 </v-list-item>
               </v-list>
@@ -131,62 +110,63 @@
         </v-hover>
       </template>
     </v-list-group>
-    <v-list-group v-model="moreOpen" link dense sub-group>
-      <template #activator>
-        <v-list-item-icon>
-          <v-icon dense>mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon>
-        </v-list-item-icon>
-        <v-list-item-content>
+    <v-list-group v-model="moreOpen" link dense>
+      <template #activator="{ props }">
+        <v-list-item v-bind="props" link density="compact">
+        <template #prepend>
+          <v-icon size="small">mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon>
+        </template>
+        
           <v-list-item-title>More</v-list-item-title>
-        </v-list-item-content>
+        </v-list-item>
       </template>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'status',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>Status</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'pcaps',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>PCAPs</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'tags',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>Manage Tags</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'converters',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>Manage Converters</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
 
       <v-btn-toggle

@@ -1,9 +1,9 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="fetchGraphLocal">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn v-bind="props" icon @click="fetchGraphLocal">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -14,8 +14,8 @@
           v-model="chartType"
           :items="Object.keys(chartTypes)"
           flat
-          solo
-          dense
+          variant="solo"
+          density="compact"
           label="Type"
         ></v-select>
         <v-select
@@ -23,37 +23,37 @@
           :items="chartTagOptions"
           multiple
           flat
-          solo
-          dense
+          variant="solo"
+          density="compact"
           label="Grouping"
         >
-          <template #item="{ item, attrs, on }">
-            <v-list-item v-if="item.value.startsWith('header/')" dense>
-              <v-list-item-content>
-                <v-subheader
+          <template #item="{ item, props }">
+            <v-list-item v-if="item.value.startsWith('header/')" density="compact">
+              
+                <v-list-subheader
                   >{{ item.text }}
                   <v-btn
-                    x-small
+                    size="x-small"
                     link
-                    text
+                    variant="text"
                     @click="setChartTagOptions(item.value.substring(7), true)"
                     >All</v-btn
                   >
                   <v-btn
-                    x-small
+                    size="x-small"
                     link
-                    text
+                    variant="text"
                     @click="setChartTagOptions(item.value.substring(7), false)"
                     >None</v-btn
-                  ></v-subheader
+                  ></v-list-subheader
                 >
-              </v-list-item-content>
+              
             </v-list-item>
-            <v-list-item v-else v-slot="{ active }" v-bind="attrs" v-on="on">
+            <v-list-item v-else v-slot="{ active }" v-bind="props">
               <v-list-item-action>
-                <v-checkbox :ripple="false" :input-value="active"></v-checkbox>
+                <v-checkbox :ripple="false" :model-value="active"></v-checkbox>
               </v-list-item-action>
-              <v-list-item-content>{{ item.text }}</v-list-item-content>
+              {{ item.text }}
             </v-list-item>
           </template>
         </v-select>
@@ -63,7 +63,7 @@
       v-if="graphStore.running"
       type="image"
     ></v-skeleton-loader>
-    <v-alert v-else-if="graphStore.error" type="error" dense>{{
+    <v-alert v-else-if="graphStore.error" type="error" density="compact">{{
       graphStore.error
     }}</v-alert>
     <div v-else-if="chartData != null && chartOptions != null">
