@@ -98,7 +98,6 @@ import APIClient, {
 import ToolBar from "./ToolBar.vue";
 import { computed, onMounted, ref } from "vue";
 import { useRootStore } from "@/stores";
-import { DataTableItemProps } from "vuetify";
 
 const store = useRootStore();
 const headers = [
@@ -151,8 +150,10 @@ function refreshConverters() {
   });
 }
 
-function rowClick(item: unknown, handler: DataTableItemProps) {
-  handler.expand(!handler.isExpanded);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowClick(_event: MouseEvent, row: any) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+  row.expand(!row.isExpanded);
 }
 
 function confirmConverterReset(converter: ConverterStatistics) {

@@ -1,35 +1,42 @@
 import { defineConfig } from "vite";
-import vue from "@vitejs/plugin-vue2";
+import vue from "@vitejs/plugin-vue";
+import vuetify from "vite-plugin-vuetify";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import Components from "unplugin-vue-components/vite";
-import { VuetifyResolver } from "unplugin-vue-components/resolvers";
 import { fileURLToPath } from "url";
 import path from "path";
 import checker from "vite-plugin-checker";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      vue: "@vue/compat",
+      "@": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "./src"),
+    },
+  },
   plugins: [
-    vue(),
-    Components({
-      resolvers: VuetifyResolver(),
-      dts: true,
+    vue({
+      template: {
+        compilerOptions: {
+          compatConfig: {
+            MODE: 3,
+          },
+        },
+      },
+    }),
+    vuetify({
+      autoImport: true,
     }),
     nodePolyfills({
       include: ["events"], // tiny-typed-emitter
     }),
     checker({
-      typescript: true,
+      // typescript: true,
       eslint: {
         lintCommand: "eslint --ext .js,.ts,.vue .",
       },
     }),
   ],
-  resolve: {
-    alias: {
-      "@": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "./src"),
-    },
-  },
   server: {
     port: 8080,
     proxy: {

@@ -40,6 +40,9 @@ import TagDetailsDialog from "./TagDetailsDialog.vue";
 import TagColorChangeDialog from "./TagColorChangeDialog.vue";
 import ErrorBanner from "./ErrorBanner.vue";
 import { ref } from "vue";
+import { useTheme } from "vuetify";
+import { registerVuetifyTheme } from "@/lib/darkmode";
 
 const showNavigation = ref(true);
+registerVuetifyTheme(useTheme());
 </script>

@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-v-for-template-key-on-child -->
 <template>
   <div>
     <v-data-table

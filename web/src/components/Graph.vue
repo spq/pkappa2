@@ -85,11 +85,11 @@ import { computed, nextTick, ref, onMounted, watch } from "vue";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { GraphType, useGraphStore } from "@/stores/graph";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import {
   default as VueApexCharts,
   VueApexChartsComponent,
-} from "vue-apexcharts";
+} from "vue3-apexcharts";
 import * as ApexCharts from "apexcharts";
 import { getColorScheme, onColorSchemeChange } from "../lib/darkmode";
 
@@ -680,8 +680,8 @@ onMounted(() => {
   fetchGraphLocal();
 });
 
-function setChartTagOptions(typ: string, active: boolean) {
-  nextTick(() => {
+async function setChartTagOptions(typ: string, active: boolean) {
+  return nextTick(() => {
     const sel = chartTags.value;
     for (var i = 0; i < sel.length; i++) {
       if (sel[i].startsWith(`${typ}/`)) {

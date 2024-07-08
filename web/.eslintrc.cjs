@@ -9,7 +9,7 @@ module.exports = {
   extends: [
     // add more generic rulesets here, such as:
     "eslint:recommended",
-    "plugin:vue/recommended",
+    "plugin:vue/vue3-recommended",
     "prettier",
   ],
   rules: {
@@ -33,7 +33,8 @@ module.exports = {
       plugins: ["@typescript-eslint", "@typescript-eslint/eslint-plugin"],
       extends: [
         "eslint:recommended",
-        "plugin:vue/recommended", // Use this if you are using Vue.js 2.x.
+        "plugin:vue/vue3-recommended",
+        "plugin:vuetify/base",
         "@vue/typescript",
         "plugin:@typescript-eslint/recommended-requiring-type-checking",
         "plugin:@typescript-eslint/eslint-recommended",

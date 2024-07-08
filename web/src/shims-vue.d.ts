@@ -5,6 +5,15 @@ declare module "*.vue" {
   export default component;
 }
 
+declare module 'vue' {
+  import { CompatVue } from '@vue/runtime-dom';
+  const Vue: CompatVue;
+  export default Vue;
+  export * from '@vue/runtime-dom';
+  // const { configureCompat } = Vue;
+  // export { configureCompat };
+}
+
 /* eslint-disable @typescript-eslint/no-namespace */
 declare module "shims-vue" {
   global {
@@ -17,24 +26,4 @@ declare module "shims-vue" {
       }
     }
   }
-}
-
-declare module "vue-filter-pretty-bytes" {
-  import { PluginObject } from "vue";
-  type prettyBytes = (
-    bytes: number,
-    decimals: number,
-    kib: boolean,
-    maxuint: string
-  ) => string;
-  interface VueFilterPrettyBytes extends PluginObject<undefined> {}
-
-  module "vue/types/vue" {
-    interface Vue {
-      $prettyBytes: prettyBytes;
-    }
-  }
-
-  const VueFilterPrettyBytes: VueFilterPrettyBytes;
-  export default VueFilterPrettyBytes;
 }

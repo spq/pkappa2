@@ -20,8 +20,8 @@
         </tr>
       </thead>
       <tbody>
-        <template v-for="tagType in tagTypes">
-          <tr :key="tagType.key">
+        <template v-for="tagType in tagTypes" :key="tagType.key">
+          <tr>
             <th colspan="5">
               <v-icon>mdi-{{ tagType.icon }}</v-icon>
               {{ tagType.title }}

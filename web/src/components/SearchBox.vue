@@ -81,15 +81,15 @@ import { EventBus } from "./EventBus";
 import { addSearch, getTermAt } from "./searchHistory";
 import suggest from "@/parser/suggest";
 import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import { useRootStore } from "@/stores";
 import { tagNameForURI } from "@/filters";
-import { VTextField } from "vuetify/lib";
+import { VTextField } from "vuetify/components";
 
 const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
-const searchBoxField = ref<InstanceType<typeof VTextField> | null>(null);
+const searchBoxField = ref<VTextField | null>(null);
 const searchBox = ref<string>(route.query.q as string);
 const historyIndex = ref(-1);
 const pendingSearch = ref("");
@@ -131,14 +131,15 @@ watch(
     suggestionMenuOpen.value = suggestionItems.value.length > 0;
     if (suggestionMenuOpen.value) {
       suggestionSelectedIndex.value = 0;
+      const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
       const cursorIndex =
-        searchBoxField.value?.$el.querySelector("input")?.selectionStart ??
+      searchBoxElement.querySelector("input")?.selectionStart ??
         null;
       if (cursorIndex === null) return;
       const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
       suggestionMenuPosX.value =
         cursorIndex * fontWidth +
-        (searchBoxField.value?.$el.getBoundingClientRect().left ?? 0);
+        (searchBoxElement.getBoundingClientRect().left ?? 0);
     }
   },
   { immediate: true }
@@ -153,14 +154,16 @@ onMounted(() => {
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
     if (e.key != "/") return;
     e.preventDefault();
-    searchBoxField.value?.$el.querySelector("input")?.focus();
+    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
+    searchBoxElement.querySelector("input")?.focus();
   };
   document.body.addEventListener("keydown", keyListener);
   onBeforeUnmount(() => {
     document.body.removeEventListener("keydown", keyListener);
   });
+  const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
   suggestionMenuPosY.value =
-    searchBoxField.value?.$el.getBoundingClientRect().bottom ?? 0;
+  searchBoxElement.getBoundingClientRect().bottom ?? 0;
 });
 
 function onTab() {
@@ -216,8 +219,9 @@ type SuggestionResults = {
 function startSuggestionSearch() {
   const val = searchBox.value;
   typingDelay.value = window.setTimeout(() => {
+    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
     const cursorPosition =
-      searchBoxField.value?.$el.querySelector("input")?.selectionStart ?? 0;
+    searchBoxElement.querySelector("input")?.selectionStart ?? 0;
     const suggestionResult: SuggestionResults = suggest(
       val,
       cursorPosition,

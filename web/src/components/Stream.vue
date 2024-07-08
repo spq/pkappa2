@@ -71,9 +71,8 @@
           </v-tooltip>
         </template>
         <v-list v-if="stream.stream !== null" dense>
-          <template v-for="tag of groupedTags.mark">
+          <template v-for="tag of groupedTags.mark" :key="tag.Name">
             <v-list-item
-              :key="tag.Name"
               link
               @click="
                 markStream(tag.Name, !stream.stream.Tags.includes(tag.Name))
@@ -349,13 +348,12 @@ import { useStreamStore } from "@/stores/stream";
 import { useStreamsStore } from "@/stores/streams";
 import {
   computed,
-  getCurrentInstance,
   ref,
   onBeforeUnmount,
   onMounted,
   watch,
 } from "vue";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import StreamData from "./StreamData.vue";
 import ToolBar from "./ToolBar.vue";
 import {
@@ -372,7 +370,7 @@ const router = useRouter();
 const presentation = ref("ascii");
 const selectionData = ref("");
 const selectionQuery = ref("");
-const streamData = ref<HTMLElement | null>(null);
+const streamData = ref<InstanceType<typeof StreamData> | null>(null);
 
 if (localStorage.streamPresentation) {
   presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";
@@ -470,7 +468,7 @@ watch(presentation, (v) => {
 onMounted(() => {
   fetchStreamForId();
   const proxy = {
-    proxy: getCurrentInstance()!.proxy,
+    streamData,
     selectionData,
     selectionQuery,
   };
