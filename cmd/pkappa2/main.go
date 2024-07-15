@@ -809,6 +809,35 @@ func main() {
 		}
 	})
 	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
+	rUser.Get("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(mgr.ListPcapProcessorWebhooks()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
+	rUser.Delete("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query()["url"]
+		if len(u) != 1 || u[0] == "" {
+			http.Error(w, "`url` parameter missing", http.StatusBadRequest)
+			return
+		}
+		if err := mgr.DelPcapProcessorWebhook(u[0]); err != nil {
+			http.Error(w, fmt.Sprintf("delete failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	})
+	rUser.Put("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query()["url"]
+		if len(u) != 1 || u[0] == "" {
+			http.Error(w, "`url` parameter missing or empty", http.StatusBadRequest)
+			return
+		}
+		if err := mgr.AddPcapProcessorWebhook(u[0]); err != nil {
+			http.Error(w, fmt.Sprintf("add failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	})
 	rUser.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
 		if err != nil {

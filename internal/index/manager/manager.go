@@ -1,12 +1,14 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,6 +28,11 @@ import (
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+)
+
+const (
+	// Request timeout for webhooks
+	pcapProcessorWebhookTimeout = time.Second * 5
 )
 
 type (
@@ -87,7 +94,8 @@ type (
 		updatedStreamsDuringTaggingJob bitmask.LongBitmask
 		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
-		streamsToConvert map[string]*bitmask.LongBitmask
+		streamsToConvert         map[string]*bitmask.LongBitmask
+		pcapProcessorWebhookUrls []string
 
 		tags       map[string]*tag
 		converters map[string]*converters.CachedConverter
@@ -122,7 +130,8 @@ type (
 			Color      string
 			Converters []string
 		}
-		Pcaps []*pcapmetadata.PcapInfo
+		Pcaps                    []*pcapmetadata.PcapInfo
+		PcapProcessorWebhookUrls []string
 	}
 
 	updateTagOperationInfo struct {
@@ -325,6 +334,7 @@ nextStateFile:
 			break
 		}
 		mgr.tags = newTags
+		mgr.pcapProcessorWebhookUrls = s.PcapProcessorWebhookUrls
 		mgr.stateFilename = fn
 		stateTimestamp = s.Saved
 		cachedKnownPcapData = s.Pcaps
@@ -398,8 +408,9 @@ func (mgr *Manager) Close() {
 
 func (mgr *Manager) saveState() error {
 	j := stateFile{
-		Saved: time.Now(),
-		Pcaps: mgr.builder.KnownPcaps(),
+		Saved:                    time.Now(),
+		Pcaps:                    mgr.builder.KnownPcaps(),
+		PcapProcessorWebhookUrls: mgr.pcapProcessorWebhookUrls,
 	}
 	for n, t := range mgr.tags {
 		j.Tags = append(j.Tags, struct {
@@ -561,6 +572,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 				PacketCount:    mgr.nPackets,
 			},
 		})
+		mgr.triggerPcapProcessedWebhooks(filenames[:processedFiles])
 	}
 }
 
@@ -1589,6 +1601,101 @@ func (mgr *Manager) ConverterStderr(converterName string, pid int) (*converters.
 		return nil, fmt.Errorf("error: converter %s or process with pid %d does not exist", converterName, pid)
 	}
 	return stderr, nil
+}
+
+func (mgr *Manager) ListPcapProcessorWebhooks() []string {
+	c := make(chan []string)
+	mgr.jobs <- func() {
+		if mgr.pcapProcessorWebhookUrls == nil {
+			c <- []string{}
+		} else {
+			c <- mgr.pcapProcessorWebhookUrls
+		}
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) AddPcapProcessorWebhook(url string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		for _, u := range mgr.pcapProcessorWebhookUrls {
+			if u == url {
+				c <- fmt.Errorf("error: url %q already exists", url)
+				close(c)
+				return
+			}
+		}
+		mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls, url)
+		c <- mgr.saveState()
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) DelPcapProcessorWebhook(url string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		for i, u := range mgr.pcapProcessorWebhookUrls {
+			if u == url {
+				mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls[:i], mgr.pcapProcessorWebhookUrls[i+1:]...)
+				c <- mgr.saveState()
+				close(c)
+				return
+			}
+		}
+		c <- fmt.Errorf("error: url %q does not exist", url)
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) triggerPcapProcessedWebhooks(filenames []string) {
+	var absFilenames []string
+	for _, filename := range filenames {
+		absFilename, err := filepath.Abs(filename)
+		if err != nil {
+			fmt.Printf("error: pcap webhook failed to get absolute path of %q: %v\n", filename, err)
+			continue
+		}
+		absFilenames = append(absFilenames, absFilename)
+	}
+	jsonBody, err := json.Marshal(absFilenames)
+	if err != nil {
+		fmt.Printf("error: webhook body json encode failed: %v\n", err)
+		return
+	}
+	for _, webhookUrl := range mgr.pcapProcessorWebhookUrls {
+		go mgr.triggerPcapProcessedWebhook(webhookUrl, jsonBody)
+	}
+}
+
+func (mgr *Manager) triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
+	err := func() error {
+		bodyReader := bytes.NewReader(jsonBody)
+
+		ctx, cncl := context.WithTimeout(context.Background(), pcapProcessorWebhookTimeout)
+		defer cncl()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookUrl, bodyReader)
+		if err != nil {
+			return fmt.Errorf("failed to create webhook request for processed pcap: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to making webhook request for processed pcap: %w", err)
+		}
+
+		if res.StatusCode != 200 {
+			return fmt.Errorf("webhook request for processed pcap failed: %q", res.Status)
+		}
+		return nil
+	}()
+	if err != nil {
+		fmt.Printf("webhook error: %v\n", err)
+	}
 }
 
 func (mgr *Manager) GetView() View {
