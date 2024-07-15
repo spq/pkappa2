@@ -1655,14 +1655,14 @@ func (mgr *Manager) triggerPcapProcessedWebhooks(filenames []string) {
 	for _, filename := range filenames {
 		absFilename, err := filepath.Abs(filename)
 		if err != nil {
-			fmt.Printf("error: pcap webhook failed to get absolute path of %q: %v\n", filename, err)
+			log.Printf("error: pcap webhook failed to get absolute path of %q: %v\n", filename, err)
 			continue
 		}
 		absFilenames = append(absFilenames, absFilename)
 	}
 	jsonBody, err := json.Marshal(absFilenames)
 	if err != nil {
-		fmt.Printf("error: webhook body json encode failed: %v\n", err)
+		log.Printf("error: webhook body json encode failed: %v\n", err)
 		return
 	}
 	for _, webhookUrl := range mgr.pcapProcessorWebhookUrls {
@@ -1694,7 +1694,7 @@ func (mgr *Manager) triggerPcapProcessedWebhook(webhookUrl string, jsonBody []by
 		return nil
 	}()
 	if err != nil {
-		fmt.Printf("webhook error: %v\n", err)
+		log.Printf("webhook error: %v\n", err)
 	}
 }
 
