@@ -19,7 +19,9 @@ function isSearches(obj: unknown): obj is Searches {
 }
 
 function getSearches() {
-  const searches: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "");
+  const searches: unknown = JSON.parse(
+    localStorage.getItem(STORAGE_KEY) ?? "{}"
+  );
   if (isSearches(searches)) {
     return searches;
   }

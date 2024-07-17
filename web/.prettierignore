@@ -1,5 +1,5 @@
 dist/
 *.md
-src/parser/query.js
+src/parser/query.ts
 components.d.ts
 *.guard.ts

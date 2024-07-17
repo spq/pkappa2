@@ -1,5 +1,6 @@
-# nearleyc query.ne -o query.js
+# nearleyc query.ne -o query.ts
 @preprocessor esmodule
+@preprocessor typescript
 @{%
 /* eslint-disable */
 /* prettier-ignore */
@@ -11,7 +12,7 @@ const lexer = moo.compile({
         {match: /[:=]"(?:[^"]*|"")*"/, value: x => x.slice(2, -1)},
         {match: /[:=]"(?:[^"]*|"")*/, value: x => x.slice(2)},
         {match: /[:=](?:(?:[^"\\ \t\n\r]|\\.)(?:[^\\ \t\n\r]|\\.)*)?(?:[^)\\ \t\n\r]|\\.)/, value: x => x.slice(1)},
-        {match: /[:=]/, value: () => null},
+        {match: /[:=]/, value: _ => ""},
     ],
     lparen: '(',
     rparen: ')',
@@ -25,6 +26,41 @@ const lexer = moo.compile({
         'kw_then': 'then',
     })},
 });
+
+export interface QueryElement {
+  type: string;
+};
+
+export interface LogicQueryElement extends QueryElement {
+  type: "logic";
+  op: "or" | "and" | "sequence";
+  expressions: QueryElement[];
+}
+
+export interface SubexpressionQueryElement extends QueryElement {
+  type: "not" | "subquery" | "error";
+  expression: QueryElement;
+}
+
+export interface ExpressionQueryElement extends QueryElement {
+  type: "expression";
+  subquery_var?: moo.Token;
+  keyword: moo.Token;
+  converter?: moo.Token;
+  value?: moo.Token;
+}
+
+export function isLogicExpression(obj: QueryElement): obj is LogicQueryElement {
+  return obj.type === "logic";
+}
+
+export function isSubExpression(obj: QueryElement): obj is SubexpressionQueryElement {
+  return ["not", "subquery", "error"].includes(obj.type);
+}
+
+export function isExpression(obj: QueryElement): obj is ExpressionQueryElement {
+  return obj.type === "expression";
+}
 %}
 
 @lexer lexer
