@@ -174,6 +174,7 @@ export function setupWebsocket() {
             console.error("Invalid pcap processed event:", e);
             return;
           }
+          streamsStore.outdated = true;
           if (store.status != null) {
             store.status.PcapCount = e.PcapStats.PcapCount;
             store.status.ImportJobCount = e.PcapStats.ImportJobCount;

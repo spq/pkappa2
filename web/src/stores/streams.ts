@@ -9,6 +9,7 @@ interface State {
   running: boolean;
   error: string | null;
   result: SearchResult | null;
+  outdated: boolean;
 }
 
 export const useStreamsStore = defineStore("streams", {
@@ -18,6 +19,7 @@ export const useStreamsStore = defineStore("streams", {
     running: false,
     error: null,
     result: null,
+    outdated: false,
   }),
   actions: {
     async searchStreams(query: string, page: number) {
@@ -27,11 +29,13 @@ export const useStreamsStore = defineStore("streams", {
       this.running = true;
       this.error = null;
       this.result = null;
+      this.outdated = false;
       return APIClient.searchStreams(query, page)
         .then((data) => {
           if ("Error" in data) {
             this.error = data.Error;
             this.result = null;
+            this.outdated = false;
           } else {
             this.error = null;
             this.result = data;
@@ -51,6 +55,7 @@ export const useStreamsStore = defineStore("streams", {
                 ? err.response.data
                 : err.message;
             this.result = null;
+            this.outdated = false;
           } else throw err;
         });
     },
