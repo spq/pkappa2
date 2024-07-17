@@ -1,5 +1,6 @@
 # Build frontend
 FROM node:20-alpine AS frontend_builder
+RUN apk add --no-cache git
 WORKDIR /app
 COPY ./web/ /app
 RUN yarn install --frozen-lockfile && yarn build
@@ -20,14 +21,14 @@ RUN go build -o ./bin/pkappa2 ./cmd/pkappa2/main.go
 FROM ubuntu:latest
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends libpcap0.8 python3 python3-dev python3-pip && rm -rf /var/lib/apt/lists/*
-RUN python3 -m pip install --upgrade pip setuptools wheel
 COPY converters/pkappa2lib/requirements.txt requirements.txt
-RUN python3 -m pip install --upgrade -r requirements.txt
+RUN python3 -m pip install --break-system-packages --upgrade -r requirements.txt
 
 COPY --from=backend_builder /app/bin/pkappa2 ./pkappa2
 COPY --from=backend_builder /app/web/dist ./web/dist
 
 RUN adduser pkappa2
+RUN mkdir /data && chown pkappa2:pkappa2 /data
 USER pkappa2
 
 EXPOSE 8080

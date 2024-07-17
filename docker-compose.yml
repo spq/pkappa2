@@ -6,10 +6,13 @@ services:
     ports:
       - 8080:8080
     volumes:
-      - ./docker_data:/data
+      - pkappa2-data:/data
       - ./converters:/app/converters
     restart: unless-stopped
     environment:
       # Change values in .env file
       PKAPPA2_USER_PASSWORD: ${PKAPPA2_USER_PASSWORD}
       PKAPPA2_PCAP_PASSWORD: ${PKAPPA2_PCAP_PASSWORD}
+
+volumes:
+  pkappa2-data:
