@@ -1653,7 +1653,7 @@ func (mgr *Manager) DelPcapProcessorWebhook(url string) error {
 func (mgr *Manager) triggerPcapProcessedWebhooks(filenames []string) {
 	var absFilenames []string
 	for _, filename := range filenames {
-		absFilename, err := filepath.Abs(filename)
+		absFilename, err := filepath.Abs(filepath.Join(mgr.PcapDir, filename))
 		if err != nil {
 			log.Printf("error: pcap webhook failed to get absolute path of %q: %v\n", filename, err)
 			continue
