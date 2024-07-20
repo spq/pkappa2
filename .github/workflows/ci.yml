@@ -32,9 +32,7 @@ jobs:
       - name: Build frontend
         working-directory: ./web
         run: |
-          env
-          unset NODE_ENV
-          yarn install --frozen-lockfile --verbose
+          yarn install --frozen-lockfile
           yarn build
 
       - name: Set up Go ${{ matrix.go }}
