@@ -26,8 +26,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node }}
-          cache: "yarn"
-          cache-dependency-path: "web/yarn.lock"
+          # cache: "yarn"
+          # cache-dependency-path: "web/yarn.lock"
 
       - name: Build frontend
         working-directory: ./web
