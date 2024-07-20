@@ -26,13 +26,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          # cache: "yarn"
-          # cache-dependency-path: "web/yarn.lock"
+          cache: "yarn"
+          cache-dependency-path: "web/yarn.lock"
 
       - name: Build frontend
         working-directory: ./web
         run: |
-          yarn --frozen-lockfile --production=false
+          yarn install --frozen-lockfile --disable-pnp
           yarn --check-files
           ls -la node_modules
           ls -la node_modules/vite
