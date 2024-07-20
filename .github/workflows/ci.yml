@@ -33,7 +33,7 @@ jobs:
         working-directory: ./web
         run: |
           yarn install --frozen-lockfile
-          yarn build
+          yarn run build
 
       - name: Set up Go ${{ matrix.go }}
         uses: actions/setup-go@v3
