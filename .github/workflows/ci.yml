@@ -33,10 +33,9 @@ jobs:
         working-directory: ./web
         run: |
           yarn install --frozen-lockfile
-          ls -l node_modules
-          ls -l node_modules/.bin
-          ls -l node_modules/vite
-          ls -l node_modules/vite/.bin
+          ls -la node_modules
+          ls -la node_modules/vite
+          ls -la node_modules/vite/bin
           yarn run build
 
       - name: Set up Go ${{ matrix.go }}
