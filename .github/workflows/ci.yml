@@ -33,6 +33,7 @@ jobs:
         working-directory: ./web
         run: |
           yarn install --frozen-lockfile --production=false
+          yarn --check-files
           find . -name vite
           find / -name vite
           ls -la node_modules
