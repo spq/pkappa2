@@ -32,11 +32,10 @@ jobs:
       - name: Build frontend
         working-directory: ./web
         run: |
-          yarn install --frozen-lockfile --disable-pnp
-          yarn --check-files
+          yarn install --frozen-lockfile --disable-pnp --verbose
+          echo $?
           ls -la node_modules
           ls -la node_modules/vite
-          ls -la node_modules/vite/bin
           yarn build
 
       - name: Set up Go ${{ matrix.go }}
