@@ -1,8 +1,8 @@
 name: Continuous Integration
 
 on:
-  # push:
-  #   branches: ["main"]
+  push:
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
@@ -34,7 +34,7 @@ jobs:
         run: |
           env
           unset NODE_ENV
-          yarn install --frozen-lockfile
+          yarn install --frozen-lockfile --verbose
           yarn build
 
       - name: Set up Go ${{ matrix.go }}
