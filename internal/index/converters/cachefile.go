@@ -460,8 +460,8 @@ func (cachefile *cacheFile) SetData(streamID uint64, convertedPackets []index.Da
 func (cachefile *cacheFile) InvalidateChangedStreams(streams *bitmask.LongBitmask) bitmask.LongBitmask {
 	invalidatedStreams := bitmask.LongBitmask{}
 
-	cachefile.rwmutex.RLock()
-	defer cachefile.rwmutex.RUnlock()
+	cachefile.rwmutex.Lock()
+	defer cachefile.rwmutex.Unlock()
 
 	// see which of the streams are in the cache
 	for streamID := uint(0); streams.Next(&streamID); streamID++ {
