@@ -124,7 +124,7 @@
                   name: 'search',
                   query: {
                     q: $route.query.q,
-                    p: (+$route.query.p - 1).toString(),
+                    p: (Number($route.query.p ?? 0) - 1).toString(),
                   },
                 })
               "
@@ -146,7 +146,7 @@
                   name: 'search',
                   query: {
                     q: $route.query.q,
-                    p: (+$route.query.p + 1).toString(),
+                    p: (Number($route.query.p ?? 0) + 1).toString(),
                   },
                 })
               "
