@@ -110,15 +110,16 @@ func saveSnapshots(filename string, snapshots []*snapshot) error {
 }
 
 func compactSnapshots(snapshots []*snapshot) []*snapshot {
-	for i := len(snapshots) - 3; i >= 0; i -= 2 {
-		a, b, c := snapshots[i], snapshots[i+1], snapshots[i+2]
-		aChunks, bChunks, cChunks := a.chunkCount, b.chunkCount, c.chunkCount
-		if aChunks > bChunks || bChunks > cChunks {
-			break
-		}
-		b.chunkCount += a.chunkCount
-		//remove a
-		snapshots = append(snapshots[:i], snapshots[i+1:]...)
-	}
 	return snapshots
+	// for i := len(snapshots) - 3; i >= 0; i -= 2 {
+	// 	a, b, c := snapshots[i], snapshots[i+1], snapshots[i+2]
+	// 	aChunks, bChunks, cChunks := a.chunkCount, b.chunkCount, c.chunkCount
+	// 	if aChunks > bChunks || bChunks > cChunks {
+	// 		break
+	// 	}
+	// 	b.chunkCount += a.chunkCount
+	// 	//remove a
+	// 	snapshots = append(snapshots[:i], snapshots[i+1:]...)
+	// }
+	// return snapshots
 }
