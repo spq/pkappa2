@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "env && vite build",
     "serve": "vite preview",
     "lint": "eslint --ext .js,.ts,.vue --fix .",
     "format": "prettier --check --write .",
