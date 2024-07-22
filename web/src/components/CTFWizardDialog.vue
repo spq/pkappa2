@@ -54,7 +54,8 @@
           <v-tab-item value="tab_flag_regex">
             <v-card-text>
               This wizard will create the two tags {{ flagInName }} and
-              {{ flagOutName }} with the specified regex below:
+              {{ flagOutName }} with the specified regex below if they don't
+              already exist.
 
               <v-text-field
                 v-model="flagRegex"
@@ -161,16 +162,23 @@ function createService() {
 function createFlagTags() {
   flag_regex_loading.value = true;
   flag_regex_error.value = false;
-  store
-    .addTag(tagPrefix + flagInName, flagInPrefix + flagRegex.value, flagInColor)
-    .then(() => {
-      return store.addTag(
-        tagPrefix + flagOutName,
-        flagOutPrefix + flagRegex.value,
-        flagOutColor
-      );
-    })
-    .then(() => {
+  Promise.allSettled([
+    store.addTag(
+      tagPrefix + flagInName,
+      flagInPrefix + flagRegex.value,
+      flagInColor
+    ),
+    store.addTag(
+      tagPrefix + flagOutName,
+      flagOutPrefix + flagRegex.value,
+      flagOutColor
+    ),
+  ])
+    .then((res) => {
+      const rejected = res.filter((r) => r.status === "rejected");
+      if (rejected.length != 0) {
+        throw rejected.map((r) => r.reason as string).join("; ");
+      }
       visible.value = false;
       flag_regex_loading.value = false;
     })
