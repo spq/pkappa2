@@ -116,7 +116,10 @@
                   </v-list-item-icon>
                   <v-list-item-title>Change Name</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagDefinitionChangeDialog(tag.Name)">
+                <v-list-item
+                  link
+                  @click="showTagDefinitionChangeDialog(tag.Name)"
+                >
                   <v-list-item-icon>
                     <v-icon>mdi-text-search-variant</v-icon>
                   </v-list-item-icon>
