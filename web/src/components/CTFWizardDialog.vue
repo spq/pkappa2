@@ -24,12 +24,14 @@
               <v-text-field
                 v-model="serviceName"
                 label="Service name"
+                :error="serviceName == ''"
                 autofocus
               ></v-text-field>
               <v-text-field
                 v-model="servicePorts"
                 label="Service ports"
                 example="80,8080-8081"
+                :error="!goodServicePorts"
                 autofocus
               ></v-text-field>
             </v-card-text>
@@ -61,6 +63,7 @@
                 v-model="flagRegex"
                 label="Flag Regex"
                 example="flag_[a-fA-F0-9]{32}"
+                :error="!goodFlagRegex"
                 autofocus
               ></v-text-field>
             </v-card-text>
@@ -69,7 +72,7 @@
               <v-btn text @click="visible = false">Cancel</v-btn>
               <v-btn
                 text
-                :disabled="flagRegex == '' || flag_regex_loading"
+                :disabled="!goodFlagRegex || flag_regex_loading"
                 :loading="flag_regex_loading"
                 :color="flag_regex_error ? 'error' : 'primary'"
                 type="submit"
@@ -116,6 +119,17 @@ EventBus.on("showCTFWizard", openDialog);
 
 const goodServicePorts = computed(() => {
   return /^(,[0-9]+|,[0-9]+[-:][0-9]+)+$/.test("," + servicePorts.value);
+});
+
+const goodFlagRegex = computed(() => {
+  const v = flagRegex.value;
+  if (v === "" || v.includes(" ")) return false;
+  try {
+    RegExp(v);
+  } catch {
+    return false;
+  }
+  return true;
 });
 
 function openDialog() {
