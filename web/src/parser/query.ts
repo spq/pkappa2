@@ -108,7 +108,9 @@ const grammar: Grammar = {
   ParserRules: [
     {"name": "queryRoot$ebnf$1", "symbols": [(lexer.has("ws") ? {type: "ws"} : ws)], "postprocess": id},
     {"name": "queryRoot$ebnf$1", "symbols": [], "postprocess": () => null},
-    {"name": "queryRoot", "symbols": ["queryOrCondition", "queryRoot$ebnf$1"], "postprocess": id},
+    {"name": "queryRoot$ebnf$2", "symbols": [(lexer.has("ws") ? {type: "ws"} : ws)], "postprocess": id},
+    {"name": "queryRoot$ebnf$2", "symbols": [], "postprocess": () => null},
+    {"name": "queryRoot", "symbols": ["queryRoot$ebnf$1", "queryOrCondition", "queryRoot$ebnf$2"], "postprocess": (d) => d[1]},
     {"name": "queryOrCondition", "symbols": ["queryOrCondition", (lexer.has("ws") ? {type: "ws"} : ws), (lexer.has("kw_or") ? {type: "kw_or"} : kw_or), (lexer.has("ws") ? {type: "ws"} : ws), "queryAndCondition"], "postprocess": (d) => d.length > 1 ? {'type': 'logic', 'op': 'or', 'expressions': [d[0], d[4]]} : d[0]},
     {"name": "queryOrCondition", "symbols": ["queryAndCondition"], "postprocess": id},
     {"name": "queryAndCondition$ebnf$1$subexpression$1", "symbols": [(lexer.has("kw_and") ? {type: "kw_and"} : kw_and), (lexer.has("ws") ? {type: "ws"} : ws)]},
