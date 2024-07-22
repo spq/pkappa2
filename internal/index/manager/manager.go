@@ -810,12 +810,25 @@ func (mgr *Manager) ListTags() []TagInfo {
 	return <-c
 }
 
+func parseTagName(fullName string) (typ, name string, isMark bool) {
+	ok := false
+	typ, name, ok = strings.Cut(fullName, "/")
+	if !ok {
+		return "", "", false
+	}
+	isMark = typ == "mark" || typ == "generated"
+	if typ != "tag" && typ != "service" && !isMark {
+		return "", "", false
+	}
+	return
+}
+
 func (mgr *Manager) AddTag(name, color, queryString string) error {
-	isMark := strings.HasPrefix(name, "mark/") || strings.HasPrefix(name, "generated/")
-	if !(strings.HasPrefix(name, "tag/") || strings.HasPrefix(name, "service/") || isMark) {
+	typ, sub, isMark := parseTagName(name)
+	if typ == "" {
 		return errors.New("invalid tag name (need a 'tag/', 'service/', 'mark/' or 'generated/' prefix)")
 	}
-	if sub := strings.SplitN(name, "/", 2)[1]; sub == "" {
+	if sub == "" {
 		return errors.New("invalid tag name (prefix only not allowed)")
 	}
 	q, err := query.Parse(queryString)
@@ -1179,7 +1192,15 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				mgr.startConverterJobIfNeeded()
 			}
 			if info.name != "" {
-				if _, ok := mgr.tags[name]; ok {
+				oldTyp, _, _ := parseTagName(name)
+				newTyp, newSub, _ := parseTagName(info.name)
+				if newTyp != oldTyp {
+					return errors.New("invalid tag name (can't change type of tag)")
+				}
+				if newSub == "" {
+					return errors.New("invalid tag name (prefix only not allowed)")
+				}
+				if _, ok := mgr.tags[info.name]; ok {
 					return fmt.Errorf("tag %q already exists", info.name)
 				}
 				if len(tag.referencedBy) != 0 {
