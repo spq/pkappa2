@@ -14,6 +14,7 @@ interface GlobalEvents {
   showTagDeleteDialog: (tagId: string) => void;
   showTagDetailsDialog: (tagId: string) => void;
   showTagSetConvertersDialog: (tagId: string) => void;
+  showCTFWizard: () => void;
 }
 
 export const EventBus = new TypedEmitter<GlobalEvents>();
