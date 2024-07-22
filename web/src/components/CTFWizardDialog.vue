@@ -40,7 +40,7 @@
                 text
                 :disabled="
                   serviceName == '' ||
-                  (!goodServicePorts) ||
+                  !goodServicePorts ||
                   service_by_port_loading
                 "
                 :loading="service_by_port_loading"
