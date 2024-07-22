@@ -254,6 +254,20 @@ func main() {
 				return
 			}
 			operation = manager.UpdateTagOperationUpdateColor(c[0])
+		case "change_query":
+			c := r.URL.Query()["query"]
+			if len(c) != 1 {
+				http.Error(w, "`query` parameter missing", http.StatusBadRequest)
+				return
+			}
+			operation = manager.UpdateTagOperationUpdateQuery(c[0])
+		case "change_name":
+			c := r.URL.Query()["new_name"]
+			if len(c) != 1 || c[0] == "" {
+				http.Error(w, "`new_name` parameter missing or empty", http.StatusBadRequest)
+				return
+			}
+			operation = manager.UpdateTagOperationUpdateName(c[0])
 		case "converter_set":
 			c := r.URL.Query()["converters"]
 			operation = manager.UpdateTagOperationSetConverter(c)

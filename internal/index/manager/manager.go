@@ -136,7 +136,8 @@ type (
 
 	updateTagOperationInfo struct {
 		markTagAddStreams, markTagDelStreams []uint64
-		color                                string
+		color, name                          string
+		query                                *string
 		setConverterNames                    []string
 		convertersUpdated                    bool
 	}
@@ -955,6 +956,18 @@ func UpdateTagOperationUpdateColor(color string) UpdateTagOperation {
 	}
 }
 
+func UpdateTagOperationUpdateQuery(query string) UpdateTagOperation {
+	return func(i *updateTagOperationInfo) {
+		i.query = &query
+	}
+}
+
+func UpdateTagOperationUpdateName(name string) UpdateTagOperation {
+	return func(i *updateTagOperationInfo) {
+		i.name = name
+	}
+}
+
 func UpdateTagOperationSetConverter(converterNames []string) UpdateTagOperation {
 	return func(i *updateTagOperationInfo) {
 		i.setConverterNames = converterNames
@@ -986,6 +999,37 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 		}
 		maxUsedStreamID--
 	}
+	var newTag *tag
+	if info.query != nil {
+		q, err := query.Parse(*info.query)
+		if err != nil {
+			return err
+		}
+		features := q.Conditions.Features()
+		if (features.MainFeatures|features.SubQueryFeatures)&query.FeatureFilterTimeRelative != 0 {
+			return errors.New("relative times not yet supported in tags")
+		}
+		if q.Grouping != nil {
+			return errors.New("grouping not allowed in tags")
+		}
+		newTag = &tag{
+			TagDetails: query.TagDetails{
+				Conditions: q.Conditions,
+			},
+			definition: *info.query,
+			features:   features,
+		}
+		for _, tn := range newTag.referencedTags() {
+			if tn == name {
+				return errors.New("self reference not allowed in tags")
+			}
+		}
+		if strings.HasPrefix(name, "mark/") {
+			if _, ok := q.Conditions.StreamIDs(0); !ok {
+				return errors.New("tags of type `mark` have to only contain an `id` filter")
+			}
+		}
+	}
 	c := make(chan error)
 	mgr.jobs <- func() {
 		err := func() error {
@@ -995,6 +1039,49 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 			}
 			if info.color != "" {
 				tag.color = info.color
+			}
+			if newTag != nil {
+				newTag.color = tag.color
+				newTag.converters = tag.converters
+				newTag.referencedBy = tag.referencedBy
+				newTag.Uncertain = mgr.allStreams
+				onlyBefore := map[string]struct{}{}
+				onlyAfter := map[string]struct{}{}
+				for _, rtn := range tag.referencedTags() {
+					onlyBefore[rtn] = struct{}{}
+				}
+				for _, rtn := range newTag.referencedTags() {
+					if _, ok := onlyBefore[rtn]; ok {
+						delete(onlyBefore, rtn)
+					} else {
+						onlyAfter[rtn] = struct{}{}
+					}
+				}
+				for rtn := range onlyBefore {
+					rt := mgr.tags[rtn]
+					delete(rt.referencedBy, name)
+					if len(rt.referencedBy) == 0 {
+						mgr.event(Event{
+							Type: "tagUpdated",
+							Tag:  makeTagInfo(rtn, rt),
+						})
+					}
+				}
+				for rtn := range onlyAfter {
+					rt := mgr.tags[rtn]
+					rt.referencedBy[name] = struct{}{}
+					if len(rt.referencedBy) == 1 {
+						mgr.event(Event{
+							Type: "tagUpdated",
+							Tag:  makeTagInfo(rtn, rt),
+						})
+					}
+				}
+				tag = newTag
+				mgr.tags[name] = tag
+				mgr.inheritTagUncertainty()
+				mgr.startTaggingJobIfNeeded()
+				mgr.startConverterJobIfNeeded()
 			}
 			if info.convertersUpdated {
 				// detach deselected converters from tag
@@ -1091,10 +1178,38 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				mgr.startTaggingJobIfNeeded()
 				mgr.startConverterJobIfNeeded()
 			}
-			mgr.event(Event{
-				Type: "tagUpdated",
-				Tag:  makeTagInfo(name, tag),
-			})
+			if info.name != "" {
+				if _, ok := mgr.tags[name]; ok {
+					return fmt.Errorf("tag %q already exists", info.name)
+				}
+				if len(tag.referencedBy) != 0 {
+					return fmt.Errorf("tag %q still references the tag to be renamed", maps.Keys(tag.referencedBy)[0])
+				}
+				delete(mgr.tags, name)
+				mgr.tags[info.name] = tag
+				for _, rtn := range tag.referencedTags() {
+					rt := mgr.tags[rtn]
+					delete(rt.referencedBy, name)
+					rt.referencedBy[info.name] = struct{}{}
+				}
+
+				mgr.event(Event{
+					Type: "tagDeleted",
+					Tag: &TagInfo{
+						Name:       name,
+						Converters: []string{},
+					},
+				})
+				mgr.event(Event{
+					Type: "tagAdded",
+					Tag:  makeTagInfo(name, tag),
+				})
+			} else {
+				mgr.event(Event{
+					Type: "tagUpdated",
+					Tag:  makeTagInfo(name, tag),
+				})
+			}
 			return mgr.saveState()
 		}()
 		c <- err
