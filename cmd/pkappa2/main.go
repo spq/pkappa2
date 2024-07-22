@@ -82,10 +82,6 @@ func main() {
 		fmt.Println("Flags can also be set via environment variables prefixed with PKAPPA2_")
 	}
 	flag.Parse()
-	fmt.Println(*baseDir)
-	if *baseDir != "asdddasd" {
-		return
-	}
 
 	if *startupCpuprofile != "" {
 		f, err := os.Create(*startupCpuprofile)
