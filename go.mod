@@ -1,6 +1,6 @@
 module github.com/spq/pkappa2
 
-go 1.18
+go 1.19
 
 require (
 	github.com/alecthomas/participle/v2 v2.1.0
