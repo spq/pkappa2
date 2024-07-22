@@ -11,6 +11,8 @@ interface GlobalEvents {
   ) => void;
   showError: (message: string) => void;
   showTagColorChangeDialog: (tagId: string) => void;
+  showTagDefinitionChangeDialog: (tagId: string) => void;
+  showTagNameChangeDialog: (tagId: string) => void;
   showTagDeleteDialog: (tagId: string) => void;
   showTagDetailsDialog: (tagId: string) => void;
   showTagSetConvertersDialog: (tagId: string) => void;

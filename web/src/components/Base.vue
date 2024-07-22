@@ -25,6 +25,8 @@
     <TagSetConverterDialog />
     <TagDetailsDialog />
     <TagColorChangeDialog />
+    <TagDefinitionChangeDialog />
+    <TagNameChangeDialog />
     <ErrorBanner />
   </v-app>
 </template>
@@ -38,6 +40,8 @@ import TagSetConverterDialog from "./TagSetConverterDialog.vue";
 import TagCreateDialog from "./TagCreateDialog.vue";
 import TagDetailsDialog from "./TagDetailsDialog.vue";
 import TagColorChangeDialog from "./TagColorChangeDialog.vue";
+import TagDefinitionChangeDialog from "./TagDefinitionChangeDialog.vue";
+import TagNameChangeDialog from "./TagNameChangeDialog.vue";
 import ErrorBanner from "./ErrorBanner.vue";
 import { ref } from "vue";
 

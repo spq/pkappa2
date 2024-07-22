@@ -198,6 +198,20 @@ const APIClient = {
     params.append("color", color);
     return this.perform("patch", `/tags`, null, params);
   },
+  async changeTagDefinition(name: string, definition: string) {
+    const params = new URLSearchParams();
+    params.append("name", name);
+    params.append("method", "change_query");
+    params.append("query", definition);
+    return this.perform("patch", `/tags`, null, params);
+  },
+  async changeTagName(name: string, newName: string) {
+    const params = new URLSearchParams();
+    params.append("name", name);
+    params.append("method", "change_name");
+    params.append("new_name", newName);
+    return this.perform("patch", `/tags`, null, params);
+  },
   async getGraph(
     delta: string,
     aspects: string[],
