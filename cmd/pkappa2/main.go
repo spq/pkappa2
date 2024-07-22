@@ -58,7 +58,32 @@ var (
 )
 
 func main() {
+	// parse environment variables and if given, set as default values for flags
+	for _, env := range os.Environ() {
+		name, value, ok := strings.Cut(env, "=")
+		if !ok {
+			continue
+		}
+		if !strings.HasPrefix(name, "PKAPPA2_") {
+			continue
+		}
+		name = strings.ToLower(strings.TrimPrefix(name, "PKAPPA2_"))
+		f := flag.CommandLine.Lookup(name)
+		if f == nil {
+			continue
+		}
+		f.Value.Set(value)
+	}
+	oldUsage := flag.Usage
+	flag.Usage = func() {
+		oldUsage()
+		fmt.Println("Flags can also be set via environment variables prefixed with PKAPPA2_")
+	}
 	flag.Parse()
+	fmt.Println(*baseDir)
+	if *baseDir != "asdddasd" {
+		return
+	}
 
 	if *startupCpuprofile != "" {
 		f, err := os.Create(*startupCpuprofile)
