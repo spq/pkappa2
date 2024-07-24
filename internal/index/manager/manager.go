@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/google/gopacket/pcap"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
 	"github.com/spq/pkappa2/internal/index/converters"
@@ -42,12 +44,22 @@ type (
 		StreamCount    int
 		PacketCount    int
 	}
+
 	Event struct {
 		Type      string
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
 		PcapStats PcapStatistics         `json:",omitempty"`
 	}
+
+	PcapOverIPEndpointInfo struct {
+		Address string
+	}
+	pcapOverIPEndpoint struct {
+		PcapOverIPEndpointInfo
+		cancel func()
+	}
+
 	listener struct {
 		close  chan struct{}
 		active int
@@ -96,6 +108,7 @@ type (
 
 		streamsToConvert         map[string]*bitmask.LongBitmask
 		pcapProcessorWebhookUrls []string
+		pcapOverIPEndpoints      []*pcapOverIPEndpoint
 
 		tags       map[string]*tag
 		converters map[string]*converters.CachedConverter
@@ -132,6 +145,7 @@ type (
 		}
 		Pcaps                    []*pcapmetadata.PcapInfo
 		PcapProcessorWebhookUrls []string
+		PcapOverIPEndpoints      []string
 	}
 
 	updateTagOperationInfo struct {
@@ -167,6 +181,7 @@ type (
 )
 
 func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
+	ctx := context.Background()
 	mgr := Manager{
 		PcapDir:      pcapDir,
 		IndexDir:     indexDir,
@@ -239,6 +254,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 			mgr.allStreams.Set(uint(i))
 		}
 	}
+	var pcapOverIPEndpoints map[string]struct{}
 nextStateFile:
 	for _, fn := range stateFilenames {
 		f, err := os.Open(fn)
@@ -333,9 +349,25 @@ nextStateFile:
 			}
 			break
 		}
+		pcapOverIPEndpointsTemp := map[string]struct{}{}
+		for _, v := range s.PcapOverIPEndpoints {
+			_, _, err := net.SplitHostPort(v)
+			if err != nil {
+				log.Printf("Invalid pcap-over-ip host %q in statefile %q: %v", v, fn, err)
+				pcapOverIPEndpointsTemp = nil
+				continue nextStateFile
+			}
+			if _, ok := pcapOverIPEndpointsTemp[v]; ok {
+				log.Printf("Invalid pcap-over-ip host %q in statefile %q: duplicate", v, fn)
+				pcapOverIPEndpointsTemp = nil
+				continue nextStateFile
+			}
+			pcapOverIPEndpointsTemp[v] = struct{}{}
+		}
 		mgr.tags = newTags
 		mgr.pcapProcessorWebhookUrls = s.PcapProcessorWebhookUrls
 		mgr.stateFilename = fn
+		pcapOverIPEndpoints = pcapOverIPEndpointsTemp
 		stateTimestamp = s.Saved
 		cachedKnownPcapData = s.Pcaps
 	}
@@ -348,6 +380,9 @@ nextStateFile:
 		if err := mgr.saveState(); err != nil {
 			return nil, fmt.Errorf("unable to save state: %w", err)
 		}
+	}
+	for a := range pcapOverIPEndpoints {
+		mgr.pcapOverIPEndpoints = append(mgr.pcapOverIPEndpoints, mgr.newPcapOverIPEndpoint(ctx, a))
 	}
 
 	go func() {
@@ -1696,6 +1731,118 @@ func (mgr *Manager) triggerPcapProcessedWebhook(webhookUrl string, jsonBody []by
 	if err != nil {
 		log.Printf("webhook error: %v\n", err)
 	}
+}
+
+func (mgr *Manager) newPcapOverIPEndpoint(ctx context.Context, address string) *pcapOverIPEndpoint {
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		for {
+			func() {
+				d := net.Dialer{}
+				c, err := d.DialContext(ctx, "tcp", address)
+				if err != nil {
+					log.Printf("Can't connect to PCAP-over-IP endpoint %q: %v\n", address, err)
+					return
+				}
+				conn := c.(*net.TCPConn)
+				conn.CloseWrite()
+				file, err := conn.File()
+				conn.Close()
+				conn = nil
+				if err != nil {
+					log.Printf("Can't get file descriptor of PCAP-over-IP endpoint %q: %v\n", address, err)
+					return
+				}
+				ctx, innerCancel := context.WithCancel(ctx)
+				go func() {
+					<-ctx.Done()
+					file.Close()
+				}()
+				defer innerCancel()
+				log.Printf("Connection to PCAP-over-IP endpoint %q established\n", address)
+				handle, err := pcap.OpenOfflineFile(file)
+				if err != nil {
+					log.Printf("Can't open file descriptor of PCAP-over-IP endpoint %q: %v\n", address, err)
+					return
+				}
+				defer handle.Close()
+				for {
+					//data, ci, err := handle.ReadPacketData()
+					_, _, err := handle.ReadPacketData()
+					if err != nil {
+						log.Printf("Error reading packet from PCAP-over-IP endpoint %q: %v\n", address, err)
+						return
+					}
+					//TODO: do something with data & ci
+				}
+			}()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+			}
+		}
+	}()
+	return &pcapOverIPEndpoint{
+		PcapOverIPEndpointInfo: PcapOverIPEndpointInfo{
+			Address: address,
+		},
+		cancel: cancel,
+	}
+}
+
+func (mgr *Manager) ListPcapOverIPEndpoints() []PcapOverIPEndpointInfo {
+	c := make(chan []PcapOverIPEndpointInfo)
+	mgr.jobs <- func() {
+		endpoints := make([]PcapOverIPEndpointInfo, 0, len(mgr.pcapOverIPEndpoints))
+		for _, e := range mgr.pcapOverIPEndpoints {
+			endpoints = append(endpoints, e.PcapOverIPEndpointInfo)
+		}
+		c <- endpoints
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) AddPcapOverIPEndpoint(address string) error {
+	if _, _, err := net.SplitHostPort(address); err != nil {
+		return err
+	}
+	c := make(chan error)
+	mgr.jobs <- func() {
+		err := func() error {
+			for _, e := range mgr.pcapOverIPEndpoints {
+				if e.Address == address {
+					return fmt.Errorf("error: address %q already exists", address)
+				}
+			}
+			mgr.pcapOverIPEndpoints = append(mgr.pcapOverIPEndpoints, mgr.newPcapOverIPEndpoint(context.Background(), address))
+			return mgr.saveState()
+		}()
+		c <- err
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) DelPcapOverIPEndpoint(address string) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		err := func() error {
+			toDelete := slices.IndexFunc(mgr.pcapOverIPEndpoints, func(e *pcapOverIPEndpoint) bool {
+				return e.Address == address
+			})
+			if toDelete == -1 {
+				return fmt.Errorf("error: address %q doesn't exist", address)
+			}
+			mgr.pcapOverIPEndpoints[toDelete].cancel()
+			mgr.pcapOverIPEndpoints = slices.Delete(mgr.pcapOverIPEndpoints, toDelete, toDelete+1)
+			return mgr.saveState()
+		}()
+		c <- err
+		close(c)
+	}
+	return <-c
 }
 
 func (mgr *Manager) GetView() View {

@@ -831,7 +831,6 @@ func main() {
 			return
 		}
 	})
-	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
 	rUser.Get("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -857,6 +856,35 @@ func main() {
 			return
 		}
 		if err := mgr.AddPcapProcessorWebhook(u[0]); err != nil {
+			http.Error(w, fmt.Sprintf("add failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	})
+	rUser.Get("/api/pcap-over-ip", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(mgr.ListPcapOverIPEndpoints()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
+	rUser.Delete("/api/pcap-over-ip", func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query()["address"]
+		if len(u) != 1 || u[0] == "" {
+			http.Error(w, "`address` parameter missing", http.StatusBadRequest)
+			return
+		}
+		if err := mgr.DelPcapOverIPEndpoint(u[0]); err != nil {
+			http.Error(w, fmt.Sprintf("delete failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	})
+	rUser.Put("/api/pcap-over-ip", func(w http.ResponseWriter, r *http.Request) {
+		a := r.URL.Query()["address"]
+		if len(a) != 1 || a[0] == "" {
+			http.Error(w, "`address` parameter missing or empty", http.StatusBadRequest)
+			return
+		}
+		if err := mgr.AddPcapOverIPEndpoint(a[0]); err != nil {
 			http.Error(w, fmt.Sprintf("add failed: %v", err), http.StatusBadRequest)
 			return
 		}
@@ -931,6 +959,7 @@ func main() {
 		}
 		log.Printf("WebSocket Client %q disconnected", c.RemoteAddr().String())
 	})
+	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
 
 	server := &http.Server{
 		Addr:    *listenAddress,
