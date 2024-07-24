@@ -368,12 +368,10 @@ nextStateFile:
 			_, _, err := net.SplitHostPort(v)
 			if err != nil {
 				log.Printf("Invalid pcap-over-ip host %q in statefile %q: %v", v, fn, err)
-				pcapOverIPEndpointsTemp = nil
 				continue nextStateFile
 			}
 			if _, ok := pcapOverIPEndpointsTemp[v]; ok {
 				log.Printf("Invalid pcap-over-ip host %q in statefile %q: duplicate", v, fn)
-				pcapOverIPEndpointsTemp = nil
 				continue nextStateFile
 			}
 			pcapOverIPEndpointsTemp[v] = struct{}{}
@@ -1859,7 +1857,10 @@ func (mgr *Manager) newPcapOverIPEndpoint(ctx context.Context, address string) *
 					return
 				}
 				conn := c.(*net.TCPConn)
-				conn.CloseWrite()
+				if err := conn.CloseWrite(); err != nil {
+					log.Printf("Can't close write end of PCAP-over-IP endpoint %q: %v\n", endpoint.Address, err)
+					return
+				}
 				file, err := conn.File()
 				conn.Close()
 				conn = nil
