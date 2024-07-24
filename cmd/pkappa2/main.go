@@ -179,7 +179,7 @@ func main() {
 			}
 			return
 		}
-		mgr.ImportPcap(filename)
+		mgr.ImportPcaps([]string{filename})
 		http.Error(w, "OK", http.StatusOK)
 	})
 	rUser.Mount("/debug", middleware.Profiler())
