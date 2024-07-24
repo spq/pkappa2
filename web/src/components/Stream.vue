@@ -140,25 +140,23 @@
           <span>RAW</span>
         </v-tooltip>
       </v-btn-toggle>
-      <v-row>
-        <v-col cols="6">
-          <v-tooltip
-            v-if="stream.stream !== null && selectableConverters.length > 1"
-            bottom
-          >
-            <template #activator="{ on, attrs }">
-              <v-select
-                v-bind="attrs"
-                :items="selectableConverters"
-                :value="activeConverter"
-                v-on="on"
-                @change="changeConverter"
-              />
-            </template>
-            <span>Select converter view</span>
-          </v-tooltip>
-        </v-col>
-      </v-row>
+      <v-tooltip
+        v-if="stream.stream !== null && selectableConverters.length > 1"
+        bottom
+      >
+        <template #activator="{ on, attrs }">
+          <v-select
+            hide-details
+            dense
+            v-bind="attrs"
+            :items="selectableConverters"
+            :value="activeConverter"
+            v-on="on"
+            @change="changeConverter"
+          />
+        </template>
+        <span>Select converter view</span>
+      </v-tooltip>
       <v-spacer />
       <div v-if="streamIndex !== null && streams.result !== null">
         <span class="text-caption"
