@@ -1,22 +1,22 @@
 <template>
   <v-dialog v-model="visible" width="500" @keydown.enter="submitCurrent">
-    <v-form>
-      <v-card>
-        <v-card-title>
-          <span class="text-h5">CTF Setup Wizards</span>
-        </v-card-title>
-        <v-tabs v-model="tab" icons-and-text>
-          <v-tab href="#tab_flag_regex">
-            Setup Flag tags
-            <v-icon>mdi-flag</v-icon>
-          </v-tab>
-          <v-tab href="#tab_service_by_port">
-            Setup Service ports
-            <v-icon>mdi-cloud-outline</v-icon>
-          </v-tab>
-        </v-tabs>
-        <v-tabs-items v-model="tab">
-          <v-tab-item value="tab_service_by_port">
+    <v-card>
+      <v-card-title>
+        <span class="text-h5">CTF Setup Wizards</span>
+      </v-card-title>
+      <v-tabs v-model="tab" icons-and-text>
+        <v-tab href="#tab_flag_regex">
+          Setup Flag tags
+          <v-icon>mdi-flag</v-icon>
+        </v-tab>
+        <v-tab href="#tab_service_by_port">
+          Setup Service ports
+          <v-icon>mdi-cloud-outline</v-icon>
+        </v-tab>
+      </v-tabs>
+      <v-tabs-items v-model="tab">
+        <v-tab-item value="tab_service_by_port">
+          <v-form>
             <v-card-text>
               This wizard will create a service with the given port(s). Enter
               the ports separated by commas, ranges using a dash.
@@ -24,15 +24,14 @@
               <v-text-field
                 v-model="serviceName"
                 label="Service name"
-                :error="serviceName == ''"
                 autofocus
+                :rules="[() => serviceName != '']"
               ></v-text-field>
               <v-text-field
                 v-model="servicePorts"
                 label="Service ports"
                 example="80,8080-8081"
-                :error="!goodServicePorts"
-                autofocus
+                :rules="[() => goodServicePorts]"
               ></v-text-field>
             </v-card-text>
             <v-card-actions>
@@ -52,8 +51,10 @@
                 >Create Service</v-btn
               >
             </v-card-actions>
-          </v-tab-item>
-          <v-tab-item value="tab_flag_regex">
+          </v-form>
+        </v-tab-item>
+        <v-tab-item value="tab_flag_regex">
+          <v-form>
             <v-card-text>
               This wizard will create the two tags {{ flagInName }} and
               {{ flagOutName }} with the specified regex below if they don't
@@ -63,8 +64,8 @@
                 v-model="flagRegex"
                 label="Flag Regex"
                 example="flag_[a-fA-F0-9]{32}"
-                :error="!goodFlagRegex"
                 autofocus
+                :rules="[() => goodFlagRegex]"
               ></v-text-field>
             </v-card-text>
             <v-card-actions>
@@ -80,10 +81,10 @@
                 >Create Flag tags</v-btn
               >
             </v-card-actions>
-          </v-tab-item>
-        </v-tabs-items>
-      </v-card>
-    </v-form>
+          </v-form>
+        </v-tab-item>
+      </v-tabs-items>
+    </v-card>
   </v-dialog>
 </template>
 
