@@ -1,5 +1,5 @@
 <template>
-  <v-snackbar v-model="visible" app color="error" timeout="5000">
+  <v-snackbar v-model="visible" app :color="color" timeout="5000">
     {{ message }}
     <template #action="{ attrs }">
       <v-btn icon v-bind="attrs" @click="visible = false">
@@ -15,11 +15,21 @@ import { EventBus } from "./EventBus";
 
 const visible = ref(false);
 const message = ref("");
+const color = ref("error");
 
 EventBus.on("showError", showError);
+EventBus.on("showMessage", showMessage);
 
 function showError(msg: string) {
   message.value = msg;
+  color.value = "error";
+  visible.value = true;
+  console.error(msg);
+}
+
+function showMessage(msg: string) {
+  message.value = msg;
+  color.value = "success";
   visible.value = true;
   console.error(msg);
 }

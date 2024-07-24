@@ -119,7 +119,7 @@ const flagOutPrefix = "sdata:";
 EventBus.on("showCTFWizard", openDialog);
 
 const goodServicePorts = computed(() => {
-  return /^(,[0-9]+|,[0-9]+[-:][0-9]+)+$/.test("," + servicePorts.value);
+  return /^( *, *[0-9]+ *([-:] *[0-9]+ *)?)+$/.test("," + servicePorts.value);
 });
 
 const goodFlagRegex = computed(() => {
@@ -164,8 +164,8 @@ function createService() {
   store
     .addTag(servicePrefix + serviceName.value, query, randomColor())
     .then(() => {
-      visible.value = false;
       service_by_port_loading.value = false;
+      EventBus.emit("showMessage", `Service ${serviceName.value} created.`);
     })
     .catch((err: string) => {
       service_by_port_error.value = true;

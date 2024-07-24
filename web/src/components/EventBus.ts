@@ -10,6 +10,7 @@ interface GlobalEvents {
     tagStreams: number[]
   ) => void;
   showError: (message: string) => void;
+  showMessage: (message: string) => void;
   showTagColorChangeDialog: (tagId: string) => void;
   showTagDeleteDialog: (tagId: string) => void;
   showTagDetailsDialog: (tagId: string) => void;
