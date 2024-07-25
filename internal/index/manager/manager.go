@@ -461,6 +461,10 @@ func (mgr *Manager) saveState() error {
 		Saved:                    time.Now(),
 		Pcaps:                    mgr.builder.KnownPcaps(),
 		PcapProcessorWebhookUrls: mgr.pcapProcessorWebhookUrls,
+		PcapOverIPEndpoints:      make([]string, 0, len(mgr.pcapOverIPEndpoints)),
+	}
+	for _, e := range mgr.pcapOverIPEndpoints {
+		j.PcapOverIPEndpoints = append(j.PcapOverIPEndpoints, e.Address)
 	}
 	for n, t := range mgr.tags {
 		j.Tags = append(j.Tags, struct {
