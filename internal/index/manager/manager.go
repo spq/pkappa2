@@ -1861,20 +1861,18 @@ func (mgr *Manager) newPcapOverIPEndpoint(ctx context.Context, address string) *
 					return
 				}
 				conn := c.(*net.TCPConn)
-				if err := conn.CloseWrite(); err != nil {
-					log.Printf("Can't close write end of PCAP-over-IP endpoint %q: %v\n", endpoint.Address, err)
-					return
-				}
 				file, err := conn.File()
-				conn.Close()
-				conn = nil
 				if err != nil {
+					conn.Close()
 					log.Printf("Can't get file descriptor of PCAP-over-IP endpoint %q: %v\n", endpoint.Address, err)
 					return
 				}
 				ctx, innerCancel := context.WithCancel(ctx)
 				go func() {
 					<-ctx.Done()
+					conn.CloseRead()
+					conn.CloseWrite()
+					conn.Close()
 					file.Close()
 				}()
 				defer innerCancel()
