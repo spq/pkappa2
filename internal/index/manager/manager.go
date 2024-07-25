@@ -1870,8 +1870,8 @@ func (mgr *Manager) newPcapOverIPEndpoint(ctx context.Context, address string) *
 				ctx, innerCancel := context.WithCancel(ctx)
 				go func() {
 					<-ctx.Done()
-					conn.CloseRead()
-					conn.CloseWrite()
+					_ = conn.CloseRead()
+					_ = conn.CloseWrite()
 					conn.Close()
 					file.Close()
 				}()
