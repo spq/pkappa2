@@ -1897,7 +1897,9 @@ func (mgr *Manager) newPcapOverIPEndpoint(ctx context.Context, address string) *
 					endpoint.ReceivedPackets++
 				}
 			}()
-			endpoint.LastDisconnected = time.Now().UnixNano()
+			if endpoint.LastDisconnected <= endpoint.LastConnected {
+				endpoint.LastDisconnected = time.Now().UnixNano()
+			}
 			select {
 			case <-ctx.Done():
 				return
