@@ -1756,7 +1756,7 @@ func (mgr *Manager) triggerPcapProcessedWebhook(webhookUrl string, jsonBody []by
 func writePcaps(pcapDir string, packets []pcapOverIPPacket) ([]string, error) {
 	filenames := []string(nil)
 	handledLinkTypes := map[layers.LinkType]struct{}{}
-	for len(packets) == 0 {
+	for len(packets) != 0 {
 		lt := packets[0].linkType
 		fn := tools.MakeFilename(pcapDir, "pcap")
 		f, err := os.Create(fn)
