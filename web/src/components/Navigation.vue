@@ -189,6 +189,18 @@
           <v-list-item-title>Manage Converters</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
+      <v-list-item
+        link
+        dense
+        exact
+        :to="{
+          name: 'pcap-over-ip',
+        }"
+      >
+        <v-list-item-content>
+          <v-list-item-title>Manage PCAP-over-IP</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
 
       <v-btn-toggle
         v-model="colorscheme"

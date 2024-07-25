@@ -2,7 +2,7 @@
  * Generated type guards for "apiClient.ts".
  * WARNING: Do not manually change this file.
  */
-import { Error, SearchResult, SearchResponse, StreamData, Statistics, PcapsResponse, ConvertersResponse, ProcessStderr, TagsResponse, GraphResponse } from "./apiClient";
+import { Error, SearchResult, SearchResponse, StreamData, Statistics, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, TagsResponse, GraphResponse } from "./apiClient";
 
 export function isError(obj: unknown): obj is Error {
     const typedObj = obj as Error
@@ -183,6 +183,22 @@ export function isProcessStderr(obj: unknown): obj is ProcessStderr {
         Array.isArray(typedObj["Stderr"]) &&
         typedObj["Stderr"].every((e: any) =>
             typeof e === "string"
+        )
+    )
+}
+
+export function isPcapOverIPResponse(obj: unknown): obj is PcapOverIPResponse {
+    const typedObj = obj as PcapOverIPResponse
+    return (
+        Array.isArray(typedObj) &&
+        typedObj.every((e: any) =>
+            (e !== null &&
+                typeof e === "object" ||
+                typeof e === "function") &&
+            typeof e["Address"] === "string" &&
+            typeof e["LastConnected"] === "number" &&
+            typeof e["LastDisconnected"] === "number" &&
+            typeof e["ReceivedPackets"] === "number"
         )
     )
 }

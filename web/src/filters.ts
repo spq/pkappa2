@@ -12,6 +12,10 @@ export function tagify(id: string, what: "id" | "type" | "name") {
   return { id, type, name }[what];
 }
 
+export function formatDuration(seconds: number) {
+  return vue.$moment.duration(seconds, "seconds").humanize();
+}
+
 export function formatDate(time: string | null) {
   if (time === null) return undefined;
   const moment = vue.$moment(time).local();
