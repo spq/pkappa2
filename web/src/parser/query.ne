@@ -66,7 +66,7 @@ export function isExpression(obj: QueryElement): obj is ExpressionQueryElement {
 @lexer lexer
 
 # Rules
-queryRoot -> queryOrCondition %ws:? {% id %}
+queryRoot -> %ws:? queryOrCondition %ws:? {% (d) => d[1] %}
 queryOrCondition ->
     queryOrCondition %ws %kw_or %ws queryAndCondition {% (d) => d.length > 1 ? {'type': 'logic', 'op': 'or', 'expressions': [d[0], d[4]]} : d[0] %}
     | queryAndCondition {% id %}

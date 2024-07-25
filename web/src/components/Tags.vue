@@ -9,6 +9,14 @@
         </template>
         <span>Refresh</span>
       </v-tooltip>
+      <v-tooltip bottom>
+        <template #activator="{ on, attrs }">
+          <v-btn v-bind="attrs" icon v-on="on" @click="setupCTF">
+            <v-icon>mdi-wizard-hat</v-icon>
+          </v-btn>
+        </template>
+        <span>CTF Setup Wizards</span>
+      </v-tooltip>
     </ToolBar>
     <v-simple-table dense>
       <thead>
@@ -197,6 +205,10 @@ function updateTags() {
   store.updateTags().catch((err: string) => {
     EventBus.emit("showError", `Failed to update tags: ${err}`);
   });
+}
+
+function setupCTF() {
+  EventBus.emit("showCTFWizard");
 }
 
 function showTagSetConvertersDialog(tagId: string) {

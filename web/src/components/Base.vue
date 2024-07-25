@@ -19,6 +19,7 @@
     <v-main>
       <router-view></router-view>
     </v-main>
+    <CTFWizardDialog />
     <ConverterResetDialog />
     <TagDeleteDialog />
     <TagCreateDialog />
@@ -34,6 +35,7 @@
 <script lang="ts" setup>
 import Navigation from "./Navigation.vue";
 import SearchBox from "./SearchBox.vue";
+import CTFWizardDialog from "./CTFWizardDialog.vue";
 import ConverterResetDialog from "./ConverterResetDialog.vue";
 import TagDeleteDialog from "./TagDeleteDialog.vue";
 import TagSetConverterDialog from "./TagSetConverterDialog.vue";

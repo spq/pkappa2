@@ -292,9 +292,14 @@ watch(colorscheme, () => {
 });
 
 onMounted(() => {
-  store.updateTags().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update tags: ${err}`);
-  });
+  store
+    .updateTags()
+    .then(() => {
+      if (store.tags?.length === 0) EventBus.emit("showCTFWizard");
+    })
+    .catch((err: string) => {
+      EventBus.emit("showError", `Failed to update tags: ${err}`);
+    });
   store.updateStatus().catch((err: string) => {
     EventBus.emit("showError", `Failed to update status: ${err}`);
   });
