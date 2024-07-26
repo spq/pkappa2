@@ -1806,7 +1806,7 @@ func writePcaps(pcapDir string, packets []pcapOverIPPacket) ([]string, error) {
 			return filenames, err
 		}
 		filenames = append(filenames, fnPartial)
-		fnFull, fnPartial = "", ""
+		fnFull = ""
 		if nextStart == 0 {
 			break
 		}
