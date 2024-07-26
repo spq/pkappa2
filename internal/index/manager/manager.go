@@ -1762,19 +1762,23 @@ func writePcaps(pcapDir string, packets []pcapOverIPPacket) ([]string, error) {
 	handledLinkTypes := map[layers.LinkType]struct{}{}
 	for len(packets) != 0 {
 		lt := packets[0].linkType
-		fn := tools.MakeFilename(pcapDir, "pcap")
-		f, err := os.Create(fn)
+		fnPartial := tools.MakeFilename("", "pcap")
+		fnFull := filepath.Join(pcapDir, fnPartial)
+		f, err := os.Create(fnFull)
 		if err != nil {
 			return filenames, err
 		}
 		defer func() {
 			if f != nil {
 				if err := f.Close(); err != nil {
-					log.Printf("error closing file %q: %v", fn, err)
+					log.Printf("error closing file %q: %v", fnFull, err)
 				}
 			}
-			if err := os.Remove(fn); err != nil {
-				log.Printf("error removing file %q: %v", fn, err)
+			if fnFull != "" {
+				log.Printf("removing file %q because of a previous error", fnFull)
+				if err := os.Remove(fnFull); err != nil {
+					log.Printf("error removing file %q: %v", fnFull, err)
+				}
 			}
 		}()
 		w, err := pcapgo.NewNgWriter(f, lt)
@@ -1798,11 +1802,11 @@ func writePcaps(pcapDir string, packets []pcapOverIPPacket) ([]string, error) {
 		if err := w.Flush(); err != nil {
 			return filenames, err
 		}
-		if err := f.Close(); err != nil {
-			f = nil
+		if f, err = nil, f.Close(); err != nil {
 			return filenames, err
 		}
-		filenames = append(filenames, fn)
+		filenames = append(filenames, fnPartial)
+		fnFull, fnPartial = "", ""
 		if nextStart == 0 {
 			break
 		}
@@ -1830,7 +1834,7 @@ func (mgr *Manager) pcapOverIPPacketHandler() {
 				continue
 			}
 		}
-		go func() {
+		go func(packets []pcapOverIPPacket) {
 			filenames, err := writePcaps(mgr.PcapDir, packets)
 			if err != nil {
 				log.Printf("error writing PCAP-over-IP packets: %v", err)
@@ -1838,7 +1842,7 @@ func (mgr *Manager) pcapOverIPPacketHandler() {
 			if len(filenames) != 0 {
 				mgr.ImportPcaps(filenames)
 			}
-		}()
+		}(packets)
 		packets = nil
 	}
 }
