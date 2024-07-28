@@ -110,6 +110,21 @@
                   </v-list-item-icon>
                   <v-list-item-title>Change Color</v-list-item-title>
                 </v-list-item>
+                <v-list-item link @click="showTagNameChangeDialog(tag.Name)">
+                  <v-list-item-icon>
+                    <v-icon>mdi-rename-outline</v-icon>
+                  </v-list-item-icon>
+                  <v-list-item-title>Change Name</v-list-item-title>
+                </v-list-item>
+                <v-list-item
+                  link
+                  @click="showTagDefinitionChangeDialog(tag.Name)"
+                >
+                  <v-list-item-icon>
+                    <v-icon>mdi-text-search-variant</v-icon>
+                  </v-list-item-icon>
+                  <v-list-item-title>Change Definition</v-list-item-title>
+                </v-list-item>
                 <v-list-item link @click="showTagSetConvertersDialog(tag.Name)">
                   <v-list-item-icon>
                     <v-icon>mdi-file-replace-outline</v-icon>
@@ -308,6 +323,14 @@ function setQuery(query: string) {
 
 function showTagColorChangeDialog(tagId: string) {
   EventBus.emit("showTagColorChangeDialog", tagId);
+}
+
+function showTagDefinitionChangeDialog(tagId: string) {
+  EventBus.emit("showTagDefinitionChangeDialog", tagId);
+}
+
+function showTagNameChangeDialog(tagId: string) {
+  EventBus.emit("showTagNameChangeDialog", tagId);
 }
 </script>
 

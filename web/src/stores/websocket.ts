@@ -103,8 +103,10 @@ export function setupWebsocket() {
           if (
             store.tags != null &&
             !store.tags.find((tag) => tag.Name == e.Tag.Name)
-          )
+          ) {
             store.tags.push(e.Tag);
+            store.tags.sort((a, b) => a.Name.localeCompare(b.Name));
+          }
           break;
         case "tagDeleted":
           if (!isTagEvent(e)) {
@@ -144,8 +146,10 @@ export function setupWebsocket() {
           if (
             store.converters != null &&
             !store.converters.find((c) => c.Name == e.Converter.Name)
-          )
+          ) {
             store.converters.push(e.Converter);
+            store.converters.sort((a, b) => a.Name.localeCompare(b.Name));
+          }
           break;
         case "converterDeleted":
           if (!isConverterEvent(e)) {

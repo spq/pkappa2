@@ -103,6 +103,31 @@
                 <template #activator="{ on, attrs }">
                   <v-btn
                     v-bind="attrs"
+                    :disabled="tag.Referenced"
+                    icon
+                    v-on="on"
+                    @click="showTagNameChangeDialog(tag.Name)"
+                    ><v-icon>mdi-rename-outline</v-icon></v-btn
+                  >
+                </template>
+                <span>Change Name</span>
+              </v-tooltip>
+              <v-tooltip bottom>
+                <template #activator="{ on, attrs }">
+                  <v-btn
+                    v-bind="attrs"
+                    icon
+                    v-on="on"
+                    @click="showTagDefinitionChangeDialog(tag.Name)"
+                    ><v-icon>mdi-text-search-variant</v-icon></v-btn
+                  >
+                </template>
+                <span>Change Definition</span>
+              </v-tooltip>
+              <v-tooltip bottom>
+                <template #activator="{ on, attrs }">
+                  <v-btn
+                    v-bind="attrs"
                     icon
                     v-on="on"
                     @click="showTagSetConvertersDialog(tag.Name)"
@@ -200,6 +225,14 @@ function setQuery(query: string) {
 
 function showTagColorChangeDialog(tagId: string) {
   EventBus.emit("showTagColorChangeDialog", tagId);
+}
+
+function showTagDefinitionChangeDialog(tagId: string) {
+  EventBus.emit("showTagDefinitionChangeDialog", tagId);
+}
+
+function showTagNameChangeDialog(tagId: string) {
+  EventBus.emit("showTagNameChangeDialog", tagId);
 }
 </script>
 
