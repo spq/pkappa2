@@ -1223,7 +1223,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 				})
 				mgr.event(Event{
 					Type: "tagAdded",
-					Tag:  makeTagInfo(name, tag),
+					Tag:  makeTagInfo(info.name, tag),
 				})
 			} else {
 				mgr.event(Event{
