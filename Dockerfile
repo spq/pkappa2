@@ -29,13 +29,14 @@ COPY --from=backend_builder /app/web/dist ./web/dist
 
 RUN adduser pkappa2
 RUN mkdir /data && chown pkappa2:pkappa2 /data
+RUN mkdir /app/converters && chown pkappa2:pkappa2 /app/converters
 USER pkappa2
 
 EXPOSE 8080
 VOLUME /data
 VOLUME /app/converters
 
-ENV PKAPPA2_USER_PASSWORD ""
-ENV PKAPPA2_PCAP_PASSWORD ""
+ENV PKAPPA2_BASE_DIR="/data"
+ENV PKAPPA2_ADDRESS=":8080"
 
-CMD /app/pkappa2 -base_dir /data -address :8080 -user_password "${PKAPPA2_USER_PASSWORD}" -pcap_password "${PKAPPA2_PCAP_PASSWORD}"
+ENTRYPOINT [ "/app/pkappa2" ]
