@@ -787,7 +787,7 @@ func (mgr *Manager) ImportPcaps(filenames []string) {
 		//start import job when none running
 		if len(mgr.importJobs) == len(filenames) {
 			indexes, releaser := mgr.getIndexesCopy(0)
-			go mgr.importPcapJob(mgr.importJobs[:1], mgr.nextStreamID, indexes, releaser)
+			go mgr.importPcapJob(mgr.importJobs[:len(filenames)], mgr.nextStreamID, indexes, releaser)
 		}
 		mgr.event(Event{
 			Type: "pcapArrived",

@@ -60,13 +60,51 @@
     </ToolBar>
     <v-data-table
       :headers="headers"
-      :items="items"
+      :items="store.pcapOverIPEndpoints"
       item-key="address"
       dense
       disable-pagination
       disable-filtering
       hide-default-footer
     >
+      <template #[`item.status`]="props">
+        <v-tooltip>
+          <template #activator="{ on, attrs }">
+            <div v-bind="attrs" v-on="on">
+              {{
+                props.item.LastConnected === 0 &&
+                props.item.LastDisconnected === 0
+                  ? "Never connected"
+                  : props.item.LastConnected > props.item.LastDisconnected
+                  ? `Connected since ${moment
+                      .duration(
+                        currentTime - props.item.LastConnected / 1_000_000
+                      )
+                      .humanize()}`
+                  : `Disconnected since ${moment
+                      .duration(
+                        currentTime - props.item.LastDisconnected / 1_000_000
+                      )
+                      .humanize()}`
+              }}
+            </div>
+          </template>
+          <span
+            >last connected:
+            {{
+              props.item.LastConnected == 0
+                ? "never"
+                : moment(props.item.LastConnected / 1_000_000)
+            }}
+            / last disconnected:
+            {{
+              props.item.LastDisconnected == 0
+                ? "never"
+                : moment(props.item.LastDisconnected / 1_000_000)
+            }}</span
+          >
+        </v-tooltip>
+      </template>
       <template #[`item.delete`]="props">
         <v-tooltip bottom>
           <template #activator="{ on, attrs }">
@@ -139,9 +177,13 @@ const goodNewAddress = computed(() => {
 
 const store = useRootStore();
 const headers = [
-  { text: "Address", value: "address", cellClass: "cursor-pointer" },
+  { text: "Address", value: "Address", cellClass: "cursor-pointer" },
   { text: "Status", value: "status", cellClass: "cursor-pointer" },
-  { text: "Packets Received", value: "packets", cellClass: "cursor-pointer" },
+  {
+    text: "Packets Received",
+    value: "ReceivedPackets",
+    cellClass: "cursor-pointer",
+  },
   { text: "", value: "delete", sortable: false, cellClass: "cursor-pointer" },
 ];
 
@@ -156,25 +198,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (ticker.value != null) clearInterval(ticker.value);
-});
-
-const items = computed(() => {
-  return store.pcapOverIPEndpoints?.map((e) => {
-    return {
-      address: e.Address,
-      status:
-        e.LastConnected === 0 && e.LastDisconnected === 0
-          ? "Never connected"
-          : e.LastConnected > e.LastDisconnected
-          ? `Connected since ${moment
-              .duration(currentTime.value - e.LastConnected / 1_000_000)
-              .humanize()}`
-          : `Disconnected since ${moment
-              .duration(currentTime.value - e.LastDisconnected / 1_000_000)
-              .humanize()}`,
-      packets: e.ReceivedPackets,
-    };
-  });
 });
 
 onMounted(() => {

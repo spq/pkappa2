@@ -10,7 +10,6 @@ declare module 'vue' {
     Base: typeof import('./src/components/Base.vue')['default']
     ConverterResetDialog: typeof import('./src/components/ConverterResetDialog.vue')['default']
     Converters: typeof import('./src/components/Converters.vue')['default']
-    copy: typeof import('./src/components/Converters copy.vue')['default']
     CTFWizardDialog: typeof import('./src/components/CTFWizardDialog.vue')['default']
     ErrorBanner: typeof import('./src/components/ErrorBanner.vue')['default']
     Graph: typeof import('./src/components/Graph.vue')['default']
