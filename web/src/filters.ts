@@ -16,7 +16,7 @@ export function formatDuration(seconds: number) {
   return vue.$moment.duration(seconds, "seconds").humanize();
 }
 
-export function formatDate(time: string | null) {
+export function formatDate(time: string | Date | null) {
   if (time === null) return undefined;
   const moment = vue.$moment(time).local();
   let format = "HH:mm:ss.SSS";
@@ -24,7 +24,7 @@ export function formatDate(time: string | null) {
   return moment.format(format);
 }
 
-export function formatDateLong(time: string | null) {
+export function formatDateLong(time: string | Date | null) {
   if (time === null) return undefined;
   const moment = vue.$moment(time).local();
   return moment.format("YYYY-MM-DD HH:mm:ss.SSS ZZ");
