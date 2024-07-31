@@ -105,7 +105,7 @@
           >
         </v-tooltip>
       </template>
-      <template #[`item.delete`]="props">
+      <template #[`item.delete`]="{ item }">
         <v-tooltip bottom>
           <template #activator="{ on, attrs }">
             <v-btn
@@ -113,7 +113,7 @@
               icon
               v-on="on"
               @click="
-                delDialogAddress = props.item.address;
+                delDialogAddress = item.Address;
                 delDialogVisible = true;
               "
             >
