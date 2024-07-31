@@ -335,6 +335,15 @@ func main() {
 			http.Error(w, fmt.Sprintf("reset failed: %v", err), http.StatusBadRequest)
 		}
 	})
+	rUser.Get(`/api/download/pcap/{file:[^/\\]+[.]pcap}`, func(w http.ResponseWriter, r *http.Request) {
+		filename := chi.URLParam(r, "file")
+		if filename != filepath.Base(filename) {
+			http.Error(w, "Invalid filename", http.StatusBadRequest)
+			return
+		}
+		fullFilename := filepath.Join(*baseDir, *pcapDir, filename)
+		http.ServeFile(w, r, fullFilename)
+	})
 	rUser.Get(`/api/download/{stream:\d+}.pcap`, func(w http.ResponseWriter, r *http.Request) {
 		streamIDStr := chi.URLParam(r, "stream")
 		streamID, err := strconv.ParseUint(streamIDStr, 10, 64)
