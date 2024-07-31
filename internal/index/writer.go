@@ -676,7 +676,7 @@ func (w *Writer) AddIndex(r *Reader) (bool, error) {
 		w.hostGroups = w.hostGroups[:hgCountBefore]
 	})
 	for _, rhg := range r.hostGroups {
-		for whgIdx := 0; whgIdx <= len(w.hostGroups); {
+		for whgIdx := 0; whgIdx <= len(w.hostGroups); whgIdx++ {
 			remap := hgRemap{
 				hostGroupRemap: uint16(whgIdx),
 			}
