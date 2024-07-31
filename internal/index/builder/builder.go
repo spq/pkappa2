@@ -282,6 +282,7 @@ outer:
 					oldPackets = oldPackets[oldPacketIndex-1:]
 				} else {
 					oldPackets = oldPackets[oldPacketIndex:]
+					newPacketIndex--
 				}
 				break
 			}

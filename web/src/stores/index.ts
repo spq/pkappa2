@@ -135,6 +135,16 @@ export const useRootStore = defineStore("root", {
         .then(() => this.updateTags()) // TODO: not required with websocket?
         .catch(handleAxiosDefaultError);
     },
+    async changeTagDefinition(name: string, definition: string) {
+      return APIClient.changeTagDefinition(name, definition)
+        .then(() => this.updateTags()) // TODO: not required with websocket?
+        .catch(handleAxiosDefaultError);
+    },
+    async changeTagName(name: string, newName: string) {
+      return APIClient.changeTagName(name, newName)
+        .then(() => this.updateTags()) // TODO: not required with websocket?
+        .catch(handleAxiosDefaultError);
+    },
     async setTagConverters(name: string, converters: string[]) {
       return APIClient.converterTagSet(name, converters)
         .then(() => this.updateTags()) // TODO: not required with websocket?
