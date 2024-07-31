@@ -60,7 +60,7 @@
     </ToolBar>
     <v-data-table
       :headers="headers"
-      :items="store.pcapOverIPEndpoints"
+      :items="store.pcapOverIPEndpoints || []"
       item-key="address"
       dense
       disable-pagination
