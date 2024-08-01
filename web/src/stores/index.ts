@@ -6,6 +6,7 @@ import { setupWebsocket } from "./websocket";
 import APIClient, {
   ConverterStatistics,
   PcapInfo,
+  PcapOverIPEndpoint,
   Statistics,
   TagInfo,
 } from "@/apiClient";
@@ -15,6 +16,7 @@ interface State {
   pcaps: PcapInfo[] | null;
   tags: TagInfo[] | null;
   converters: ConverterStatistics[] | null;
+  pcapOverIPEndpoints: PcapOverIPEndpoint[] | null;
 }
 
 export const useRootStore = defineStore("root", {
@@ -25,6 +27,7 @@ export const useRootStore = defineStore("root", {
       pcaps: null,
       tags: null,
       converters: null,
+      pcapOverIPEndpoints: null,
     };
   },
   getters: {
@@ -81,6 +84,25 @@ export const useRootStore = defineStore("root", {
     async updateTags() {
       return APIClient.getTags()
         .then((data) => (this.tags = data))
+        .catch(handleAxiosDefaultError);
+    },
+    async updatePcapOverIPEndpoints() {
+      return APIClient.getPcapOverIPEndpoints()
+        .then((data) => (this.pcapOverIPEndpoints = data))
+        .catch(handleAxiosDefaultError);
+    },
+    async addPcapOverIPEndpoint(address: string) {
+      return APIClient.addPcapOverIPEndpoint(address)
+        .then(() => this.updatePcapOverIPEndpoints())
+        .catch(handleAxiosDefaultError);
+    },
+    async delPcapOverIPEndpoint(address: string) {
+      return APIClient.delPcapOverIPEndpoint(address)
+        .then(() => {
+          this.updatePcapOverIPEndpoints().catch((err) => {
+            throw err;
+          });
+        })
         .catch(handleAxiosDefaultError);
     },
     async updateConverters() {

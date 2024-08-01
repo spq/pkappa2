@@ -15,6 +15,7 @@ declare module 'vue' {
     Graph: typeof import('./src/components/Graph.vue')['default']
     Home: typeof import('./src/components/Home.vue')['default']
     Navigation: typeof import('./src/components/Navigation.vue')['default']
+    PcapOverIP: typeof import('./src/components/PcapOverIP.vue')['default']
     Pcaps: typeof import('./src/components/Pcaps.vue')['default']
     Results: typeof import('./src/components/Results.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

@@ -2,12 +2,23 @@
   <div>
     <v-data-table
       :headers="headers"
-      :items="pcapsPretty"
-      :loading="pcaps === null"
-      disable-pagination
-      hide-default-footer
+      :items="store.pcaps || []"
+      :loading="store.pcaps === null"
+      :footer-props="{
+        itemsPerPageOptions: [20, 50, 100, -1],
+        showFirstLastPage: true,
+      }"
       dense
     >
+      <template #[`item.download`]="{ item }"
+        ><v-btn
+          :href="`/api/download/pcap/${item.Filename}`"
+          icon
+          @click.native.stop
+        >
+          <v-icon>mdi-download</v-icon>
+        </v-btn></template
+      >
       <template
         v-for="field of [
           'ParseTime',
@@ -15,9 +26,11 @@
           'PacketTimestampMax',
         ]"
         #[`item.${field}`]="{ index, value }"
-        ><span :key="`${field}/${index}`" :title="formatDateLong(value)">{{
-          formatDate(value)
-        }}</span></template
+        ><span
+          :key="`${field}/${index}`"
+          :title="formatDateLong(new Date(value))"
+          >{{ formatDate(new Date(value)) }}</span
+        ></template
       >
       <template #[`item.Filesize`]="{ value }"
         ><span :title="`${value} Bytes`">{{
@@ -29,10 +42,9 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted } from "vue";
+import { onMounted } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
-import { PcapInfo } from "@/apiClient";
 import { formatDate, formatDateLong } from "@/filters";
 
 const store = useRootStore();
@@ -60,19 +72,18 @@ const headers = [
   {
     text: "Parse Time",
     value: "ParseTime",
+    align: "end",
+    class: "pr-0",
+    cellClass: "pr-0",
+  },
+  {
+    text: "",
+    value: "download",
+    sortable: false,
+    class: ["px-0", "w0"],
+    cellClass: ["px-0", "w0"],
   },
 ];
-const pcaps = computed(() => store.pcaps);
-const pcapsPretty = computed(() => {
-  if (pcaps.value == null) return [];
-  return pcaps.value.map((i) => {
-    const res: { [key: string]: string | number | Date } = { ...i };
-    for (const k of ["ParseTime", "PacketTimestampMin", "PacketTimestampMax"]) {
-      res[k] = new Date(res[k]);
-    }
-    return res as PcapInfo;
-  });
-});
 
 onMounted(() => {
   store.updatePcaps().catch((err: string) => {
@@ -80,3 +91,9 @@ onMounted(() => {
   });
 });
 </script>
+
+<style scoped>
+.w0 {
+  width: 0;
+}
+</style>
