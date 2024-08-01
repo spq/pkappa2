@@ -20,7 +20,7 @@ import (
 
 type (
 	ConverterAccess interface {
-		Data(stream *Stream, moreDetails bool) (data []Data, clientBytes, serverBytes uint64, err error)
+		Data(stream *Stream, moreDetails bool) (data []Data, clientBytes, serverBytes uint64, wasCached bool, err error)
 		DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, bool, error)
 	}
 	subQuerySelection struct {

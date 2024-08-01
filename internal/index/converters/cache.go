@@ -71,27 +71,27 @@ func (cache *CachedConverter) Contains(streamID uint64) bool {
 	return cache.cacheFile.Contains(streamID)
 }
 
-func (cache *CachedConverter) Data(stream *index.Stream, moreDetails bool) (data []index.Data, clientBytes, serverBytes uint64, err error) {
+func (cache *CachedConverter) Data(stream *index.Stream, moreDetails bool) (data []index.Data, clientBytes, serverBytes uint64, wasCached bool, err error) {
 	// See if the stream data is cached already.
 	data, clientBytes, serverBytes, err = cache.cacheFile.Data(stream.ID())
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, true, err
 	}
 	if data != nil {
-		return data, clientBytes, serverBytes, nil
+		return data, clientBytes, serverBytes, true, nil
 	}
 
 	// Convert the stream if it's not in the cache.
 	convertedPackets, clientBytes, serverBytes, err := cache.converter.Data(stream, moreDetails)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, false, err
 	}
 
 	// Save it to the cache.
 	if err := cache.cacheFile.SetData(stream.ID(), convertedPackets); err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, false, err
 	}
-	return convertedPackets, clientBytes, serverBytes, nil
+	return convertedPackets, clientBytes, serverBytes, false, nil
 }
 
 func (cache *CachedConverter) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uint64, uint64, bool, error) {

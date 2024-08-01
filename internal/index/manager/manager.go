@@ -1421,7 +1421,7 @@ func (mgr *Manager) convertStreamJob(allConverters []*converters.CachedConverter
 					if stream == nil {
 						continue
 					}
-					_, _, _, err = converter.Data(stream, false)
+					_, _, _, _, err = converter.Data(stream, false)
 					results <- result{job, err}
 					return
 				}
@@ -2368,9 +2368,9 @@ func (c StreamContext) Data(converterName string) ([]index.Data, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid converter %q", converterName)
 	}
-	data, _, _, err := converter.Data(c.Stream(), true)
-	// TODO: only send event if the data wasn't cached before
-	if err == nil {
+	data, _, _, wasCached, err := converter.Data(c.Stream(), true)
+	// only send event if the data wasn't cached before
+	if err == nil && !wasCached {
 		c.v.mgr.jobs <- func() {
 			converter, ok := c.v.mgr.converters[converterName]
 			if ok {
