@@ -14,7 +14,7 @@
       <v-card-title>Status</v-card-title>
       <v-simple-table>
         <tbody>
-          <tr v-for="(value, name) in status" :key="name">
+          <tr v-for="(value, name) in (store.status || [])" :key="name">
             <th>{{ name }}</th>
             <td width="100%">{{ value }}</td>
           </tr>
@@ -26,12 +26,11 @@
 
 <script lang="ts" setup>
 import ToolBar from "./ToolBar.vue";
-import { computed, onMounted } from "vue";
+import { onMounted } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 
 const store = useRootStore();
-const status = computed(() => store.status);
 
 onMounted(() => {
   updateStatus();

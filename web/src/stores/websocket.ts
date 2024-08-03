@@ -45,9 +45,12 @@ export type ConverterEvent = {
 
 export type PcapStats = {
   PcapCount: number;
-  ImportJobCount: number;
-  StreamCount: number;
   PacketCount: number;
+  ImportJobCount: number;
+  IndexCount: number;
+  StreamCount: number;
+  StreamRecordCount: number;
+  PacketRecordCount: number;
 };
 
 /** @see {isPcapProcessedEvent} ts-auto-guard:type-guard */
@@ -181,9 +184,12 @@ export function setupWebsocket() {
           streamsStore.outdated = true;
           if (store.status != null) {
             store.status.PcapCount = e.PcapStats.PcapCount;
-            store.status.ImportJobCount = e.PcapStats.ImportJobCount;
-            store.status.StreamCount = e.PcapStats.StreamCount;
             store.status.PacketCount = e.PcapStats.PacketCount;
+            store.status.ImportJobCount = e.PcapStats.ImportJobCount;
+            store.status.IndexCount = e.PcapStats.IndexCount;
+            store.status.StreamCount = e.PcapStats.StreamCount;
+            store.status.StreamRecordCount = e.PcapStats.StreamRecordCount;
+            store.status.PacketRecordCount = e.PcapStats.PacketRecordCount;
           }
           break;
         default:

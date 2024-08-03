@@ -23,6 +23,7 @@ type (
 	Builder struct {
 		snapshots        []*snapshot
 		knownPcaps       []*pcapmetadata.PcapInfo
+		packetCount      uint
 		indexDir         string
 		snapshotDir      string
 		snapshotFilename string
@@ -61,6 +62,7 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 			}
 		}
 		b.knownPcaps = append(b.knownPcaps, info)
+		b.packetCount += info.PacketCount
 	}
 	// load the snapshot file with the most packets covered
 	snapshotFiles, err := os.ReadDir(snapshotDir)
@@ -541,6 +543,9 @@ outer:
 	}
 
 	b.knownPcaps = append(b.knownPcaps, newPcapInfos...)
+	for _, pi := range newPcapInfos {
+		b.packetCount += pi.PacketCount
+	}
 	b.snapshots = newSnapshots
 
 	outputFiles := []string{}
@@ -549,6 +554,10 @@ outer:
 	}
 	log.Printf("Built indexes %q from pcaps %q\n", outputFiles, pcapFilenames)
 	return nProcessedPcaps, indexes, nil
+}
+
+func (b *Builder) PacketCount() uint {
+	return b.packetCount
 }
 
 func (b *Builder) KnownPcaps() []*pcapmetadata.PcapInfo {
