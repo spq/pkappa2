@@ -14,7 +14,7 @@
       <v-card-title>Status</v-card-title>
       <v-simple-table>
         <tbody>
-          <tr v-for="(value, name) in (store.status || [])" :key="name">
+          <tr v-for="(value, name) in store.status || []" :key="name">
             <th>{{ name }}</th>
             <td width="100%">{{ value }}</td>
           </tr>
