@@ -424,97 +424,106 @@ func (dcc *dataConditionsContainer) finalize(r *Reader, queryPartIndex int, prev
 		})
 	}
 
-	//add filter for scanning the data section
-	br := seekbufio.NewSeekableBufferReader(r.sectionReader(sectionData))
-	buffers := [2][]byte{}
-	convertersToSearch := []string(nil)
-	if converterName == "" {
-		convertersToSearch = append(convertersToSearch, "none")
-		for c := range converters {
-			convertersToSearch = append(convertersToSearch, c)
-		}
-	} else {
-		convertersToSearch = []string{converterName}
+	dataSources := []func(s *stream) ([][2]int, [2][]byte, error)(nil)
+	if converterName == "" || converterName == "none" {
+		br := seekbufio.NewSeekableBufferReader(r.sectionReader(sectionData))
+		buffers := [2][]byte{nil, nil}
+		bufferLengths := [][2]int{{}}
+		dataSources = append(dataSources, func(s *stream) ([][2]int, [2][]byte, error) {
+			streamLength := [2]int{}
+			streamLength[C2S] = int(s.ClientBytes)
+			streamLength[S2C] = int(s.ServerBytes)
+
+			// read the data
+			if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
+				return nil, [2][]byte{}, err
+			}
+			for dir := range [2]int{C2S, S2C} {
+				l := streamLength[dir]
+				if cap(buffers[dir]) < l {
+					buffers[dir] = make([]byte, l)
+				} else {
+					buffers[dir] = buffers[dir][:l]
+				}
+				if err := binary.Read(br, binary.LittleEndian, buffers[dir]); err != nil {
+					return nil, [2][]byte{}, err
+				}
+			}
+			// read the direction chunk sizes
+			bufferLengths = bufferLengths[:1]
+			for dir := C2S; ; dir ^= C2S ^ S2C {
+				last := bufferLengths[len(bufferLengths)-1]
+				if last[C2S] == streamLength[C2S] && last[S2C] == streamLength[S2C] {
+					break
+				}
+				sz := uint64(0)
+				for {
+					b := byte(0)
+					if err := binary.Read(br, binary.LittleEndian, &b); err != nil {
+						return nil, [2][]byte{}, err
+					}
+					sz <<= 7
+					sz |= uint64(b & 0x7f)
+					if b < 128 {
+						break
+					}
+				}
+				if sz == 0 {
+					continue
+				}
+				new := [2]int{
+					last[0],
+					last[1],
+				}
+				new[dir] += int(sz)
+				bufferLengths = append(bufferLengths, new)
+			}
+			return bufferLengths, buffers, nil
+		})
 	}
-	return append(filters, func(sc *searchContext, s *stream) (bool, error) {
-		for _, converterName := range convertersToSearch {
+	if converterName != "none" {
+		for c := range converters {
+			if converterName != "" && converterName != c {
+				continue
+			}
+			dataSources = append(dataSources, func(s *stream) ([][2]int, [2][]byte, error) {
+				converter := converters[converterName]
+				// TODO: pass `buffers` through to DataForSearch to avoid re-allocating?
+				data, dataSizes, _, _, wasCached, err := converter.DataForSearch(s.StreamID)
+				if err != nil {
+					return nil, [2][]byte{}, fmt.Errorf("data for search %w", err)
+				}
+				if !wasCached {
+					return nil, [2][]byte{}, nil
+				}
+				return dataSizes, data, nil
+			})
+		}
+	}
+
+	return append(filters, makeDataConditionFilter(dataSources, possibleSubQueries, dcc.conditions, dcc.regexes)), nil
+}
+
+func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte, error), possibleSubQueries map[string]subQueryVariableData, conditions []*query.DataCondition, regexes []regex) func(sc *searchContext, s *stream) (bool, error) {
+	//add filter for scanning the data section
+	return func(sc *searchContext, s *stream) (bool, error) {
+		for _, dataSource := range dataSources {
 			ok, err := func() (bool, error) {
-				progressGroups := make([]progressGroup, len(dcc.conditions))
+				progressGroups := make([]progressGroup, len(conditions))
 				for i := range progressGroups {
 					progressGroups[i].variants = make([]progressVariant, 1)
 				}
 
-				streamLength := [2]int{}
-				bufferLengths := [][2]int{{}}
-
-				if converterName == "none" {
-					streamLength[C2S] = int(s.ClientBytes)
-					streamLength[S2C] = int(s.ServerBytes)
-
-					// read the data
-					if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
-						return false, err
-					}
-					for dir := range [2]int{C2S, S2C} {
-						l := streamLength[dir]
-						if cap(buffers[dir]) < l {
-							buffers[dir] = make([]byte, l)
-						} else {
-							buffers[dir] = buffers[dir][:l]
-						}
-						if err := binary.Read(br, binary.LittleEndian, buffers[dir]); err != nil {
-							return false, err
-						}
-					}
-					// read the direction chunk sizes
-					for dir := C2S; ; dir ^= C2S ^ S2C {
-						last := bufferLengths[len(bufferLengths)-1]
-						if last[C2S] == streamLength[C2S] && last[S2C] == streamLength[S2C] {
-							break
-						}
-						sz := uint64(0)
-						for {
-							b := byte(0)
-							if err := binary.Read(br, binary.LittleEndian, &b); err != nil {
-								return false, err
-							}
-							sz <<= 7
-							sz |= uint64(b & 0x7f)
-							if b < 128 {
-								break
-							}
-						}
-						if sz == 0 {
-							continue
-						}
-						new := [2]int{
-							last[0],
-							last[1],
-						}
-						new[dir] += int(sz)
-						bufferLengths = append(bufferLengths, new)
-					}
-				} else {
-					converter := converters[converterName]
-					// TODO: pass `buffers` through to DataForSearch to avoid re-allocating?
-					data, dataSizes, clientBytes, serverBytes, wasCached, err := converter.DataForSearch(s.StreamID)
-					if err != nil {
-						return false, fmt.Errorf("data for search %w", err)
-					}
-					if !wasCached {
-						return false, nil
-					}
-					streamLength[C2S] = int(clientBytes)
-					streamLength[S2C] = int(serverBytes)
-					buffers = data
-					bufferLengths = dataSizes
+				bufferLengths, buffers, err := dataSource(s)
+				if err != nil || bufferLengths == nil {
+					return false, err
 				}
 				for {
 					recheckRegexes := false
-					for rIdx := range dcc.regexes {
-						r := &dcc.regexes[rIdx]
+					for rIdx := range regexes {
+						r := &regexes[rIdx]
 						for _, o := range r.occurence {
-							e := dcc.conditions[o.condition].Elements[o.element]
+							e := conditions[o.condition].Elements[o.element]
 							dir := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
 
 							ps := &progressGroups[o.condition]
@@ -742,7 +751,7 @@ func (dcc *dataConditionsContainer) finalize(r *Reader, queryPartIndex int, prev
 									continue
 								}
 								p.nSuccessful++
-								d := dcc.conditions[o.condition]
+								d := conditions[o.condition]
 								if p.nSuccessful != len(d.Elements) {
 									// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
 									recheckRegexes = true
@@ -788,7 +797,7 @@ func (dcc *dataConditionsContainer) finalize(r *Reader, queryPartIndex int, prev
 				}
 
 				// check if any of the regexe's failed and collect variable contents
-				for cIdx, d := range dcc.conditions {
+				for cIdx, d := range conditions {
 					pg := &progressGroups[cIdx]
 					for pIdx := range pg.variants {
 						p := &pg.variants[pIdx]
@@ -842,5 +851,5 @@ func (dcc *dataConditionsContainer) finalize(r *Reader, queryPartIndex int, prev
 			}
 		}
 		return false, nil
-	}), nil
+	}
 }
