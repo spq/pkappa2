@@ -723,149 +723,141 @@ func (ps *progressGroup) prepare(r *regex, pIdx int, e *query.DataConditionEleme
 }
 
 func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte, error), possibleSubQueries map[string]subQueryVariableData, conditions []*query.DataCondition, regexes []regex) func(sc *searchContext, s *stream) (bool, error) {
+	progressGroups := make([]progressGroup, len(conditions))
 	//add filter for scanning the data section
 	return func(sc *searchContext, s *stream) (bool, error) {
 		for _, dataSource := range dataSources {
-			ok, err := func() (bool, error) {
-				bufferLengths, buffers, err := dataSource(s)
-				if err != nil || bufferLengths == nil {
-					return false, err
-				}
-
-				progressGroups := make([]progressGroup, len(conditions))
-				for i := range progressGroups {
-					progressGroups[i].variants = make([]progressVariant, 1)
-				}
-
-				for {
-					recheckRegexes := false
-					for rIdx := range regexes {
-						r := &regexes[rIdx]
-						for _, o := range r.occurence {
-							e := &conditions[o.condition].Elements[o.element]
-							dir := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
-
-							ps := &progressGroups[o.condition]
-							for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
-								if p := &ps.variants[pIdx]; o.element != p.nSuccessful {
-									continue
-								}
-
-								p, err := ps.prepare(r, pIdx, e, possibleSubQueries)
-								if err != nil {
-									return false, err
-								}
-
-								res := p.find(buffers, dir)
-								if res == nil {
-									continue
-								}
-								if p.flags&progressVariantFlagState == progressVariantFlagStatePrecondition {
-									recheckRegexes = true
-									p.flags += progressVariantFlagStatePreconditionMatched - progressVariantFlagStatePrecondition
-									p.regex = nil
-									continue
-								}
-								p.nSuccessful++
-								d := conditions[o.condition]
-								if p.nSuccessful != len(d.Elements) {
-									// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
-									recheckRegexes = true
-								} else if d.Inverted {
-									return false, nil
-								}
-								if len(res) > 2 {
-									variableNames := p.regex.SubexpNames()
-									for i := 2; i < len(res); i += 2 {
-										varName := variableNames[i/2]
-										if varName == "" {
-											continue
-										}
-										if _, ok := p.variables[varName]; ok {
-											return false, fmt.Errorf("variable %q already seen", varName)
-										}
-										if p.variables == nil {
-											p.variables = make(map[string]string)
-										}
-										p.variables[varName] = string(buffers[dir][p.streamOffset[dir]:][res[i]:res[i+1]])
-									}
-								}
-								p.regex = nil
-								p.flags = 0
-
-								if res[1] != 0 {
-									// update stream offsets: a follow up regex for the same direction
-									// may consume the byte following the match, a regex for the other
-									// direction may start reading from the next received packet,
-									// so everything read before is out-of reach.
-									p.streamOffset[dir] += res[1]
-									for i := len(bufferLengths) - 1; ; i-- {
-										if bufferLengths[i-1][dir] < p.streamOffset[dir] {
-											p.streamOffset[(C2S^S2C)-dir] = bufferLengths[i][(C2S^S2C)-dir]
-											break
-										}
-									}
-								}
-							}
-						}
-					}
-					if !recheckRegexes {
-						break
-					}
-				}
-
-				// check if any of the regexe's failed and collect variable contents
-				for cIdx, d := range conditions {
-					pg := &progressGroups[cIdx]
-					for pIdx := range pg.variants {
-						p := &pg.variants[pIdx]
-						nUnsuccessful := len(d.Elements) - p.nSuccessful
-						if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
-							if len(p.variant) == 0 {
-								return false, nil
-							}
-							sqs := []string(nil)
-							forbidden := []*bitmask.ConnectedBitmask(nil)
-							for sq, v := range p.variant {
-								sqs = append(sqs, sq)
-								badSQR := &possibleSubQueries[sq].variableData[v].results
-								forbidden = append(forbidden, badSQR)
-							}
-							sc.allowedSubQueries.remove(sqs, forbidden)
-							if sc.allowedSubQueries.empty() {
-								return false, nil
-							}
-							continue
-						}
-						if p.variables == nil {
-							continue
-						}
-						if sc.outputVariables == nil {
-							sc.outputVariables = make(map[string][]string)
-						}
-					outer:
-						for n, v := range p.variables {
-							values := sc.outputVariables[n]
-							for _, on := range values {
-								if n == on {
-									continue outer
-								}
-							}
-							sc.outputVariables[n] = append(values, v)
-						}
-					}
-				}
-				return true, nil
-			}()
-			// if it's a match on one of the converter outputs, there's no need to check the
-			// other outputs.
-			if ok {
-				return true, nil
-			}
-			// if there's an error on any converter's output, always return it.
+			bufferLengths, buffers, err := dataSource(s)
 			if err != nil {
 				return false, err
 			}
+			if bufferLengths == nil {
+				continue
+			}
+			for i := range progressGroups {
+				progressGroups[i].variants = append(progressGroups[i].variants[:0], progressVariant{})
+			}
+			for recheckRegexes := true; recheckRegexes; {
+				recheckRegexes = false
+				for rIdx := range regexes {
+					r := &regexes[rIdx]
+					for _, o := range r.occurence {
+						e := &conditions[o.condition].Elements[o.element]
+						dir := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
+
+						ps := &progressGroups[o.condition]
+						for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
+							if p := &ps.variants[pIdx]; o.element != p.nSuccessful {
+								continue
+							}
+
+							p, err := ps.prepare(r, pIdx, e, possibleSubQueries)
+							if err != nil {
+								return false, err
+							}
+
+							res := p.find(buffers, dir)
+							if res == nil {
+								continue
+							}
+							variableNames := p.regex.SubexpNames()
+							p.regex = nil
+							if p.flags&progressVariantFlagState == progressVariantFlagStatePrecondition {
+								recheckRegexes = true
+								p.flags += progressVariantFlagStatePreconditionMatched - progressVariantFlagStatePrecondition
+								continue
+							}
+							p.flags = 0
+							p.nSuccessful++
+							d := conditions[o.condition]
+							if p.nSuccessful != len(d.Elements) {
+								// remember that we advanced a sequence that has a follow up and we have to re-check the regexes
+								recheckRegexes = true
+							} else if d.Inverted {
+								// the condition matched but was inverted, so it failed
+								if len(dataSources) == 1 {
+									// if we don't have other data sources, we can stop here
+									return false, nil
+								}
+								continue
+							}
+							for i := 2; i < len(res); i += 2 {
+								varName := variableNames[i/2]
+								if varName == "" {
+									continue
+								}
+								if _, ok := p.variables[varName]; ok {
+									return false, fmt.Errorf("variable %q already seen", varName)
+								}
+								if p.variables == nil {
+									p.variables = make(map[string]string)
+								}
+								p.variables[varName] = string(buffers[dir][p.streamOffset[dir]:][res[i]:res[i+1]])
+							}
+
+							if res[1] != 0 {
+								// update stream offsets: a follow up regex for the same direction
+								// may consume the byte following the match, a regex for the other
+								// direction may start reading from the next received packet,
+								// so everything read before is out-of reach.
+								p.streamOffset[dir] += res[1]
+								for i := len(bufferLengths) - 1; ; i-- {
+									if bufferLengths[i-1][dir] < p.streamOffset[dir] {
+										p.streamOffset[(C2S^S2C)-dir] = bufferLengths[i][(C2S^S2C)-dir]
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// check if any of the regexe's failed and collect variable contents
+			for cIdx, d := range conditions {
+				pg := &progressGroups[cIdx]
+				for pIdx := range pg.variants {
+					p := &pg.variants[pIdx]
+					nUnsuccessful := len(d.Elements) - p.nSuccessful
+					if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
+						if len(dataSources) == 1 {
+							// if we don't have other data sources, we can stop here
+							if len(p.variant) != 0 {
+								sqs := []string(nil)
+								forbidden := []*bitmask.ConnectedBitmask(nil)
+								for sq, v := range p.variant {
+									sqs = append(sqs, sq)
+									badSQR := &possibleSubQueries[sq].variableData[v].results
+									forbidden = append(forbidden, badSQR)
+								}
+								sc.allowedSubQueries.remove(sqs, forbidden)
+								if !sc.allowedSubQueries.empty() {
+									continue
+								}
+							}
+							return false, nil
+						}
+						continue
+					}
+					if p.variables == nil {
+						continue
+					}
+					if sc.outputVariables == nil {
+						sc.outputVariables = make(map[string][]string)
+					}
+				outer:
+					for n, v := range p.variables {
+						values := sc.outputVariables[n]
+						for _, ov := range values {
+							if v == ov {
+								continue outer
+							}
+						}
+						sc.outputVariables[n] = append(values, v)
+					}
+				}
+			}
+			return true, nil
 		}
 		return false, nil
 	}
