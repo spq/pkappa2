@@ -11,8 +11,16 @@ services:
     restart: unless-stopped
     environment:
       # Change values in .env file
-      PKAPPA2_USER_PASSWORD: ${PKAPPA2_USER_PASSWORD}
-      PKAPPA2_PCAP_PASSWORD: ${PKAPPA2_PCAP_PASSWORD}
+      - PKAPPA2_USER_PASSWORD
+      - PKAPPA2_PCAP_PASSWORD
+      - PKAPPA2_BASE_DIR
+      - PKAPPA2_PCAP_DIR
+      - PKAPPA2_INDEX_DIR
+      - PKAPPA2_SNAPSHOT_DIR
+      - PKAPPA2_STATE_DIR
+      - PKAPPA2_CONVERTER_DIR
+      - PKAPPA2_TCP_CHECK_OPTIONS
+      - PKAPPA2_TCP_CHECK_STATE
 
 volumes:
   pkappa2-data:

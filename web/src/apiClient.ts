@@ -3,6 +3,7 @@ import type { Base64, DateTimeString } from "@/types/common";
 import {
   isConvertersResponse,
   isGraphResponse,
+  isPcapOverIPResponse,
   isPcapsResponse,
   isProcessStderr,
   isSearchResponse,
@@ -113,6 +114,16 @@ export type ProcessStderr = {
   Stderr: string[];
 };
 
+export type PcapOverIPEndpoint = {
+  Address: string;
+  LastConnected: number;
+  LastDisconnected: number;
+  ReceivedPackets: number;
+};
+
+/** @see {isPcapOverIPResponse} ts-auto-guard:type-guard */
+export type PcapOverIPResponse = PcapOverIPEndpoint[];
+
 export type TagInfo = {
   Name: string;
   Definition: string;
@@ -169,6 +180,15 @@ const APIClient = {
   async getPcaps() {
     return this.performGuarded("get", `/pcaps.json`, isPcapsResponse);
   },
+  async getPcapOverIPEndpoints() {
+    return this.performGuarded("get", `/pcap-over-ip`, isPcapOverIPResponse);
+  },
+  async addPcapOverIPEndpoint(address: string) {
+    return this.perform("put", `/pcap-over-ip`, null, { address });
+  },
+  async delPcapOverIPEndpoint(address: string) {
+    return this.perform("delete", `/pcap-over-ip`, null, { address });
+  },
   async getConverters() {
     return this.performGuarded("get", `/converters`, isConvertersResponse);
   },
@@ -196,6 +216,20 @@ const APIClient = {
     params.append("name", name);
     params.append("method", "change_color");
     params.append("color", color);
+    return this.perform("patch", `/tags`, null, params);
+  },
+  async changeTagDefinition(name: string, definition: string) {
+    const params = new URLSearchParams();
+    params.append("name", name);
+    params.append("method", "change_query");
+    params.append("query", definition);
+    return this.perform("patch", `/tags`, null, params);
+  },
+  async changeTagName(name: string, newName: string) {
+    const params = new URLSearchParams();
+    params.append("name", name);
+    params.append("method", "change_name");
+    params.append("new_name", newName);
     return this.perform("patch", `/tags`, null, params);
   },
   async getGraph(

@@ -179,7 +179,7 @@ func main() {
 			}
 			return
 		}
-		mgr.ImportPcap(filename)
+		mgr.ImportPcaps([]string{filename})
 		http.Error(w, "OK", http.StatusOK)
 	})
 	rUser.Mount("/debug", middleware.Profiler())
@@ -277,6 +277,20 @@ func main() {
 				return
 			}
 			operation = manager.UpdateTagOperationUpdateColor(c[0])
+		case "change_query":
+			c := r.URL.Query()["query"]
+			if len(c) != 1 {
+				http.Error(w, "`query` parameter missing", http.StatusBadRequest)
+				return
+			}
+			operation = manager.UpdateTagOperationUpdateQuery(c[0])
+		case "change_name":
+			c := r.URL.Query()["new_name"]
+			if len(c) != 1 || c[0] == "" {
+				http.Error(w, "`new_name` parameter missing or empty", http.StatusBadRequest)
+				return
+			}
+			operation = manager.UpdateTagOperationUpdateName(c[0])
 		case "converter_set":
 			c := r.URL.Query()["converters"]
 			operation = manager.UpdateTagOperationSetConverter(c)
@@ -320,6 +334,15 @@ func main() {
 		if err := mgr.ResetConverter(name); err != nil {
 			http.Error(w, fmt.Sprintf("reset failed: %v", err), http.StatusBadRequest)
 		}
+	})
+	rUser.Get(`/api/download/pcap/{file:[^/\\]+[.]pcap}`, func(w http.ResponseWriter, r *http.Request) {
+		filename := chi.URLParam(r, "file")
+		if filename != filepath.Base(filename) {
+			http.Error(w, "Invalid filename", http.StatusBadRequest)
+			return
+		}
+		fullFilename := filepath.Join(*baseDir, *pcapDir, filename)
+		http.ServeFile(w, r, fullFilename)
 	})
 	rUser.Get(`/api/download/{stream:\d+}.pcap`, func(w http.ResponseWriter, r *http.Request) {
 		streamIDStr := chi.URLParam(r, "stream")
@@ -831,7 +854,6 @@ func main() {
 			return
 		}
 	})
-	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
 	rUser.Get("/api/webhooks", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -857,6 +879,35 @@ func main() {
 			return
 		}
 		if err := mgr.AddPcapProcessorWebhook(u[0]); err != nil {
+			http.Error(w, fmt.Sprintf("add failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	})
+	rUser.Get("/api/pcap-over-ip", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(mgr.ListPcapOverIPEndpoints()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
+	rUser.Delete("/api/pcap-over-ip", func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query()["address"]
+		if len(u) != 1 || u[0] == "" {
+			http.Error(w, "`address` parameter missing", http.StatusBadRequest)
+			return
+		}
+		if err := mgr.DelPcapOverIPEndpoint(u[0]); err != nil {
+			http.Error(w, fmt.Sprintf("delete failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	})
+	rUser.Put("/api/pcap-over-ip", func(w http.ResponseWriter, r *http.Request) {
+		a := r.URL.Query()["address"]
+		if len(a) != 1 || a[0] == "" {
+			http.Error(w, "`address` parameter missing or empty", http.StatusBadRequest)
+			return
+		}
+		if err := mgr.AddPcapOverIPEndpoint(a[0]); err != nil {
 			http.Error(w, fmt.Sprintf("add failed: %v", err), http.StatusBadRequest)
 			return
 		}
@@ -931,6 +982,7 @@ func main() {
 		}
 		log.Printf("WebSocket Client %q disconnected", c.RemoteAddr().String())
 	})
+	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
 
 	server := &http.Server{
 		Addr:    *listenAddress,

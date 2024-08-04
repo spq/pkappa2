@@ -6,6 +6,7 @@ import { setupWebsocket } from "./websocket";
 import APIClient, {
   ConverterStatistics,
   PcapInfo,
+  PcapOverIPEndpoint,
   Statistics,
   TagInfo,
 } from "@/apiClient";
@@ -15,6 +16,7 @@ interface State {
   pcaps: PcapInfo[] | null;
   tags: TagInfo[] | null;
   converters: ConverterStatistics[] | null;
+  pcapOverIPEndpoints: PcapOverIPEndpoint[] | null;
 }
 
 export const useRootStore = defineStore("root", {
@@ -25,6 +27,7 @@ export const useRootStore = defineStore("root", {
       pcaps: null,
       tags: null,
       converters: null,
+      pcapOverIPEndpoints: null,
     };
   },
   getters: {
@@ -83,6 +86,25 @@ export const useRootStore = defineStore("root", {
         .then((data) => (this.tags = data))
         .catch(handleAxiosDefaultError);
     },
+    async updatePcapOverIPEndpoints() {
+      return APIClient.getPcapOverIPEndpoints()
+        .then((data) => (this.pcapOverIPEndpoints = data))
+        .catch(handleAxiosDefaultError);
+    },
+    async addPcapOverIPEndpoint(address: string) {
+      return APIClient.addPcapOverIPEndpoint(address)
+        .then(() => this.updatePcapOverIPEndpoints())
+        .catch(handleAxiosDefaultError);
+    },
+    async delPcapOverIPEndpoint(address: string) {
+      return APIClient.delPcapOverIPEndpoint(address)
+        .then(() => {
+          this.updatePcapOverIPEndpoints().catch((err) => {
+            throw err;
+          });
+        })
+        .catch(handleAxiosDefaultError);
+    },
     async updateConverters() {
       return APIClient.getConverters()
         .then((data) => (this.converters = data))
@@ -110,6 +132,16 @@ export const useRootStore = defineStore("root", {
     },
     async changeTagColor(name: string, color: string) {
       return APIClient.changeTagColor(name, color)
+        .then(() => this.updateTags()) // TODO: not required with websocket?
+        .catch(handleAxiosDefaultError);
+    },
+    async changeTagDefinition(name: string, definition: string) {
+      return APIClient.changeTagDefinition(name, definition)
+        .then(() => this.updateTags()) // TODO: not required with websocket?
+        .catch(handleAxiosDefaultError);
+    },
+    async changeTagName(name: string, newName: string) {
+      return APIClient.changeTagName(name, newName)
         .then(() => this.updateTags()) // TODO: not required with websocket?
         .catch(handleAxiosDefaultError);
     },
