@@ -594,6 +594,7 @@ func (ps *progressGroup) prepare(r *regex, pIdx int, e *query.DataConditionEleme
 			} else {
 				p.flags = progressVariantFlagStateExact
 			}
+			return p, nil
 		}
 	case progressVariantFlagStateExact:
 		panic("why am i here?")
@@ -637,11 +638,11 @@ func (ps *progressGroup) prepare(r *regex, pIdx int, e *query.DataConditionEleme
 			}
 		}
 		p = &ps.variants[pIdx]
+		if p.regex != nil {
+			return p, nil
+		}
 	}
 
-	if p.regex != nil {
-		return p, nil
-	}
 	expr := e.Regex
 	p.flags = progressVariantFlagStateExact
 	for i := len(e.Variables) - 1; i >= 0; i-- {
@@ -759,10 +760,10 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 								if res == nil {
 									continue
 								}
-								p.regex = nil
 								if p.flags&progressVariantFlagState == progressVariantFlagStatePrecondition {
 									recheckRegexes = true
 									p.flags += progressVariantFlagStatePreconditionMatched - progressVariantFlagStatePrecondition
+									p.regex = nil
 									continue
 								}
 								p.nSuccessful++
@@ -773,21 +774,24 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 								} else if d.Inverted {
 									return false, nil
 								}
-								variableNames := p.regex.SubexpNames()
-								p.flags = 0
-								for i := 2; i < len(res); i += 2 {
-									varName := variableNames[i/2]
-									if varName == "" {
-										continue
+								if len(res) > 2 {
+									variableNames := p.regex.SubexpNames()
+									for i := 2; i < len(res); i += 2 {
+										varName := variableNames[i/2]
+										if varName == "" {
+											continue
+										}
+										if _, ok := p.variables[varName]; ok {
+											return false, fmt.Errorf("variable %q already seen", varName)
+										}
+										if p.variables == nil {
+											p.variables = make(map[string]string)
+										}
+										p.variables[varName] = string(buffers[dir][p.streamOffset[dir]:][res[i]:res[i+1]])
 									}
-									if _, ok := p.variables[varName]; ok {
-										return false, fmt.Errorf("variable %q already seen", varName)
-									}
-									if p.variables == nil {
-										p.variables = make(map[string]string)
-									}
-									p.variables[varName] = string(buffers[dir][p.streamOffset[dir]:][res[i]:res[i+1]])
 								}
+								p.regex = nil
+								p.flags = 0
 
 								if res[1] != 0 {
 									// update stream offsets: a follow up regex for the same direction
