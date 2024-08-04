@@ -438,7 +438,7 @@ func (dcc *dataConditionsContainer) finalize(r *Reader, queryPartIndex int, prev
 			if _, err := br.Seek(int64(s.DataStart), io.SeekStart); err != nil {
 				return nil, [2][]byte{}, err
 			}
-			for dir := range [2]int{C2S, S2C} {
+			for _, dir := range [2]int{C2S, S2C} {
 				l := streamLength[dir]
 				if cap(buffers[dir]) < l {
 					buffers[dir] = make([]byte, l)
@@ -486,8 +486,8 @@ func (dcc *dataConditionsContainer) finalize(r *Reader, queryPartIndex int, prev
 			if converterName != "" && converterName != c {
 				continue
 			}
+			converter := converters[c]
 			dataSources = append(dataSources, func(s *stream) ([][2]int, [2][]byte, error) {
-				converter := converters[converterName]
 				// TODO: pass `buffers` through to DataForSearch to avoid re-allocating?
 				data, dataSizes, _, _, wasCached, err := converter.DataForSearch(s.StreamID)
 				if err != nil {
@@ -504,249 +504,264 @@ func (dcc *dataConditionsContainer) finalize(r *Reader, queryPartIndex int, prev
 	return append(filters, makeDataConditionFilter(dataSources, possibleSubQueries, dcc.conditions, dcc.regexes)), nil
 }
 
+func (p *progressVariant) find(buffers [2][]byte, dir uint8) []int {
+	buffer := buffers[dir][p.streamOffset[dir]:]
+	if uint(len(buffer)) < p.acceptedLength.MinLength {
+		return nil
+	}
+
+	if len(p.prefix) != 0 {
+		//the regex has a prefix, find it
+		pos := bytes.Index(buffer, p.prefix)
+		if pos < 0 {
+			// the prefix is not in the string, we can discard part of the buffer
+			p.streamOffset[dir] = len(buffers[dir])
+			return nil
+		}
+		//skip the part that doesn't have the prefix
+		p.streamOffset[dir] += pos
+		buffer = buffer[pos:]
+		if uint(len(buffer)) < p.acceptedLength.MinLength {
+			return nil
+		}
+	}
+	if len(p.suffix) != 0 {
+		//the regex has a suffix, find it
+		pos := bytes.LastIndex(buffer, p.suffix)
+		if pos < 0 {
+			// the suffix is not in the string, we can discard part of the buffer
+			p.streamOffset[dir] = len(buffers[dir])
+			return nil
+		}
+		//drop the part that doesn't have the suffix
+		buffer = buffer[:pos+len(p.suffix)]
+		if uint(len(buffer)) < p.acceptedLength.MinLength {
+			return nil
+		}
+	}
+
+	if p.acceptedLength.MinLength == p.acceptedLength.MaxLength && len(p.prefix) == 0 && len(p.suffix) != 0 {
+		beforeSuffixLen := int(p.acceptedLength.MinLength) - len(p.suffix)
+		for {
+			pos := bytes.Index(buffer[beforeSuffixLen:], p.suffix)
+			if pos < 0 {
+				p.streamOffset[dir] = len(buffers[dir])
+				return nil
+			}
+			p.streamOffset[dir] += pos
+			buffer = buffer[pos:]
+			res := p.regex.FindSubmatchIndex(buffer[:p.acceptedLength.MinLength])
+			if res != nil {
+				return res
+			}
+			p.streamOffset[dir]++
+			buffer = buffer[1:]
+		}
+	}
+	res := p.regex.FindSubmatchIndex(buffer)
+	if res == nil {
+		p.streamOffset[dir] = len(buffers[dir])
+	}
+	return res
+}
+
+func (ps *progressGroup) prepare(r *regex, pIdx int, e *query.DataConditionElement, possibleSubQueries map[string]subQueryVariableData) (*progressVariant, error) {
+	p := &ps.variants[pIdx]
+	if p.regex != nil {
+		return p, nil
+	}
+	root := &r.root
+	for {
+		if root.childSubQuery == "" {
+			break
+		}
+		v, ok := p.variant[root.childSubQuery]
+		if !ok {
+			break
+		}
+		root = &root.children[v]
+	}
+	explodeOneVariant := false
+	switch p.flags & progressVariantFlagState {
+	case progressVariantFlagStateUninitialzed:
+		if root.regex != nil {
+			p.regex = root.regex
+			p.prefix = root.prefix
+			p.suffix = root.suffix
+			p.acceptedLength = root.acceptedLength
+			if root.isPrecondition {
+				p.flags = progressVariantFlagStatePrecondition
+			} else {
+				p.flags = progressVariantFlagStateExact
+			}
+		}
+	case progressVariantFlagStateExact:
+		panic("why am i here?")
+	case progressVariantFlagStatePrecondition:
+		panic("why am i here?")
+	case progressVariantFlagStatePreconditionMatched:
+		if root.childSubQuery == "" {
+			explodeOneVariant = true
+			break
+		}
+		for cIdx, c := range root.children[1:] {
+			np := progressVariant{
+				streamOffset:   p.streamOffset,
+				nSuccessful:    p.nSuccessful,
+				regex:          c.regex,
+				acceptedLength: c.acceptedLength,
+				prefix:         c.prefix,
+				suffix:         c.suffix,
+				variant: map[string]int{
+					root.childSubQuery: cIdx,
+				},
+			}
+			for sq, v := range p.variant {
+				np.variant[sq] = v
+			}
+			if p.variables != nil {
+				np.variables = make(map[string]string)
+				for n, v := range p.variables {
+					np.variables[n] = v
+				}
+			}
+			if c.isPrecondition {
+				np.flags = progressVariantFlagStatePrecondition
+			} else {
+				np.flags = progressVariantFlagStateExact
+			}
+			if cIdx == 0 {
+				ps.variants[pIdx] = np
+			} else {
+				ps.variants = append(ps.variants, np)
+			}
+		}
+		p = &ps.variants[pIdx]
+	}
+
+	if p.regex != nil {
+		return p, nil
+	}
+	expr := e.Regex
+	p.flags = progressVariantFlagStateExact
+	for i := len(e.Variables) - 1; i >= 0; i-- {
+		v := e.Variables[i]
+		content := ""
+		if v.SubQuery == "" {
+			ok := false
+			content, ok = p.variables[v.Name]
+			if !ok {
+				return nil, fmt.Errorf("variable %q not defined", v.Name)
+			}
+			content = binaryregexp.QuoteMeta(content)
+		} else {
+			psq := possibleSubQueries[v.SubQuery]
+			vIdx := psq.variableIndex[v.Name]
+			variant, ok := p.variant[v.SubQuery]
+			if ok || explodeOneVariant {
+				if !ok {
+					explodeOneVariant = false
+					// we have not yet split this progress element
+					// the precondition regex matched, split this progress element
+					for j := 1; j < len(psq.variableData); j++ {
+						np := progressVariant{
+							streamOffset: p.streamOffset,
+							nSuccessful:  p.nSuccessful,
+							flags:        progressVariantFlagStateUninitialzed,
+							variant:      map[string]int{v.SubQuery: j},
+						}
+						for k, v := range p.variant {
+							np.variant[k] = v
+						}
+						if p.variables != nil {
+							np.variables = make(map[string]string)
+							for n, v := range p.variables {
+								np.variables[n] = v
+							}
+						}
+						ps.variants = append(ps.variants, np)
+					}
+					p = &ps.variants[pIdx]
+					if p.variant == nil {
+						p.variant = make(map[string]int)
+					}
+					p.variant[v.SubQuery] = 0
+				}
+				content = psq.variableData[variant].quotedData[vIdx]
+			} else {
+				p.flags = progressVariantFlagStatePrecondition
+				for _, vd := range psq.variableData {
+					content += vd.quotedData[vIdx] + "|"
+				}
+				content = content[:len(content)-1]
+			}
+		}
+		expr = fmt.Sprintf("%s(?:%s)%s", expr[:v.Position], content, expr[v.Position:])
+	}
+	var err error
+	if p.regex, err = binaryregexp.Compile(expr); err != nil {
+		return p, err
+	}
+	prefix, complete := p.regex.LiteralPrefix()
+	root.prefix = []byte(prefix)
+	if complete {
+		p.acceptedLength = regexanalysis.AcceptedLengths{
+			MinLength: uint(len(prefix)),
+			MaxLength: uint(len(prefix)),
+		}
+		root.suffix = root.prefix
+	} else {
+		if p.acceptedLength, err = regexanalysis.AcceptedLength(expr); err != nil {
+			return nil, err
+		}
+		if p.suffix, err = regexanalysis.ConstantSuffix(expr); err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
+}
+
 func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte, error), possibleSubQueries map[string]subQueryVariableData, conditions []*query.DataCondition, regexes []regex) func(sc *searchContext, s *stream) (bool, error) {
 	//add filter for scanning the data section
 	return func(sc *searchContext, s *stream) (bool, error) {
 		for _, dataSource := range dataSources {
 			ok, err := func() (bool, error) {
+				bufferLengths, buffers, err := dataSource(s)
+				if err != nil || bufferLengths == nil {
+					return false, err
+				}
+
 				progressGroups := make([]progressGroup, len(conditions))
 				for i := range progressGroups {
 					progressGroups[i].variants = make([]progressVariant, 1)
 				}
 
-				bufferLengths, buffers, err := dataSource(s)
-				if err != nil || bufferLengths == nil {
-					return false, err
-				}
 				for {
 					recheckRegexes := false
 					for rIdx := range regexes {
 						r := &regexes[rIdx]
 						for _, o := range r.occurence {
-							e := conditions[o.condition].Elements[o.element]
+							e := &conditions[o.condition].Elements[o.element]
 							dir := (e.Flags & query.DataRequirementSequenceFlagsDirection) / query.DataRequirementSequenceFlagsDirection
 
 							ps := &progressGroups[o.condition]
-						outer2:
 							for pIdx := 0; pIdx < len(ps.variants); pIdx++ {
-								p := &ps.variants[pIdx]
-								if o.element != p.nSuccessful {
-									continue
-								}
-								if p.regex == nil {
-									root := &r.root
-									for {
-										if root.childSubQuery == "" {
-											break
-										}
-										v, ok := p.variant[root.childSubQuery]
-										if !ok {
-											break
-										}
-										root = &root.children[v]
-									}
-									explodeOneVariant := false
-									switch p.flags & progressVariantFlagState {
-									case progressVariantFlagStateUninitialzed:
-										if root.regex != nil {
-											p.regex = root.regex
-											p.prefix = root.prefix
-											p.suffix = root.suffix
-											p.acceptedLength = root.acceptedLength
-											if root.isPrecondition {
-												p.flags = progressVariantFlagStatePrecondition
-											} else {
-												p.flags = progressVariantFlagStateExact
-											}
-										}
-									case progressVariantFlagStateExact:
-										panic("why am i here?")
-									case progressVariantFlagStatePrecondition:
-										panic("why am i here?")
-									case progressVariantFlagStatePreconditionMatched:
-										if root.childSubQuery == "" {
-											explodeOneVariant = true
-											break
-										}
-										for cIdx, c := range root.children[1:] {
-											np := progressVariant{
-												streamOffset:   p.streamOffset,
-												nSuccessful:    p.nSuccessful,
-												regex:          c.regex,
-												acceptedLength: c.acceptedLength,
-												prefix:         c.prefix,
-												suffix:         c.suffix,
-												variant: map[string]int{
-													root.childSubQuery: cIdx,
-												},
-											}
-											for sq, v := range p.variant {
-												np.variant[sq] = v
-											}
-											if p.variables != nil {
-												np.variables = make(map[string]string)
-												for n, v := range p.variables {
-													np.variables[n] = v
-												}
-											}
-											if c.isPrecondition {
-												np.flags = progressVariantFlagStatePrecondition
-											} else {
-												np.flags = progressVariantFlagStateExact
-											}
-											if cIdx == 0 {
-												ps.variants[pIdx] = np
-											} else {
-												ps.variants = append(ps.variants, np)
-											}
-										}
-										p = &ps.variants[pIdx]
-									}
-
-									if p.regex == nil {
-										expr := e.Regex
-										p.flags = progressVariantFlagStateExact
-										for i := len(e.Variables) - 1; i >= 0; i-- {
-											v := e.Variables[i]
-											content := ""
-											if v.SubQuery == "" {
-												ok := false
-												content, ok = p.variables[v.Name]
-												if !ok {
-													return false, fmt.Errorf("variable %q not defined", v.Name)
-												}
-												content = binaryregexp.QuoteMeta(content)
-											} else {
-												psq := possibleSubQueries[v.SubQuery]
-												vIdx := psq.variableIndex[v.Name]
-												variant, ok := p.variant[v.SubQuery]
-												if ok || explodeOneVariant {
-													if !ok {
-														explodeOneVariant = false
-														// we have not yet split this progress element
-														// the precondition regex matched, split this progress element
-														for j := 1; j < len(psq.variableData); j++ {
-															np := progressVariant{
-																streamOffset: p.streamOffset,
-																nSuccessful:  p.nSuccessful,
-																flags:        progressVariantFlagStateUninitialzed,
-																variant:      map[string]int{v.SubQuery: j},
-															}
-															for k, v := range p.variant {
-																np.variant[k] = v
-															}
-															if p.variables != nil {
-																np.variables = make(map[string]string)
-																for n, v := range p.variables {
-																	np.variables[n] = v
-																}
-															}
-															ps.variants = append(ps.variants, np)
-														}
-														p = &ps.variants[pIdx]
-														if p.variant == nil {
-															p.variant = make(map[string]int)
-														}
-														p.variant[v.SubQuery] = 0
-													}
-													content = psq.variableData[variant].quotedData[vIdx]
-												} else {
-													p.flags = progressVariantFlagStatePrecondition
-													for _, vd := range psq.variableData {
-														content += vd.quotedData[vIdx] + "|"
-													}
-													content = content[:len(content)-1]
-												}
-											}
-											expr = fmt.Sprintf("%s(?:%s)%s", expr[:v.Position], content, expr[v.Position:])
-										}
-										var err error
-										if p.regex, err = binaryregexp.Compile(expr); err != nil {
-											return false, err
-										}
-										prefix, complete := p.regex.LiteralPrefix()
-										root.prefix = []byte(prefix)
-										if complete {
-											p.acceptedLength = regexanalysis.AcceptedLengths{
-												MinLength: uint(len(prefix)),
-												MaxLength: uint(len(prefix)),
-											}
-											root.suffix = root.prefix
-										} else {
-											if p.acceptedLength, err = regexanalysis.AcceptedLength(expr); err != nil {
-												return false, err
-											}
-											if p.suffix, err = regexanalysis.ConstantSuffix(expr); err != nil {
-												return false, err
-											}
-										}
-									}
-								}
-
-								buffer := buffers[dir][p.streamOffset[dir]:]
-								if uint(len(buffer)) < p.acceptedLength.MinLength {
+								if p := &ps.variants[pIdx]; o.element != p.nSuccessful {
 									continue
 								}
 
-								if len(p.prefix) != 0 {
-									//the regex has a prefix, find it
-									pos := bytes.Index(buffer, p.prefix)
-									if pos < 0 {
-										// the prefix is not in the string, we can discard part of the buffer
-										p.streamOffset[dir] = len(buffers[dir])
-										continue
-									}
-									//skip the part that doesn't have the prefix
-									p.streamOffset[dir] += pos
-									buffer = buffer[pos:]
-									if uint(len(buffer)) < p.acceptedLength.MinLength {
-										continue
-									}
-								}
-								if len(p.suffix) != 0 {
-									//the regex has a suffix, find it
-									pos := bytes.LastIndex(buffer, p.suffix)
-									if pos < 0 {
-										// the suffix is not in the string, we can discard part of the buffer
-										p.streamOffset[dir] = len(buffers[dir])
-										continue
-									}
-									//drop the part that doesn't have the suffix
-									buffer = buffer[:pos+len(p.suffix)]
-									if uint(len(buffer)) < p.acceptedLength.MinLength {
-										continue
-									}
+								p, err := ps.prepare(r, pIdx, e, possibleSubQueries)
+								if err != nil {
+									return false, err
 								}
 
-								var res []int
-								if p.acceptedLength.MinLength == p.acceptedLength.MaxLength && len(p.prefix) == 0 && len(p.suffix) != 0 {
-									beforeSuffixLen := int(p.acceptedLength.MinLength) - len(p.suffix)
-									for {
-										pos := bytes.Index(buffer[beforeSuffixLen:], p.suffix)
-										if pos < 0 {
-											p.streamOffset[dir] = len(buffers[dir])
-											continue outer2
-										}
-										p.streamOffset[dir] += pos
-										buffer = buffer[pos:]
-										res = p.regex.FindSubmatchIndex(buffer[:p.acceptedLength.MinLength])
-										if res != nil {
-											break
-										}
-										p.streamOffset[dir]++
-										buffer = buffer[1:]
-									}
-								} else {
-									res = p.regex.FindSubmatchIndex(buffer)
-								}
-
+								res := p.find(buffers, dir)
 								if res == nil {
-									p.streamOffset[dir] = len(buffers[dir])
 									continue
 								}
+								p.regex = nil
 								if p.flags&progressVariantFlagState == progressVariantFlagStatePrecondition {
 									recheckRegexes = true
-									p.regex = nil
 									p.flags += progressVariantFlagStatePreconditionMatched - progressVariantFlagStatePrecondition
 									continue
 								}
@@ -759,7 +774,6 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 									return false, nil
 								}
 								variableNames := p.regex.SubexpNames()
-								p.regex = nil
 								p.flags = 0
 								for i := 2; i < len(res); i += 2 {
 									varName := variableNames[i/2]
@@ -772,7 +786,7 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 									if p.variables == nil {
 										p.variables = make(map[string]string)
 									}
-									p.variables[varName] = string(buffer[res[i]:res[i+1]])
+									p.variables[varName] = string(buffers[dir][p.streamOffset[dir]:][res[i]:res[i+1]])
 								}
 
 								if res[1] != 0 {
@@ -812,7 +826,6 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 								sqs = append(sqs, sq)
 								badSQR := &possibleSubQueries[sq].variableData[v].results
 								forbidden = append(forbidden, badSQR)
-
 							}
 							sc.allowedSubQueries.remove(sqs, forbidden)
 							if sc.allowedSubQueries.empty() {
