@@ -732,6 +732,15 @@ func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, release
 		releaser.release(mgr)
 		mgr.event(Event{
 			Type: "indexesMerged",
+			PcapStats: PcapStatistics{
+				PcapCount:         len(mgr.builder.KnownPcaps()),
+				ImportJobCount:    len(mgr.importJobs),
+				StreamCount:       int(mgr.nextStreamID),
+				PacketCount:       int(mgr.builder.PacketCount()),
+				IndexCount:        len(mgr.indexes),
+				StreamRecordCount: mgr.nStreamRecords,
+				PacketRecordCount: mgr.nPacketRecords,
+			},
 		})
 	}
 }

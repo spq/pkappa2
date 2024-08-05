@@ -5,7 +5,7 @@ import { useStreamsStore } from "./streams";
 import {
   isConverterEvent,
   isEvent,
-  isPcapProcessedEvent,
+  isPcapStatsEvent,
   isTagEvent,
 } from "./websocket.guard";
 
@@ -53,9 +53,9 @@ export type PcapStats = {
   PacketRecordCount: number;
 };
 
-/** @see {isPcapProcessedEvent} ts-auto-guard:type-guard */
-export type PcapProcessedEvent = {
-  Type: "pcapProcessed";
+/** @see {isPcapStatsEvent} ts-auto-guard:type-guard */
+export type PcapStatsEvent = {
+  Type: "pcapProcessed" | "indexesMerged";
   PcapStats: PcapStats;
 };
 
@@ -177,11 +177,12 @@ export function setupWebsocket() {
           }
           break;
         case "pcapProcessed":
-          if (!isPcapProcessedEvent(e)) {
-            console.error("Invalid pcap processed event:", e);
+        case "indexesMerged":
+          if (!isPcapStatsEvent(e)) {
+            console.error("Invalid pcap stats event:", e);
             return;
           }
-          streamsStore.outdated = true;
+          if (e.Type == "pcapProcessed") streamsStore.outdated = true;
           if (store.status != null) {
             store.status.PcapCount = e.PcapStats.PcapCount;
             store.status.PacketCount = e.PcapStats.PacketCount;
