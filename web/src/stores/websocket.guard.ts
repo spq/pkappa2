@@ -79,8 +79,11 @@ export function isPcapProcessedEvent(obj: unknown): obj is PcapProcessedEvent {
             typeof typedObj["PcapStats"] === "object" ||
             typeof typedObj["PcapStats"] === "function") &&
         typeof typedObj["PcapStats"]["PcapCount"] === "number" &&
+        typeof typedObj["PcapStats"]["PacketCount"] === "number" &&
         typeof typedObj["PcapStats"]["ImportJobCount"] === "number" &&
+        typeof typedObj["PcapStats"]["IndexCount"] === "number" &&
         typeof typedObj["PcapStats"]["StreamCount"] === "number" &&
-        typeof typedObj["PcapStats"]["PacketCount"] === "number"
+        typeof typedObj["PcapStats"]["StreamRecordCount"] === "number" &&
+        typeof typedObj["PcapStats"]["PacketRecordCount"] === "number"
     )
 }
