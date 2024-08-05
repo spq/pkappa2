@@ -69,7 +69,10 @@ type (
 		flags progressVariantFlag
 	}
 	progressGroup struct {
-		variants []progressVariant
+		variants            []progressVariant
+		success             bool
+		failedVariants      []map[string]int
+		successfulVariables []map[string]string
 	}
 )
 
@@ -605,7 +608,7 @@ func (ps *progressGroup) prepare(r *regex, pIdx int, e *query.DataConditionEleme
 			explodeOneVariant = true
 			break
 		}
-		for cIdx, c := range root.children[1:] {
+		for cIdx, c := range root.children {
 			np := progressVariant{
 				streamOffset:   p.streamOffset,
 				nSuccessful:    p.nSuccessful,
@@ -775,8 +778,9 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 								recheckRegexes = true
 							} else if d.Inverted {
 								// the condition matched but was inverted, so it failed
-								if len(dataSources) == 1 {
-									// if we don't have other data sources, we can stop here
+								if len(p.variant) == 0 && len(dataSources) == 1 {
+									// we don't have an active sub query and only one data source
+									// this string is not part of the result
 									return false, nil
 								}
 								continue
@@ -820,45 +824,53 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 					p := &pg.variants[pIdx]
 					nUnsuccessful := len(d.Elements) - p.nSuccessful
 					if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
-						if len(dataSources) == 1 {
-							// if we don't have other data sources, we can stop here
-							if len(p.variant) != 0 {
-								sqs := []string(nil)
-								forbidden := []*bitmask.ConnectedBitmask(nil)
-								for sq, v := range p.variant {
-									sqs = append(sqs, sq)
-									badSQR := &possibleSubQueries[sq].variableData[v].results
-									forbidden = append(forbidden, badSQR)
-								}
-								sc.allowedSubQueries.remove(sqs, forbidden)
-								if !sc.allowedSubQueries.empty() {
-									continue
-								}
-							}
-							return false, nil
+						if len(p.variant) != 0 {
+							pg.failedVariants = append(pg.failedVariants, p.variant)
 						}
 						continue
 					}
-					if p.variables == nil {
-						continue
-					}
-					if sc.outputVariables == nil {
-						sc.outputVariables = make(map[string][]string)
-					}
-				outer:
-					for n, v := range p.variables {
-						values := sc.outputVariables[n]
-						for _, ov := range values {
-							if v == ov {
-								continue outer
-							}
-						}
-						sc.outputVariables[n] = append(values, v)
+					pg.success = true
+					if p.variables != nil {
+						pg.successfulVariables = append(pg.successfulVariables, p.variables)
 					}
 				}
 			}
-			return true, nil
 		}
-		return false, nil
+		for _, pg := range progressGroups {
+			if !pg.success {
+				return false, nil
+			}
+		}
+		for _, pg := range progressGroups {
+			if len(pg.successfulVariables) != 0 && sc.outputVariables == nil {
+				sc.outputVariables = make(map[string][]string)
+			}
+			for _, sv := range pg.successfulVariables {
+			outer:
+				for n, v := range sv {
+					values := sc.outputVariables[n]
+					for _, ov := range values {
+						if v == ov {
+							continue outer
+						}
+					}
+					sc.outputVariables[n] = append(values, v)
+				}
+			}
+			for _, fv := range pg.failedVariants {
+				sqs := []string(nil)
+				forbidden := []*bitmask.ConnectedBitmask(nil)
+				for sq, v := range fv {
+					sqs = append(sqs, sq)
+					badSQR := &possibleSubQueries[sq].variableData[v].results
+					forbidden = append(forbidden, badSQR)
+				}
+				sc.allowedSubQueries.remove(sqs, forbidden)
+				if sc.allowedSubQueries.empty() {
+					break
+				}
+			}
+		}
+		return true, nil
 	}
 }
