@@ -235,7 +235,13 @@ func TestSearchStreams(t *testing.T) {
 			}
 			for streamID := range tc.streams {
 				streamID := uint64(streamID)
-				w.AddStream(&tc.streams[streamID].s, streamID)
+				ok, err := w.AddStream(&tc.streams[streamID].s, streamID)
+				if err != nil {
+					t.Fatalf("Error adding stream to index: %v", err)
+				}
+				if !ok {
+					t.Fatalf("Stream couldn't be added to index")
+				}
 				for i, d := range tc.streams[streamID].c {
 					if d == nil {
 						continue
