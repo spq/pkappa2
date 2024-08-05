@@ -7,6 +7,7 @@
     "jsx": "preserve",
     "moduleResolution": "node",
     "isolatedModules": true,
+    "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": false,
     "sourceMap": true,
