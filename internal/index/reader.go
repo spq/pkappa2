@@ -548,3 +548,8 @@ func (r *Reader) AllStreams(handler func(*Stream) error) error {
 	}
 	return nil
 }
+
+func (r *Reader) sectionReader(section section) *io.SectionReader {
+	s := r.header.Sections[section]
+	return io.NewSectionReader(r.file, int64(s.Begin), s.size())
+}
