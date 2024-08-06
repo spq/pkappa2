@@ -47,6 +47,9 @@ jobs:
       - name: Build
         run: go build -v ./cmd/pkappa2/main.go
 
+      - name: Test with the Go CLI
+        run: go test -v ./...
+
   golangci:
     name: Lint Go
     runs-on: ubuntu-latest
