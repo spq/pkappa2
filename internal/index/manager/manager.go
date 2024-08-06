@@ -42,10 +42,13 @@ const (
 
 type (
 	PcapStatistics struct {
-		PcapCount      int
-		ImportJobCount int
-		StreamCount    int
-		PacketCount    int
+		PcapCount         int
+		PacketCount       int
+		ImportJobCount    int
+		IndexCount        int
+		StreamCount       int
+		StreamRecordCount int
+		PacketRecordCount int
 	}
 
 	Event struct {
@@ -108,7 +111,8 @@ type (
 
 		builder             *builder.Builder
 		indexes             []*index.Reader
-		nStreams, nPackets  int
+		nStreamRecords      int
+		nPacketRecords      int
 		nextStreamID        uint64
 		nUnmergeableIndexes int
 		stateFilename       string
@@ -140,6 +144,8 @@ type (
 		PcapCount           int
 		StreamCount         int
 		PacketCount         int
+		StreamRecordCount   int
+		PacketRecordCount   int
 		MergeJobRunning     bool
 		TaggingJobRunning   bool
 		ConverterJobRunning bool
@@ -249,8 +255,8 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 			continue
 		}
 		mgr.indexes = append(mgr.indexes, idx)
-		mgr.nStreams += idx.StreamCount()
-		mgr.nPackets += idx.PacketCount()
+		mgr.nStreamRecords += idx.StreamCount()
+		mgr.nPacketRecords += idx.PacketCount()
 		if next := idx.MaxStreamID() + 1; mgr.nextStreamID < next {
 			mgr.nextStreamID = next
 		}
@@ -596,8 +602,8 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		// add new indexes if some were created
 		if len(createdIndexes) > 0 {
 			mgr.indexes = append(mgr.indexes, createdIndexes...)
-			mgr.nStreams += newStreamCount
-			mgr.nPackets += newPacketCount
+			mgr.nStreamRecords += newStreamCount
+			mgr.nPacketRecords += newPacketCount
 			mgr.nextStreamID = newNextStreamID
 			mgr.lock(createdIndexes)
 			mgr.addedStreamsDuringTaggingJob.Or(addedStreams)
@@ -623,10 +629,13 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		mgr.event(Event{
 			Type: "pcapProcessed",
 			PcapStats: PcapStatistics{
-				PcapCount:      len(mgr.builder.KnownPcaps()),
-				ImportJobCount: len(mgr.importJobs),
-				StreamCount:    mgr.nStreams,
-				PacketCount:    mgr.nPackets,
+				PcapCount:         len(mgr.builder.KnownPcaps()),
+				ImportJobCount:    len(mgr.importJobs),
+				StreamCount:       int(mgr.nextStreamID),
+				PacketCount:       int(mgr.builder.PacketCount()),
+				IndexCount:        len(mgr.indexes),
+				StreamRecordCount: mgr.nStreamRecords,
+				PacketRecordCount: mgr.nPacketRecords,
 			},
 		})
 		mgr.triggerPcapProcessedWebhooks(filenames[:processedFiles])
@@ -643,7 +652,7 @@ func (mgr *Manager) startMergeJobIfNeeded() {
 			return
 		}
 	}
-	nStreams := mgr.nStreams
+	nStreams := mgr.nStreamRecords
 	for i, idx := range mgr.indexes {
 		c := idx.StreamCount()
 		nStreams -= c
@@ -715,14 +724,23 @@ func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, release
 			mgr.lock(mergedIndexes)
 			mgr.indexes = append(mgr.indexes[:offset], append(mergedIndexes, mgr.indexes[offset+len(indexes):]...)...)
 			mgr.nUnmergeableIndexes += len(mergedIndexes) - 1
-			mgr.nStreams += streamsDiff
-			mgr.nPackets += packetsDiff
+			mgr.nStreamRecords += streamsDiff
+			mgr.nPacketRecords += packetsDiff
 		}
 		mgr.mergeJobRunning = false
 		mgr.startMergeJobIfNeeded()
 		releaser.release(mgr)
 		mgr.event(Event{
 			Type: "indexesMerged",
+			PcapStats: PcapStatistics{
+				PcapCount:         len(mgr.builder.KnownPcaps()),
+				ImportJobCount:    len(mgr.importJobs),
+				StreamCount:       int(mgr.nextStreamID),
+				PacketCount:       int(mgr.builder.PacketCount()),
+				IndexCount:        len(mgr.indexes),
+				StreamRecordCount: mgr.nStreamRecords,
+				PacketRecordCount: mgr.nPacketRecords,
+			},
 		})
 	}
 }
@@ -813,8 +831,10 @@ func (mgr *Manager) Status() Statistics {
 			IndexLockCount:      locks,
 			PcapCount:           len(mgr.builder.KnownPcaps()),
 			ImportJobCount:      len(mgr.importJobs),
-			StreamCount:         mgr.nStreams,
-			PacketCount:         mgr.nPackets,
+			StreamRecordCount:   mgr.nStreamRecords,
+			PacketRecordCount:   mgr.nPacketRecords,
+			StreamCount:         int(mgr.nextStreamID),
+			PacketCount:         int(mgr.builder.PacketCount()),
 			MergeJobRunning:     mgr.mergeJobRunning,
 			TaggingJobRunning:   mgr.taggingJobRunning,
 			ConverterJobRunning: mgr.converterJobRunning,

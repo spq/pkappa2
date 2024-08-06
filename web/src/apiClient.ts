@@ -74,7 +74,9 @@ export type Statistics = {
   PcapCount: number;
   ImportJobCount: number;
   StreamCount: number;
+  StreamRecordCount: number;
   PacketCount: number;
+  PacketRecordCount: number;
   MergeJobRunning: boolean;
   TaggingJobRunning: boolean;
   ConverterJobRunning: boolean;
