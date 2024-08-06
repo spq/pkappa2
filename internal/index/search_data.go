@@ -12,6 +12,7 @@ import (
 	"github.com/spq/pkappa2/internal/tools/bitmask"
 	regexanalysis "github.com/spq/pkappa2/internal/tools/regexAnalysis"
 	"github.com/spq/pkappa2/internal/tools/seekbufio"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"rsc.io/binaryregexp"
 )
@@ -68,11 +69,15 @@ type (
 		// flags for this progress
 		flags progressVariantFlag
 	}
+	variantResult struct {
+		variant   map[string]int
+		successes int
+		fails     int
+	}
 	progressGroup struct {
-		variants            []progressVariant
-		success             bool
-		failedVariants      []map[string]int
-		successfulVariables []map[string]string
+		variants         []progressVariant
+		successes, fails int
+		variantResults   []variantResult
 	}
 )
 
@@ -621,7 +626,9 @@ func (ps *progressGroup) prepare(r *regex, pIdx int, e *query.DataConditionEleme
 				},
 			}
 			for sq, v := range p.variant {
-				np.variant[sq] = v
+				if sq != root.childSubQuery {
+					np.variant[sq] = v
+				}
 			}
 			if p.variables != nil {
 				np.variables = make(map[string]string)
@@ -729,6 +736,13 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 	progressGroups := make([]progressGroup, len(conditions))
 	//add filter for scanning the data section
 	return func(sc *searchContext, s *stream) (bool, error) {
+		for i := range progressGroups {
+			ps := &progressGroups[i]
+			ps.variantResults = ps.variantResults[:0]
+			ps.fails = 0
+			ps.successes = 0
+		}
+		evaluatedDataSources := 0
 		for _, dataSource := range dataSources {
 			bufferLengths, buffers, err := dataSource(s)
 			if err != nil {
@@ -737,8 +751,10 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 			if bufferLengths == nil {
 				continue
 			}
+			evaluatedDataSources++
 			for i := range progressGroups {
-				progressGroups[i].variants = append(progressGroups[i].variants[:0], progressVariant{})
+				ps := &progressGroups[i]
+				ps.variants = append(ps.variants[:0], progressVariant{})
 			}
 			for recheckRegexes := true; recheckRegexes; {
 				recheckRegexes = false
@@ -823,51 +839,137 @@ func makeDataConditionFilter(dataSources []func(s *stream) ([][2]int, [2][]byte,
 				for pIdx := range pg.variants {
 					p := &pg.variants[pIdx]
 					nUnsuccessful := len(d.Elements) - p.nSuccessful
-					if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
-						if len(p.variant) != 0 {
-							pg.failedVariants = append(pg.failedVariants, p.variant)
+					var vr *variantResult
+					for i := range pg.variantResults {
+						lvr := &pg.variantResults[i]
+						if maps.Equal(lvr.variant, p.variant) {
+							vr = lvr
+							break
 						}
-						continue
 					}
-					pg.success = true
-					if p.variables != nil {
-						pg.successfulVariables = append(pg.successfulVariables, p.variables)
+					if vr == nil {
+						pg.variantResults = append(pg.variantResults, variantResult{
+							variant: p.variant,
+						})
+						vr = &pg.variantResults[len(pg.variantResults)-1]
+					}
+					if nUnsuccessful >= 2 || (nUnsuccessful != 0) != d.Inverted {
+						pg.fails++
+						vr.fails++
+					} else {
+						pg.successes++
+						vr.successes++
+						if len(p.variables) != 0 {
+							if sc.outputVariables == nil {
+								sc.outputVariables = make(map[string][]string)
+							}
+						variables:
+							for n, v := range p.variables {
+								values := sc.outputVariables[n]
+								for _, ov := range values {
+									if v == ov {
+										continue variables
+									}
+								}
+								sc.outputVariables[n] = append(values, v)
+							}
+						}
 					}
 				}
 			}
 		}
-		for _, pg := range progressGroups {
-			if !pg.success {
+		if evaluatedDataSources == 0 {
+			for _, c := range conditions {
+				if !c.Inverted {
+					// at least one condition is not inverted, it is not a match...
+					return false, nil
+				}
+			}
+			// only inverted conditions exist, since no data sources had data, this is a match
+			return true, nil
+		}
+		for pgIdx, pg := range progressGroups {
+			if pg.successes == 0 {
+				// this never succeeded, we can stop here
 				return false, nil
 			}
-		}
-		for _, pg := range progressGroups {
-			if len(pg.successfulVariables) != 0 && sc.outputVariables == nil {
-				sc.outputVariables = make(map[string][]string)
+			if pg.fails == 0 {
+				// this succeeded for all data sources, we don't have to do more with this
+				continue
 			}
-			for _, sv := range pg.successfulVariables {
-			outer:
-				for n, v := range sv {
-					values := sc.outputVariables[n]
-					for _, ov := range values {
-						if v == ov {
-							continue outer
+			// we have both successes and fails
+			inverted := conditions[pgIdx].Inverted
+			if pg.successes+pg.fails == evaluatedDataSources {
+				// there are no variants, we don't match partially
+				if inverted {
+					// an inverted condition fails if at least one data source made it fail
+					return false, nil
+				}
+				continue
+			}
+
+			for vrIdx := 0; vrIdx < len(pg.variantResults); vrIdx++ {
+				vr := &pg.variantResults[vrIdx]
+				if vr.fails == 0 {
+					continue
+				}
+				if vr.successes+vr.fails != evaluatedDataSources {
+					// we are either a split or we get splitted more for another data source
+
+					// explode all variants and re-calculate their success/fail counts
+					sort.Slice(pg.variantResults, func(il, ir int) bool {
+						l, r := pg.variantResults[il], pg.variantResults[ir]
+						return len(l.variant) > len(r.variant)
+					})
+					maxVariantDimensions := len(pg.variantResults[0].variant)
+					for vrIdx := range pg.variantResults {
+						vr = &pg.variantResults[vrIdx]
+						if len(vr.variant) != maxVariantDimensions {
+							pg.variantResults = pg.variantResults[:vrIdx]
+							break
+						}
+					outer:
+						for vrIdx2 := vrIdx + 1; vrIdx2 < len(pg.variantResults); vrIdx2++ {
+							vr2 := &pg.variantResults[vrIdx2]
+							if len(vr.variant) <= len(vr2.variant) {
+								continue
+							}
+							for sq, v2 := range vr2.variant {
+								v, ok := vr.variant[sq]
+								if v != v2 || !ok {
+									continue outer
+								}
+							}
+							vr.successes += vr2.successes
+							vr.fails += vr2.fails
+							if vr.successes+vr.fails == evaluatedDataSources {
+								break
+							}
+						}
+						if vr.successes+vr.fails != evaluatedDataSources {
+							return false, fmt.Errorf("not implemented")
 						}
 					}
-					sc.outputVariables[n] = append(values, v)
+					//restart the evaluation
+					vrIdx = -1
+					continue
 				}
-			}
-			for _, fv := range pg.failedVariants {
+				if vr.successes != 0 && !inverted {
+					// some data sources failed some succeeded - if this is not inverted, then this is a match
+					continue
+				}
+
+				//this variant is never split differently
 				sqs := []string(nil)
 				forbidden := []*bitmask.ConnectedBitmask(nil)
-				for sq, v := range fv {
+				for sq, v := range vr.variant {
 					sqs = append(sqs, sq)
 					badSQR := &possibleSubQueries[sq].variableData[v].results
 					forbidden = append(forbidden, badSQR)
 				}
 				sc.allowedSubQueries.remove(sqs, forbidden)
 				if sc.allowedSubQueries.empty() {
-					break
+					return false, nil
 				}
 			}
 		}
