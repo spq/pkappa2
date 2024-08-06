@@ -124,7 +124,9 @@ export function isStatistics(obj: unknown): obj is Statistics {
         typeof typedObj["PcapCount"] === "number" &&
         typeof typedObj["ImportJobCount"] === "number" &&
         typeof typedObj["StreamCount"] === "number" &&
+        typeof typedObj["StreamRecordCount"] === "number" &&
         typeof typedObj["PacketCount"] === "number" &&
+        typeof typedObj["PacketRecordCount"] === "number" &&
         typeof typedObj["MergeJobRunning"] === "boolean" &&
         typeof typedObj["TaggingJobRunning"] === "boolean" &&
         typeof typedObj["ConverterJobRunning"] === "boolean"

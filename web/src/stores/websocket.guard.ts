@@ -2,7 +2,7 @@
  * Generated type guards for "websocket.ts".
  * WARNING: Do not manually change this file.
  */
-import { Event, TagEvent, ConverterEvent, PcapProcessedEvent } from "./websocket";
+import { Event, TagEvent, ConverterEvent, PcapStatsEvent } from "./websocket";
 
 export function isEvent(obj: unknown): obj is Event {
     const typedObj = obj as Event
@@ -68,19 +68,23 @@ export function isConverterEvent(obj: unknown): obj is ConverterEvent {
     )
 }
 
-export function isPcapProcessedEvent(obj: unknown): obj is PcapProcessedEvent {
-    const typedObj = obj as PcapProcessedEvent
+export function isPcapStatsEvent(obj: unknown): obj is PcapStatsEvent {
+    const typedObj = obj as PcapStatsEvent
     return (
         (typedObj !== null &&
             typeof typedObj === "object" ||
             typeof typedObj === "function") &&
-        typedObj["Type"] === "pcapProcessed" &&
+        (typedObj["Type"] === "indexesMerged" ||
+            typedObj["Type"] === "pcapProcessed") &&
         (typedObj["PcapStats"] !== null &&
             typeof typedObj["PcapStats"] === "object" ||
             typeof typedObj["PcapStats"] === "function") &&
         typeof typedObj["PcapStats"]["PcapCount"] === "number" &&
+        typeof typedObj["PcapStats"]["PacketCount"] === "number" &&
         typeof typedObj["PcapStats"]["ImportJobCount"] === "number" &&
+        typeof typedObj["PcapStats"]["IndexCount"] === "number" &&
         typeof typedObj["PcapStats"]["StreamCount"] === "number" &&
-        typeof typedObj["PcapStats"]["PacketCount"] === "number"
+        typeof typedObj["PcapStats"]["StreamRecordCount"] === "number" &&
+        typeof typedObj["PcapStats"]["PacketRecordCount"] === "number"
     )
 }
