@@ -95,6 +95,39 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	}
 }
 
+func makeIndex(tmpDir string, streams map[uint64]streamInfo, converters *map[string]ConverterAccess) (*Reader, error) {
+	w, err := NewWriter(tools.MakeFilename(tmpDir, "idx"))
+	if err != nil {
+		return nil, err
+	}
+	for streamID, si := range streams {
+		ok, err := w.AddStream(&si.s, streamID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("Stream couldn't be added to index")
+		}
+		for i, d := range streams[streamID].c {
+			if d == nil {
+				continue
+			}
+			c := fmt.Sprintf("c%d", i)
+			if _, ok := (*converters)[c]; !ok {
+				(*converters)[c] = &fakeConverter{
+					data: make(map[uint64][]string),
+				}
+			}
+			(*converters)[c].(*fakeConverter).data[streamID] = d
+		}
+	}
+	r, err := w.Finalize()
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
 func (c *fakeConverter) Data(stream *Stream, moreDetails bool) (data []Data, clientBytes, serverBytes uint64, wasCached bool, err error) {
 	return nil, 0, 0, false, nil
 }
@@ -122,7 +155,10 @@ func (c *fakeConverter) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uin
 
 func TestSearchStreams(t *testing.T) {
 	tmpDir := t.TempDir()
-	t1, _ := time.Parse(time.RFC3339, "2020-01-01T12:00:00Z00:00")
+	t1, err := time.Parse(time.RFC3339, "2020-01-01T12:00:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse failed with error: %v", err)
+	}
 	testCases := []struct {
 		name     string
 		streams  []streamInfo
@@ -229,36 +265,11 @@ func TestSearchStreams(t *testing.T) {
 			converters := map[string]ConverterAccess{
 				"dummy": &fakeConverter{},
 			}
-			w, err := NewWriter(tools.MakeFilename(tmpDir, "idx"))
-			if err != nil {
-				t.Fatalf("Error creating index writer: %v", err)
+			streamsMap := make(map[uint64]streamInfo)
+			for i, s := range tc.streams {
+				streamsMap[uint64(i)] = s
 			}
-			for streamID := range tc.streams {
-				streamID := uint64(streamID)
-				ok, err := w.AddStream(&tc.streams[streamID].s, streamID)
-				if err != nil {
-					t.Fatalf("Error adding stream to index: %v", err)
-				}
-				if !ok {
-					t.Fatalf("Stream couldn't be added to index")
-				}
-				for i, d := range tc.streams[streamID].c {
-					if d == nil {
-						continue
-					}
-					c := fmt.Sprintf("c%d", i)
-					if _, ok := converters[c]; !ok {
-						converters[c] = &fakeConverter{
-							data: make(map[uint64][]string),
-						}
-					}
-					converters[c].(*fakeConverter).data[streamID] = d
-				}
-			}
-			r, err := w.Finalize()
-			if err != nil {
-				t.Fatalf("Error finalizing index writer: %v", err)
-			}
+			r, err := makeIndex(tmpDir, streamsMap, &converters)
 			q, err := query.Parse(tc.query)
 			if err != nil {
 				t.Errorf("Error parsing query: %v", err)
