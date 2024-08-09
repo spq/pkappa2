@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
@@ -57,7 +58,15 @@ func readPackets(pcapDir, pcapFilename string, info *pcapmetadata.PcapInfo) (*pc
 	}
 	defer handle.Close()
 	packets := []Packet(nil)
-	decoder := handle.LinkType()
+	var decoder gopacket.Decoder
+	switch lt := handle.LinkType(); lt {
+	case layers.LinkTypeIPv4:
+		decoder = layers.LayerTypeIPv4
+	case layers.LinkTypeIPv6:
+		decoder = layers.LayerTypeIPv6
+	default:
+		decoder = lt
+	}
 	for packetIndex := uint64(0); ; packetIndex++ {
 		data, ci, err := handle.ReadPacketData()
 		switch err {
