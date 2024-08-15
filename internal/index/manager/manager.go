@@ -1253,6 +1253,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						markQuery = markQuery[:len(markQuery)-1]
 						if q, err := query.Parse(markQuery); err == nil {
 							newTag.Conditions = q.Conditions
+							newTag.definition = markQuery
 						}
 					}
 				}
