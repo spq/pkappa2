@@ -119,6 +119,7 @@ type (
 		allStreams          bitmask.LongBitmask
 
 		updatedStreamsDuringTaggingJob bitmask.LongBitmask
+		resetStreamsDuringTaggingJob   bitmask.LongBitmask
 		addedStreamsDuringTaggingJob   bitmask.LongBitmask
 
 		streamsToConvert         map[string]*bitmask.LongBitmask
@@ -546,7 +547,7 @@ func (mgr *Manager) inheritTagUncertainty() {
 	}
 }
 
-func (mgr *Manager) invalidateTags(updatedStreams, addedStreams bitmask.LongBitmask) {
+func (mgr *Manager) invalidateTags(updatedStreams, resetStreams, addedStreams bitmask.LongBitmask) {
 	for tn, ti := range mgr.tags {
 		tin := *ti
 		if ti.features.SubQueryFeatures != 0 {
@@ -557,6 +558,7 @@ func (mgr *Manager) invalidateTags(updatedStreams, addedStreams bitmask.LongBitm
 		} else {
 			tin.Uncertain = ti.Uncertain.Copy()
 			tin.Uncertain.Or(addedStreams)
+			tin.Uncertain.Or(resetStreams)
 			if ti.features.MainFeatures&(query.FeatureFilterData|query.FeatureFilterTimeAbsolute|query.FeatureFilterTimeRelative) != 0 {
 				tin.Uncertain.Or(updatedStreams)
 			}
@@ -567,34 +569,23 @@ func (mgr *Manager) invalidateTags(updatedStreams, addedStreams bitmask.LongBitm
 }
 
 func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, existingIndexes []*index.Reader, existingIndexesReleaser indexReleaser) {
-	processedFiles, createdIndexes, err := mgr.builder.FromPcap(mgr.PcapDir, filenames, existingIndexes)
+	processedFiles, usedNewStreamIDs, createdIndexes, updatedStreams, resetStreams, addedStreams, err := mgr.builder.FromPcap(mgr.PcapDir, filenames, existingIndexes)
 	if err != nil {
 		log.Printf("importPcapJob(%q) failed: %s", filenames, err)
 	}
-	updatedStreams := bitmask.LongBitmask{}
-	addedStreams := bitmask.LongBitmask{}
-	newStreamCount, newPacketCount := 0, 0
-	newNextStreamID := nextStreamID
+	allStreams := bitmask.LongBitmask{}
+	nextStreamID += usedNewStreamIDs
+	if nextStreamID != 0 {
+		allStreams.Set(uint(nextStreamID - 1))
+		for i := uint64(0); i < nextStreamID; i++ {
+			allStreams.Set(uint(i))
+		}
+	}
+	newStreamCount := 0
+	newPacketCount := 0
 	for _, idx := range createdIndexes {
 		newStreamCount += idx.StreamCount()
 		newPacketCount += idx.PacketCount()
-		if next := idx.MaxStreamID() + 1; newNextStreamID < next {
-			newNextStreamID = next
-		}
-		for i := range idx.StreamIDs() {
-			if i < nextStreamID {
-				updatedStreams.Set(uint(i))
-			} else {
-				addedStreams.Set(uint(i))
-			}
-		}
-	}
-	allStreams := bitmask.LongBitmask{}
-	if newNextStreamID != 0 {
-		allStreams.Set(uint(newNextStreamID - 1))
-		for i := uint64(0); i < newNextStreamID; i++ {
-			allStreams.Set(uint(i))
-		}
 	}
 	mgr.jobs <- func() {
 		mgr.allStreams = allStreams
@@ -604,12 +595,13 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 			mgr.indexes = append(mgr.indexes, createdIndexes...)
 			mgr.nStreamRecords += newStreamCount
 			mgr.nPacketRecords += newPacketCount
-			mgr.nextStreamID = newNextStreamID
+			mgr.nextStreamID = nextStreamID
 			mgr.lock(createdIndexes)
-			mgr.addedStreamsDuringTaggingJob.Or(addedStreams)
-			mgr.updatedStreamsDuringTaggingJob.Or(updatedStreams)
-			mgr.invalidateTags(updatedStreams, addedStreams)
-			mgr.invalidateConverters(&updatedStreams)
+			mgr.updatedStreamsDuringTaggingJob.Or(*updatedStreams)
+			mgr.resetStreamsDuringTaggingJob.Or(*resetStreams)
+			mgr.addedStreamsDuringTaggingJob.Or(*addedStreams)
+			mgr.invalidateTags(*updatedStreams, *resetStreams, *addedStreams)
+			mgr.invalidateConverters(updatedStreams)
 		}
 		// remove finished job from queue
 		mgr.importJobs = mgr.importJobs[processedFiles:]
@@ -684,6 +676,7 @@ outer:
 			tagDetails[tn] = mgr.tags[tn].TagDetails
 		}
 		mgr.updatedStreamsDuringTaggingJob = bitmask.LongBitmask{}
+		mgr.resetStreamsDuringTaggingJob = bitmask.LongBitmask{}
 		mgr.addedStreamsDuringTaggingJob = bitmask.LongBitmask{}
 		mgr.taggingJobRunning = true
 		indexes, releaser := mgr.getIndexesCopy(0)
@@ -777,8 +770,8 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 				mgr.streamsToConvert[converter.Name()].Or(t.Matches)
 			}
 			mgr.tags[name] = &t
-			if !(mgr.updatedStreamsDuringTaggingJob.IsZero() && mgr.addedStreamsDuringTaggingJob.IsZero()) {
-				mgr.invalidateTags(mgr.updatedStreamsDuringTaggingJob, mgr.addedStreamsDuringTaggingJob)
+			if !(mgr.updatedStreamsDuringTaggingJob.IsZero() && mgr.resetStreamsDuringTaggingJob.IsZero() && mgr.addedStreamsDuringTaggingJob.IsZero()) {
+				mgr.invalidateTags(mgr.updatedStreamsDuringTaggingJob, mgr.resetStreamsDuringTaggingJob, mgr.addedStreamsDuringTaggingJob)
 			}
 			if err := mgr.saveState(); err != nil {
 				log.Printf("updateTagJob failed, unable to save state: %q", err)
