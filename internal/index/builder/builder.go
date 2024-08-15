@@ -16,6 +16,7 @@ import (
 	"github.com/spq/pkappa2/internal/index/streams"
 	"github.com/spq/pkappa2/internal/index/udpreassembly"
 	"github.com/spq/pkappa2/internal/tools"
+	"github.com/spq/pkappa2/internal/tools/bitmask"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
 )
 
@@ -92,7 +93,7 @@ func New(pcapDir, indexDir, snapshotDir string, cachedKnownPcaps []*pcapmetadata
 	return &b, nil
 }
 
-func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndexes []*index.Reader) (int, []*index.Reader, error) {
+func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndexes []*index.Reader) (int, uint64, []*index.Reader, *bitmask.LongBitmask, *bitmask.LongBitmask, *bitmask.LongBitmask, error) {
 	log.Printf("Building indexes from pcaps %q\n", pcapFilenames)
 	// load, find ts of oldest new package
 	newPcapInfos := []*pcapmetadata.PcapInfo(nil)
@@ -113,7 +114,7 @@ func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndex
 			if nProcessedPcaps == 0 {
 				// report that we failed to process a single pcap,
 				// the caller can then decide what to do...
-				return 1, nil, err
+				return 1, 0, nil, nil, nil, nil, err
 			}
 			// process the other pcaps that we already loaded and
 			// let the next run deal with the problematic pcap...
@@ -134,7 +135,7 @@ func (b *Builder) FromPcap(pcapDir string, pcapFilenames []string, existingIndex
 		}
 	}
 	if len(newPackets) == 0 {
-		return nProcessedPcaps, nil, nil
+		return nProcessedPcaps, 0, nil, nil, nil, nil, nil
 	}
 
 	// find last snapshot with ts < oldest new package
@@ -225,7 +226,7 @@ outer:
 			if err != nil {
 				// we couldn't load an old pcap that contains packets that we
 				// have to re-evaluate, if we just continue here, we lose data.
-				return 0, nil, err
+				return 0, 0, nil, nil, nil, nil, err
 			}
 			if bestSnapshot.timestamp.After(pcap.PacketTimestampMin) {
 				packetIndexes := bestSnapshot.referencedPackets[pcap.Filename]
@@ -443,12 +444,18 @@ outer:
 			nextStreamID = maxStreamID + 1
 		}
 	}
+	originalNextStreamID := nextStreamID
+
+	updatedStreams := bitmask.LongBitmask{}
+	addedStreams := bitmask.LongBitmask{}
+	resetStreams := bitmask.LongBitmask{}
 
 	indexBuilders := []*index.Writer{}
 	if err := func() error {
 		// dump collected streams to new indexes
 		for _, s := range streamFactory.Streams {
 			id := nextStreamID
+			streamCategory := &addedStreams
 			touchedByNewPcaps := false
 		outer:
 			for pi := range s.Packets {
@@ -457,6 +464,7 @@ outer:
 					if pmd.PcapInfo == p {
 						touchedByNewPcaps = true
 						if id != nextStreamID {
+							streamCategory = &updatedStreams
 							break outer
 						}
 						continue outer
@@ -476,6 +484,7 @@ outer:
 					}
 				}
 				if touchedByNewPcaps {
+					streamCategory = &resetStreams
 					break
 				}
 			}
@@ -500,6 +509,7 @@ outer:
 					return err
 				}
 				if ok {
+					streamCategory.Set(uint(id))
 					break
 				}
 			}
@@ -510,7 +520,7 @@ outer:
 			ib.Close()
 			os.Remove(ib.Filename())
 		}
-		return 0, nil, err
+		return 0, 0, nil, nil, nil, nil, err
 	}
 
 	indexes := []*index.Reader{}
@@ -525,7 +535,7 @@ outer:
 				ib.Close()
 				os.Remove(ib.Filename())
 			}
-			return 0, nil, err
+			return 0, 0, nil, nil, nil, nil, err
 		}
 		indexes = append(indexes, i)
 	}
@@ -553,7 +563,7 @@ outer:
 		outputFiles = append(outputFiles, i.Filename())
 	}
 	log.Printf("Built indexes %q from pcaps %q\n", outputFiles, pcapFilenames)
-	return nProcessedPcaps, indexes, nil
+	return nProcessedPcaps, nextStreamID - originalNextStreamID, indexes, &updatedStreams, &resetStreams, &addedStreams, nil
 }
 
 func (b *Builder) PacketCount() uint {
