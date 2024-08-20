@@ -1877,11 +1877,11 @@ func (mgr *Manager) triggerPcapProcessedWebhooks(filenames []string) {
 		return
 	}
 	for _, webhookUrl := range mgr.pcapProcessorWebhookUrls {
-		go mgr.triggerPcapProcessedWebhook(webhookUrl, jsonBody)
+		go triggerPcapProcessedWebhook(webhookUrl, jsonBody)
 	}
 }
 
-func (mgr *Manager) triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
+func triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
 	err := func() error {
 		bodyReader := bytes.NewReader(jsonBody)
 
