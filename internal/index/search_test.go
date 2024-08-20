@@ -216,12 +216,64 @@ func TestSearchStreams(t *testing.T) {
 			[]uint64{},
 		},
 		{
-			"show issue #53 (stream should not be returned but it is)",
+			"show issue #53 fixed",
 			[]streamInfo{
 				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo"}, []string{"bar"}, []string{"baz"}),
 			},
 			"-cdata:bar",
-			[]uint64{0},
+			[]uint64{},
+		},
+		{
+			"a subquery with data query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle1"}),
+				makeStream("192.168.0.100:234", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle2"}),
+				makeStream("192.168.0.100:345", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle0 needle1 needle2"}),
+			},
+			"@sub:cdata.none:\"(?P<var>needle[0-9])\" cdata.none:@sub:var@ id:@sub:id@+1:",
+			[]uint64{2},
+		},
+		{
+			"a subquery with negated data query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:234", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:345", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+				makeStream("192.168.0.100:456", "192.168.0.1:80", t1.Add(time.Hour*4), []string{"needle0 needle1 needle2"}),
+				makeStream("192.168.0.100:567", "192.168.0.1:80", t1.Add(time.Hour*5), []string{"needle0 missing1 needle2"}),
+			},
+			"@sub:id:0,1,2 @sub:cdata:\"(?P<var>needle[0-9])\" -cdata:@sub:var@ id:3,4",
+			[]uint64{4},
+		},
+		{
+			"a subquery with data query and converters",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle0 missing1"}, []string{"missing0 needle1"}),
+			},
+			"@sub:id:0,1 @sub:cdata:\"(?P<var>needle[0-9])\" cdata:@sub:var@ id:2",
+			[]uint64{2},
+		},
+		{
+			"a subquery with inverted data query and converters",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle0 missing1"}, []string{"missing0 needle1"}),
+			},
+			"@sub:id:0,1 @sub:cdata:\"(?P<var>needle[0-9])\" -cdata:@sub:var@ id:2",
+			[]uint64{},
+		},
+		{
+			"a subquery with data query and converters matching only one subquery stream in one converter",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"foo"}, []string{"needle0"}),
+			},
+			"@sub:id:0,1 @sub:cdata:\"(?P<var>needle[0-9])\" cdata:@sub:var@ id:2",
+			[]uint64{2},
 		},
 	}
 	for _, tc := range testCases {
@@ -259,20 +311,21 @@ func TestSearchStreams(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error finalizing index writer: %v", err)
 			}
+			t.Logf("using query %q", tc.query)
 			q, err := query.Parse(tc.query)
 			if err != nil {
 				t.Errorf("Error parsing query: %v", err)
 			}
 			results, _, err := SearchStreams(context.Background(), []*Reader{r}, nil, q.ReferenceTime, q.Conditions, q.Grouping, q.Sorting, 100, 0, nil, converters)
 			if err != nil {
-				t.Errorf("Error searching streams: %v", err)
+				t.Fatalf("Error searching streams: %v", err)
 			}
 			got := []uint64(nil)
 			for _, s := range results {
 				got = append(got, s.StreamID)
 			}
 			if !slices.Equal(got, tc.expected) {
-				t.Errorf("Unexpected streams: %v", got)
+				t.Errorf("Unexpected streams: %v, want: %v", got, tc.expected)
 			}
 		})
 	}
