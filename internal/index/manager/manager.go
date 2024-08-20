@@ -38,6 +38,9 @@ import (
 const (
 	// Request timeout for webhooks
 	pcapProcessorWebhookTimeout = time.Second * 5
+
+	pcapOverIPCmdFlush = pcapOverIPCmd(iota)
+	pcapOverIPCmdClose
 )
 
 type (
@@ -73,6 +76,7 @@ type (
 		data     []byte
 		ci       gopacket.CaptureInfo
 	}
+	pcapOverIPCmd byte
 
 	listener struct {
 		close  chan struct{}
@@ -127,7 +131,7 @@ type (
 		pcapOverIPEndpoints      []*pcapOverIPEndpoint
 
 		pcapOverIPPackets chan pcapOverIPPacket
-		pcapOverIPFlush   chan struct{}
+		pcapOverIPCmd     chan pcapOverIPCmd
 
 		tags       map[string]*tag
 		converters map[string]*converters.CachedConverter
@@ -403,7 +407,7 @@ nextStateFile:
 		}
 	}
 	mgr.pcapOverIPPackets = make(chan pcapOverIPPacket, 100)
-	mgr.pcapOverIPFlush = make(chan struct{}, 1)
+	mgr.pcapOverIPCmd = make(chan pcapOverIPCmd, 1)
 
 	go func() {
 		for f := range mgr.jobs {
@@ -460,6 +464,10 @@ func (mgr *Manager) Close() {
 			}
 			close(l.close)
 		}
+		for _, e := range mgr.pcapOverIPEndpoints {
+			e.cancel()
+		}
+		mgr.pcapOverIPCmd <- pcapOverIPCmdClose
 		close(c)
 	}
 	<-c
@@ -611,7 +619,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 			idxs, rel := mgr.getIndexesCopy(0)
 			go mgr.importPcapJob(mgr.importJobs[:], mgr.nextStreamID, idxs, rel)
 		} else {
-			mgr.pcapOverIPFlush <- struct{}{}
+			mgr.pcapOverIPCmd <- pcapOverIPCmdFlush
 		}
 		mgr.startTaggingJobIfNeeded()
 		mgr.startConverterJobIfNeeded()
@@ -1980,10 +1988,15 @@ func (mgr *Manager) pcapOverIPPacketHandler() {
 			}
 			queue = true
 
-		case <-mgr.pcapOverIPFlush:
-			if len(packets) == 0 {
-				queue = false
-				continue
+		case cmd := <-mgr.pcapOverIPCmd:
+			switch cmd {
+			case pcapOverIPCmdClose:
+				return
+			case pcapOverIPCmdFlush:
+				if len(packets) == 0 {
+					queue = false
+					continue
+				}
 			}
 		}
 		go func(packets []pcapOverIPPacket) {
