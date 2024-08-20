@@ -17,8 +17,8 @@
                 noneSelected
                   ? "checkbox-blank-outline"
                   : allSelected
-                  ? "checkbox-marked"
-                  : "minus-box"
+                    ? "checkbox-marked"
+                    : "minus-box"
               }}</v-icon
             >
           </v-btn>
@@ -55,7 +55,7 @@
               @click="
                 markSelectedStreams(
                   tag.Name,
-                  tagStatusForSelection[tag.Name] !== true
+                  tagStatusForSelection[tag.Name] !== true,
                 )
               "
             >
@@ -65,8 +65,8 @@
                     tagStatusForSelection[tag.Name] === true
                       ? "checkbox-outline"
                       : tagStatusForSelection[tag.Name] === false
-                      ? "minus-box"
-                      : "checkbox-blank-outline"
+                        ? "minus-box"
+                        : "checkbox-blank-outline"
                   }}</v-icon
                 >
               </v-list-item-action>
@@ -252,7 +252,7 @@
                   $options.filters?.prettyBytes(
                     stream.Stream.Client.Bytes,
                     1,
-                    true
+                    true,
                   )
                 }}</span>
               </td>
@@ -264,7 +264,7 @@
                   $options.filters?.prettyBytes(
                     stream.Stream.Server.Bytes,
                     1,
-                    true
+                    true,
                   )
                 }}</span>
               </td>
@@ -310,7 +310,7 @@ const selected = ref<boolean[]>([]);
 const tags = computed(() => store.tags);
 const groupedTags = computed(() => store.groupedTags);
 const selectedCount = computed(
-  () => selected.value.filter((i) => i === true).length
+  () => selected.value.filter((i) => i === true).length,
 );
 const noneSelected = computed(() => selectedCount.value === 0);
 const allSelected = computed(() => {
@@ -440,8 +440,8 @@ function regexEscape(text: string) {
             .charCodeAt(0)
             .toString(16)
             .toUpperCase()
-            .padStart(2, "0")}}`
-      )
+            .padStart(2, "0")}}`,
+      ),
     )
     .join("");
 }

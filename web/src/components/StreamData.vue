@@ -72,7 +72,7 @@ const inlineHex = (b64: string) => {
   const ui8 = Uint8Array.from(
     atob(b64)
       .split("")
-      .map((char) => char.charCodeAt(0))
+      .map((char) => char.charCodeAt(0)),
   );
   var str = ([] as number[]).slice
     .call(ui8)
@@ -85,7 +85,7 @@ const hexdump = (b64: string) => {
   const ui8 = Uint8Array.from(
     atob(b64)
       .split("")
-      .map((char) => char.charCodeAt(0))
+      .map((char) => char.charCodeAt(0)),
   );
   var str = ([] as number[]).slice
     .call(ui8)

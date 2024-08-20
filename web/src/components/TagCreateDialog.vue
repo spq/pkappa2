@@ -94,7 +94,7 @@ EventBus.on("showCreateTagDialog", openDialog);
 function openDialog(
   tagTypeValue: string,
   tagQueryValue: string,
-  tagStreamsValue: number[]
+  tagStreamsValue: number[],
 ) {
   tagType.value = tagTypeValue;
   tagQuery.value = tagQueryValue;
@@ -118,12 +118,12 @@ function createTag() {
     ? store.markTagNew(
         `${tagType.value}/${tagName.value}`,
         tagStreams.value,
-        tagColor.value
+        tagColor.value,
       )
     : store.addTag(
         `${tagType.value}/${tagName.value}`,
         tagQuery.value,
-        tagColor.value
+        tagColor.value,
       )
   )
     .then(() => {

@@ -13,14 +13,14 @@ function isSearches(obj: unknown): obj is Searches {
   return (
     typeof typedObj === "object" &&
     Object.entries(typedObj).every(
-      ([key, value]) => typeof key === "string" && typeof value === "number"
+      ([key, value]) => typeof key === "string" && typeof value === "number",
     )
   );
 }
 
 function getSearches() {
   const searches: unknown = JSON.parse(
-    localStorage.getItem(STORAGE_KEY) ?? "{}"
+    localStorage.getItem(STORAGE_KEY) ?? "{}",
   );
   if (isSearches(searches)) {
     return searches;

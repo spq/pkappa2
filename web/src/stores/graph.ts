@@ -40,7 +40,7 @@ export const useGraphStore = defineStore("graph", {
       aspects: string[],
       tags: string[],
       query: string,
-      type: GraphType
+      type: GraphType,
     ) {
       this.delta = delta;
       this.aspects = aspects;

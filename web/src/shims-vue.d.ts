@@ -25,7 +25,7 @@ declare module "vue-filter-pretty-bytes" {
     bytes: number,
     decimals: number,
     kib: boolean,
-    maxuint: string
+    maxuint: string,
   ) => string;
   interface VueFilterPrettyBytes extends PluginObject<undefined> {}
 
