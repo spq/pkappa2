@@ -919,9 +919,10 @@ func (mgr *Manager) AddTag(name, color, queryString string) error {
 		TagDetails: query.TagDetails{
 			Conditions: q.Conditions,
 		},
-		definition: queryString,
-		features:   features,
-		color:      color,
+		definition:   queryString,
+		features:     features,
+		color:        color,
+		referencedBy: make(map[string]struct{}),
 	}
 	for _, tn := range nt.referencedTags() {
 		if tn == name {
