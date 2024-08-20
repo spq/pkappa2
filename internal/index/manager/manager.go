@@ -38,6 +38,9 @@ import (
 const (
 	// Request timeout for webhooks
 	pcapProcessorWebhookTimeout = time.Second * 5
+
+	pcapOverIPCmdFlush = pcapOverIPCmd(iota)
+	pcapOverIPCmdClose
 )
 
 type (
@@ -73,6 +76,7 @@ type (
 		data     []byte
 		ci       gopacket.CaptureInfo
 	}
+	pcapOverIPCmd byte
 
 	listener struct {
 		close  chan struct{}
@@ -127,7 +131,7 @@ type (
 		pcapOverIPEndpoints      []*pcapOverIPEndpoint
 
 		pcapOverIPPackets chan pcapOverIPPacket
-		pcapOverIPFlush   chan struct{}
+		pcapOverIPCmd     chan pcapOverIPCmd
 
 		tags       map[string]*tag
 		converters map[string]*converters.CachedConverter
@@ -223,6 +227,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
 	}
+	mgr.watcher = watcher
 	mgr.startMonitoringConverters(watcher)
 
 	// Lookup all available converter binaries
@@ -402,7 +407,7 @@ nextStateFile:
 		}
 	}
 	mgr.pcapOverIPPackets = make(chan pcapOverIPPacket, 100)
-	mgr.pcapOverIPFlush = make(chan struct{}, 1)
+	mgr.pcapOverIPCmd = make(chan pcapOverIPCmd, 1)
 
 	go func() {
 		for f := range mgr.jobs {
@@ -459,6 +464,10 @@ func (mgr *Manager) Close() {
 			}
 			close(l.close)
 		}
+		for _, e := range mgr.pcapOverIPEndpoints {
+			e.cancel()
+		}
+		mgr.pcapOverIPCmd <- pcapOverIPCmdClose
 		close(c)
 	}
 	<-c
@@ -610,7 +619,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 			idxs, rel := mgr.getIndexesCopy(0)
 			go mgr.importPcapJob(mgr.importJobs[:], mgr.nextStreamID, idxs, rel)
 		} else {
-			mgr.pcapOverIPFlush <- struct{}{}
+			mgr.pcapOverIPCmd <- pcapOverIPCmdFlush
 		}
 		mgr.startTaggingJobIfNeeded()
 		mgr.startConverterJobIfNeeded()
@@ -918,9 +927,10 @@ func (mgr *Manager) AddTag(name, color, queryString string) error {
 		TagDetails: query.TagDetails{
 			Conditions: q.Conditions,
 		},
-		definition: queryString,
-		features:   features,
-		color:      color,
+		definition:   queryString,
+		features:     features,
+		color:        color,
+		referencedBy: make(map[string]struct{}),
 	}
 	for _, tn := range nt.referencedTags() {
 		if tn == name {
@@ -1253,6 +1263,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						markQuery = markQuery[:len(markQuery)-1]
 						if q, err := query.Parse(markQuery); err == nil {
 							newTag.Conditions = q.Conditions
+							newTag.definition = markQuery
 						}
 					}
 				}
@@ -1874,11 +1885,11 @@ func (mgr *Manager) triggerPcapProcessedWebhooks(filenames []string) {
 		return
 	}
 	for _, webhookUrl := range mgr.pcapProcessorWebhookUrls {
-		go mgr.triggerPcapProcessedWebhook(webhookUrl, jsonBody)
+		go triggerPcapProcessedWebhook(webhookUrl, jsonBody)
 	}
 }
 
-func (mgr *Manager) triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
+func triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
 	err := func() error {
 		bodyReader := bytes.NewReader(jsonBody)
 
@@ -1977,10 +1988,15 @@ func (mgr *Manager) pcapOverIPPacketHandler() {
 			}
 			queue = true
 
-		case <-mgr.pcapOverIPFlush:
-			if len(packets) == 0 {
-				queue = false
-				continue
+		case cmd := <-mgr.pcapOverIPCmd:
+			switch cmd {
+			case pcapOverIPCmdClose:
+				return
+			case pcapOverIPCmdFlush:
+				if len(packets) == 0 {
+					queue = false
+					continue
+				}
 			}
 		}
 		go func(packets []pcapOverIPPacket) {
@@ -2398,6 +2414,9 @@ func (c StreamContext) Data(converterName string) ([]index.Data, error) {
 }
 
 func (c StreamContext) HasTag(name string) (bool, error) {
+	if c.v == nil {
+		return false, fmt.Errorf("no view")
+	}
 	td := c.v.tagDetails[name]
 	if !td.Uncertain.IsSet(uint(c.s.ID())) {
 		return td.Matches.IsSet(uint(c.s.ID())), nil
@@ -2407,6 +2426,9 @@ func (c StreamContext) HasTag(name string) (bool, error) {
 }
 
 func (c StreamContext) AllTags() ([]string, error) {
+	if c.v == nil {
+		return nil, fmt.Errorf("no view")
+	}
 	tags := []string{}
 	for tn, td := range c.v.tagDetails {
 		if !td.Uncertain.IsSet(uint(c.s.ID())) {
@@ -2422,6 +2444,9 @@ func (c StreamContext) AllTags() ([]string, error) {
 }
 
 func (c StreamContext) AllConverters() ([]string, error) {
+	if c.v == nil {
+		return nil, fmt.Errorf("no view")
+	}
 	converters := []string{}
 	for tn, cns := range c.v.tagConverters {
 		ok, err := c.HasTag(tn)

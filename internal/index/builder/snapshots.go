@@ -3,6 +3,7 @@ package builder
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
 	"os"
 	"time"
 )
@@ -43,7 +44,10 @@ func loadSnapshots(filename string) ([]*snapshot, error) {
 		if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
 			return nil, err
 		}
-		ss.timestamp = time.Unix(header.TimestampSec, header.TimestampNSec)
+		if header.TimestampNSec/1e9 != header.TimestampSec {
+			return nil, fmt.Errorf("invalid timestamp: %d.%d", header.TimestampSec, header.TimestampNSec)
+		}
+		ss.timestamp = time.Unix(header.TimestampSec, header.TimestampNSec%1e9)
 		ss.chunkCount = header.ChunkCount
 		ss.referencedPackets = make(map[string][]uint64, header.NumPcaps)
 		for ; header.NumPcaps > 0; header.NumPcaps-- {
