@@ -223,6 +223,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
 	}
+	mgr.watcher = watcher
 	mgr.startMonitoringConverters(watcher)
 
 	// Lookup all available converter binaries
