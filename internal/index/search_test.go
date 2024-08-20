@@ -26,7 +26,19 @@ type (
 	}
 )
 
-func makeStream(client, server string, t1 time.Time, data []string, converterData ...[]string) streamInfo {
+var (
+	t1 time.Time
+)
+
+func init() {
+	var err error
+	t1, err = time.Parse(time.RFC3339, "2020-01-01T12:00:00Z")
+	if err != nil {
+		panic(err)
+	}
+}
+
+func makeStream(client, server string, t time.Time, data []string, converterData ...[]string) streamInfo {
 	first := reassembly.TCPDirClientToServer
 	if len(data) != 0 && data[0] == "" {
 		data = data[1:]
@@ -34,14 +46,14 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	}
 	clientAddrPort := netip.MustParseAddrPort(client)
 	serverAddrPort := netip.MustParseAddrPort(server)
-	t2 := t1.Add(time.Second * time.Duration(2+len(data)))
+	t2 := t.Add(time.Second * time.Duration(2+len(data)))
 	t3 := t2.Add(time.Minute)
 
 	pcapinfo := &pcapmetadata.PcapInfo{
-		Filename: fmt.Sprintf("%s_%s_%d.pcap", client, server, t1.UnixNano()),
+		Filename: fmt.Sprintf("%s_%s_%d.pcap", client, server, t.UnixNano()),
 		Filesize: 123,
 
-		PacketTimestampMin: t1,
+		PacketTimestampMin: t,
 		PacketTimestampMax: t2,
 
 		ParseTime:   t3,
@@ -50,7 +62,7 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	packets := []gopacket.CaptureInfo(nil)
 	packetDirections := []reassembly.TCPFlowDirection(nil)
 	packets = append(packets, gopacket.CaptureInfo{
-		Timestamp:     t1,
+		Timestamp:     t,
 		CaptureLength: 123,
 		Length:        123,
 	})
@@ -58,7 +70,7 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	streamData := []streams.StreamData(nil)
 	for i, d := range data {
 		packets = append(packets, gopacket.CaptureInfo{
-			Timestamp:     t1.Add(time.Second * time.Duration(i+1)),
+			Timestamp:     t.Add(time.Second * time.Duration(i+1)),
 			CaptureLength: 123,
 			Length:        123,
 		})
@@ -155,10 +167,6 @@ func (c *fakeConverter) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uin
 
 func TestSearchStreams(t *testing.T) {
 	tmpDir := t.TempDir()
-	t1, err := time.Parse(time.RFC3339, "2020-01-01T12:00:00Z")
-	if err != nil {
-		t.Fatalf("time.Parse failed with error: %v", err)
-	}
 	testCases := []struct {
 		name     string
 		streams  []streamInfo
@@ -310,6 +318,42 @@ func TestSearchStreams(t *testing.T) {
 			},
 			"@sub:id:0,1 @sub:cdata:\"(?P<var>needle[0-9])\" cdata:@sub:var@ id:2",
 			[]uint64{2},
+		},
+		{
+			"test protocol:tcp query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+			},
+			"protocol:tcp",
+			[]uint64{0},
+		},
+		{
+			"test protocol:udp query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+			},
+			"protocol:udp",
+			[]uint64{},
+		},
+		{
+			"test ftime query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.101:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.102:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			fmt.Sprintf(`ftime:"%s"`, t1.Add(time.Hour*2).Local().Format("2006-01-02 1504")),
+			[]uint64{1},
+		},
+		{
+			"test ltime query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.101:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.102:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			fmt.Sprintf(`ltime:":%s"`, t1.Add(time.Hour*2).Local().Format("2006-01-02 1504")),
+			[]uint64{0},
 		},
 	}
 	for _, tc := range testCases {
