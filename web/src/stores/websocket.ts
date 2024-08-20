@@ -79,7 +79,7 @@ export function setupWebsocket() {
           reconnectTimeout < 1000
             ? `1/${1000 / reconnectTimeout}`
             : reconnectTimeout / 1000.0
-        }s`
+        }s`,
       );
       setTimeout(() => {
         if (reconnectTimeout < 10000) reconnectTimeout *= 2;
@@ -120,14 +120,14 @@ export function setupWebsocket() {
             store.tags = store.tags.filter((tag) => tag.Name != e.Tag.Name);
           if (streamStore.stream != null)
             streamStore.stream.Tags = streamStore.stream.Tags.filter(
-              (tag) => tag !== e.Tag.Name
+              (tag) => tag !== e.Tag.Name,
             );
           if (streamsStore.result != null)
             streamsStore.result.Results = streamsStore.result.Results.map(
               (result) => {
                 result.Tags = result.Tags.filter((tag) => tag !== e.Tag.Name);
                 return result;
-              }
+              },
             );
           break;
         case "tagUpdated":
@@ -138,7 +138,7 @@ export function setupWebsocket() {
           }
           if (store.tags != null)
             store.tags = store.tags.map((t) =>
-              t.Name == e.Tag.Name ? e.Tag : t
+              t.Name == e.Tag.Name ? e.Tag : t,
             );
           break;
         case "converterAdded":
@@ -161,7 +161,7 @@ export function setupWebsocket() {
           }
           if (store.converters != null)
             store.converters = store.converters.filter(
-              (c) => c.Name != e.Converter.Name
+              (c) => c.Name != e.Converter.Name,
             );
           break;
         case "converterCompleted":
@@ -172,7 +172,7 @@ export function setupWebsocket() {
           }
           if (store.converters != null) {
             store.converters = store.converters.map((c) =>
-              c.Name == e.Converter.Name ? e.Converter : c
+              c.Name == e.Converter.Name ? e.Converter : c,
             );
           }
           break;

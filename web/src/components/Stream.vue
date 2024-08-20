@@ -241,7 +241,7 @@
               $options.filters?.prettyBytes(
                 stream.stream.Stream.Client.Bytes,
                 1,
-                true
+                true,
               )
             }})</v-col
           >
@@ -281,7 +281,7 @@
               $options.filters?.prettyBytes(
                 stream.stream.Stream.Server.Bytes,
                 1,
-                true
+                true,
               )
             }})</v-col
           >

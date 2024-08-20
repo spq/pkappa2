@@ -592,7 +592,7 @@ graphStore.$subscribe((_mutation, state) => {
   }
   const updateChartFilter = function (
     min: number | undefined,
-    max: number | undefined
+    max: number | undefined,
   ) {
     if (min !== undefined && max !== undefined) {
       const fmt = (t: number) => {
@@ -714,7 +714,7 @@ function fetchGraphLocal() {
       chartTypes[type].aspects,
       tags,
       query as string,
-      type as GraphType
+      type as GraphType,
     )
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to update graph: ${err}`);

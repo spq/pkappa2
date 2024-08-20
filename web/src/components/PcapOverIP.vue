@@ -76,16 +76,16 @@
                 props.item.LastDisconnected === 0
                   ? "Never connected"
                   : props.item.LastConnected > props.item.LastDisconnected
-                  ? `Connected since ${moment
-                      .duration(
-                        currentTime - props.item.LastConnected / 1_000_000
-                      )
-                      .humanize()}`
-                  : `Disconnected since ${moment
-                      .duration(
-                        currentTime - props.item.LastDisconnected / 1_000_000
-                      )
-                      .humanize()}`
+                    ? `Connected since ${moment
+                        .duration(
+                          currentTime - props.item.LastConnected / 1_000_000,
+                        )
+                        .humanize()}`
+                    : `Disconnected since ${moment
+                        .duration(
+                          currentTime - props.item.LastDisconnected / 1_000_000,
+                        )
+                        .humanize()}`
               }}
             </div>
           </template>
@@ -208,7 +208,7 @@ function refresh() {
   store.updatePcapOverIPEndpoints().catch((err: string) => {
     EventBus.emit(
       "showError",
-      `Failed to update PCAP-over-IP endpoints: ${err}`
+      `Failed to update PCAP-over-IP endpoints: ${err}`,
     );
   });
 }
@@ -243,7 +243,7 @@ function del() {
     .catch((err: string) => {
       EventBus.emit(
         "showError",
-        `Failed to delete PCAP-over-IP endpoint: ${err}`
+        `Failed to delete PCAP-over-IP endpoint: ${err}`,
       );
       delDialogError.value = true;
       delDialogLoading.value = false;

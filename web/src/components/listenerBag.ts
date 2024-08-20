@@ -14,7 +14,7 @@ export default class ListenerBag {
   addListener(
     node: Node,
     event: string,
-    callback: EventListenerOrEventListenerObject
+    callback: EventListenerOrEventListenerObject,
   ) {
     this.listeners.push({ node, event, callback });
     node.addEventListener(event, callback);
@@ -22,7 +22,7 @@ export default class ListenerBag {
 
   clear() {
     this.listeners.forEach(({ node, event, callback }) =>
-      node.removeEventListener(event, callback)
+      node.removeEventListener(event, callback),
     );
     this.listeners = [];
   }

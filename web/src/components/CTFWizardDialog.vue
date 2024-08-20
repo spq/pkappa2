@@ -181,12 +181,12 @@ function createFlagTags() {
     store.addTag(
       tagPrefix + flagInName,
       flagInPrefix + flagRegex.value,
-      flagInColor
+      flagInColor,
     ),
     store.addTag(
       tagPrefix + flagOutName,
       flagOutPrefix + flagRegex.value,
-      flagOutColor
+      flagOutColor,
     ),
   ])
     .then((res) => {

@@ -262,7 +262,7 @@ const schemeInitialisations: Record<
   dark: 2,
 };
 const colorscheme = ref<ColorSchemeButtonTriState>(
-  schemeInitialisations[getColorSchemeFromStorage()]
+  schemeInitialisations[getColorSchemeFromStorage()],
 );
 const tagTypes = [
   {

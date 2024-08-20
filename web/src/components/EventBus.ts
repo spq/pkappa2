@@ -7,7 +7,7 @@ interface GlobalEvents {
   showCreateTagDialog: (
     tagType: string,
     tagQuery: string,
-    tagStreams: number[]
+    tagStreams: number[],
   ) => void;
   showError: (message: string) => void;
   showMessage: (message: string) => void;
