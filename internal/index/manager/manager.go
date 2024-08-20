@@ -2401,6 +2401,9 @@ func (c StreamContext) Data(converterName string) ([]index.Data, error) {
 }
 
 func (c StreamContext) HasTag(name string) (bool, error) {
+	if c.v == nil {
+		return false, fmt.Errorf("no view")
+	}
 	td := c.v.tagDetails[name]
 	if !td.Uncertain.IsSet(uint(c.s.ID())) {
 		return td.Matches.IsSet(uint(c.s.ID())), nil
@@ -2410,6 +2413,9 @@ func (c StreamContext) HasTag(name string) (bool, error) {
 }
 
 func (c StreamContext) AllTags() ([]string, error) {
+	if c.v == nil {
+		return nil, fmt.Errorf("no view")
+	}
 	tags := []string{}
 	for tn, td := range c.v.tagDetails {
 		if !td.Uncertain.IsSet(uint(c.s.ID())) {
@@ -2425,6 +2431,9 @@ func (c StreamContext) AllTags() ([]string, error) {
 }
 
 func (c StreamContext) AllConverters() ([]string, error) {
+	if c.v == nil {
+		return nil, fmt.Errorf("no view")
+	}
 	converters := []string{}
 	for tn, cns := range c.v.tagConverters {
 		ok, err := c.HasTag(tn)
