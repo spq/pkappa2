@@ -103,7 +103,9 @@ func makeUDPPacket(client, server string, t time.Time, payload string) pcapOverI
 		SrcPort: layers.UDPPort(clientAddrPort.Port()),
 		DstPort: layers.UDPPort(serverAddrPort.Port()),
 	}
-	udp.SetNetworkLayerForChecksum(&ip)
+	if err := udp.SetNetworkLayerForChecksum(&ip); err != nil {
+		panic(err)
+	}
 
 	options := gopacket.SerializeOptions{
 		ComputeChecksums: true,
@@ -199,7 +201,9 @@ func TestTags(t *testing.T) {
 			}}; !reflect.DeepEqual(got, want) {
 				t.Fatalf("Manager.ListTags() = %v, want %v", got, want)
 			}
-			mgr.DelTag(tc.tag)
+			if err := mgr.DelTag(tc.tag); err != nil {
+				t.Fatalf("Manager.DelTag failed with error: %v", err)
+			}
 		})
 	}
 	if err := mgr.AddTag("service/foo", "red", "cport:2,3"); err != nil {
@@ -390,16 +394,22 @@ func TestWebhooks(t *testing.T) {
 		data, err := io.ReadAll(req.Body)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte(err.Error()))
+			if _, err := rw.Write([]byte(err.Error())); err != nil {
+				panic(err)
+			}
 			return
 		}
 		res := []string(nil)
 		if err := json.Unmarshal(data, &res); err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte(err.Error()))
+			if _, err := rw.Write([]byte(err.Error())); err != nil {
+				panic(err)
+			}
 			return
 		}
-		rw.Write([]byte("ok"))
+		if _, err := rw.Write([]byte("ok")); err != nil {
+			panic(err)
+		}
 		receivedPcaps <- res
 		close(receivedPcaps)
 	}))
@@ -461,9 +471,11 @@ func TestManagerView(t *testing.T) {
 	}
 	view := mgr.GetView()
 	defer view.Release()
-	view.AllStreams(context.Background(), func(sc StreamContext) error {
+	if err := view.AllStreams(context.Background(), func(sc StreamContext) error {
 		return nil
-	}, PrefetchAllTags())
+	}, PrefetchAllTags()); err != nil {
+		t.Fatalf("View.AllStreams failed with error: %v", err)
+	}
 	rt, err := view.ReferenceTime()
 	if err != nil {
 		t.Fatalf("View.ReferenceTime failed with error: %v", err)

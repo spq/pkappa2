@@ -322,6 +322,9 @@ func TestSearchStreams(t *testing.T) {
 				streamsMap[uint64(i)] = s
 			}
 			r, err := makeIndex(tmpDir, streamsMap, &converters)
+			if err != nil {
+				t.Fatalf("Error creating index: %v", err)
+			}
 			t.Logf("using query %q", tc.query)
 			q, err := query.Parse(tc.query)
 			if err != nil {
