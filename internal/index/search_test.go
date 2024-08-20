@@ -38,7 +38,7 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	t3 := t2.Add(time.Minute)
 
 	pcapinfo := &pcapmetadata.PcapInfo{
-		Filename: "test.pcap",
+		Filename: fmt.Sprintf("%s_%s_%d.pcap", client, server, t1.UnixNano()),
 		Filesize: 123,
 
 		PacketTimestampMin: t1,
