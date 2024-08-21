@@ -21,7 +21,7 @@ export default function suggest(
   query: string,
   cursorOffset: number,
   groupedTags: { [key: string]: TagInfo[] },
-  converters: ConverterStatistics[] | null
+  converters: ConverterStatistics[] | null,
 ): SuggestionResults {
   const parser = new nearley.Parser(queryGrammar);
   try {
@@ -35,7 +35,7 @@ export default function suggest(
   // Find element at cursor
   const targetElem = _findElementAtCursor(
     parser.results as QueryElement[],
-    cursorOffset
+    cursorOffset,
   );
   if (!targetElem) return { suggestions: [], start: 0, end: 0, type: "tag" };
 
@@ -50,7 +50,7 @@ export default function suggest(
     const end = start + (text.length ?? 0) - 1;
     const tagsInGroup = groupedTags[keyword].map((t) => t.Name.split("/")[1]);
     const suggestions = tagsInGroup.filter(
-      (t) => t.startsWith(value) && t !== value
+      (t) => t.startsWith(value) && t !== value,
     );
     return {
       suggestions,
@@ -82,12 +82,12 @@ export default function suggest(
 
 function _findElementAtCursor(
   results: QueryElement[],
-  cursorOffset: number
+  cursorOffset: number,
 ): ExpressionQueryElement | null {
   const elements = [...results];
   const isCursorInsideElement = (
     elem: ExpressionQueryElement,
-    part: "value" | "converter"
+    part: "value" | "converter",
   ) => {
     const partValue = elem[part];
     if (!partValue) return false;

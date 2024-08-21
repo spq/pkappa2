@@ -162,7 +162,7 @@ const APIClient = {
       query,
       {
         page,
-      }
+      },
     );
   },
   async getStream(streamId: number, converter: string) {
@@ -173,7 +173,7 @@ const APIClient = {
       null,
       {
         converter,
-      }
+      },
     );
   },
   async getStatus() {
@@ -198,7 +198,7 @@ const APIClient = {
     return this.performGuarded(
       "get",
       `/converters/stderr/${converter}/${pid}`,
-      isProcessStderr
+      isProcessStderr,
     );
   },
   async resetConverter(converter: string) {
@@ -238,7 +238,7 @@ const APIClient = {
     delta: string,
     aspects: string[],
     tags: string[],
-    query: string
+    query: string,
   ) {
     const params = new URLSearchParams();
     params.append("delta", delta);
@@ -256,7 +256,7 @@ const APIClient = {
       "/graph.json",
       isGraphResponse,
       null,
-      params
+      params,
     );
   },
   async markTagNew(name: string, streams: number[], color: string) {
@@ -296,7 +296,7 @@ const APIClient = {
     method: string,
     resource: string,
     data?: string | null,
-    params?: object | URLSearchParams
+    params?: object | URLSearchParams,
   ) {
     let signal: AbortSignal | undefined;
     if (resource == "/search.json" || resource == "/graph.json") {
@@ -318,7 +318,7 @@ const APIClient = {
     resource: string,
     guard: (obj: unknown) => obj is ResponseData,
     data?: string | null,
-    params?: object | URLSearchParams
+    params?: object | URLSearchParams,
   ) {
     const response = await this.perform(method, resource, data, params);
     if (guard(response.data)) {

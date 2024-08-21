@@ -15,7 +15,7 @@ export function registerSelectionListener(streamInstance: ThisProxy) {
   listenerBag.addListener(
     document,
     "selectionchange",
-    onSelectionChange.bind(streamInstance)
+    onSelectionChange.bind(streamInstance),
   );
 }
 
@@ -27,7 +27,7 @@ function getFromDataSet(
   outerBound: Node,
   container: Node,
   data: string,
-  fallback = null
+  fallback = null,
 ) {
   const node = getDataSetContainer(outerBound, container, data);
   if (node == null) return fallback;
@@ -66,8 +66,8 @@ function escape(text: string) {
             .charCodeAt(0)
             .toString(16)
             .toUpperCase()
-            .padStart(2, "0")}}`
-      )
+            .padStart(2, "0")}}`,
+      ),
     )
     .join("");
 }
@@ -107,12 +107,12 @@ function onSelectionChange(this: ThisProxy) {
   const datasetStartContainer = getDataSetContainer(
     streamDataNode,
     startContainer,
-    "chunkIdx"
+    "chunkIdx",
   );
   const datasetEndContainer = getDataSetContainer(
     streamDataNode,
     endContainer,
-    "chunkIdx"
+    "chunkIdx",
   );
   if (
     datasetStartContainer == null ||
@@ -127,10 +127,10 @@ function onSelectionChange(this: ThisProxy) {
     return;
   }
   const startChunkIdx = parseInt(
-    getFromDataSet(streamDataNode, datasetStartContainer, "chunkIdx") ?? "0"
+    getFromDataSet(streamDataNode, datasetStartContainer, "chunkIdx") ?? "0",
   );
   const endChunkIdx = parseInt(
-    getFromDataSet(streamDataNode, datasetEndContainer, "chunkIdx") ?? "0"
+    getFromDataSet(streamDataNode, datasetEndContainer, "chunkIdx") ?? "0",
   );
   if (
     [startChunkIdx, startOffset, endChunkIdx, endOffset].some((i) => i === null)

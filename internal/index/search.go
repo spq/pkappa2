@@ -60,8 +60,8 @@ outer:
 	for _, remaining := range oldRemaining {
 		for sqi, sq := range subqueries {
 			old := remaining[sq]
-			remove := old.And(*forbidden[sqi])
-			keep := old.Sub(*forbidden[sqi])
+			remove := old.AndCopy(*forbidden[sqi])
+			keep := old.SubCopy(*forbidden[sqi])
 			if remove.IsZero() {
 				sqs.remaining = append(sqs.remaining, remaining)
 				continue outer
@@ -530,7 +530,7 @@ conditions:
 			lastSubQueryData := subQueryData[len(subQueryData)-1]
 			for i, l := 0, len(lastSubQueryData)-1; i < l; i++ {
 				r := &lastSubQueryData[i+1].ranges
-				*r = r.Or(lastSubQueryData[i].ranges)
+				*r = r.OrCopy(lastSubQueryData[i].ranges)
 			}
 
 			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
@@ -674,7 +674,7 @@ conditions:
 			lastSubQueryData := subQueryData[len(subQueryData)-1]
 			for i, l := 0, len(lastSubQueryData)-1; i < l; i++ {
 				r := &lastSubQueryData[i+1].ranges
-				*r = r.Or(lastSubQueryData[i].ranges)
+				*r = r.OrCopy(lastSubQueryData[i].ranges)
 			}
 			filters = append(filters, func(sc *searchContext, s *stream) (bool, error) {
 				d := startD

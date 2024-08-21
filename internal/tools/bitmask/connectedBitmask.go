@@ -48,13 +48,6 @@ func (bm ConnectedBitmask) IsZero() bool {
 	return len(bm.entries) == 0
 }
 
-func (bm ConnectedBitmask) LeadingZeros() int {
-	if len(bm.entries) != 0 {
-		return int(bm.entries[0].min)
-	}
-	return -1
-}
-
 func (bm *ConnectedBitmask) Set(bit uint) {
 	for i := range bm.entries {
 		e := &bm.entries[i]
@@ -145,7 +138,11 @@ func (bm ConnectedBitmask) Equal(other ConnectedBitmask) bool {
 	return true
 }
 
-func (bm ConnectedBitmask) Or(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) Or(other ConnectedBitmask) {
+	*bm = bm.OrCopy(other)
+}
+
+func (bm ConnectedBitmask) OrCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 	aIdx, bIdx := 0, 0
 	for aIdx < len(bm.entries) && bIdx < len(other.entries) {
@@ -172,7 +169,9 @@ func (bm ConnectedBitmask) Or(other ConnectedBitmask) ConnectedBitmask {
 			if aIdx < len(bm.entries) {
 				a = bm.entries[aIdx]
 				if n.max+1 >= a.min {
-					n.max = a.max
+					if n.max < a.max {
+						n.max = a.max
+					}
 					aIdx++
 					continue
 				}
@@ -180,7 +179,9 @@ func (bm ConnectedBitmask) Or(other ConnectedBitmask) ConnectedBitmask {
 			if bIdx < len(other.entries) {
 				b = other.entries[bIdx]
 				if n.max+1 >= b.min {
-					n.max = b.max
+					if n.max < b.max {
+						n.max = b.max
+					}
 					bIdx++
 					continue
 				}
@@ -194,7 +195,11 @@ func (bm ConnectedBitmask) Or(other ConnectedBitmask) ConnectedBitmask {
 	return ConnectedBitmask{new}
 }
 
-func (bm ConnectedBitmask) And(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) And(other ConnectedBitmask) {
+	*bm = bm.AndCopy(other)
+}
+
+func (bm ConnectedBitmask) AndCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 	for aIdx, bIdx := 0, 0; aIdx < len(bm.entries) && bIdx < len(other.entries); {
 		a, b := bm.entries[aIdx], other.entries[bIdx]
@@ -224,7 +229,11 @@ func (bm ConnectedBitmask) And(other ConnectedBitmask) ConnectedBitmask {
 	return ConnectedBitmask{new}
 }
 
-func (bm ConnectedBitmask) Xor(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) Xor(other ConnectedBitmask) {
+	*bm = bm.XorCopy(other)
+}
+
+func (bm ConnectedBitmask) XorCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 	aIdx, bIdx := 0, 0
 	for aIdx < len(bm.entries) && bIdx < len(other.entries) {
@@ -261,6 +270,7 @@ func (bm ConnectedBitmask) Xor(other ConnectedBitmask) ConnectedBitmask {
 				bIdx++
 				if bIdx >= len(other.entries) {
 					new = append(new, a)
+					aIdx++
 					break
 				}
 				b = other.entries[bIdx]
@@ -269,6 +279,7 @@ func (bm ConnectedBitmask) Xor(other ConnectedBitmask) ConnectedBitmask {
 				aIdx++
 				if aIdx >= len(bm.entries) {
 					new = append(new, b)
+					bIdx++
 					break
 				}
 				a = bm.entries[aIdx]
@@ -280,7 +291,11 @@ func (bm ConnectedBitmask) Xor(other ConnectedBitmask) ConnectedBitmask {
 	return ConnectedBitmask{new}
 }
 
-func (bm ConnectedBitmask) Sub(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) Sub(other ConnectedBitmask) {
+	*bm = bm.SubCopy(other)
+}
+
+func (bm ConnectedBitmask) SubCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 outer:
 	for aIdx, bIdx := 0, 0; aIdx < len(bm.entries); aIdx++ {
@@ -319,16 +334,26 @@ func (bm ConnectedBitmask) Copy() ConnectedBitmask {
 }
 
 func (bm *ConnectedBitmask) Inject(bit uint, value bool) {
+loop:
 	for i := len(bm.entries) - 1; i >= 0; i-- {
 		e := &bm.entries[i]
-		if e.max < bit {
-			break
+		switch {
+		case bit == e.min && bit == e.max:
+			e.min++
+			e.max++
+		case bit == e.min:
+			e.min++
+			e.max++
+		case bit == e.max:
+			e.max++
+		case bit >= e.min && bit <= e.max:
+			e.max++
+		case bit < e.min:
+			e.min++
+			e.max++
+		case bit > e.max:
+			break loop
 		}
-		e.max++
-		if e.min < bit {
-			break
-		}
-		e.min++
 	}
 	if value {
 		bm.Set(bit)
@@ -337,36 +362,37 @@ func (bm *ConnectedBitmask) Inject(bit uint, value bool) {
 	}
 }
 
-func (bm *ConnectedBitmask) Extract(bit uint) {
+func (bm *ConnectedBitmask) Extract(bit uint) bool {
 	for i := len(bm.entries) - 1; i >= 0; i-- {
 		e := &bm.entries[i]
 		if e.max < bit {
-			break
+			return false
 		}
 		e.max--
 		if e.min < bit {
-			break
+			return true
 		}
 		if e.min == bit {
 			if e.max < e.min {
 				// remove the entry, it was {bit, bit} before
 				bm.entries = append(bm.entries[:i], bm.entries[i+1:]...)
 			}
-			break
+			return true
 		}
 		e.min--
 		if bit == e.min {
 			// we might be extracting a 1 bit wide gap between two entries, if so, merge them
 			if i == 0 {
-				break
+				return false
 			}
 			e2 := &bm.entries[i-1]
 			if e2.max+1 != e.min {
-				break
+				return false
 			}
 			e2.max = e.max
 			bm.entries = append(bm.entries[:i], bm.entries[i+1:]...)
-			break
+			return false
 		}
 	}
+	return false
 }

@@ -193,7 +193,7 @@ watch(
   () => {
     setSearchBox(route.query.q as string);
   },
-  { immediate: true }
+  { immediate: true },
 );
 watch(
   suggestionItems,
@@ -211,7 +211,7 @@ watch(
         (searchBoxField.value?.$el.getBoundingClientRect().left ?? 0);
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 onMounted(() => {
@@ -285,7 +285,7 @@ function startSuggestionSearch() {
       val,
       cursorPosition,
       store.groupedTags,
-      store.converters
+      store.converters,
     );
     suggestionItems.value = suggestionResult.suggestions;
     suggestionStart.value = suggestionResult.start;
@@ -336,7 +336,7 @@ function menuUp() {
 function selectSuggestionIndex(index: number) {
   suggestionSelectedIndex.value = Math.min(
     Math.max(index, 0),
-    suggestionItems.value.length - 1
+    suggestionItems.value.length - 1,
   );
 }
 
@@ -364,7 +364,7 @@ function historyDown() {
   setSearchBox(
     historyIndex.value === -1
       ? pendingSearch.value
-      : getTermAt(historyIndex.value)
+      : getTermAt(historyIndex.value),
   );
 }
 

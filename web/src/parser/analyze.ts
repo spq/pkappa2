@@ -21,7 +21,7 @@ export default function analyze(query: string): {
     parser.feed(query);
   } catch (parseError) {
     console.log(
-      `Error at character ${(parseError as { offset: number }).offset}`
+      `Error at character ${(parseError as { offset: number }).offset}`,
     );
     return {};
   }

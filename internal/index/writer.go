@@ -168,9 +168,9 @@ func (w *Writer) AddStream(s *streams.Stream, streamID uint64) (bool, error) {
 		w.header.FirstPacketTime = firstPacketSeconds
 		newReferenceTime := time.Unix(int64(w.header.FirstPacketTime), 0)
 		diff := uint64(oldReferenceTime.Sub(newReferenceTime).Nanoseconds())
-		for _, oldStream := range w.streams {
-			oldStream.FirstPacketTimeNS += diff
-			oldStream.LastPacketTimeNS += diff
+		for i := range w.streams {
+			w.streams[i].FirstPacketTimeNS += diff
+			w.streams[i].LastPacketTimeNS += diff
 		}
 	}
 	referenceTime := time.Unix(int64(w.header.FirstPacketTime), 0)

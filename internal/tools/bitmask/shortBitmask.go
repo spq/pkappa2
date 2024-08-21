@@ -1,6 +1,8 @@
 package bitmask
 
-import "math/bits"
+import (
+	"math/bits"
+)
 
 type (
 	ShortBitmask struct {
@@ -12,6 +14,18 @@ type (
 func MakeShortBitmask(mask uint64) ShortBitmask {
 	return ShortBitmask{
 		mask: mask,
+	}
+}
+
+func (bm ShortBitmask) Copy() ShortBitmask {
+	var next *ShortBitmask
+	if bm.next != nil {
+		tmp := bm.next.Copy()
+		next = &tmp
+	}
+	return ShortBitmask{
+		mask: bm.mask,
+		next: next,
 	}
 }
 
@@ -56,18 +70,6 @@ func (bm ShortBitmask) IsZero() bool {
 		}
 		if bm.next == nil {
 			return true
-		}
-		bm = *bm.next
-	}
-}
-
-func (bm ShortBitmask) LeadingZeros() int {
-	for offset := 0; ; offset += 64 {
-		if bm.mask != 0 {
-			return offset + bits.LeadingZeros64(bm.mask)
-		}
-		if bm.next == nil {
-			return -1
 		}
 		bm = *bm.next
 	}
@@ -134,6 +136,12 @@ func (bm ShortBitmask) Equal(other ShortBitmask) bool {
 	}
 }
 
+func (bm *ShortBitmask) OrCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.Or(other)
+	return res
+}
+
 func (bm *ShortBitmask) Or(other ShortBitmask) {
 	for {
 		bm.mask |= other.mask
@@ -149,19 +157,26 @@ func (bm *ShortBitmask) Or(other ShortBitmask) {
 	}
 }
 
-func (bm *ShortBitmask) And(other ShortBitmask) {
-	for {
-		bm.mask &= other.mask
+func (bm ShortBitmask) AndCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.And(other)
+	return res
+}
 
-		if other.next == nil {
-			break
-		}
-		if bm.next == nil {
-			bm.next = &ShortBitmask{}
-		}
+func (bm *ShortBitmask) And(other ShortBitmask) {
+	for other.next != nil && bm.next != nil {
+		bm.mask &= other.mask
 		bm = bm.next
 		other = *other.next
 	}
+	bm.mask &= other.mask
+	bm.next = nil
+}
+
+func (bm *ShortBitmask) XorCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.Xor(other)
+	return res
 }
 
 func (bm *ShortBitmask) Xor(other ShortBitmask) {
@@ -179,15 +194,18 @@ func (bm *ShortBitmask) Xor(other ShortBitmask) {
 	}
 }
 
+func (bm *ShortBitmask) SubCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.Sub(other)
+	return res
+}
+
 func (bm *ShortBitmask) Sub(other ShortBitmask) {
 	for {
 		bm.mask &= ^other.mask
 
-		if other.next == nil {
+		if other.next == nil || bm.next == nil {
 			break
-		}
-		if bm.next == nil {
-			bm.next = &ShortBitmask{}
 		}
 		bm = bm.next
 		other = *other.next
@@ -206,4 +224,44 @@ func (bm *ShortBitmask) Shrink() {
 			lastNonZero = bm
 		}
 	}
+}
+
+func (bm *ShortBitmask) Inject(bit uint, value bool) {
+	if bit >= 64 {
+		if bm.next == nil {
+			if !value {
+				return
+			}
+			bm.next = &ShortBitmask{}
+		}
+		bm.next.Inject(bit-64, value)
+		return
+	}
+	carry := bm.mask>>63 != 0
+	bm.mask = bm.mask&((1<<bit)-1) | (bm.mask&^((1<<bit)-1))<<1
+	if value {
+		bm.mask |= 1 << bit
+	}
+	if bm.next != nil {
+		bm.next.Inject(0, carry)
+	} else if carry {
+		bm.next = &ShortBitmask{mask: 1}
+	}
+}
+
+func (bm *ShortBitmask) Extract(bit uint) bool {
+	if bit >= 64 {
+		if bm.next == nil {
+			return false
+		}
+		return bm.next.Extract(bit - 64)
+	}
+	res := (bm.mask>>bit)&1 != 0
+	bm.mask = bm.mask&((1<<bit)-1) | (bm.mask>>1)&^((1<<bit)-1)
+	if bm.next != nil {
+		if bm.next.Extract(0) {
+			bm.mask |= 1 << 63
+		}
+	}
+	return res
 }

@@ -57,15 +57,6 @@ func (bm LongBitmask) IsZero() bool {
 	return true
 }
 
-func (bm LongBitmask) LeadingZeros() int {
-	for idx, m := range bm.mask {
-		if m != 0 {
-			return idx*64 + bits.LeadingZeros64(m)
-		}
-	}
-	return -1
-}
-
 func (bm LongBitmask) TrailingZerosFrom(bit uint) int {
 	startIdx, lbit := bit/64, bit%64
 	if startIdx >= uint(len(bm.mask)) {
@@ -126,6 +117,12 @@ func (bm LongBitmask) Equal(other LongBitmask) bool {
 	return true
 }
 
+func (bm LongBitmask) OrCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.Or(other)
+	return res
+}
+
 func (bm *LongBitmask) Or(other LongBitmask) {
 	min := len(other.mask)
 	if min > len(bm.mask) {
@@ -139,6 +136,12 @@ func (bm *LongBitmask) Or(other LongBitmask) {
 	}
 }
 
+func (bm LongBitmask) AndCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.And(other)
+	return res
+}
+
 func (bm *LongBitmask) And(other LongBitmask) {
 	if len(bm.mask) > len(other.mask) {
 		bm.mask = bm.mask[:len(other.mask)]
@@ -146,6 +149,12 @@ func (bm *LongBitmask) And(other LongBitmask) {
 	for idx := range bm.mask {
 		bm.mask[idx] &= other.mask[idx]
 	}
+}
+
+func (bm LongBitmask) XorCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.Xor(other)
+	return res
 }
 
 func (bm *LongBitmask) Xor(other LongBitmask) {
@@ -159,6 +168,12 @@ func (bm *LongBitmask) Xor(other LongBitmask) {
 	if len(bm.mask) < len(other.mask) {
 		bm.mask = append(bm.mask, other.mask[len(bm.mask):]...)
 	}
+}
+
+func (bm LongBitmask) SubCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.Sub(other)
+	return res
 }
 
 func (bm *LongBitmask) Sub(other LongBitmask) {
@@ -187,4 +202,22 @@ func (bm LongBitmask) Next(bit *uint) bool {
 		return true
 	}
 	return false
+}
+
+func (bm *LongBitmask) Inject(bit uint, value bool) {
+	idx := bit / 64
+	if idx >= uint(len(bm.mask)) {
+		if value {
+			bm.Set(bit)
+		}
+		return
+	}
+	bit = bit & 63
+	m := &bm.mask[idx]
+	carry := *m >= 1<<63
+	*m = *m&((1<<bit)-1) | (*m&^((1<<bit)-1))<<1
+	if value {
+		*m |= 1 << bit
+	}
+	bm.Inject(idx*64+64, carry)
 }
