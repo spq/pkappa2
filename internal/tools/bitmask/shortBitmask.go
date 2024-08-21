@@ -1,6 +1,8 @@
 package bitmask
 
-import "math/bits"
+import (
+	"math/bits"
+)
 
 type (
 	ShortBitmask struct {
@@ -162,18 +164,14 @@ func (bm ShortBitmask) AndCopy(other ShortBitmask) ShortBitmask {
 }
 
 func (bm *ShortBitmask) And(other ShortBitmask) {
-	for {
+	for other.next != nil && bm.next != nil {
 		bm.mask &= other.mask
-
-		if other.next == nil {
-			break
-		}
-		if bm.next == nil {
-			bm.next = &ShortBitmask{}
-		}
 		bm = bm.next
 		other = *other.next
 	}
+	bm.mask &= other.mask
+	bm.next = nil
+}
 
 func (bm *ShortBitmask) XorCopy(other ShortBitmask) ShortBitmask {
 	res := bm.Copy()
@@ -206,11 +204,8 @@ func (bm *ShortBitmask) Sub(other ShortBitmask) {
 	for {
 		bm.mask &= ^other.mask
 
-		if other.next == nil {
+		if other.next == nil || bm.next == nil {
 			break
-		}
-		if bm.next == nil {
-			bm.next = &ShortBitmask{}
 		}
 		bm = bm.next
 		other = *other.next
