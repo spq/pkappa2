@@ -15,6 +15,18 @@ func MakeShortBitmask(mask uint64) ShortBitmask {
 	}
 }
 
+func (bm ShortBitmask) Copy() ShortBitmask {
+	var next *ShortBitmask
+	if bm.next != nil {
+		tmp := bm.next.Copy()
+		next = &tmp
+	}
+	return ShortBitmask{
+		mask: bm.mask,
+		next: next,
+	}
+}
+
 func (bm ShortBitmask) IsSet(bit uint) bool {
 	for {
 		if bit < 64 {
@@ -134,6 +146,12 @@ func (bm ShortBitmask) Equal(other ShortBitmask) bool {
 	}
 }
 
+func (bm *ShortBitmask) OrCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.Or(other)
+	return res
+}
+
 func (bm *ShortBitmask) Or(other ShortBitmask) {
 	for {
 		bm.mask |= other.mask
@@ -149,6 +167,12 @@ func (bm *ShortBitmask) Or(other ShortBitmask) {
 	}
 }
 
+func (bm ShortBitmask) AndCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.And(other)
+	return res
+}
+
 func (bm *ShortBitmask) And(other ShortBitmask) {
 	for {
 		bm.mask &= other.mask
@@ -162,6 +186,11 @@ func (bm *ShortBitmask) And(other ShortBitmask) {
 		bm = bm.next
 		other = *other.next
 	}
+
+func (bm *ShortBitmask) XorCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.Xor(other)
+	return res
 }
 
 func (bm *ShortBitmask) Xor(other ShortBitmask) {
@@ -177,6 +206,12 @@ func (bm *ShortBitmask) Xor(other ShortBitmask) {
 		bm = bm.next
 		other = *other.next
 	}
+}
+
+func (bm *ShortBitmask) SubCopy(other ShortBitmask) ShortBitmask {
+	res := bm.Copy()
+	res.Sub(other)
+	return res
 }
 
 func (bm *ShortBitmask) Sub(other ShortBitmask) {

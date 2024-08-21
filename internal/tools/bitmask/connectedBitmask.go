@@ -145,7 +145,11 @@ func (bm ConnectedBitmask) Equal(other ConnectedBitmask) bool {
 	return true
 }
 
-func (bm ConnectedBitmask) Or(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) Or(other ConnectedBitmask) {
+	*bm = bm.OrCopy(other)
+}
+
+func (bm ConnectedBitmask) OrCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 	aIdx, bIdx := 0, 0
 	for aIdx < len(bm.entries) && bIdx < len(other.entries) {
@@ -194,7 +198,11 @@ func (bm ConnectedBitmask) Or(other ConnectedBitmask) ConnectedBitmask {
 	return ConnectedBitmask{new}
 }
 
-func (bm ConnectedBitmask) And(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) And(other ConnectedBitmask) {
+	*bm = bm.AndCopy(other)
+}
+
+func (bm ConnectedBitmask) AndCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 	for aIdx, bIdx := 0, 0; aIdx < len(bm.entries) && bIdx < len(other.entries); {
 		a, b := bm.entries[aIdx], other.entries[bIdx]
@@ -224,7 +232,11 @@ func (bm ConnectedBitmask) And(other ConnectedBitmask) ConnectedBitmask {
 	return ConnectedBitmask{new}
 }
 
-func (bm ConnectedBitmask) Xor(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) Xor(other ConnectedBitmask) {
+	*bm = bm.XorCopy(other)
+}
+
+func (bm ConnectedBitmask) XorCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 	aIdx, bIdx := 0, 0
 	for aIdx < len(bm.entries) && bIdx < len(other.entries) {
@@ -280,7 +292,11 @@ func (bm ConnectedBitmask) Xor(other ConnectedBitmask) ConnectedBitmask {
 	return ConnectedBitmask{new}
 }
 
-func (bm ConnectedBitmask) Sub(other ConnectedBitmask) ConnectedBitmask {
+func (bm *ConnectedBitmask) Sub(other ConnectedBitmask) {
+	*bm = bm.SubCopy(other)
+}
+
+func (bm ConnectedBitmask) SubCopy(other ConnectedBitmask) ConnectedBitmask {
 	new := []connectedBitmaskEntry(nil)
 outer:
 	for aIdx, bIdx := 0, 0; aIdx < len(bm.entries); aIdx++ {

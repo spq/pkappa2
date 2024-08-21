@@ -126,6 +126,12 @@ func (bm LongBitmask) Equal(other LongBitmask) bool {
 	return true
 }
 
+func (bm LongBitmask) OrCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.Or(other)
+	return res
+}
+
 func (bm *LongBitmask) Or(other LongBitmask) {
 	min := len(other.mask)
 	if min > len(bm.mask) {
@@ -139,6 +145,12 @@ func (bm *LongBitmask) Or(other LongBitmask) {
 	}
 }
 
+func (bm LongBitmask) AndCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.And(other)
+	return res
+}
+
 func (bm *LongBitmask) And(other LongBitmask) {
 	if len(bm.mask) > len(other.mask) {
 		bm.mask = bm.mask[:len(other.mask)]
@@ -146,6 +158,12 @@ func (bm *LongBitmask) And(other LongBitmask) {
 	for idx := range bm.mask {
 		bm.mask[idx] &= other.mask[idx]
 	}
+}
+
+func (bm LongBitmask) XorCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.Xor(other)
+	return res
 }
 
 func (bm *LongBitmask) Xor(other LongBitmask) {
@@ -159,6 +177,12 @@ func (bm *LongBitmask) Xor(other LongBitmask) {
 	if len(bm.mask) < len(other.mask) {
 		bm.mask = append(bm.mask, other.mask[len(bm.mask):]...)
 	}
+}
+
+func (bm LongBitmask) SubCopy(other LongBitmask) LongBitmask {
+	res := bm.Copy()
+	res.Sub(other)
+	return res
 }
 
 func (bm *LongBitmask) Sub(other LongBitmask) {
