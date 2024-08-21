@@ -169,7 +169,9 @@ func (bm ConnectedBitmask) OrCopy(other ConnectedBitmask) ConnectedBitmask {
 			if aIdx < len(bm.entries) {
 				a = bm.entries[aIdx]
 				if n.max+1 >= a.min {
-					n.max = a.max
+					if n.max < a.max {
+						n.max = a.max
+					}
 					aIdx++
 					continue
 				}
@@ -177,7 +179,9 @@ func (bm ConnectedBitmask) OrCopy(other ConnectedBitmask) ConnectedBitmask {
 			if bIdx < len(other.entries) {
 				b = other.entries[bIdx]
 				if n.max+1 >= b.min {
-					n.max = b.max
+					if n.max < b.max {
+						n.max = b.max
+					}
 					bIdx++
 					continue
 				}
@@ -266,6 +270,7 @@ func (bm ConnectedBitmask) XorCopy(other ConnectedBitmask) ConnectedBitmask {
 				bIdx++
 				if bIdx >= len(other.entries) {
 					new = append(new, a)
+					aIdx++
 					break
 				}
 				b = other.entries[bIdx]
@@ -274,6 +279,7 @@ func (bm ConnectedBitmask) XorCopy(other ConnectedBitmask) ConnectedBitmask {
 				aIdx++
 				if aIdx >= len(bm.entries) {
 					new = append(new, b)
+					bIdx++
 					break
 				}
 				a = bm.entries[aIdx]
@@ -328,16 +334,26 @@ func (bm ConnectedBitmask) Copy() ConnectedBitmask {
 }
 
 func (bm *ConnectedBitmask) Inject(bit uint, value bool) {
+loop:
 	for i := len(bm.entries) - 1; i >= 0; i-- {
 		e := &bm.entries[i]
-		if e.max < bit {
-			break
+		switch {
+		case bit == e.min && bit == e.max:
+			e.min++
+			e.max++
+		case bit == e.min:
+			e.min++
+			e.max++
+		case bit == e.max:
+			e.max++
+		case bit >= e.min && bit <= e.max:
+			e.max++
+		case bit < e.min:
+			e.min++
+			e.max++
+		case bit > e.max:
+			break loop
 		}
-		e.max++
-		if e.min < bit {
-			break
-		}
-		e.min++
 	}
 	if value {
 		bm.Set(bit)
@@ -346,36 +362,37 @@ func (bm *ConnectedBitmask) Inject(bit uint, value bool) {
 	}
 }
 
-func (bm *ConnectedBitmask) Extract(bit uint) {
+func (bm *ConnectedBitmask) Extract(bit uint) bool {
 	for i := len(bm.entries) - 1; i >= 0; i-- {
 		e := &bm.entries[i]
 		if e.max < bit {
-			break
+			return false
 		}
 		e.max--
 		if e.min < bit {
-			break
+			return true
 		}
 		if e.min == bit {
 			if e.max < e.min {
 				// remove the entry, it was {bit, bit} before
 				bm.entries = append(bm.entries[:i], bm.entries[i+1:]...)
 			}
-			break
+			return true
 		}
 		e.min--
 		if bit == e.min {
 			// we might be extracting a 1 bit wide gap between two entries, if so, merge them
 			if i == 0 {
-				break
+				return false
 			}
 			e2 := &bm.entries[i-1]
 			if e2.max+1 != e.min {
-				break
+				return false
 			}
 			e2.max = e.max
 			bm.entries = append(bm.entries[:i], bm.entries[i+1:]...)
-			break
+			return false
 		}
 	}
+	return false
 }
