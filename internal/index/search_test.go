@@ -26,7 +26,19 @@ type (
 	}
 )
 
-func makeStream(client, server string, t1 time.Time, data []string, converterData ...[]string) streamInfo {
+var (
+	t1 time.Time
+)
+
+func init() {
+	var err error
+	t1, err = time.Parse(time.RFC3339, "2020-01-01T12:00:00Z")
+	if err != nil {
+		panic(err)
+	}
+}
+
+func makeStream(client, server string, t time.Time, data []string, converterData ...[]string) streamInfo {
 	first := reassembly.TCPDirClientToServer
 	if len(data) != 0 && data[0] == "" {
 		data = data[1:]
@@ -34,14 +46,14 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	}
 	clientAddrPort := netip.MustParseAddrPort(client)
 	serverAddrPort := netip.MustParseAddrPort(server)
-	t2 := t1.Add(time.Second * time.Duration(2+len(data)))
+	t2 := t.Add(time.Second * time.Duration(2+len(data)))
 	t3 := t2.Add(time.Minute)
 
 	pcapinfo := &pcapmetadata.PcapInfo{
-		Filename: "test.pcap",
+		Filename: fmt.Sprintf("%s_%s_%d.pcap", client, server, t.UnixNano()),
 		Filesize: 123,
 
-		PacketTimestampMin: t1,
+		PacketTimestampMin: t,
 		PacketTimestampMax: t2,
 
 		ParseTime:   t3,
@@ -50,7 +62,7 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	packets := []gopacket.CaptureInfo(nil)
 	packetDirections := []reassembly.TCPFlowDirection(nil)
 	packets = append(packets, gopacket.CaptureInfo{
-		Timestamp:     t1,
+		Timestamp:     t,
 		CaptureLength: 123,
 		Length:        123,
 	})
@@ -58,7 +70,7 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	streamData := []streams.StreamData(nil)
 	for i, d := range data {
 		packets = append(packets, gopacket.CaptureInfo{
-			Timestamp:     t1.Add(time.Second * time.Duration(i+1)),
+			Timestamp:     t.Add(time.Second * time.Duration(i+1)),
 			CaptureLength: 123,
 			Length:        123,
 		})
@@ -95,6 +107,39 @@ func makeStream(client, server string, t1 time.Time, data []string, converterDat
 	}
 }
 
+func makeIndex(tmpDir string, streams map[uint64]streamInfo, converters *map[string]ConverterAccess) (*Reader, error) {
+	w, err := NewWriter(tools.MakeFilename(tmpDir, "idx"))
+	if err != nil {
+		return nil, err
+	}
+	for streamID, si := range streams {
+		ok, err := w.AddStream(&si.s, streamID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("Stream couldn't be added to index")
+		}
+		for i, d := range streams[streamID].c {
+			if d == nil {
+				continue
+			}
+			c := fmt.Sprintf("c%d", i)
+			if _, ok := (*converters)[c]; !ok {
+				(*converters)[c] = &fakeConverter{
+					data: make(map[uint64][]string),
+				}
+			}
+			(*converters)[c].(*fakeConverter).data[streamID] = d
+		}
+	}
+	r, err := w.Finalize()
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
 func (c *fakeConverter) Data(stream *Stream, moreDetails bool) (data []Data, clientBytes, serverBytes uint64, wasCached bool, err error) {
 	return nil, 0, 0, false, nil
 }
@@ -122,7 +167,6 @@ func (c *fakeConverter) DataForSearch(streamID uint64) ([2][]byte, [][2]int, uin
 
 func TestSearchStreams(t *testing.T) {
 	tmpDir := t.TempDir()
-	t1, _ := time.Parse(time.RFC3339, "2020-01-01T12:00:00Z00:00")
 	testCases := []struct {
 		name     string
 		streams  []streamInfo
@@ -275,41 +319,165 @@ func TestSearchStreams(t *testing.T) {
 			"@sub:id:0,1 @sub:cdata:\"(?P<var>needle[0-9])\" cdata:@sub:var@ id:2",
 			[]uint64{2},
 		},
+		{
+			"test protocol:tcp query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+			},
+			"protocol:tcp",
+			[]uint64{0},
+		},
+		{
+			"test protocol:udp query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+			},
+			"protocol:udp",
+			[]uint64{},
+		},
+		{
+			"test ftime query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.101:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.102:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			fmt.Sprintf(`ftime:"%s"`, t1.Add(time.Hour*2).Local().Format("2006-01-02 1504")),
+			[]uint64{1},
+		},
+		{
+			"test ltime query",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.101:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.102:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			fmt.Sprintf(`ltime:":%s"`, t1.Add(time.Hour*2).Local().Format("2006-01-02 1504")),
+			[]uint64{0},
+		},
+		{
+			"sort by id",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			"sort:id",
+			[]uint64{0, 1, 2},
+		},
+		{
+			"sort by -id",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			"sort:-id",
+			[]uint64{2, 1, 0},
+		},
+		{
+			"sort by ftime",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			"sort:ftime",
+			[]uint64{1, 0, 2},
+		},
+		{
+			"sort by ltime",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle1", "foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle2"}),
+			},
+			"sort:ltime",
+			[]uint64{2, 1, 0},
+		},
+		{
+			"sort by cbytes",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"AA"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"AAA"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"A"}),
+			},
+			"sort:cbytes",
+			[]uint64{2, 0, 1},
+		},
+		{
+			"sort by sbytes",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo", "A"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"foo", "AAA"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"foo", "AA"}),
+			},
+			"sort:sbytes",
+			[]uint64{0, 2, 1},
+		},
+		{
+			"sort by cport",
+			[]streamInfo{
+				makeStream("192.168.0.100:2", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:1", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:3", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:cport",
+			[]uint64{1, 0, 2},
+		},
+		{
+			"sort by sport",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:3", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:1", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:2", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:sport",
+			[]uint64{1, 2, 0},
+		},
+		{
+			"sort by chost",
+			[]streamInfo{
+				makeStream("192.168.0.102:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.101:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:chost",
+			[]uint64{2, 1, 0},
+		},
+		{
+			"sort by shost",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.2:80", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.3:80", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:shost",
+			[]uint64{0, 1, 2},
+		},
+		{
+			"sort by multiple",
+			[]streamInfo{
+				makeStream("192.168.0.100:2", "192.168.0.1:1", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:1", "192.168.0.1:1", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:1", "192.168.0.1:2", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:cport,sport",
+			[]uint64{1, 2, 0},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			converters := map[string]ConverterAccess{
 				"dummy": &fakeConverter{},
 			}
-			w, err := NewWriter(tools.MakeFilename(tmpDir, "idx"))
-			if err != nil {
-				t.Fatalf("Error creating index writer: %v", err)
+			streamsMap := make(map[uint64]streamInfo)
+			for i, s := range tc.streams {
+				streamsMap[uint64(i)] = s
 			}
-			for streamID := range tc.streams {
-				streamID := uint64(streamID)
-				ok, err := w.AddStream(&tc.streams[streamID].s, streamID)
-				if err != nil {
-					t.Fatalf("Error adding stream to index: %v", err)
-				}
-				if !ok {
-					t.Fatalf("Stream couldn't be added to index")
-				}
-				for i, d := range tc.streams[streamID].c {
-					if d == nil {
-						continue
-					}
-					c := fmt.Sprintf("c%d", i)
-					if _, ok := converters[c]; !ok {
-						converters[c] = &fakeConverter{
-							data: make(map[uint64][]string),
-						}
-					}
-					converters[c].(*fakeConverter).data[streamID] = d
-				}
-			}
-			r, err := w.Finalize()
+			r, err := makeIndex(tmpDir, streamsMap, &converters)
 			if err != nil {
-				t.Fatalf("Error finalizing index writer: %v", err)
+				t.Fatalf("Error creating index: %v", err)
 			}
 			t.Logf("using query %q", tc.query)
 			q, err := query.Parse(tc.query)
