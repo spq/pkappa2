@@ -230,3 +230,43 @@ func (bm *ShortBitmask) Shrink() {
 		}
 	}
 }
+
+func (bm *ShortBitmask) Inject(bit uint, value bool) {
+	if bit >= 64 {
+		if bm.next == nil {
+			if !value {
+				return
+			}
+			bm.next = &ShortBitmask{}
+		}
+		bm.next.Inject(bit-64, value)
+		return
+	}
+	carry := bm.mask>>63 != 0
+	bm.mask = bm.mask&((1<<bit)-1) | (bm.mask&^((1<<bit)-1))<<1
+	if value {
+		bm.mask |= 1 << bit
+	}
+	if bm.next != nil {
+		bm.next.Inject(0, carry)
+	} else if carry {
+		bm.next = &ShortBitmask{mask: 1}
+	}
+}
+
+func (bm *ShortBitmask) Extract(bit uint) bool {
+	if bit >= 64 {
+		if bm.next == nil {
+			return false
+		}
+		return bm.next.Extract(bit - 64)
+	}
+	res := (bm.mask>>bit)&1 != 0
+	bm.mask = bm.mask&((1<<bit)-1) | (bm.mask>>1)&^((1<<bit)-1)
+	if bm.next != nil {
+		if bm.next.Extract(0) {
+			bm.mask |= 1 << 63
+		}
+	}
+	return res
+}

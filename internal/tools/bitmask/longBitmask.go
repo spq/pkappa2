@@ -203,3 +203,21 @@ func (bm LongBitmask) Next(bit *uint) bool {
 	}
 	return false
 }
+
+func (bm *LongBitmask) Inject(bit uint, value bool) {
+	idx := bit / 64
+	if idx >= uint(len(bm.mask)) {
+		if value {
+			bm.Set(bit)
+		}
+		return
+	}
+	bit = bit & 63
+	m := &bm.mask[idx]
+	carry := *m >= 1<<63
+	*m = *m&((1<<bit)-1) | (*m&^((1<<bit)-1))<<1
+	if value {
+		*m |= 1 << bit
+	}
+	bm.Inject(idx*64+64, carry)
+}
