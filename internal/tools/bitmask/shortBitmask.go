@@ -73,18 +73,6 @@ func (bm ShortBitmask) IsZero() bool {
 	}
 }
 
-func (bm ShortBitmask) LeadingZeros() int {
-	for offset := 0; ; offset += 64 {
-		if bm.mask != 0 {
-			return offset + bits.LeadingZeros64(bm.mask)
-		}
-		if bm.next == nil {
-			return -1
-		}
-		bm = *bm.next
-	}
-}
-
 func (bm *ShortBitmask) Set(bit uint) {
 	for {
 		if bit < 64 {

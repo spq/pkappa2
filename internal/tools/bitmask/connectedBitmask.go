@@ -48,13 +48,6 @@ func (bm ConnectedBitmask) IsZero() bool {
 	return len(bm.entries) == 0
 }
 
-func (bm ConnectedBitmask) LeadingZeros() int {
-	if len(bm.entries) != 0 {
-		return int(bm.entries[0].min)
-	}
-	return -1
-}
-
 func (bm *ConnectedBitmask) Set(bit uint) {
 	for i := range bm.entries {
 		e := &bm.entries[i]
