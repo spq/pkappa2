@@ -355,6 +355,116 @@ func TestSearchStreams(t *testing.T) {
 			fmt.Sprintf(`ltime:":%s"`, t1.Add(time.Hour*2).Local().Format("2006-01-02 1504")),
 			[]uint64{0},
 		},
+		{
+			"sort by id",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			"sort:id",
+			[]uint64{0, 1, 2},
+		},
+		{
+			"sort by -id",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			"sort:-id",
+			[]uint64{2, 1, 0},
+		},
+		{
+			"sort by ftime",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle1"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"needle2"}),
+			},
+			"sort:ftime",
+			[]uint64{1, 0, 2},
+		},
+		{
+			"sort by ltime",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle0"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle1", "foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle2"}),
+			},
+			"sort:ltime",
+			[]uint64{2, 1, 0},
+		},
+		{
+			"sort by cbytes",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"AA"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"AAA"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"A"}),
+			},
+			"sort:cbytes",
+			[]uint64{2, 0, 1},
+		},
+		{
+			"sort by sbytes",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo", "A"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"foo", "AAA"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"foo", "AA"}),
+			},
+			"sort:sbytes",
+			[]uint64{0, 2, 1},
+		},
+		{
+			"sort by cport",
+			[]streamInfo{
+				makeStream("192.168.0.100:2", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:1", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:3", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:cport",
+			[]uint64{1, 0, 2},
+		},
+		{
+			"sort by sport",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:3", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:1", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:2", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:sport",
+			[]uint64{1, 2, 0},
+		},
+		{
+			"sort by chost",
+			[]streamInfo{
+				makeStream("192.168.0.102:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.101:123", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:chost",
+			[]uint64{2, 1, 0},
+		},
+		{
+			"sort by shost",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.2:80", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:123", "192.168.0.3:80", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:shost",
+			[]uint64{0, 1, 2},
+		},
+		{
+			"sort by multiple",
+			[]streamInfo{
+				makeStream("192.168.0.100:2", "192.168.0.1:1", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("192.168.0.100:1", "192.168.0.1:1", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("192.168.0.100:1", "192.168.0.1:2", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:cport,sport",
+			[]uint64{1, 2, 0},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

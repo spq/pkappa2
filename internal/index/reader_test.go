@@ -23,7 +23,7 @@ func TestReader(t *testing.T) {
 		t.Fatalf("makeIndex failed: %v", err)
 	}
 	if got, want := idx.PacketCount(), 30; got != want {
-		t.Fatalf("Reader.PacketCount() = %v, want %v", got, want)
+		t.Errorf("Reader.PacketCount() = %v, want %v", got, want)
 	}
 	gotStreams := idx.StreamIDs()
 	if len(gotStreams) != len(streams) {
@@ -35,28 +35,34 @@ func TestReader(t *testing.T) {
 			t.Fatalf("Reader.StreamByID failed with error: %v", err)
 		}
 		if s1.index != streamIndex {
-			t.Fatalf("streamIndex mismatch: %v != %v", s1.index, streamIndex)
+			t.Errorf("streamIndex mismatch: %v != %v", s1.index, streamIndex)
 		}
 		s2, err := idx.streamByIndex(streamIndex)
 		if err != nil {
 			t.Fatalf("Reader.streamByIndex failed with error: %v", err)
 		}
 		if s2.StreamID != streamID {
-			t.Fatalf("streamID mismatch: %v != %v", s2.StreamID, streamID)
+			t.Errorf("streamID mismatch: %v != %v", s2.StreamID, streamID)
 		}
 		s3, err := idx.StreamByFirstPacketSource(streams[streamID].s.Packets[0].AncillaryData[0].(*pcapmetadata.PcapMetadata).PcapInfo.Filename, 0)
 		if err != nil {
 			t.Fatalf("Reader.StreamByFirstPacketSource failed with error: %v", err)
 		}
 		if s3.index != streamIndex {
-			t.Fatalf("streamIndex mismatch: %v != %v", s3.index, streamIndex)
+			t.Errorf("streamIndex mismatch: %v != %v", s3.index, streamIndex)
 		}
 		packets, err := s1.Packets()
 		if err != nil {
 			t.Fatalf("Stream.Packets failed with error: %v", err)
 		}
 		if len(packets) != 3 {
-			t.Fatalf("len(Stream.Packets()) = %v, want 3", len(packets))
+			t.Errorf("len(Stream.Packets()) = %v, want 3", len(packets))
+		}
+		if got, want := s1.FirstPacket().UTC(), t1.Add(time.Hour*time.Duration(streamID/100)).UTC(); !got.Equal(want) {
+			t.Errorf("Stream[%d].FirstPacket() = %v, want %v", streamID, got, want)
+		}
+		if got, want := s1.LastPacket().UTC(), t1.Add(time.Hour*time.Duration(streamID/100)+time.Second*3).UTC(); !got.Equal(want) {
+			t.Errorf("Stream[%d].LastPacket() = %v, want %v", streamID, got, want)
 		}
 	}
 }
