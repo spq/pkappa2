@@ -422,7 +422,8 @@ func (s *Stream) Packets() ([]Packet, error) {
 		flagsPacketDirectionClientToServer: DirectionClientToServer,
 		flagsPacketDirectionServerToClient: DirectionServerToClient,
 	}
-	refTime := s.r.ReferenceTime.Add(time.Nanosecond * time.Duration(s.FirstPacketTimeNS))
+	refTime := s.FirstPacket()
+	lastRelPacketTimeMS := uint32(0)
 	for i := uint64(s.PacketInfoStart); ; i++ {
 		p, err := s.r.packetByIndex(i)
 		if err != nil {
@@ -432,11 +433,15 @@ func (s *Stream) Packets() ([]Packet, error) {
 			lastImportID = int(p.ImportID)
 			lastPacketIndex = int(p.PacketIndex)
 			imp := s.r.imports[p.ImportID]
+			if p.RelPacketTimeMS < lastRelPacketTimeMS {
+				refTime = refTime.Add(time.Microsecond << 32)
+			}
+			lastRelPacketTimeMS = p.RelPacketTimeMS
 			packets = append(packets, Packet{
 				PcapFilename: imp.filename,
 				PcapIndex:    imp.packetIndexOffset + uint64(p.PacketIndex),
 				Direction:    dir[p.Flags&flagsPacketDirection],
-				Timestamp:    refTime.Add(time.Duration(p.RelPacketTimeMS * uint32(time.Millisecond))),
+				Timestamp:    refTime.Add(time.Duration(p.RelPacketTimeMS) * time.Microsecond),
 			})
 		}
 		if p.Flags&flagsPacketHasNext == 0 {
@@ -490,11 +495,11 @@ func (s *Stream) Data() ([]Data, error) {
 	return data, nil
 }
 func (s *Stream) FirstPacket() time.Time {
-	return s.r.ReferenceTime.Add(time.Duration(s.FirstPacketTimeNS) * time.Nanosecond).Local()
+	return s.r.ReferenceTime.Add(time.Duration(s.FirstPacketTimeNS) * time.Nanosecond)
 }
 
 func (s *Stream) LastPacket() time.Time {
-	return s.r.ReferenceTime.Add(time.Duration(s.LastPacketTimeNS) * time.Nanosecond).Local()
+	return s.r.ReferenceTime.Add(time.Duration(s.LastPacketTimeNS) * time.Nanosecond)
 }
 
 func (s *Stream) Reader() *Reader {
@@ -515,8 +520,8 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 		Index                   string
 	}{
 		ID:          s.ID(),
-		FirstPacket: s.FirstPacket(),
-		LastPacket:  s.LastPacket(),
+		FirstPacket: s.FirstPacket().Local(),
+		LastPacket:  s.LastPacket().Local(),
 		Client: SideInfo{
 			Host:  s.r.hostGroups[s.HostGroup].get(s.ClientHost).String(),
 			Port:  s.ClientPort,

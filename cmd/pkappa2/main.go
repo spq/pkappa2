@@ -740,9 +740,9 @@ func main() {
 					}
 					switch a & AspectAnchor {
 					case AspectAnchorFirst:
-						t = s.FirstPacket()
+						t = s.FirstPacket().Local()
 					case AspectAnchorLast:
-						t = s.LastPacket()
+						t = s.LastPacket().Local()
 					}
 					t = t.Truncate(delta)
 					if skip = (!min.IsZero() && min.After(t)) || (!max.IsZero() && max.Before(t)); skip {
