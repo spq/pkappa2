@@ -117,8 +117,12 @@ func TestLongPackets(t *testing.T) {
 				PacketIndex: uint64(i),
 			})
 		}
-		s.PacketDirections = append(s.PacketDirections, reassembly.TCPDirClientToServer)
-		s.PacketDirections = append(s.PacketDirections, reassembly.TCPDirClientToServer)
+		dir := reassembly.TCPDirClientToServer
+		if (0b0110>>(i&3))&1 != 0 {
+			// this produces the pattern c2s, s2c, s2c, c2s
+			dir = dir.Reverse()
+		}
+		s.PacketDirections = append(s.PacketDirections, dir)
 	}
 	streams := map[uint64]streamInfo{
 		0: {s: s},
@@ -160,7 +164,7 @@ func TestLongPackets(t *testing.T) {
 		if got := data[i].Content; !bytes.Equal(got, wantData) {
 			t.Errorf("data[%d].Content = %v, want %v", i, got, wantData)
 		}
-		if got, want := data[i].Direction, DirectionClientToServer; got != want {
+		if got, want := data[i].Direction, [2]Direction{DirectionClientToServer, DirectionServerToClient}[i&1]; got != want {
 			t.Errorf("data[%d].Direction = %v, want %v", i, got, want)
 		}
 	}
@@ -171,8 +175,13 @@ func TestLongPackets(t *testing.T) {
 		if got, want := packets[i].PcapFilename, "foo.pcap"; got != want {
 			t.Errorf("packets[%d].PcapFilename = %v, want %v", i, got, want)
 		}
-		if got, want := packets[i].Direction, DirectionClientToServer; got != want {
-			t.Errorf("packets[%d].Direction = %v, want %v", i, got, want)
+		wantDir := DirectionClientToServer
+		if (0b0110>>(i&3))&1 != 0 {
+			// this produces the pattern c2s, s2c, s2c, c2s
+			wantDir = wantDir.Reverse()
+		}
+		if got := packets[i].Direction; got != wantDir {
+			t.Errorf("packets[%d].Direction = %v, want %v", i, got, wantDir)
 		}
 		if got, want := packets[i].Timestamp, t1.Add(time.Duration(i)*2*time.Minute); !got.Equal(want) {
 			t.Errorf("packets[%d].Timestamp = %v, want %v", i, got, want)
