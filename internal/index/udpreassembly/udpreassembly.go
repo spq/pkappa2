@@ -67,7 +67,7 @@ func (a *Assembler) AssembleWithContext(netFlow gopacket.Flow, u *layers.UDP, ac
 	cs, ok := a.connections[hash]
 	if ok {
 		ok = false
-		for _, c := range cs {
+		for i, c := range cs {
 			aIsClient := bytes.Equal(c.stream.ClientAddr, ah.Raw()) && c.stream.ClientPort == ap
 			aIsServer := bytes.Equal(c.stream.ServerAddr, ah.Raw()) && c.stream.ServerPort == ap
 			bIsClient := bytes.Equal(c.stream.ClientAddr, bh.Raw()) && c.stream.ClientPort == bp
@@ -83,7 +83,7 @@ func (a *Assembler) AssembleWithContext(netFlow gopacket.Flow, u *layers.UDP, ac
 				dir = reassembly.TCPDirServerToClient
 			}
 			// register activity in connection
-			c.lastActivity = ac.GetCaptureInfo().Timestamp
+			cs[i].lastActivity = ac.GetCaptureInfo().Timestamp
 			break
 		}
 	}
