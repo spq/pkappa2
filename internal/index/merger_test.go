@@ -32,6 +32,9 @@ func TestMerge(t *testing.T) {
 			12: makeStream("[0::34:12]:6", "[0::12:34]:4", t1.Add(time.Hour*6), []string{"", "in", "voluptate", "velit", "esse", "cillum", "dolore", "eu", "fugiat"}),
 			13: makeStream("1.20.3.4:4", "5.6.107.8:6", t1.Add(time.Hour*7), []string{"", "exercitation", "ullamco", "laboris", "nisi", "ut", "aliquip", "ex", "ea"}),
 		},
+		{
+			20: makeStream("0.0.0.0:0", "0.0.0.0:0", t1, []string{""}),
+		},
 	}
 
 	indexes := []*Reader(nil)
@@ -52,6 +55,7 @@ func TestMerge(t *testing.T) {
 		11: 1,
 		12: 1,
 		13: 1,
+		20: 2,
 	}
 
 	merged, err := Merge(tmpDir, indexes)
