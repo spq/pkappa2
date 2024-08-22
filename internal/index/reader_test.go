@@ -34,8 +34,11 @@ func TestReader(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Reader.StreamByID failed with error: %v", err)
 		}
-		if s1.index != streamIndex {
+		if s1.Index() != streamIndex {
 			t.Errorf("streamIndex mismatch: %v != %v", s1.index, streamIndex)
+		}
+		if s1.Reader() != idx {
+			t.Error("Stream.Reader() returned unexpected value")
 		}
 		s2, err := idx.streamByIndex(streamIndex)
 		if err != nil {
@@ -63,6 +66,12 @@ func TestReader(t *testing.T) {
 		}
 		if got, want := s1.LastPacket(), t1.Add(time.Hour*time.Duration(streamID/100)+time.Second*3).UTC(); !got.Equal(want) {
 			t.Errorf("Stream[%d].LastPacket() = %v, want %v", streamID, got, want)
+		}
+		if got, want := s1.ClientHostIP(), "1.2.3.4"; got != want {
+			t.Errorf("Stream[%d].ClientHostIP() = %v, want %v", streamID, got, want)
+		}
+		if got, want := s1.ServerHostIP(), "4.3.2.1"; got != want {
+			t.Errorf("Stream[%d].ServerHostIP() = %v, want %v", streamID, got, want)
 		}
 	}
 }
