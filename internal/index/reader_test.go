@@ -167,6 +167,9 @@ func TestLongPackets(t *testing.T) {
 		if got, want := data[i].Direction, [2]Direction{DirectionClientToServer, DirectionServerToClient}[i&1]; got != want {
 			t.Errorf("data[%d].Direction = %v, want %v", i, got, want)
 		}
+		if got, want := data[i].Time, t1.Add(time.Duration(i)*4*time.Minute); !got.Equal(want) {
+			t.Errorf("data[%d].Time = %v, want %v", i, got, want)
+		}
 	}
 	for i := 0; i < 40; i++ {
 		if got, want := packets[i].PcapIndex, uint64(i); got != want {
