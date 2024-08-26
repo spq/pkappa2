@@ -18,8 +18,16 @@ updates:
     groups:
       production-dependencies:
         dependency-type: "production"
+        exclude-patterns:
+          - "vue"
+          - "vue-router"
+          - "vuetify"
       development-dependencies:
         dependency-type: "development"
+        exclude-patterns:
+          - "eslint"
+          - "@typescript-eslint/parser"
+          - "@typescript-eslint/eslint-plugin"
 
   - package-ecosystem: "gomod"
     directory: "/"
