@@ -7,7 +7,7 @@ updates:
       interval: "weekly"
     groups:
       dependencies:
-        applies-to: version-updates
+        applies-to: "version-updates"
   
   - package-ecosystem: "npm"
     directory: "/web"
@@ -25,4 +25,4 @@ updates:
       interval: "weekly"
     groups:
       dependencies:
-        applies-to: version-updates
+        applies-to: "version-updates"
