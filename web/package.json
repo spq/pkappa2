@@ -14,7 +14,7 @@
   "dependencies": {
     "apexcharts": "^3.52.0",
     "axios": "^1.7.4",
-    "core-js": "^3.38.0",
+    "core-js": "^3.38.1",
     "moo": "^0.5.2",
     "nearley": "^2.20.1",
     "pinia": "^2.2.2",
