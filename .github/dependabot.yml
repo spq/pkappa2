@@ -6,9 +6,11 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      dependencies:
-        applies-to: "version-updates"
-  
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:
@@ -24,5 +26,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      dependencies:
-        applies-to: "version-updates"
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
