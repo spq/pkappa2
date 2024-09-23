@@ -40,11 +40,11 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-vue": "^9.28.0",
     "prettier": "^3.3.3",
-    "sass": "~1.78.0",
+    "sass": "~1.79.3",
     "ts-auto-guard": "^5.0.1",
     "typescript": "~5.6.2",
     "unplugin-vue-components": "^0.27.4",
-    "vite": "^5.4.6",
+    "vite": "^5.4.7",
     "vite-plugin-checker": "^0.8.0",
     "vite-plugin-node-polyfills": "^0.22.0"
   },
