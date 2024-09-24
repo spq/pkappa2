@@ -49,6 +49,17 @@ jobs:
 
       - name: Test with the Go CLI
         run: go test -v ./...
+      
+      - name: Update coverage report
+        uses: ncruces/go-coverage-report@v0
+        with:
+          report: true
+          chart: true
+          amend: true
+        if: |
+          matrix.go == '1.22' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main'
 
   golangci:
     name: Lint Go

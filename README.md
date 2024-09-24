@@ -1,5 +1,7 @@
 # Pkappa2
 
+[![Go Coverage](https://github.com/spq/pkappa2/wiki/coverage.svg)](https://raw.githack.com/wiki/spq/pkappa2/coverage.html)
+
 Pkappa2 is a packet stream analysis tool intended for Attack & Defense CTF Competitions.
 It receives pcap files via a http upload, usually send by a tcpdump-complete script.
 The received pcaps are processed and using the webinterface, users can run queries over the streams.
