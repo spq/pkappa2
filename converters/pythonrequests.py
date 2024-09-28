@@ -52,7 +52,10 @@ s = requests.Session()
         port = ""
         if stream.Metadata.ServerPort != 80:
             port = f":{stream.Metadata.ServerPort}"
-        self.target_host = f"{{IP}}{port}"
+        if ":" in stream.Metadata.ServerHost:
+            self.target_host = f"[{{IP}}]{port}"
+        else:
+            self.target_host = f"{{IP}}{port}"
         result = super().handle_stream(stream)
 
         return Result(
