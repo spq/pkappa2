@@ -12,12 +12,12 @@
     "nearley": "nearleyc src/parser/query.ne -o src/parser/query.ts"
   },
   "dependencies": {
-    "apexcharts": "^3.54.1",
+    "apexcharts": "^4.0.0",
     "axios": "^1.7.7",
-    "core-js": "^3.38.1",
+    "core-js": "^3.39.0",
     "moo": "^0.5.2",
     "nearley": "^2.20.1",
-    "pinia": "^2.2.4",
+    "pinia": "^2.2.6",
     "tiny-typed-emitter": "^2.1.0",
     "vue": "^2.7.14",
     "vue-apexcharts": "git+https://github.com/apexcharts/vue-apexcharts#c4b6de32b0659a46d610e4f457afb8ede0493fef",
