@@ -191,12 +191,14 @@ EventBus.on("setSearchTerm", setSearchTerm);
 watch(
   [route,searchBoxFieldRect],
   () => {
-    var input = searchBoxField.value?.$el.querySelector("input");
+    if (!route.query.q) {
+      var input = searchBoxField.value?.$el.querySelector("input");
       setSearchBox(" ltime:-1h:");
       input?.focus();
       setTimeout(()=>{
         input?.setSelectionRange(0,0);
       },0);
+    }
   } 
 )
 
