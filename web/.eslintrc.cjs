@@ -33,8 +33,9 @@ module.exports = {
       plugins: ["@typescript-eslint", "@typescript-eslint/eslint-plugin"],
       extends: [
         "eslint:recommended",
+        "plugin:vue/base",
         "plugin:vue/vue3-recommended",
-        "plugin:vuetify/base",
+        // "plugin:vuetify/base",
         "@vue/typescript",
         "plugin:@typescript-eslint/recommended-requiring-type-checking",
         "plugin:@typescript-eslint/eslint-recommended",

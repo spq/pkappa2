@@ -36,7 +36,7 @@
         </v-tooltip>
       </div>
       <div v-else>
-        <v-menu offset-y location="right bottom" 
+        <v-menu location="right bottom" 
           ><template #activator="{ props: propsMenu }">
             <v-tooltip location="bottom">
               <template #activator="{ props: propsTooltip }">
@@ -270,6 +270,7 @@
                 <v-btn
                   :href="`/api/download/${stream.Stream.ID}.pcap`"
                   icon
+                  variant="flat"
                   @click.stop
                 >
                   <v-icon>mdi-download</v-icon>

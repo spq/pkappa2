@@ -22,10 +22,10 @@
       link
       dense
       :value="true"
-      sub-group
+      subgroup
     >
-    <template #activator="{ props }">
-      <v-list-item v-bind="props" link>
+      <template #activator="{ props }">
+        <v-list-item v-bind="props" link>
           <template #prepend>
             <v-icon size="small">mdi-{{ tagType.icon }}</v-icon>
           </template>
@@ -34,7 +34,7 @@
       </template>
       <template v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
         <v-hover
-          v-slot="{ hover }"
+          v-slot="{ isHovering }"
           :style="{ backgroundColor: tag.Color }"
         >
           <v-list-item
@@ -58,10 +58,10 @@
                 }}</v-list-item-title
               >
             
-            <v-menu offset-y location="bottom right" open-on-hover >
+            <v-menu location="bottom right" open-on-hover >
               <template #activator="{ props }">
                 <v-list-item-action v-bind="props">
-                  <v-btn v-if="hover" icon size="x-small">
+                  <v-btn v-if="isHovering" icon size="x-small">
                     <v-icon>mdi-dots-vertical</v-icon>
                   </v-btn>
                   <v-chip v-else size="x-small"
@@ -172,7 +172,6 @@
       <v-btn-toggle
         v-model="colorscheme"
         mandatory
-        background-color="transparent"
         class="pl-9 pt-2"
       >
         <v-btn>

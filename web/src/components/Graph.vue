@@ -34,14 +34,12 @@
                   >{{ item.text }}
                   <v-btn
                     size="x-small"
-                    link
                     variant="text"
                     @click="setChartTagOptions(item.value.substring(7), true)"
                     >All</v-btn
                   >
                   <v-btn
                     size="x-small"
-                    link
                     variant="text"
                     @click="setChartTagOptions(item.value.substring(7), false)"
                     >None</v-btn

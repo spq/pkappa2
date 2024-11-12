@@ -10,19 +10,19 @@ import checker from "vite-plugin-checker";
 export default defineConfig({
   resolve: {
     alias: {
-      vue: "@vue/compat",
+      // vue: "@vue/compat",
       "@": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "./src"),
     },
   },
   plugins: [
     vue({
-      template: {
-        compilerOptions: {
-          compatConfig: {
-            MODE: 3,
-          },
-        },
-      },
+      // template: {
+      //   compilerOptions: {
+      //     compatConfig: {
+      //       MODE: 3,
+      //     },
+      //   },
+      // },
     }),
     vuetify({
       autoImport: true,

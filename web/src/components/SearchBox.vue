@@ -16,7 +16,7 @@
       @keydown.esc.exact="suggestionMenuOpen = false"
     >
       <template #append>
-        <v-menu offset-y location="right bottom" >
+        <v-menu location="right bottom" >
           <template #activator="{ props }">
             <v-btn size="small" icon v-bind="props"
               ><v-icon>mdi-dots-vertical</v-icon></v-btn
@@ -42,17 +42,14 @@
     <v-menu
       ref="suggestionMenu"
       v-model="suggestionMenuOpen"
-      :position-x="suggestionMenuPosX"
-      :position-y="suggestionMenuPosY"
       absolute
       dense
     >
-      <v-list>
-        <v-list-item-group
-          :value="suggestionSelectedIndex"
-          color="primary"
-          mandatory
-        >
+      <v-list
+      :value="suggestionSelectedIndex"
+      color="primary"
+      mandatory
+      >
           <v-list-item
             v-for="(item, index) in suggestionItems"
             :key="index"
@@ -62,7 +59,6 @@
           >
             <v-list-item-title>{{ item }}</v-list-item-title>
           </v-list-item>
-        </v-list-item-group>
       </v-list>
     </v-menu>
   </div>

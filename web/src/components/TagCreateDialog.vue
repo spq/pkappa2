@@ -12,8 +12,6 @@
               <v-menu
                 v-model="colorPickerOpen"
                 location="top"
-                nudge-bottom="182"
-                nudge-left="32"
                 :close-on-content-click="false"
               >
                 <template #activator="{ props }">
@@ -24,10 +22,8 @@
                     <v-color-picker
                       v-model="colorPickerValue"
                       mode="hexa"
-                      hide-mode-switch
                       hide-inputs
                       show-swatches
-                      flat
                       @update:model-value="colorPickerValueUpdate"
                     />
                   </v-card-text>

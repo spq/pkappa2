@@ -29,7 +29,6 @@
         <template #activator="{ props }">
           <v-btn
             :disabled="selectionQuery == ''"
-            link
             exact
            
             icon
@@ -48,7 +47,6 @@
       <v-tooltip location="bottom">
         <template #activator="{ props }">
           <v-btn
-            link
             exact
            
             icon
@@ -59,7 +57,7 @@
         </template>
         <span>Open in CyberChef</span>
       </v-tooltip>
-      <v-menu offset-y location="right bottom" 
+      <v-menu location="right bottom" 
         ><template #activator="{ props: propsMenu }">
           <v-tooltip location="bottom">
             <template #activator="{ props: propsTooltip }">
@@ -113,7 +111,7 @@
         </template>
         <span>Download PCAP</span>
       </v-tooltip>
-      <v-btn-toggle v-model="presentation" mandatory density="compact" borderless>
+      <v-btn-toggle v-model="presentation" mandatory density="compact" :border="false">
         <v-tooltip location="bottom">
           <template #activator="{ props }">
             <v-btn value="ascii" v-bind="props">
@@ -177,7 +175,7 @@
                 :disabled="prevStreamId == null"
                 :to="
                   prevStreamId == null
-                    ? null
+                    ? undefined
                     : {
                         name: 'stream',
                         query: { q: $route.query.q, p: $route.query.p },
@@ -200,7 +198,7 @@
                 :disabled="nextStreamId == null"
                 :to="
                   nextStreamId == null
-                    ? null
+                    ? undefined
                     : {
                         name: 'stream',
                         query: { q: $route.query.q, p: $route.query.p },

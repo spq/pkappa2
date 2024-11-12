@@ -1,5 +1,5 @@
 <template>
-  <v-snackbar v-model="visible" app color="error" timeout="5000">
+  <v-snackbar v-model="visible" color="error" timeout="5000">
     {{ message }}
     <template #actions>
       <v-btn icon @click="visible = false">
