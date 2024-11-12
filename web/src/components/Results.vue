@@ -395,7 +395,7 @@ function checkboxAction() {
 
 function fetchStreams(forceUpdate = false) {
   const query = route.query.q as string;
-  const page = +route.query.p;
+  const page = Number(route.query.p) || 0;
 
   if (!forceUpdate && streams.query === query && streams.page === page && streams.result) {
     console.debug("Using cached store:", query, page);
