@@ -8,7 +8,11 @@
             icon
             :to="{
               name: 'search',
-              query: { q: $route.query.q, p: $route.query.p },
+              query: {
+                q: $route.query.q,
+                p: $route.query.p,
+                converter: $route.query.converter,
+              },
             }"
             v-on="on"
           >
@@ -179,7 +183,11 @@
                     ? null
                     : {
                         name: 'stream',
-                        query: { q: $route.query.q, p: $route.query.p },
+                        query: {
+                          q: $route.query.q,
+                          p: $route.query.p,
+                          converter: $route.query.converter,
+                        },
                         params: { streamId: prevStreamId },
                       }
                 "
@@ -202,7 +210,11 @@
                     ? null
                     : {
                         name: 'stream',
-                        query: { q: $route.query.q, p: $route.query.p },
+                        query: {
+                          q: $route.query.q,
+                          p: $route.query.p,
+                          converter: $route.query.converter,
+                        },
                         params: { streamId: nextStreamId },
                       }
                 "
@@ -479,7 +491,11 @@ onMounted(() => {
     e.preventDefault();
     void router.push({
       name: "stream",
-      query: { q: route.query.q, p: route.query.p },
+      query: {
+        q: route.query.q,
+        p: route.query.p,
+        converter: route.query.converter,
+      },
       params: { streamId: streamId.toString() },
     });
   };

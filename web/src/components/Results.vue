@@ -212,7 +212,11 @@
             v-slot="{ navigate }"
             :to="{
               name: 'stream',
-              query: { q: $route.query.q, p: $route.query.p },
+              query: {
+                q: $route.query.q,
+                p: $route.query.p,
+                converter: $route.query.converter,
+              },
               params: { streamId: stream.Stream.ID.toString() },
             }"
             custom
