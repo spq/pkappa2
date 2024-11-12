@@ -106,6 +106,8 @@ import {
   onMounted,
   onBeforeUnmount,
   watch,
+  onBeforeMount,
+  reactive,
 } from "vue";
 import { useRoute, useRouter } from "vue-router/composables";
 import { useRootStore } from "@/stores";
@@ -188,19 +190,24 @@ const searchBoxFieldRect = computed(() => {
 
 EventBus.on("setSearchTerm", setSearchTerm);
 
-watch(
-  [route,searchBoxFieldRect],
-  () => {
-    if (!route.query.q) {
-      var input = searchBoxField.value?.$el.querySelector("input");
-      setSearchBox(" ltime:-1h:");
-      input?.focus();
-      setTimeout(()=>{
-        input?.setSelectionRange(0,0);
-      },0);
-    }
-  } 
-)
+const reactiveStore = reactive(store);
+
+watch([route, searchBoxField, reactiveStore], () => {
+  if (
+    route &&
+    searchBoxField &&
+    reactiveStore.clientConfig &&
+    !route.query.q &&
+    store.clientConfig?.AutoInsertLimitToQuery
+  ) {
+    var input = searchBoxField.value?.$el.querySelector("input");
+    setSearchBox(" ltime:-1h:");
+    input?.focus();
+    setTimeout(() => {
+      input?.setSelectionRange(0, 0);
+    }, 0);
+  }
+});
 
 watch(
   route,
@@ -230,10 +237,16 @@ watch(
   { immediate: true },
 );
 
-onMounted(() => {
+onBeforeMount(() => {
+  store.getClientConfig().catch((err: string) => {
+    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  });
   store.updateConverters().catch((err: string) => {
     EventBus.emit("showError", `Failed to update converters: ${err}`);
   });
+});
+
+onMounted(() => {
   const keyListener = (e: KeyboardEvent) => {
     if (e.target === null || !(e.target instanceof Element)) return;
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;

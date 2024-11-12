@@ -70,7 +70,7 @@ func addConverter(dirs dirs, name string) {
 }
 
 func makeManager(t *testing.T, dirs dirs) *Manager {
-	mgr, err := New(dirs.pcap, dirs.index, dirs.snapshot, dirs.state, dirs.converter)
+	mgr, err := New(dirs.pcap, dirs.index, dirs.snapshot, dirs.state, dirs.converter, ClientConfig{AutoInsertLimitToQuery: false})
 	if err != nil {
 		t.Fatalf("manager.New failed with error: %v", err)
 	}

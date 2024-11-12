@@ -140,6 +140,8 @@ type (
 		watcher     *fsnotify.Watcher
 
 		listeners map[chan Event]listener
+
+		clientConfig ClientConfig
 	}
 
 	Statistics struct {
@@ -154,6 +156,10 @@ type (
 		MergeJobRunning     bool
 		TaggingJobRunning   bool
 		ConverterJobRunning bool
+	}
+
+	ClientConfig struct {
+		AutoInsertLimitToQuery bool
 	}
 
 	indexReleaser []*index.Reader
@@ -206,7 +212,7 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string, clientConfig ClientConfig) (*Manager, error) {
 	ctx := context.Background()
 	mgr := Manager{
 		PcapDir:      pcapDir,
@@ -221,6 +227,8 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		streamsToConvert: make(map[string]*bitmask.LongBitmask),
 		jobs:             make(chan func()),
 		listeners:        make(map[chan Event]listener),
+
+		clientConfig: clientConfig,
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -819,6 +827,22 @@ func (mgr *Manager) ImportPcaps(filenames []string) {
 func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	indexes := append([]*index.Reader(nil), mgr.indexes[start:]...)
 	return indexes, mgr.lock(indexes)
+}
+
+func (mgr *Manager) ClientConfig() ClientConfig {
+	c := make(chan ClientConfig)
+	mgr.jobs <- func() {
+		locks := uint(0)
+		for _, n := range mgr.usedIndexes {
+			locks += n
+		}
+		c <- ClientConfig{
+			AutoInsertLimitToQuery: mgr.clientConfig.AutoInsertLimitToQuery,
+		}
+		close(c)
+	}
+	res := <-c
+	return res
 }
 
 func (mgr *Manager) Status() Statistics {

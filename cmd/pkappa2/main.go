@@ -54,7 +54,8 @@ var (
 
 	listenAddress = flag.String("address", ":8080", "Listen address")
 
-	startupCpuprofile = flag.String("startup_cpuprofile", "", "write cpu profile to file")
+	startupCpuprofile      = flag.String("startup_cpuprofile", "", "write cpu profile to file")
+	autoInsertLimitToQuery = flag.Bool("auto_insert_limit_to_query", false, "Flag to tell pkappa frontend to auto insert limit to query")
 )
 
 func main() {
@@ -101,6 +102,7 @@ func main() {
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
 		*converterDir,
+		manager.ClientConfig{AutoInsertLimitToQuery: *autoInsertLimitToQuery},
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)
@@ -183,6 +185,13 @@ func main() {
 		http.Error(w, "OK", http.StatusOK)
 	})
 	rUser.Mount("/debug", middleware.Profiler())
+	rUser.Get("/api/clientconfig.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(mgr.ClientConfig()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
 	rUser.Get("/api/status.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
