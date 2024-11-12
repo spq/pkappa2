@@ -189,9 +189,23 @@ const searchBoxFieldRect = computed(() => {
 EventBus.on("setSearchTerm", setSearchTerm);
 
 watch(
+  [route,searchBoxFieldRect],
+  () => {
+    var input = searchBoxField.value?.$el.querySelector("input");
+      setSearchBox(" ltime:-1h:");
+      input?.focus();
+      setTimeout(()=>{
+        input?.setSelectionRange(0,0);
+      },0);
+  } 
+)
+
+watch(
   route,
   () => {
-    setSearchBox(route.query.q as string);
+    if (route.query.q) {
+      setSearchBox(route.query.q as string);
+    }
   },
   { immediate: true },
 );
