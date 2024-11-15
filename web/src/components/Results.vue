@@ -28,7 +28,7 @@
       <div v-if="noneSelected">
         <v-tooltip bottom>
           <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreams">
+            <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreams(true)">
               <v-icon>mdi-refresh</v-icon>
             </v-btn>
           </template>
@@ -393,15 +393,23 @@ function checkboxAction() {
   selected.value = tmp;
 }
 
-function fetchStreams() {
+function fetchStreams(forceUpdate = false) {
+  const query = route.query.q as string;
+  const page = Number(route.query.p) || 0;
+
+  if (!forceUpdate && streams.query === query && streams.page === page && streams.result) {
+    console.debug("Using cached store:", query, page);
+    selected.value = [];
+    return;
+  }
+
   streams
-    .searchStreams(route.query.q as string, +route.query.p)
+    .searchStreams(query, page)
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to fetch streams: ${err}`);
     });
   selected.value = [];
 }
-
 function createMarkFromSelection() {
   let ids: number[] = [];
   for (const s of selectedStreams.value) {
