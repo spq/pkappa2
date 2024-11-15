@@ -397,17 +397,20 @@ function fetchStreams(forceUpdate = false) {
   const query = route.query.q as string;
   const page = Number(route.query.p) || 0;
 
-  if (!forceUpdate && streams.query === query && streams.page === page && streams.result) {
+  if (
+    !forceUpdate &&
+    streams.query === query &&
+    streams.page === page &&
+    streams.result
+  ) {
     console.debug("Using cached store:", query, page);
     selected.value = [];
     return;
   }
 
-  streams
-    .searchStreams(query, page)
-    .catch((err: string) => {
-      EventBus.emit("showError", `Failed to fetch streams: ${err}`);
-    });
+  streams.searchStreams(query, page).catch((err: string) => {
+    EventBus.emit("showError", `Failed to fetch streams: ${err}`);
+  });
   selected.value = [];
 }
 function createMarkFromSelection() {
