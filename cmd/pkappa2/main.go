@@ -192,6 +192,28 @@ func main() {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
+	rUser.Post("/api/clientconfig/set", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var config manager.ClientConfig
+		err2 := json.Unmarshal([]byte(body), &config)
+		if err2 != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		mgr.SetClientConfig(config)
+
+		if err := json.NewEncoder(w).Encode(mgr.ClientConfig()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
 	rUser.Get("/api/status.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 

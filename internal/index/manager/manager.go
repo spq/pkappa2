@@ -829,6 +829,10 @@ func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	return indexes, mgr.lock(indexes)
 }
 
+func (mgr *Manager) SetClientConfig(config ClientConfig) {
+	mgr.clientConfig = config
+}
+
 func (mgr *Manager) ClientConfig() ClientConfig {
 	c := make(chan ClientConfig)
 	mgr.jobs <- func() {
