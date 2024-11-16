@@ -118,6 +118,11 @@ export const useRootStore = defineStore("root", {
         .then((data) => (this.clientConfig = data))
         .catch(handleAxiosDefaultError);
     },
+    async addClientConfig(clientConfig: ClientConfig) {
+      return APIClient.postClientConfig(clientConfig)
+        .then((res) => (this.clientConfig = res))
+        .catch(handleAxiosDefaultError);
+    },
     async updatePcaps() {
       return APIClient.getPcaps()
         .then((data) => (this.pcaps = data))

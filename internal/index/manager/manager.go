@@ -829,8 +829,9 @@ func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	return indexes, mgr.lock(indexes)
 }
 
-func (mgr *Manager) SetClientConfig(config ClientConfig) {
+func (mgr *Manager) SetClientConfig(config ClientConfig) ClientConfig {
 	mgr.clientConfig = config
+	return mgr.ClientConfig()
 }
 
 func (mgr *Manager) ClientConfig() ClientConfig {
