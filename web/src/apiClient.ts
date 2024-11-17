@@ -186,12 +186,12 @@ const APIClient = {
     return this.performGuarded("get", `/status.json`, isStatistics);
   },
   async getClientConfig() {
-    return this.performGuarded("get", `/clientconfig.json`, isClientConfig);
+    return this.performGuarded("get", `/clientconfig`, isClientConfig);
   },
-  async postClientConfig(clientConfig: ClientConfig) {
+  async updateClientConfig(clientConfig: ClientConfig) {
     return this.performGuarded(
       "post",
-      `clientconfig/set`,
+      `clientconfig`,
       isClientConfig,
       JSON.stringify(clientConfig),
       undefined,

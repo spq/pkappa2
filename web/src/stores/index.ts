@@ -118,8 +118,8 @@ export const useRootStore = defineStore("root", {
         .then((data) => (this.clientConfig = data))
         .catch(handleAxiosDefaultError);
     },
-    async addClientConfig(clientConfig: ClientConfig) {
-      return APIClient.postClientConfig(clientConfig)
+    async updateClientConfig(clientConfig: ClientConfig) {
+      return APIClient.updateClientConfig(clientConfig)
         .then((res) => (this.clientConfig = res))
         .catch(handleAxiosDefaultError);
     },

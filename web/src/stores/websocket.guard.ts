@@ -2,7 +2,7 @@
  * Generated type guards for "websocket.ts".
  * WARNING: Do not manually change this file.
  */
-import { Event, TagEvent, ConverterEvent, PcapStatsEvent } from "./websocket";
+import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent } from "./websocket";
 
 export function isEvent(obj: unknown): obj is Event {
     const typedObj = obj as Event
@@ -86,5 +86,18 @@ export function isPcapStatsEvent(obj: unknown): obj is PcapStatsEvent {
         typeof typedObj["PcapStats"]["StreamCount"] === "number" &&
         typeof typedObj["PcapStats"]["StreamRecordCount"] === "number" &&
         typeof typedObj["PcapStats"]["PacketRecordCount"] === "number"
+    )
+}
+
+export function isConfigEvent(obj: unknown): obj is ConfigEvent {
+    const typedObj = obj as ConfigEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") && 
+        (typedObj["Config"] !== null &&
+            typeof typedObj["Config"] === "object" ||
+            typeof typedObj["Config"] === "function") &&
+        typeof typedObj["Config"]["AutoInsertLimitToQuery"] === "boolean"
     )
 }

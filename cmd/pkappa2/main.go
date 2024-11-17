@@ -54,8 +54,7 @@ var (
 
 	listenAddress = flag.String("address", ":8080", "Listen address")
 
-	startupCpuprofile      = flag.String("startup_cpuprofile", "", "write cpu profile to file")
-	autoInsertLimitToQuery = flag.Bool("auto_insert_limit_to_query", false, "Flag to tell pkappa frontend to auto insert limit to query")
+	startupCpuprofile = flag.String("startup_cpuprofile", "", "write cpu profile to file")
 )
 
 func main() {
@@ -102,7 +101,7 @@ func main() {
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
 		*converterDir,
-		manager.ClientConfig{AutoInsertLimitToQuery: *autoInsertLimitToQuery},
+		manager.ClientConfig{AutoInsertLimitToQuery: false},
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)
@@ -185,14 +184,14 @@ func main() {
 		http.Error(w, "OK", http.StatusOK)
 	})
 	rUser.Mount("/debug", middleware.Profiler())
-	rUser.Get("/api/clientconfig.json", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Get("/api/clientconfig", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if err := json.NewEncoder(w).Encode(mgr.ClientConfig()); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
-	rUser.Post("/api/clientconfig/set", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Post("/api/clientconfig", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		body, err := io.ReadAll(r.Body)
@@ -210,7 +209,7 @@ func main() {
 
 		mgr.SetClientConfig(config)
 
-		if err := json.NewEncoder(w).Encode(mgr.ClientConfig()); err != nil {
+		if err := json.NewEncoder(w).Encode(config); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})

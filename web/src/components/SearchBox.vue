@@ -190,8 +190,6 @@ const searchBoxFieldRect = computed(() => {
 
 EventBus.on("setSearchTerm", setSearchTerm);
 
-const reactiveStore = reactive(store);
-
 watch(
   route,
   () => {
@@ -221,6 +219,11 @@ watch(
 );
 
 onMounted(() => {
+
+  store.updateConverters().catch((err: string) => {
+    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  });
+
   const keyListener = (e: KeyboardEvent) => {
     if (e.target === null || !(e.target instanceof Element)) return;
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;

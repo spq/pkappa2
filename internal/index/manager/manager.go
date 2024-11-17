@@ -59,6 +59,7 @@ type (
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
 		PcapStats PcapStatistics         `json:",omitempty"`
+		Config    ClientConfig           `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -830,20 +831,25 @@ func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 }
 
 func (mgr *Manager) SetClientConfig(config ClientConfig) ClientConfig {
-	mgr.clientConfig = config
-	return mgr.ClientConfig()
+	c := make(chan ClientConfig)
+	mgr.jobs <- func() {
+		mgr.clientConfig = config
+
+		mgr.event(Event{
+			Type:   "configUpdated",
+			Config: config,
+		})
+		close(c)
+	}
+
+	res := <-c
+	return res
 }
 
 func (mgr *Manager) ClientConfig() ClientConfig {
 	c := make(chan ClientConfig)
 	mgr.jobs <- func() {
-		locks := uint(0)
-		for _, n := range mgr.usedIndexes {
-			locks += n
-		}
-		c <- ClientConfig{
-			AutoInsertLimitToQuery: mgr.clientConfig.AutoInsertLimitToQuery,
-		}
+		c <- mgr.clientConfig
 		close(c)
 	}
 	res := <-c

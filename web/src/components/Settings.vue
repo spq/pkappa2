@@ -17,7 +17,7 @@
           <tr v-for="(value, name) in store.clientConfig || []" :key="name">
             <th>{{ name }}</th>
             <td width="100%">
-              <input v-model="visible" type="checkbox" @change="save" />
+              <input v-model="autoInsertLimitToQuery" type="checkbox" @change="save" />
             </td>
           </tr>
         </tbody>
@@ -34,7 +34,7 @@ import { EventBus } from "./EventBus";
 import { ref, computed } from "vue";
 
 const store = useRootStore();
-const visible = ref(false);
+const autoInsertLimitToQuery = ref(false);
 
 onMounted(() => {
   getSettings();
@@ -45,7 +45,7 @@ function getSettings() {
     .getClientConfig()
     .then(
       (res) =>
-        (visible.value = store.clientConfig?.AutoInsertLimitToQuery ?? false),
+        (autoInsertLimitToQuery.value = store.clientConfig?.AutoInsertLimitToQuery ?? false),
     )
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to get settings: ${err}`);
@@ -54,7 +54,7 @@ function getSettings() {
 
 function save() {
   store
-    .addClientConfig({ AutoInsertLimitToQuery: visible.value })
+    .updateClientConfig({ AutoInsertLimitToQuery: autoInsertLimitToQuery.value })
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to set settings: ${err}`);
     });
