@@ -5,7 +5,11 @@
         <v-card-title>
           <span class="text-h5"
             >Change Color of {{ capitalize(tagType) }}
-            <v-chip :color="tagColor" :text-color="textColor">{{ tagName }}</v-chip></span
+            <v-chip
+              :color="tagColor"
+              :text-color="getContrastTextColor(tagColor)"
+              >{{ tagName }}</v-chip
+            ></span
           >
         </v-card-title>
         <v-card-text>
@@ -61,7 +65,7 @@ import { EventBus } from "./EventBus";
 import { ref, computed, watch } from "vue";
 import { useRootStore } from "@/stores";
 import { capitalize } from "@/filters";
-import { isDarkColor } from "@/lib/colors"
+import { getContrastTextColor } from "@/lib/colors";
 
 const store = useRootStore();
 const visible = ref(false);
@@ -122,6 +126,4 @@ function updateColor() {
       EventBus.emit("showError", err);
     });
 }
-
-const textColor = computed(() => { return isDarkColor(tagColor.value) ? 'white' : 'black'; });
 </script>

@@ -264,7 +264,7 @@
               :key="`tag/${tag.name}`"
               small
               :color="tag.color"
-              :text-color="isDarkColor(tag.color) ? 'white' : 'black'"
+              :text-color="getContrastTextColor(tag.color)"
               >{{ tag.name }}</v-chip
             ></v-col
           >
@@ -303,7 +303,7 @@
                 :key="`service/${service.name}`"
                 small
                 :color="service.color"
-                :text-color="isDarkColor(service.color) ? 'white' : 'black'"
+                :text-color="getContrastTextColor(service.color)"
                 >{{ service.name }}</v-chip
               >
               ({{ stream.stream.Stream.Protocol }})</span
@@ -316,7 +316,7 @@
               :key="`mark/${mark.name}`"
               small
               :color="mark.color"
-              :text-color="isDarkColor(mark.color) ? 'white' : 'black'"
+              :text-color="getContrastTextColor(mark.color)"
               >{{ mark.name }}</v-chip
             ></v-col
           >
@@ -329,7 +329,7 @@
               :key="`generated/${generated.name}`"
               small
               :color="generated.color"
-              :text-color="isDarkColor(generated.color) ? 'white' : 'black'"
+              :text-color="getContrastTextColor(generated.color)"
               >{{ generated.name }}</v-chip
             ></v-col
           >
@@ -365,7 +365,7 @@ import {
   destroySelectionListener,
 } from "./streamSelector";
 import { formatDate, formatDateLong, tagify } from "@/filters";
-import { isDarkColor } from "@/lib/colors"
+import { getContrastTextColor } from "@/lib/colors";
 
 const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
 

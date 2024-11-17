@@ -36,8 +36,8 @@ export function randomColor(): string {
   return "#" + toHex(r) + toHex(g) + toHex(b);
 }
 // https://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
-export function isDarkColor(bgColor : string) : boolean {
-  const color = (bgColor.charAt(0) === '#') ? bgColor.substring(1, 7) : bgColor;
+export function isDarkColor(bgColor: string): boolean {
+  const color = bgColor.charAt(0) === "#" ? bgColor.substring(1, 7) : bgColor;
   const r = parseInt(color.substring(0, 2), 16); // hexToR
   const g = parseInt(color.substring(2, 4), 16); // hexToG
   const b = parseInt(color.substring(4, 6), 16); // hexToB
@@ -48,6 +48,10 @@ export function isDarkColor(bgColor : string) : boolean {
     }
     return Math.pow((col + 0.055) / 1.055, 2.4);
   });
-  const L = (0.2126 * c[0]) + (0.7152 * c[1]) + (0.0722 * c[2]);
+  const L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   return L <= 0.179;
+}
+
+export function getContrastTextColor(bgColor: string): string {
+  return isDarkColor(bgColor) ? "white" : "black";
 }
