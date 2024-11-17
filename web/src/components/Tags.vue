@@ -38,7 +38,7 @@
           <tr v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
             <td>
               <v-icon>mdi-circle-small</v-icon
-              ><v-chip :color="tag.Color" small>{{
+              ><v-chip :color="tag.Color" small :text-color="isDarkColor(tag.Color) ? 'white' : 'black'">{{
                 tag.Name.substring(1 + tagType.key.length)
               }}</v-chip>
             </td>
@@ -163,6 +163,7 @@ import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
 import ToolBar from "./ToolBar.vue";
+import { isDarkColor } from "@/lib/colors"
 
 const tagTypes = [
   {

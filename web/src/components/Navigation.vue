@@ -58,6 +58,7 @@
               <v-list-item-title
                 class="text-truncate"
                 style="max-width: 110px"
+                :style = "{ color: isDarkColor(tag.Color) ? 'white' : 'black' }"
                 :title="tag.Name.substr(tagType.key.length + 1)"
                 >{{
                   tag.Name.substr(tagType.key.length + 1)
@@ -67,7 +68,7 @@
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
                 <v-list-item-action v-bind="attrs" v-on="on">
-                  <v-btn v-if="hover" icon x-small>
+                  <v-btn v-if="hover" icon x-small :style = "{ color: isDarkColor(tag.Color) ? 'white' : 'black' }">
                     <v-icon>mdi-dots-vertical</v-icon>
                   </v-btn>
                   <v-chip v-else x-small
@@ -248,6 +249,7 @@ import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
 import { computed, onMounted, ref, watch } from "vue";
+import { isDarkColor } from "@/lib/colors"
 
 type ColorSchemeButtonTriState = 0 | 1 | 2;
 

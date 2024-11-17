@@ -234,7 +234,7 @@
                   v-for="tag in stream.Tags"
                   v-slot="{ hover }"
                   :key="tag"
-                  ><v-chip small :color="tagColors[tag]"
+                  ><v-chip small :color="tagColors[tag]" :text-color="isDarkColor(tagColors[tag]) ? 'white' : 'black'"
                     ><template v-if="hover"
                       >{{ capitalize(tagify(tag, "type")) }}
                       {{ tagify(tag, "name") }}</template
@@ -301,6 +301,7 @@ import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router/composables";
 import { Result } from "@/apiClient";
 import { capitalize, formatDate, formatDateLong, tagify } from "@/filters";
+import { isDarkColor } from "@/lib/colors"
 
 const store = useRootStore();
 const route = useRoute();
