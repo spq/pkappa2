@@ -9,7 +9,7 @@
         <v-list-item-title>Help</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item link dense exact :to="{ name: 'search', query: { q: '' } }">
+    <v-list-item link dense exact :to="{ name: 'search', query: { q: '', fromNavigation: true } }">
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
         <v-icon dense>mdi-all-inclusive</v-icon>
@@ -51,6 +51,7 @@
               name: 'search',
               query: {
                 q: tagForURI(tag.Name),
+                fromNavigation: true,
               },
             }"
           >
@@ -92,6 +93,7 @@
                     name: 'search',
                     query: {
                       q: tagForURI(tag.Name),
+                      fromNavigation: true,
                     },
                   }"
                 >
