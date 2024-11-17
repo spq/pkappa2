@@ -17,6 +17,7 @@ curl --data-binary @some-file.pcap http://localhost:8080/upload/some-file.pcap
 
 ## Running
 
+- requires [go](https://go.dev/dl/) 1.22+
 - install required dependencies
     - libpcap (e.g. `apt install libpcap-dev`)
 - run `yarn install && yarn build` in `/web`
