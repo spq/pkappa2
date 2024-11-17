@@ -379,12 +379,14 @@ function search(type: string | null) {
       q = JSON.parse(JSON.stringify(route.query)) as typeof route.query;
   }
   q.q = searchBox.value;
+  q.manualSearch = "true";
   addSearch(searchBox.value);
   historyIndex.value = -1;
-  void router.push({
+  let newQuery = {
     name: type,
     query: q,
-  }).catch(e => "");
+  };
+  void router.push(newQuery).catch(e => "");
 }
 
 function createTag(tagType: string, tagQuery: string) {
