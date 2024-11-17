@@ -11,7 +11,7 @@
       </v-tooltip>
     </ToolBar>
     <v-card>
-      <v-card-title>Settings</v-card-title>
+      <v-card-title>Global Settings</v-card-title>
       <v-simple-table>
         <tbody>
           <tr v-for="(value, name) in store.clientConfig || []" :key="name">
