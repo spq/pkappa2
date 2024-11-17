@@ -299,7 +299,7 @@ import { EventBus } from "./EventBus";
 import ToolBar from "./ToolBar.vue";
 import { useRootStore } from "@/stores";
 import { useStreamsStore } from "@/stores/streams";
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onMounted, onBeforeMount ,onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router/composables";
 import { Result } from "@/apiClient";
@@ -351,6 +351,15 @@ const tagColors = computed(() => {
 
 watch(route, () => {
   fetchStreams();
+});
+
+onBeforeMount(() => {
+  store.getClientConfig().catch((err: string) => {
+    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  });
+  store.updateConverters().catch((err: string) => {
+    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  });
 });
 
 onMounted(() => {

@@ -192,23 +192,6 @@ EventBus.on("setSearchTerm", setSearchTerm);
 
 const reactiveStore = reactive(store);
 
-watch([route, searchBoxField, reactiveStore], () => {
-  if (
-    route &&
-    searchBoxField &&
-    reactiveStore.clientConfig &&
-    !route.query.q &&
-    store.clientConfig?.AutoInsertLimitToQuery
-  ) {
-    var input = searchBoxField.value?.$el.querySelector("input");
-    setSearchBox(" ltime:-1h:");
-    input?.focus();
-    setTimeout(() => {
-      input?.setSelectionRange(0, 0);
-    }, 0);
-  }
-});
-
 watch(
   route,
   () => {
@@ -236,15 +219,6 @@ watch(
   },
   { immediate: true },
 );
-
-onBeforeMount(() => {
-  store.getClientConfig().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update converters: ${err}`);
-  });
-  store.updateConverters().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update converters: ${err}`);
-  });
-});
 
 onMounted(() => {
   const keyListener = (e: KeyboardEvent) => {
