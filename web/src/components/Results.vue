@@ -299,7 +299,14 @@ import { EventBus } from "./EventBus";
 import ToolBar from "./ToolBar.vue";
 import { useRootStore } from "@/stores";
 import { useStreamsStore } from "@/stores/streams";
-import { computed, onMounted, onBeforeMount ,onBeforeUnmount, ref, watch } from "vue";
+import {
+  computed,
+  onMounted,
+  onBeforeMount,
+  onBeforeUnmount,
+  ref,
+  watch,
+} from "vue";
 import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router/composables";
 import { Result } from "@/apiClient";

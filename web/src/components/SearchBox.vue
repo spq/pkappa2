@@ -384,7 +384,7 @@ function search(type: string | null) {
   void router.push({
     name: type,
     query: q,
-  });
+  }).catch(e => "");
 }
 
 function createTag(tagType: string, tagQuery: string) {
