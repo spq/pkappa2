@@ -17,7 +17,11 @@
           <tr v-for="(value, name) in store.clientConfig || []" :key="name">
             <th>{{ name }}</th>
             <td width="100%">
-              <input v-model="autoInsertLimitToQuery" type="checkbox" @change="save" />
+              <input
+                v-model="autoInsertLimitToQuery"
+                type="checkbox"
+                @change="save"
+              />
             </td>
           </tr>
         </tbody>
@@ -45,7 +49,8 @@ function getSettings() {
     .getClientConfig()
     .then(
       (res) =>
-        (autoInsertLimitToQuery.value = store.clientConfig?.AutoInsertLimitToQuery ?? false),
+        (autoInsertLimitToQuery.value =
+          store.clientConfig?.AutoInsertLimitToQuery ?? false),
     )
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to get settings: ${err}`);
@@ -54,7 +59,9 @@ function getSettings() {
 
 function save() {
   store
-    .updateClientConfig({ AutoInsertLimitToQuery: autoInsertLimitToQuery.value })
+    .updateClientConfig({
+      AutoInsertLimitToQuery: autoInsertLimitToQuery.value,
+    })
     .catch((err: string) => {
       EventBus.emit("showError", `Failed to set settings: ${err}`);
     });

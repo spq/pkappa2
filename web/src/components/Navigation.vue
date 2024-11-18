@@ -9,7 +9,16 @@
         <v-list-item-title>Help</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item link dense exact :to="config?.AutoInsertLimitToQuery ? { name: 'search', query: { q: '', fromNavigation: true }} : { name: 'search', query: { q: '' } }">
+    <v-list-item
+      link
+      dense
+      exact
+      :to="
+        config?.AutoInsertLimitToQuery
+          ? { name: 'search', query: { q: '', fromNavigation: true } }
+          : { name: 'search', query: { q: '' } }
+      "
+    >
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
         <v-icon dense>mdi-all-inclusive</v-icon>
@@ -48,20 +57,21 @@
             dense
             exact
             :to="
-            config?.AutoInsertLimitToQuery ?
-            {
-              name: 'search',
-              query: {
-                q: tagForURI(tag.Name),
-                fromNavigation: true,
-              },
-            } :
-            {
-              name: 'search',
-              query: {
-                q: tagForURI(tag.Name)
-              },
-            }"
+              config?.AutoInsertLimitToQuery
+                ? {
+                    name: 'search',
+                    query: {
+                      q: tagForURI(tag.Name),
+                      fromNavigation: true,
+                    },
+                  }
+                : {
+                    name: 'search',
+                    query: {
+                      q: tagForURI(tag.Name),
+                    },
+                  }
+            "
           >
             <v-list-item-content>
               <v-list-item-title
@@ -98,20 +108,21 @@
                   link
                   exact
                   :to="
-                  config?.AutoInsertLimitToQuery ?
-                  {
-                    name: 'search',
-                    query: {
-                      q: tagForURI(tag.Name),
-                      fromNavigation: true,
-                    },
-                  } :
-                  {
-                    name: 'search',
-                    query: {
-                      q: tagForURI(tag.Name),
-                    },
-                  }"
+                    config?.AutoInsertLimitToQuery
+                      ? {
+                          name: 'search',
+                          query: {
+                            q: tagForURI(tag.Name),
+                            fromNavigation: true,
+                          },
+                        }
+                      : {
+                          name: 'search',
+                          query: {
+                            q: tagForURI(tag.Name),
+                          },
+                        }
+                  "
                 >
                   <v-list-item-icon>
                     <v-icon>mdi-magnify</v-icon>

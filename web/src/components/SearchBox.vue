@@ -117,6 +117,7 @@ import { VTextField } from "vuetify/lib";
 const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
+const config = computed(() => store.clientConfig);
 const searchBoxField = ref<InstanceType<typeof VTextField> | null>(null);
 const searchBox = ref<string>(route.query.q as string);
 const historyIndex = ref(-1);
@@ -219,7 +220,6 @@ watch(
 );
 
 onMounted(() => {
-
   store.updateConverters().catch((err: string) => {
     EventBus.emit("showError", `Failed to update converters: ${err}`);
   });
@@ -382,14 +382,16 @@ function search(type: string | null) {
       q = JSON.parse(JSON.stringify(route.query)) as typeof route.query;
   }
   q.q = searchBox.value;
-  q.manualSearch = "true";
+  if (config.value?.AutoInsertLimitToQuery) {
+    q.manualSearch = "true";
+  }
   addSearch(searchBox.value);
   historyIndex.value = -1;
   let newQuery = {
     name: type,
     query: q,
   };
-  void router.push(newQuery).catch(e => "");
+  void router.push(newQuery).catch((e) => "");
 }
 
 function createTag(tagType: string, tagQuery: string) {
