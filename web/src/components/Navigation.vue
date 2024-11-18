@@ -9,8 +9,7 @@
         <v-list-item-title>Help</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item v-if="config?.AutoInsertLimitToQuery" link dense exact :to="{ name: 'search', query: { q: '', fromNavigation: true } }">
-    <v-list-item v-if="!config?.AutoInsertLimitToQuery" link dense exact :to="{ name: 'search', query: { q: '' } }">
+    <v-list-item link dense exact :to="config?.AutoInsertLimitToQuery ? { name: 'search', query: { q: '', fromNavigation: true }} : { name: 'search', query: { q: '' } }">
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
         <v-icon dense>mdi-all-inclusive</v-icon>
@@ -45,27 +44,22 @@
           :style="{ backgroundColor: tag.Color }"
         >
           <v-list-item
-            v-if="!config.AutoInsertLimitToQuery"
             link
             dense
             exact
-            :to="{
-              name: 'search',
-              query: {
-                q: tagForURI(tag.Name)
-              },
-            }"
-          >
-          <v-list-item
-            v-if="config.AutoInsertLimitToQuery"
-            link
-            dense
-            exact
-            :to="{
+            :to="
+            config?.AutoInsertLimitToQuery ?
+            {
               name: 'search',
               query: {
                 q: tagForURI(tag.Name),
                 fromNavigation: true,
+              },
+            } :
+            {
+              name: 'search',
+              query: {
+                q: tagForURI(tag.Name)
               },
             }"
           >
@@ -101,25 +95,21 @@
               </template>
               <v-list dense>
                 <v-list-item
-                  v-if="!config.AutoInsertLimitToQuery"
                   link
                   exact
-                  :to="{
-                    name: 'search',
-                    query: {
-                      q: tagForURI(tag.Name)
-                    },
-                  }"
-                >
-                <v-list-item
-                  v-if="config.AutoInsertLimitToQuery"
-                  link
-                  exact
-                  :to="{
+                  :to="
+                  config?.AutoInsertLimitToQuery ?
+                  {
                     name: 'search',
                     query: {
                       q: tagForURI(tag.Name),
                       fromNavigation: true,
+                    },
+                  } :
+                  {
+                    name: 'search',
+                    query: {
+                      q: tagForURI(tag.Name),
                     },
                   }"
                 >

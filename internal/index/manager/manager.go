@@ -849,7 +849,8 @@ func (mgr *Manager) SetClientConfig(config ClientConfig) ClientConfig {
 func (mgr *Manager) ClientConfig() ClientConfig {
 	c := make(chan ClientConfig)
 	mgr.jobs <- func() {
-		c <- close(c)
+		c <- mgr.clientConfig
+		close(c)
 	}
 	res := <-c
 	return res
