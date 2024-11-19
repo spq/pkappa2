@@ -35,7 +35,7 @@ import ToolBar from "./ToolBar.vue";
 import { onMounted } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
-import { ref, computed } from "vue";
+import { ref } from "vue";
 
 const store = useRootStore();
 const autoInsertLimitToQuery = ref(false);
@@ -48,7 +48,7 @@ function getSettings() {
   store
     .getClientConfig()
     .then(
-      (res) =>
+      () =>
         (autoInsertLimitToQuery.value =
           store.clientConfig?.AutoInsertLimitToQuery ?? false),
     )

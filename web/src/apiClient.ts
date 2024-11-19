@@ -191,7 +191,7 @@ const APIClient = {
   async updateClientConfig(clientConfig: ClientConfig) {
     return this.performGuarded(
       "post",
-      `clientconfig`,
+      `/clientconfig`,
       isClientConfig,
       JSON.stringify(clientConfig),
       undefined,

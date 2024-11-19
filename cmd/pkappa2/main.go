@@ -101,7 +101,6 @@ func main() {
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
 		*converterDir,
-		manager.ClientConfig{AutoInsertLimitToQuery: false},
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)

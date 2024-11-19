@@ -105,9 +105,7 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
-  watch,
-  onBeforeMount,
-  reactive,
+  watch
 } from "vue";
 import { useRoute, useRouter } from "vue-router/composables";
 import { useRootStore } from "@/stores";
@@ -391,7 +389,7 @@ function search(type: string | null) {
     name: type,
     query: q,
   };
-  void router.push(newQuery).catch((e) => "");
+  void router.push(newQuery).catch((e) => console.warn(e));
 }
 
 function createTag(tagType: string, tagQuery: string) {

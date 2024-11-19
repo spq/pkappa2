@@ -213,7 +213,7 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string, clientConfig ClientConfig) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
 	ctx := context.Background()
 	mgr := Manager{
 		PcapDir:      pcapDir,
@@ -229,7 +229,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string, clientCo
 		jobs:             make(chan func()),
 		listeners:        make(map[chan Event]listener),
 
-		clientConfig: clientConfig,
+		clientConfig: ClientConfig{AutoInsertLimitToQuery: false},
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -830,8 +830,8 @@ func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	return indexes, mgr.lock(indexes)
 }
 
-func (mgr *Manager) SetClientConfig(config ClientConfig) ClientConfig {
-	c := make(chan ClientConfig)
+func (mgr *Manager) SetClientConfig(config ClientConfig) {
+	c := make(chan struct{})
 	mgr.jobs <- func() {
 		mgr.clientConfig = config
 
@@ -842,8 +842,7 @@ func (mgr *Manager) SetClientConfig(config ClientConfig) ClientConfig {
 		close(c)
 	}
 
-	res := <-c
-	return res
+	<-c
 }
 
 func (mgr *Manager) ClientConfig() ClientConfig {
