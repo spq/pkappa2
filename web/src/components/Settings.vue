@@ -4,14 +4,17 @@
       <v-card-title>Global Settings</v-card-title>
       <v-simple-table>
         <tbody>
-          <tr v-for="(value, name) in store.clientConfig || []" :key="name">
-            <th>{{ name }}</th>
-            <td width="100%">
+          <tr>
+            <th scope="row">AutoInsertLimitToQuery</th>
+            <td>
               <input
                 v-model="autoInsertLimitToQuery"
                 type="checkbox"
                 @change="save"
               />
+            </td>
+            <td>
+              When checked auto appends limit to queries clicked on in navbar
             </td>
           </tr>
         </tbody>
