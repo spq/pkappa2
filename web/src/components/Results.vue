@@ -319,7 +319,6 @@ const router = useRouter();
 const streams = useStreamsStore();
 const selected = ref<boolean[]>([]);
 const tags = computed(() => store.tags);
-const config = computed(() => store.clientConfig);
 const groupedTags = computed(() => store.groupedTags);
 const selectedCount = computed(
   () => selected.value.filter((i) => i === true).length,

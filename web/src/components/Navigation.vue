@@ -15,7 +15,7 @@
       exact
       :to="
         config?.AutoInsertLimitToQuery
-          ? { name: 'search', query: { q: '', fromNavigation: true } }
+          ? { name: 'search', query: { q: 'ltime:-1h:' } }
           : { name: 'search', query: { q: '' } }
       "
     >
@@ -61,8 +61,7 @@
                 ? {
                     name: 'search',
                     query: {
-                      q: tagForURI(tag.Name),
-                      fromNavigation: true,
+                      q: tagForURI(tag.Name) + ' ltime:-1h:',
                     },
                   }
                 : {
@@ -112,8 +111,7 @@
                       ? {
                           name: 'search',
                           query: {
-                            q: tagForURI(tag.Name),
-                            fromNavigation: true,
+                            q: tagForURI(tag.Name)  + ' ltime:-1h:',
                           },
                         }
                       : {
