@@ -105,7 +105,7 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
-  watch
+  watch,
 } from "vue";
 import { useRoute, useRouter } from "vue-router/composables";
 import { useRootStore } from "@/stores";
