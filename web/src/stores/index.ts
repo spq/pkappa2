@@ -120,7 +120,7 @@ export const useRootStore = defineStore("root", {
     },
     async updateClientConfig(clientConfig: ClientConfig) {
       return APIClient.updateClientConfig(clientConfig)
-        .then((res) => (this.clientConfig = res))
+        .then(() => (this.clientConfig = clientConfig))
         .catch(handleAxiosDefaultError);
     },
     async updatePcaps() {

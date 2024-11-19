@@ -14,7 +14,7 @@
       dense
       exact
       :to="
-        config?.AutoInsertLimitToQuery
+        store.clientConfig?.AutoInsertLimitToQuery
           ? { name: 'search', query: { q: 'ltime:-1h:' } }
           : { name: 'search', query: { q: '' } }
       "
@@ -57,7 +57,7 @@
             dense
             exact
             :to="
-              config?.AutoInsertLimitToQuery
+              store.clientConfig?.AutoInsertLimitToQuery
                 ? {
                     name: 'search',
                     query: {
@@ -107,7 +107,7 @@
                   link
                   exact
                   :to="
-                    config?.AutoInsertLimitToQuery
+                    store.clientConfig?.AutoInsertLimitToQuery
                       ? {
                           name: 'search',
                           query: {
@@ -341,7 +341,6 @@ const moreOpen =
   ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
-const config = computed(() => store.clientConfig);
 
 watch(colorscheme, () => {
   const schemes: Record<ColorSchemeButtonTriState, ColorSchemeConfiguration> = {
