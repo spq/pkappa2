@@ -42,6 +42,11 @@ export type Error = {
   Error: string;
 };
 
+export type DataMatches = {
+  Client: string[] | null;
+  Server: string[] | null;
+};
+
 /** @see {isSearchResult} ts-auto-guard:type-guard */
 export type SearchResult = {
   Debug: string[];
@@ -49,6 +54,7 @@ export type SearchResult = {
   Elapsed: number;
   Offset: number;
   MoreResults: boolean;
+  DataMatches: DataMatches;
 };
 
 /** @see {isSearchResponse} ts-auto-guard:type-guard */

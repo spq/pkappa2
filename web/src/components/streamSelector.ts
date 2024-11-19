@@ -55,12 +55,15 @@ function getDataSetContainer(outerBound: Node, container: Node, data: string) {
   return currentNode;
 }
 
+export const escapeRegex =
+  /[^ !#%&',/0123456789:;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz~-]/;
+
 function escape(text: string) {
   return text
     .split("")
     .map((char) =>
       char.replace(
-        /[^ !#%&',/0123456789:;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz~-]/,
+        escapeRegex,
         (match) =>
           `\\x{${match
             .charCodeAt(0)

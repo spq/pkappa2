@@ -9,7 +9,7 @@
           class="chunk"
           :data-chunk-idx="index"
           :class="[classes(chunk)]"
-          v-html="inlineAscii(chunk.Content)"
+          v-html="inlineAscii(chunk)"
         >
         </span>
       </template>
@@ -34,8 +34,9 @@
 </template>
 
 <script lang="ts" setup>
-import { Data } from "@/apiClient";
+import { Data, DataMatches } from "@/apiClient";
 import { PropType, computed } from "vue";
+import { escapeRegex } from "./streamSelector";
 
 const props = defineProps({
   presentation: {
@@ -46,20 +47,67 @@ const props = defineProps({
     type: Array as PropType<Data[]>,
     required: true,
   },
+  highlightMatches: {
+    type: Object as PropType<DataMatches>,
+    required: false,
+    default: () => ({ Client: null, Server: null }),
+  },
 });
 const presentation = computed(() => props.presentation);
 const data = computed(() => props.data);
+const highlightRegex = (highlight: string[] | null) =>
+  highlight?.map((regex) => {
+    try {
+      if (regex === "") return undefined;
+      // replace \x{XX} with the actual character
+      regex = regex.replace(/\\x{([0-9a-fA-F]{2})}/g, (_, hex) => {
+        const decoded = String.fromCharCode(parseInt(hex as string, 16));
+        if (escapeRegex.test(decoded)) return `\\${decoded}`;
+        return decoded;
+      });
+      return new RegExp(regex, "g");
+    } catch (e) {
+      console.error(`Invalid regex: ${regex}`);
+    }
+  });
+
+const highlightMatchesClient = computed(() =>
+  highlightRegex(props.highlightMatches.Client),
+);
+const highlightMatchesServer = computed(() =>
+  highlightRegex(props.highlightMatches.Server),
+);
 
 const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
   if (i != 0x0d && i != 0x0a && (i < 0x20 || i > 0x7e)) return ".";
   return `&#x${i.toString(16).padStart(2, "0")};`;
 });
 
-const inlineAscii = (b64: string) => {
-  return atob(b64)
+const inlineAscii = (chunk: Data) => {
+  let chunkData = atob(chunk.Content);
+  const asciiEscaped = chunkData
     .split("")
-    .map((c) => asciiMap[c.charCodeAt(0)])
-    .join("");
+    .map((c) => asciiMap[c.charCodeAt(0)]);
+  const highlightMatches =
+    chunk.Direction === 0
+      ? highlightMatchesClient.value
+      : highlightMatchesServer.value;
+  if (highlightMatches !== undefined) {
+    const highlights: number[][] = [];
+    for (const regex of highlightMatches) {
+      if (regex === undefined) continue;
+      chunkData.matchAll(regex)?.forEach((match) => {
+        highlights.push([match.index, match[0].length]);
+      });
+    }
+    for (const [index, length] of highlights) {
+      asciiEscaped[index] = `<span class="mark">${asciiEscaped[index]}`;
+      asciiEscaped[index + length - 1] =
+        `${asciiEscaped[index + length - 1]}</span>`;
+    }
+  }
+
+  return asciiEscaped.join("");
 };
 
 const classes = (chunk: Data) => ({
@@ -132,9 +180,15 @@ const hexdump = (b64: string) => {
     margin-left: 2em;
   }
 }
+.server >>> .mark {
+  background-color: #9090ff;
+}
 .client {
   color: #800000;
   background-color: #faeeed;
+}
+.client >>> .mark {
+  background-color: #ff8e5e;
 }
 
 .theme--dark {

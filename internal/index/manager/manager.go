@@ -2382,6 +2382,10 @@ func (v *View) Stream(streamID uint64) (StreamContext, error) {
 	return StreamContext{}, nil
 }
 
+func (v *View) TagDetails() map[string]query.TagDetails {
+	return v.tagDetails
+}
+
 func (c StreamContext) Stream() *index.Stream {
 	return c.s
 }

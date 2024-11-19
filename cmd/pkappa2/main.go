@@ -537,6 +537,10 @@ func main() {
 			Elapsed     int64
 			Offset      uint
 			MoreResults bool
+			DataMatches struct {
+				Client []string
+				Server []string
+			}
 		}{
 			Debug: qq.Debug,
 			Results: []struct {
@@ -564,6 +568,52 @@ func main() {
 		if err != nil {
 			http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 			return
+		}
+
+		dataConditions := struct {
+			ClientSeen map[string]struct{}
+			Client     []string
+			ServerSeen map[string]struct{}
+			Server     []string
+		}{
+			ClientSeen: make(map[string]struct{}),
+			ServerSeen: make(map[string]struct{}),
+		}
+		tagDetails := v.TagDetails()
+		queue := []*query.ConditionsSet{&qq.Conditions}
+		for len(queue) > 0 {
+			cs := *queue[0]
+			queue = queue[1:]
+			for _, ccs := range cs.InlineTagFilters(tagDetails) {
+				for _, cc := range ccs {
+					switch ccc := cc.(type) {
+					case *query.DataCondition:
+						for _, e := range ccc.Elements {
+							if e.Flags&query.DataRequirementSequenceFlagsDirection == query.DataRequirementSequenceFlagsDirectionClientToServer {
+								if _, ok := dataConditions.ClientSeen[e.Regex]; !ok {
+									dataConditions.ClientSeen[e.Regex] = struct{}{}
+									dataConditions.Client = append(dataConditions.Client, e.Regex)
+								}
+							} else {
+								if _, ok := dataConditions.ServerSeen[e.Regex]; !ok {
+									dataConditions.ServerSeen[e.Regex] = struct{}{}
+									dataConditions.Server = append(dataConditions.Server, e.Regex)
+								}
+							}
+						}
+					case *query.TagCondition:
+						ti := tagDetails[ccc.TagName]
+						queue = append(queue, &ti.Conditions)
+					}
+				}
+			}
+		}
+		response.DataMatches = struct {
+			Client []string
+			Server []string
+		}{
+			Client: dataConditions.Client,
+			Server: dataConditions.Server,
 		}
 		response.Elapsed = time.Since(start).Microseconds()
 		response.MoreResults = hasMore
