@@ -2,8 +2,7 @@
  * Generated type guards for "apiClient.ts".
  * WARNING: Do not manually change this file.
  */
-import { Error, SearchResult, SearchResponse, StreamData, Statistics, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, TagsResponse, GraphResponse, ClientConfig } from "./apiClient";
-import { ConfigEvent } from "./stores/websocket";
+import { Error, SearchResult, SearchResponse, StreamData, Statistics, ClientConfig, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, TagsResponse, GraphResponse } from "./apiClient";
 
 export function isError(obj: unknown): obj is Error {
     const typedObj = obj as Error
@@ -139,7 +138,7 @@ export function isClientConfig(obj: unknown): obj is ClientConfig {
     return (
         (typedObj !== null &&
             typeof typedObj === "object" ||
-            typeof typedObj === "function") && 
+            typeof typedObj === "function") &&
         typeof typedObj["AutoInsertLimitToQuery"] === "boolean"
     )
 }
