@@ -111,7 +111,7 @@
                       ? {
                           name: 'search',
                           query: {
-                            q: tagForURI(tag.Name)  + ' ltime:-1h:',
+                            q: tagForURI(tag.Name) + ' ltime:-1h:',
                           },
                         }
                       : {
@@ -353,6 +353,9 @@ watch(colorscheme, () => {
 });
 
 onMounted(() => {
+  store.getClientConfig().catch((err: string) => {
+    EventBus.emit("showError", `Failed to get config: ${err}`);
+  });
   store
     .updateTags()
     .then(() => {
