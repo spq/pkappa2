@@ -59,7 +59,7 @@ type (
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
 		PcapStats PcapStatistics         `json:",omitempty"`
-		Config    ClientConfig           `json:",omitempty"`
+		Config    *ClientConfig          `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -837,7 +837,7 @@ func (mgr *Manager) SetClientConfig(config ClientConfig) {
 
 		mgr.event(Event{
 			Type:   "configUpdated",
-			Config: config,
+			Config: &config,
 		})
 		close(c)
 	}
