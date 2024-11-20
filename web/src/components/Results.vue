@@ -93,6 +93,12 @@
         >Results might be outdated.</v-alert
       >
       <v-spacer />
+      <div v-if="streams.result">
+        <span class="text-caption">
+          Query took {{ (streams.result.Elapsed / 1_000_000).toFixed(6) }}s
+        </span>
+      </div>
+      <v-spacer />
       <div
         v-if="
           !streams.running &&

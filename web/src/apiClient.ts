@@ -46,6 +46,7 @@ export type Error = {
 export type SearchResult = {
   Debug: string[];
   Results: Result[];
+  Elapsed: number;
   Offset: number;
   MoreResults: boolean;
 };
