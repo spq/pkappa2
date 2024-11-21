@@ -320,6 +320,15 @@ func TestSearchStreams(t *testing.T) {
 			[]uint64{2},
 		},
 		{
+			"test sequence of data connected using then",
+			[]streamInfo{
+				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle1", "needle2", "needle3"}),
+				makeStream("192.168.0.100:234", "192.168.0.1:80", t1.Add(time.Hour*2), []string{"needle2", "needle3", "needle1"}),
+			},
+			"cdata:needle1 then sdata:needle2",
+			[]uint64{0},
+		},
+		{
 			"test protocol:tcp query",
 			[]streamInfo{
 				makeStream("192.168.0.100:123", "192.168.0.1:80", t1.Add(time.Hour*1), []string{"needle0"}),
