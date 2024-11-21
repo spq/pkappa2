@@ -127,6 +127,7 @@ func (dcc *dataConditionsContainer) add(cc *query.DataCondition, subQuery string
 	if affectsSubquery {
 		return errors.New("SubQueries not yet fully supported")
 	}
+	dcc.conditions = append(dcc.conditions, cc)
 regexElements:
 	for eIdx, e := range cc.Elements {
 		for rIdx := range dcc.regexes {
@@ -140,7 +141,7 @@ regexElements:
 				continue
 			}
 			r.occurence = append(r.occurence, occ{
-				condition: len(dcc.conditions),
+				condition: len(dcc.conditions) - 1,
 				element:   eIdx,
 			})
 			continue regexElements
@@ -164,12 +165,11 @@ regexElements:
 		}
 		dcc.regexes = append(dcc.regexes, regex{
 			occurence: []occ{{
-				condition: len(dcc.conditions),
+				condition: len(dcc.conditions) - 1,
 				element:   eIdx,
 			}},
 		})
 	}
-	dcc.conditions = append(dcc.conditions, cc)
 	return nil
 }
 
