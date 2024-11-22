@@ -534,6 +534,7 @@ func main() {
 				Stream *index.Stream
 				Tags   []string
 			}
+			Elapsed     int64
 			Offset      uint
 			MoreResults bool
 		}{
@@ -543,6 +544,7 @@ func main() {
 				Tags   []string
 			}{},
 		}
+		start := time.Now()
 		v := mgr.GetView()
 		defer v.Release()
 		hasMore, offset, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
@@ -563,6 +565,7 @@ func main() {
 			http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+		response.Elapsed = time.Since(start).Microseconds()
 		response.MoreResults = hasMore
 		response.Offset = offset
 		w.Header().Set("Content-Type", "application/json")

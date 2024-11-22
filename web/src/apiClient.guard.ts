@@ -54,6 +54,7 @@ export function isSearchResult(obj: unknown): obj is SearchResult {
                 typeof e === "string"
             )
         ) &&
+        typeof typedObj["Elapsed"] === "number" &&
         typeof typedObj["Offset"] === "number" &&
         typeof typedObj["MoreResults"] === "boolean"
     )
