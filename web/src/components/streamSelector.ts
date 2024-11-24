@@ -23,15 +23,10 @@ export function destroySelectionListener() {
   listenerBag.clear();
 }
 
-function getFromDataSet(
-  outerBound: Node,
-  container: Node,
-  data: string,
-  fallback = null,
-) {
+function getFromDataSet(outerBound: Node, container: Node, data: string) {
   const node = getDataSetContainer(outerBound, container, data);
-  if (node == null) return fallback;
-  return node.dataset[data] ?? fallback;
+  if (node == null) return null;
+  return node.dataset[data] ?? null;
 }
 
 /**
@@ -43,6 +38,9 @@ function getFromDataSet(
 function getDataSetContainer(outerBound: Node, container: Node, data: string) {
   let currentNode: Node | null = container;
   // Ignore non-HTMLElement nodes and look for ones that have a dataset with our data attribute
+  if (!outerBound.contains(currentNode)) {
+    return null;
+  }
   while (
     !(currentNode instanceof HTMLElement) ||
     currentNode?.dataset?.[data] == null
@@ -81,6 +79,10 @@ function chunkToQueryPart(chunk: Data, data: string) {
 
 function onSelectionChange(this: ThisProxy) {
   const stream = useStreamStore();
+  const chunks = stream.stream?.Data;
+  if (chunks == null) {
+    return;
+  }
   const selection = document.getSelection();
   this.selectionData.value = "";
   this.selectionQuery.value = "";
@@ -107,39 +109,33 @@ function onSelectionChange(this: ThisProxy) {
   }
   const { startContainer, startOffset, endContainer, endOffset } =
     selection.getRangeAt(0);
-  const datasetStartContainer = getDataSetContainer(
+  const startChunkIdxString = getFromDataSet(
     streamDataNode,
     startContainer,
     "chunkIdx",
   );
-  const datasetEndContainer = getDataSetContainer(
+  const endChunkIdxString = getFromDataSet(
     streamDataNode,
     endContainer,
     "chunkIdx",
   );
-  if (
-    datasetStartContainer == null ||
-    datasetEndContainer == null ||
-    !streamDataNode.contains(datasetStartContainer) ||
-    !streamDataNode.contains(datasetEndContainer)
-  ) {
+  if (startChunkIdxString == null || endChunkIdxString == null) {
     return;
   }
-  const chunks = stream.stream?.Data;
-  if (chunks == null) {
-    return;
-  }
-  const startChunkIdx = parseInt(
-    getFromDataSet(streamDataNode, datasetStartContainer, "chunkIdx") ?? "0",
+  const startChunkIdx = parseInt(startChunkIdxString);
+  const endChunkIdx = parseInt(endChunkIdxString);
+  const startOffsetString = getFromDataSet(
+    streamDataNode,
+    startContainer,
+    "offset",
   );
-  const endChunkIdx = parseInt(
-    getFromDataSet(streamDataNode, datasetEndContainer, "chunkIdx") ?? "0",
+  const endOffsetString = getFromDataSet(
+    streamDataNode,
+    endContainer,
+    "offset",
   );
-  if (
-    [startChunkIdx, startOffset, endChunkIdx, endOffset].some((i) => i === null)
-  ) {
-    return;
-  }
+  const startChunkOffset = parseInt(startOffsetString ?? "0") + startOffset;
+  const endChunkOffset = parseInt(endOffsetString ?? "0") + endOffset;
 
   if (startChunkIdx >= chunks.length) {
     return;
@@ -153,8 +149,8 @@ function onSelectionChange(this: ThisProxy) {
     currentChunkIdx++
   ) {
     const chunk = chunks[currentChunkIdx];
-    const start = currentChunkIdx === startChunkIdx ? startOffset : 0;
-    const end = currentChunkIdx === endChunkIdx ? endOffset : undefined;
+    const start = currentChunkIdx === startChunkIdx ? startChunkOffset : 0;
+    const end = currentChunkIdx === endChunkIdx ? endChunkOffset : undefined;
     const data = atob(chunk.Content).substring(start, end);
     queryData += data;
     queryParts.push(chunkToQueryPart(chunk, data));

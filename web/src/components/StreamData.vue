@@ -100,11 +100,17 @@ const inlineAscii = (chunk: Data) => {
         highlights.push([match.index, match[0].length]);
       });
     }
+    highlights.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    if (highlights.length > 0) asciiEscaped[0] = `<span>${asciiEscaped[0]}`;
     for (const [index, length] of highlights) {
-      asciiEscaped[index] = `<span class="mark">${asciiEscaped[index]}`;
+      asciiEscaped[index] =
+        `</span><span class="mark" data-offset="${index}">${asciiEscaped[index]}`;
       asciiEscaped[index + length - 1] =
-        `${asciiEscaped[index + length - 1]}</span>`;
+        `${asciiEscaped[index + length - 1]}</span><span data-offset="${index + length}">`;
     }
+    if (highlights.length > 0)
+      asciiEscaped[chunkData.length - 1] =
+        `${asciiEscaped[chunkData.length - 1]}</span>`;
   }
 
   return asciiEscaped.join("");
