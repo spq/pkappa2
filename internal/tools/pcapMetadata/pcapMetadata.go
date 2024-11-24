@@ -3,7 +3,7 @@ package pcapmetadata
 import (
 	"time"
 
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 )
 
 type (
