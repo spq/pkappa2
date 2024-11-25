@@ -12,7 +12,7 @@
     "nearley": "nearleyc src/parser/query.ne -o src/parser/query.ts"
   },
   "dependencies": {
-    "apexcharts": "^4.0.0",
+    "apexcharts": "^4.1.0",
     "axios": "^1.7.7",
     "core-js": "^3.39.0",
     "moo": "^0.5.2",
