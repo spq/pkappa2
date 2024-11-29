@@ -512,7 +512,7 @@ func TestManagerView(t *testing.T) {
 	if err := mgr.AddTag("tag/bar", "red", ""); err != nil {
 		t.Fatalf("Manager.AddTag failed with error: %v", err)
 	}
-	if m, n, err := view.SearchStreams(context.Background(), q, func(StreamContext) error {
+	if m, n, _, err := view.SearchStreams(context.Background(), q, func(StreamContext) error {
 		return nil
 	}, Limit(1, 1), PrefetchAllTags()); err != nil || n != 1 || !m {
 		t.Fatalf("View.SearchStreams() = %v, %v, %v, want true, 1, nil", m, n, err)

@@ -56,7 +56,20 @@ export function isSearchResult(obj: unknown): obj is SearchResult {
         ) &&
         typeof typedObj["Elapsed"] === "number" &&
         typeof typedObj["Offset"] === "number" &&
-        typeof typedObj["MoreResults"] === "boolean"
+        typeof typedObj["MoreResults"] === "boolean" &&
+        (typedObj["DataRegexes"] !== null &&
+            typeof typedObj["DataRegexes"] === "object" ||
+            typeof typedObj["DataRegexes"] === "function") &&
+        (typedObj["DataRegexes"]["Client"] === null ||
+            Array.isArray(typedObj["DataRegexes"]["Client"]) &&
+            typedObj["DataRegexes"]["Client"].every((e: any) =>
+                typeof e === "string"
+            )) &&
+        (typedObj["DataRegexes"]["Server"] === null ||
+            Array.isArray(typedObj["DataRegexes"]["Server"]) &&
+            typedObj["DataRegexes"]["Server"].every((e: any) =>
+                typeof e === "string"
+            ))
     )
 }
 

@@ -537,6 +537,10 @@ func main() {
 			Elapsed     int64
 			Offset      uint
 			MoreResults bool
+			DataRegexes struct {
+				Client []string
+				Server []string
+			}
 		}{
 			Debug: qq.Debug,
 			Results: []struct {
@@ -547,7 +551,7 @@ func main() {
 		start := time.Now()
 		v := mgr.GetView()
 		defer v.Release()
-		hasMore, offset, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
+		hasMore, offset, dataRegexes, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
 			tags, err := c.AllTags()
 			if err != nil {
 				return err
@@ -565,6 +569,8 @@ func main() {
 			http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+
+		response.DataRegexes = *dataRegexes
 		response.Elapsed = time.Since(start).Microseconds()
 		response.MoreResults = hasMore
 		response.Offset = offset
@@ -780,7 +786,7 @@ func main() {
 		}
 
 		if filter != nil {
-			_, _, err := v.SearchStreams(ctx, filter, handleStream, manager.PrefetchTags(groupingTags))
+			_, _, _, err := v.SearchStreams(ctx, filter, handleStream, manager.PrefetchTags(groupingTags))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 				return

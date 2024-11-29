@@ -351,6 +351,7 @@
         ref="streamData"
         :data="stream.stream.Data"
         :presentation="presentation"
+        :highlight-matches="streams.result?.DataRegexes"
       ></StreamData>
     </div>
   </div>

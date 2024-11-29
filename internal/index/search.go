@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"time"
 
@@ -33,6 +34,10 @@ type (
 	variableDataCollection struct {
 		uses int
 		data []variableDataValue
+	}
+	DataRegexes struct {
+		Client []string
+		Server []string
 	}
 	resultData struct {
 		streams             []*Stream
@@ -863,9 +868,40 @@ var (
 	}
 )
 
-func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails, converters map[string]ConverterAccess) ([]*Stream, bool, error) {
+func extractDataRegexes(qs query.ConditionsSet, tagDetails map[string]query.TagDetails) *DataRegexes {
+	dataConditions := DataRegexes{}
+	queue := []*query.ConditionsSet{&qs}
+	for len(queue) > 0 {
+		cs := *queue[0]
+		queue = queue[1:]
+		for _, ccs := range cs.InlineTagFilters(tagDetails) {
+			for _, cc := range ccs {
+				switch ccc := cc.(type) {
+				case *query.DataCondition:
+					for _, e := range ccc.Elements {
+						if e.Flags&query.DataRequirementSequenceFlagsDirection == query.DataRequirementSequenceFlagsDirectionClientToServer {
+							if !slices.Contains(dataConditions.Client, e.Regex) {
+								dataConditions.Client = append(dataConditions.Client, e.Regex)
+							}
+						} else {
+							if !slices.Contains(dataConditions.Server, e.Regex) {
+								dataConditions.Server = append(dataConditions.Server, e.Regex)
+							}
+						}
+					}
+				case *query.TagCondition:
+					ti := tagDetails[ccc.TagName]
+					queue = append(queue, &ti.Conditions)
+				}
+			}
+		}
+	}
+	return &dataConditions
+}
+
+func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.LongBitmask, refTime time.Time, qs query.ConditionsSet, grouping *query.Grouping, sorting []query.Sorting, limit, skip uint, tagDetails map[string]query.TagDetails, converters map[string]ConverterAccess, extractRegexes bool) ([]*Stream, bool, *DataRegexes, error) {
 	if len(qs) == 0 {
-		return nil, false, nil
+		return nil, false, nil, nil
 	}
 	qs = qs.InlineTagFilters(tagDetails)
 
@@ -985,7 +1021,7 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 		variables := []string(nil)
 		for _, v := range grouping.Variables {
 			if v.SubQuery != "" {
-				return nil, false, errors.New("SubQueries not yet fully supported")
+				return nil, false, nil, errors.New("SubQueries not yet fully supported")
 			}
 			g, ok := groupingKeyMap[v.Name]
 			if ok {
@@ -1065,7 +1101,7 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 				//build search structures
 				queryPart, err := idx.buildSearchObjects(subQuery, qID, allResults, refTime, &qs[qID], indexes[idxIdx+1:], limitIDs, tagDetails, converters)
 				if err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 				if queryPart.possible && len(queryPart.lookups) == 0 && sortingLookup != nil {
 					queryPart.lookups = append(queryPart.lookups, sortingLookup)
@@ -1074,19 +1110,23 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 			}
 			err := idx.searchStreams(ctx, &results, allResults, queryParts, groupingData, sorter, resultLimit)
 			if err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 		}
 		if len(results.streams) == 0 {
-			return nil, false, nil
+			return nil, false, nil, nil
 		}
 		allResults[subQuery] = results
 	}
 	results := allResults[""]
 	if uint(len(results.streams)) <= skip {
-		return nil, false, nil
+		return nil, false, nil, nil
 	}
-	return results.streams[skip:], results.resultDropped != 0, nil
+	var dataRegexes *DataRegexes
+	if extractRegexes {
+		dataRegexes = extractDataRegexes(qs, tagDetails)
+	}
+	return results.streams[skip:], results.resultDropped != 0, dataRegexes, nil
 }
 
 func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
