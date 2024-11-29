@@ -34,7 +34,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Data, DataMatches } from "@/apiClient";
+import { Data, DataRegexes } from "@/apiClient";
 import { PropType, computed } from "vue";
 import { escapeRegex } from "./streamSelector";
 
@@ -48,7 +48,7 @@ const props = defineProps({
     required: true,
   },
   highlightMatches: {
-    type: Object as PropType<DataMatches>,
+    type: Object as PropType<DataRegexes>,
     required: false,
     default: () => ({ Client: null, Server: null }),
   },

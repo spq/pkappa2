@@ -42,7 +42,7 @@ export type Error = {
   Error: string;
 };
 
-export type DataMatches = {
+export type DataRegexes = {
   Client: string[] | null;
   Server: string[] | null;
 };
@@ -54,7 +54,7 @@ export type SearchResult = {
   Elapsed: number;
   Offset: number;
   MoreResults: boolean;
-  DataMatches: DataMatches;
+  DataRegexes: DataRegexes;
 };
 
 /** @see {isSearchResponse} ts-auto-guard:type-guard */

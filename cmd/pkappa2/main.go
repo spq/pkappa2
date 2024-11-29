@@ -537,7 +537,7 @@ func main() {
 			Elapsed     int64
 			Offset      uint
 			MoreResults bool
-			DataMatches struct {
+			DataRegexes struct {
 				Client []string
 				Server []string
 			}
@@ -608,7 +608,7 @@ func main() {
 				}
 			}
 		}
-		response.DataMatches = struct {
+		response.DataRegexes = struct {
 			Client []string
 			Server []string
 		}{
