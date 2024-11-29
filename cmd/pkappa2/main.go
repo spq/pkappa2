@@ -27,6 +27,7 @@ import (
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/web"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -571,14 +572,9 @@ func main() {
 		}
 
 		dataConditions := struct {
-			ClientSeen map[string]struct{}
-			Client     []string
-			ServerSeen map[string]struct{}
-			Server     []string
-		}{
-			ClientSeen: make(map[string]struct{}),
-			ServerSeen: make(map[string]struct{}),
-		}
+			Client []string
+			Server []string
+		}{}
 		tagDetails := v.TagDetails()
 		queue := []*query.ConditionsSet{&qq.Conditions}
 		for len(queue) > 0 {
@@ -590,13 +586,11 @@ func main() {
 					case *query.DataCondition:
 						for _, e := range ccc.Elements {
 							if e.Flags&query.DataRequirementSequenceFlagsDirection == query.DataRequirementSequenceFlagsDirectionClientToServer {
-								if _, ok := dataConditions.ClientSeen[e.Regex]; !ok {
-									dataConditions.ClientSeen[e.Regex] = struct{}{}
+								if !slices.Contains(dataConditions.Client, e.Regex) {
 									dataConditions.Client = append(dataConditions.Client, e.Regex)
 								}
 							} else {
-								if _, ok := dataConditions.ServerSeen[e.Regex]; !ok {
-									dataConditions.ServerSeen[e.Regex] = struct{}{}
+								if !slices.Contains(dataConditions.Server, e.Regex) {
 									dataConditions.Server = append(dataConditions.Server, e.Regex)
 								}
 							}
@@ -608,13 +602,7 @@ func main() {
 				}
 			}
 		}
-		response.DataRegexes = struct {
-			Client []string
-			Server []string
-		}{
-			Client: dataConditions.Client,
-			Server: dataConditions.Server,
-		}
+		response.DataRegexes = dataConditions
 		response.Elapsed = time.Since(start).Microseconds()
 		response.MoreResults = hasMore
 		response.Offset = offset
