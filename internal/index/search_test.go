@@ -493,7 +493,7 @@ func TestSearchStreams(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error parsing query: %v", err)
 			}
-			results, _, err := SearchStreams(context.Background(), []*Reader{r}, nil, q.ReferenceTime, q.Conditions, q.Grouping, q.Sorting, 100, 0, nil, converters)
+			results, _, _, err := SearchStreams(context.Background(), []*Reader{r}, nil, q.ReferenceTime, q.Conditions, q.Grouping, q.Sorting, 100, 0, nil, converters, false)
 			if err != nil {
 				t.Fatalf("Error searching streams: %v", err)
 			}

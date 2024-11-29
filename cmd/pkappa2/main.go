@@ -27,7 +27,6 @@ import (
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/web"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -552,7 +551,7 @@ func main() {
 		start := time.Now()
 		v := mgr.GetView()
 		defer v.Release()
-		hasMore, offset, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
+		hasMore, offset, dataRegexes, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
 			tags, err := c.AllTags()
 			if err != nil {
 				return err
@@ -571,38 +570,7 @@ func main() {
 			return
 		}
 
-		dataConditions := struct {
-			Client []string
-			Server []string
-		}{}
-		tagDetails := v.TagDetails()
-		queue := []*query.ConditionsSet{&qq.Conditions}
-		for len(queue) > 0 {
-			cs := *queue[0]
-			queue = queue[1:]
-			for _, ccs := range cs.InlineTagFilters(tagDetails) {
-				for _, cc := range ccs {
-					switch ccc := cc.(type) {
-					case *query.DataCondition:
-						for _, e := range ccc.Elements {
-							if e.Flags&query.DataRequirementSequenceFlagsDirection == query.DataRequirementSequenceFlagsDirectionClientToServer {
-								if !slices.Contains(dataConditions.Client, e.Regex) {
-									dataConditions.Client = append(dataConditions.Client, e.Regex)
-								}
-							} else {
-								if !slices.Contains(dataConditions.Server, e.Regex) {
-									dataConditions.Server = append(dataConditions.Server, e.Regex)
-								}
-							}
-						}
-					case *query.TagCondition:
-						ti := tagDetails[ccc.TagName]
-						queue = append(queue, &ti.Conditions)
-					}
-				}
-			}
-		}
-		response.DataRegexes = dataConditions
+		response.DataRegexes = *dataRegexes
 		response.Elapsed = time.Since(start).Microseconds()
 		response.MoreResults = hasMore
 		response.Offset = offset
@@ -818,7 +786,7 @@ func main() {
 		}
 
 		if filter != nil {
-			_, _, err := v.SearchStreams(ctx, filter, handleStream, manager.PrefetchTags(groupingTags))
+			_, _, _, err := v.SearchStreams(ctx, filter, handleStream, manager.PrefetchTags(groupingTags))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 				return
