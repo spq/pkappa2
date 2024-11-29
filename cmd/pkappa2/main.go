@@ -570,6 +570,9 @@ func main() {
 			return
 		}
 
+		if dataRegexes == nil {
+			dataRegexes = &index.DataRegexes{}
+		}
 		response.DataRegexes = *dataRegexes
 		response.Elapsed = time.Since(start).Microseconds()
 		response.MoreResults = hasMore
