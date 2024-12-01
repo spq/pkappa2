@@ -12,6 +12,7 @@
     <v-list-item link
                  dense
                  exact
+                 :style="onShiftPressed"
                  :to="{ name: 'search', query: { q: '' } }"
                  @click.shift="appendOrRemoveFilter"
     >
@@ -52,6 +53,7 @@
             link
             dense
             exact
+            :style="onShiftPressed"
             :to="{
               name: 'search',
               query: {
@@ -94,6 +96,7 @@
                 <v-list-item
                   link
                   exact
+                  :style="onShiftPressed"
                   :to="{
                     name: 'search',
                     query: {
@@ -310,6 +313,31 @@ const moreOpen =
   ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
+const config = computed(() => store.clientConfig);
+const shiftPressed = ref(false);
+const onShiftPressed = computed(() => {
+  return {
+    marginLeft: shiftPressed.value ? "5px" : "0px",
+    marginRight: shiftPressed.value ? "2.5px" : "0px",
+    transition: "margin 100ms, box-shadow 100ms",
+    boxShadow: shiftPressed.value ? "rgb(0, 0, 0, 0.6) 0px 5px 15px" : "none",
+  };
+});
+
+document.onkeydown = function (e) {
+  if (
+    e.shiftKey &&
+    (e.target as HTMLInputElement).tagName.toUpperCase() != "INPUT"
+  ) {
+    shiftPressed.value = true;
+  }
+};
+
+document.onkeyup = function (e) {
+  if (e.key === "Shift") {
+    shiftPressed.value = false;
+  }
+};
 
 watch(colorscheme, () => {
   const schemes: Record<ColorSchemeButtonTriState, ColorSchemeConfiguration> = {
@@ -365,11 +393,15 @@ function showTagNameChangeDialog(tagId: string) {
 const LTIME_QUERY_PARAM = "ltime:-1h:";
 async function appendOrRemoveFilter(e: Event) {
   e.preventDefault();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  const url = e.target?.offsetParent?.hash as string;
-  const queryParam = url?.replace("#/search?q=","") ?? "";
-  const newQueryParamComponents = decodeURIComponent(queryParam).replace(LTIME_QUERY_PARAM,"").split(" ");
-  let currentQuery = (route.query.q as string).replace(LTIME_QUERY_PARAM,"").split(" ");
+  const url = ((e.target as HTMLElement).offsetParent as HTMLAnchorElement)
+    .hash;
+  const queryParam = url?.replace("#/search?q=", "") ?? "";
+  const newQueryParamComponents = decodeURIComponent(queryParam)
+    .replace(LTIME_QUERY_PARAM, "")
+    .split(" ");
+  let currentQuery = (route.query.q as string)
+    .replace(LTIME_QUERY_PARAM, "")
+    .split(" ");
 
   var toAddParams = [];
   var toDeleteParams: string[] = [];
@@ -377,19 +409,25 @@ async function appendOrRemoveFilter(e: Event) {
     if (!currentQuery.includes(param)) {
       toAddParams.push(param);
     } else {
-      toDeleteParams.push(param)
+      toDeleteParams.push(param);
     }
   }
 
-  var newQuery = currentQuery.map(entry => toDeleteParams.includes(entry) ? "" : entry).join(" ").trim() + " " + toAddParams.join(" ").trim();
+  var newQuery =
+    currentQuery
+      .map((entry) => (toDeleteParams.includes(entry) ? "" : entry))
+      .join(" ")
+      .trim() +
+    " " +
+    toAddParams.join(" ").trim();
 
   if (config.value?.AutoInsertLimitToQuery) {
     newQuery = newQuery + " " + LTIME_QUERY_PARAM;
   }
 
-  console.log("newquery:", newQuery);
-
-  await router.push({ name: 'search', query: { q: newQuery } })
+  await router
+    .push({ name: "search", query: { q: newQuery } })
+    .catch(() => console.warn("Duplicated navigation 3:"));
 }
 </script>
 
