@@ -9,7 +9,16 @@
         <v-list-item-title>Help</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item link dense exact :to="{ name: 'search', query: { q: '' } }">
+    <v-list-item
+      link
+      dense
+      exact
+      :to="
+        store.clientConfig?.AutoInsertLimitToQuery
+          ? { name: 'search', query: { q: 'ltime:-1h:' } }
+          : { name: 'search', query: { q: '' } }
+      "
+    >
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
         <v-icon dense>mdi-all-inclusive</v-icon>
@@ -47,12 +56,21 @@
             link
             dense
             exact
-            :to="{
-              name: 'search',
-              query: {
-                q: tagForURI(tag.Name),
-              },
-            }"
+            :to="
+              store.clientConfig?.AutoInsertLimitToQuery
+                ? {
+                    name: 'search',
+                    query: {
+                      q: tagForURI(tag.Name) + ' ltime:-1h:',
+                    },
+                  }
+                : {
+                    name: 'search',
+                    query: {
+                      q: tagForURI(tag.Name),
+                    },
+                  }
+            "
           >
             <v-list-item-content>
               <v-list-item-title
@@ -88,12 +106,21 @@
                 <v-list-item
                   link
                   exact
-                  :to="{
-                    name: 'search',
-                    query: {
-                      q: tagForURI(tag.Name),
-                    },
-                  }"
+                  :to="
+                    store.clientConfig?.AutoInsertLimitToQuery
+                      ? {
+                          name: 'search',
+                          query: {
+                            q: tagForURI(tag.Name) + ' ltime:-1h:',
+                          },
+                        }
+                      : {
+                          name: 'search',
+                          query: {
+                            q: tagForURI(tag.Name),
+                          },
+                        }
+                  "
                 >
                   <v-list-item-icon>
                     <v-icon>mdi-magnify</v-icon>
@@ -174,6 +201,18 @@
       >
         <v-list-item-content>
           <v-list-item-title>Status</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+      <v-list-item
+        link
+        dense
+        exact
+        :to="{
+          name: 'settings',
+        }"
+      >
+        <v-list-item-content>
+          <v-list-item-title>Settings</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
       <v-list-item
@@ -313,6 +352,9 @@ watch(colorscheme, () => {
 });
 
 onMounted(() => {
+  store.getClientConfig().catch((err: string) => {
+    EventBus.emit("showError", `Failed to get config: ${err}`);
+  });
   store
     .updateTags()
     .then(() => {

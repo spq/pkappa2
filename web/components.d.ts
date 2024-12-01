@@ -21,6 +21,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SearchBox: typeof import('./src/components/SearchBox.vue')['default']
+    Settings: typeof import('./src/components/Settings.vue')['default']
     Status: typeof import('./src/components/Status.vue')['default']
     Stream: typeof import('./src/components/Stream.vue')['default']
     StreamData: typeof import('./src/components/StreamData.vue')['default']

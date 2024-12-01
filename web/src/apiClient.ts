@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { Base64, DateTimeString } from "@/types/common";
 import {
+  isClientConfig,
   isConvertersResponse,
   isGraphResponse,
   isPcapOverIPResponse,
@@ -87,6 +88,11 @@ export type Statistics = {
   MergeJobRunning: boolean;
   TaggingJobRunning: boolean;
   ConverterJobRunning: boolean;
+};
+
+/** @see {isClientConfig} ts-auto-guard:type-guard */
+export type ClientConfig = {
+  AutoInsertLimitToQuery: boolean;
 };
 
 export type PcapInfo = {
@@ -185,6 +191,17 @@ const APIClient = {
   },
   async getStatus() {
     return this.performGuarded("get", `/status.json`, isStatistics);
+  },
+  async getClientConfig() {
+    return this.performGuarded("get", `/clientconfig`, isClientConfig);
+  },
+  async updateClientConfig(clientConfig: ClientConfig) {
+    return this.perform(
+      "post",
+      `/clientconfig`,
+      JSON.stringify(clientConfig),
+      undefined,
+    );
   },
   async getPcaps() {
     return this.performGuarded("get", `/pcaps.json`, isPcapsResponse);

@@ -7,6 +7,7 @@ import PcapOverIP from "./components/PcapOverIP.vue";
 import Home from "./components/Home.vue";
 import Status from "./components/Status.vue";
 import Pcaps from "./components/Pcaps.vue";
+import Settings from "./components/Settings.vue";
 import Tags from "./components/Tags.vue";
 import Graph from "./components/Graph.vue";
 import Results from "./components/Results.vue";
@@ -30,6 +31,11 @@ export default new VueRouter({
           path: "status",
           name: "status",
           component: Status,
+        },
+        {
+          path: "settings",
+          name: "settings",
+          component: Settings,
         },
         {
           path: "pcaps",
