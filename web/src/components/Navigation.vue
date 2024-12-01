@@ -9,7 +9,12 @@
         <v-list-item-title>Help</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item link dense exact :to="{ name: 'search', query: { q: '' } }">
+    <v-list-item link
+                 dense
+                 exact
+                 :to="{ name: 'search', query: { q: '' } }"
+                 @click.shift="appendOrRemoveFilter"
+    >
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
         <v-icon dense>mdi-all-inclusive</v-icon>
@@ -53,6 +58,7 @@
                 q: tagForURI(tag.Name),
               },
             }"
+            @click.shift="appendOrRemoveFilter"
           >
             <v-list-item-content>
               <v-list-item-title
@@ -94,6 +100,7 @@
                       q: tagForURI(tag.Name),
                     },
                   }"
+                  @click.shift="appendOrRemoveFilter"
                 >
                   <v-list-item-icon>
                     <v-icon>mdi-magnify</v-icon>
@@ -246,7 +253,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useRoute } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router/composables";
 import {
   setColorScheme,
   getColorSchemeFromStorage,
@@ -262,6 +269,7 @@ type ColorSchemeButtonTriState = 0 | 1 | 2;
 
 const store = useRootStore();
 const route = useRoute();
+const router = useRouter();
 const schemeInitialisations: Record<
   ColorSchemeConfiguration,
   ColorSchemeButtonTriState
@@ -352,6 +360,36 @@ function showTagDefinitionChangeDialog(tagId: string) {
 
 function showTagNameChangeDialog(tagId: string) {
   EventBus.emit("showTagNameChangeDialog", tagId);
+}
+
+const LTIME_QUERY_PARAM = "ltime:-1h:";
+async function appendOrRemoveFilter(e: Event) {
+  e.preventDefault();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const url = e.target?.offsetParent?.hash as string;
+  const queryParam = url?.replace("#/search?q=","") ?? "";
+  const newQueryParamComponents = decodeURIComponent(queryParam).replace(LTIME_QUERY_PARAM,"").split(" ");
+  let currentQuery = (route.query.q as string).replace(LTIME_QUERY_PARAM,"").split(" ");
+
+  var toAddParams = [];
+  var toDeleteParams: string[] = [];
+  for (let param of newQueryParamComponents) {
+    if (!currentQuery.includes(param)) {
+      toAddParams.push(param);
+    } else {
+      toDeleteParams.push(param)
+    }
+  }
+
+  var newQuery = currentQuery.map(entry => toDeleteParams.includes(entry) ? "" : entry).join(" ").trim() + " " + toAddParams.join(" ").trim();
+
+  if (config.value?.AutoInsertLimitToQuery) {
+    newQuery = newQuery + " " + LTIME_QUERY_PARAM;
+  }
+
+  console.log("newquery:", newQuery);
+
+  await router.push({ name: 'search', query: { q: newQuery } })
 }
 </script>
 
