@@ -72,6 +72,10 @@
                   tag.Name.substr(tagType.key.length + 1)
                 }}</v-list-item-title
               >
+              <div
+              :style="filterSelected(tag.Name)"
+              >
+              </div>
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
@@ -323,6 +327,23 @@ const onShiftPressed = computed(() => {
     boxShadow: shiftPressed.value ? "rgb(0, 0, 0, 0.6) 0px 5px 15px" : "none",
   };
 });
+
+const filterSelected = (tagName: string) => {
+  return {
+    position: 'absolute',
+    backgroundColor: '#00000052',
+    width: inQuery(tagForURI(tagName)) ? '20px' : '0px',
+    height: '100%',
+    left: '0px',
+    transition: 'width 100ms'
+  }
+};
+
+const inQuery = (name: string) => {
+  console.log(route.query.q)
+  console.log(name)
+  return (route.query.q as string).includes(name);
+}
 
 document.onkeydown = function (e) {
   if (
