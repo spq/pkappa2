@@ -415,7 +415,8 @@ async function appendOrRemoveFilter(e: Event) {
 
   var newQuery =
     currentQuery
-      .map((entry) => (toDeleteParams.includes(entry) ? "" : entry))
+      .filter((entry) => !toDeleteParams.includes(entry) )
+      .map((entry) => entry.trim())
       .join(" ")
       .trim() +
     " " +
