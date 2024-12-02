@@ -409,6 +409,8 @@ function showTagNameChangeDialog(tagId: string) {
 
 const LTIME_QUERY_PARAM = "ltime:-1h:";
 async function appendOrRemoveFilter(e: Event) {
+  var query = (route?.query?.q as string) ?? "";
+
   e.preventDefault();
   const url = ((e.target as HTMLElement).offsetParent as HTMLAnchorElement)
     .hash;
@@ -417,7 +419,7 @@ async function appendOrRemoveFilter(e: Event) {
   const newSelected = Object.values(
     analyze(decodeURIComponent(queryParam).trim()),
   ).flatMap((e) => e.map((f) => f.pieces))[0];
-  const current = Object.values(analyze(route.query.q as string)).flatMap((e) =>
+  const current = Object.values(analyze(query)).flatMap((e) =>
     e.map((f) => f.pieces),
   );
 
@@ -425,7 +427,7 @@ async function appendOrRemoveFilter(e: Event) {
     return;
   }
 
-  var newQuery = (route.query.q as string).trim();
+  var newQuery = query.trim();
   if (
     current.find(
       (e) => e.keyword === newSelected.keyword && e.value === newSelected.value,
