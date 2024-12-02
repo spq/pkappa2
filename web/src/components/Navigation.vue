@@ -426,7 +426,7 @@ async function appendOrRemoveFilter(e: Event) {
   }
 
   await router
-    .push({ name: "search", query: { q: newQuery } })
+    .push({ name: "search", query: { q: newQuery.trim() } })
     .catch(() => console.warn("Duplicated navigation 3:"));
 }
 </script>
