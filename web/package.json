@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "apexcharts": "^4.1.0",
-    "axios": "^1.7.7",
+    "axios": "^1.7.8",
     "core-js": "^3.39.0",
     "moo": "^0.5.2",
     "nearley": "^2.20.1",
-    "pinia": "^2.2.6",
+    "pinia": "^2.2.8",
     "tiny-typed-emitter": "^2.1.0",
     "vue": "^2.7.14",
     "vue-apexcharts": "git+https://github.com/apexcharts/vue-apexcharts#c4b6de32b0659a46d610e4f457afb8ede0493fef",
