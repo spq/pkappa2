@@ -337,8 +337,8 @@ const filterSelected = (tagName: string) => {
 };
 
 const inQuery = (name: string) => {
-  return (route.query.q as string).includes(name);
-};
+  return ((route.query?.q ?? "") as string).includes(name);
+}
 
 document.onkeydown = function (e) {
   if (
