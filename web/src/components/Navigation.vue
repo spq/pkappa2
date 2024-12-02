@@ -268,6 +268,7 @@ import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
 import { computed, onMounted, ref, watch } from "vue";
 import { getContrastTextColor } from "@/lib/colors";
+import analyze from "@/parser/analyze";
 
 type ColorSchemeButtonTriState = 0 | 1 | 2;
 
@@ -338,7 +339,7 @@ const filterSelected = (tagName: string) => {
 
 const inQuery = (name: string) => {
   return ((route.query?.q ?? "") as string).includes(name);
-}
+};
 
 document.onkeydown = function (e) {
   if (
@@ -412,34 +413,30 @@ async function appendOrRemoveFilter(e: Event) {
   const url = ((e.target as HTMLElement).offsetParent as HTMLAnchorElement)
     .hash;
   const queryParam = url?.replace("#/search?q=", "") ?? "";
-  const newQueryParamComponents = decodeURIComponent(queryParam)
-    .replace(LTIME_QUERY_PARAM, "")
-    .split(" ");
-  let currentQuery = (route.query.q as string)
-    .replace(LTIME_QUERY_PARAM, "")
-    .split(" ");
 
-  var toAddParams = [];
-  var toDeleteParams: string[] = [];
-  for (let param of newQueryParamComponents) {
-    if (!currentQuery.includes(param)) {
-      toAddParams.push(param);
-    } else {
-      toDeleteParams.push(param);
-    }
+  const newSelected = Object.values(
+    analyze(decodeURIComponent(queryParam).trim()),
+  ).flatMap((e) => e.map((f) => f.pieces))[0];
+  const current = Object.values(analyze(route.query.q as string)).flatMap((e) =>
+    e.map((f) => f.pieces),
+  );
+
+  if (!newSelected || !current) {
+    return;
   }
 
-  var newQuery =
-    currentQuery
-      .filter((entry) => !toDeleteParams.includes(entry))
-      .map((entry) => entry.trim())
-      .join(" ")
-      .trim() +
-    " " +
-    toAddParams.join(" ").trim();
-
-  if (config.value?.AutoInsertLimitToQuery) {
-    newQuery = newQuery + " " + LTIME_QUERY_PARAM;
+  var newQuery = (route.query.q as string).trim();
+  if (
+    current.find(
+      (e) => e.keyword === newSelected.keyword && e.value === newSelected.value,
+    ) === undefined
+  ) {
+    newQuery =
+      newQuery + " " + newSelected.keyword.trim() + ":" + newSelected.value;
+  } else {
+    newQuery = newQuery
+      .replaceAll(newSelected.keyword + ":" + newSelected.value, "")
+      .replace(/  +/g, " ");
   }
 
   await router
