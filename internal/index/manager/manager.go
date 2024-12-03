@@ -58,7 +58,7 @@ type (
 		Type      string
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
-		PcapStats PcapStatistics         `json:",omitempty"`
+		PcapStats *PcapStatistics        `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -629,7 +629,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		}
 		mgr.event(Event{
 			Type: "pcapProcessed",
-			PcapStats: PcapStatistics{
+			PcapStats: &PcapStatistics{
 				PcapCount:         len(mgr.builder.KnownPcaps()),
 				ImportJobCount:    len(mgr.importJobs),
 				StreamCount:       int(mgr.nextStreamID),
@@ -734,7 +734,7 @@ func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, release
 		releaser.release(mgr)
 		mgr.event(Event{
 			Type: "indexesMerged",
-			PcapStats: PcapStatistics{
+			PcapStats: &PcapStatistics{
 				PcapCount:         len(mgr.builder.KnownPcaps()),
 				ImportJobCount:    len(mgr.importJobs),
 				StreamCount:       int(mgr.nextStreamID),
