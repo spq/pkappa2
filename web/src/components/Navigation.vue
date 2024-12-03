@@ -427,23 +427,30 @@ async function appendOrRemoveFilter(e: Event) {
     return;
   }
 
+  function formatValue(value: string) {
+    return /\s/g.test(value.trim()) ? `"${value}"` : value;
+  }
+
+  function formatTag(entry: { [key: string]: string }) {
+    return entry.keyword.trim() + ":" + formatValue(entry.value);
+  }
+
   var newQuery = query.trim();
   if (
     current.find(
       (e) => e.keyword === newSelected.keyword && e.value === newSelected.value,
     ) === undefined
   ) {
-    newQuery =
-      newQuery + " " + newSelected.keyword.trim() + ":" + newSelected.value;
+    newQuery = newQuery + " " + formatTag(newSelected);
   } else {
     newQuery = newQuery
-      .replaceAll(newSelected.keyword + ":" + newSelected.value, "")
-      .replace(/  +/g, " ");
+      .replaceAll(" " + formatTag(newSelected), "")
+      .replaceAll(formatTag(newSelected), "");
   }
 
   await router
     .push({ name: "search", query: { q: newQuery.trim() } })
-    .catch(() => console.warn("Duplicated navigation 3:"));
+    .catch(() => console.warn("Duplicated navigation"));
 }
 </script>
 
