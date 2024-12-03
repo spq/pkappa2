@@ -9,12 +9,13 @@
         <v-list-item-title>Help</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item link
-                 dense
-                 exact
-                 :style="onShiftPressed"
-                 :to="{ name: 'search', query: { q: '' } }"
-                 @click.shift="appendOrRemoveFilter"
+    <v-list-item
+      link
+      dense
+      exact
+      :style="onShiftPressed"
+      :to="{ name: 'search', query: { q: '' } }"
+      @click.shift="appendOrRemoveFilter"
     >
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
@@ -315,7 +316,6 @@ const moreOpen =
   ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
-const config = computed(() => store.clientConfig);
 const shiftPressed = ref(false);
 const onShiftPressed = computed(() => {
   return {
@@ -407,7 +407,6 @@ function showTagNameChangeDialog(tagId: string) {
   EventBus.emit("showTagNameChangeDialog", tagId);
 }
 
-const LTIME_QUERY_PARAM = "ltime:-1h:";
 async function appendOrRemoveFilter(e: Event) {
   var query = (route?.query?.q as string) ?? "";
 
