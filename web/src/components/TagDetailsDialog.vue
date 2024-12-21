@@ -22,7 +22,12 @@
           <v-row no-gutters>
             <v-col cols="4" class="text-caption">Color:</v-col>
             <v-col cols="8"
-              ><v-chip small :color="tag.Color">{{ tag.Color }}</v-chip></v-col
+              ><v-chip
+                small
+                :color="tag.Color"
+                :text-color="getContrastTextColor(tag.Color)"
+                >{{ tag.Color }}</v-chip
+              ></v-col
             >
           </v-row>
           <v-row><v-col></v-col></v-row>
@@ -49,6 +54,7 @@ import { computed, ref } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 import { capitalize } from "@/filters";
+import { getContrastTextColor } from "@/lib/colors";
 
 const store = useRootStore();
 const visible = ref(false);

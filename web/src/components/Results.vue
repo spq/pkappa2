@@ -93,6 +93,12 @@
         >Results might be outdated.</v-alert
       >
       <v-spacer />
+      <div v-if="streams.result">
+        <span class="text-caption">
+          Query took {{ (streams.result.Elapsed / 1_000_000).toFixed(6) }}s
+        </span>
+      </div>
+      <v-spacer />
       <div
         v-if="
           !streams.running &&
@@ -212,7 +218,11 @@
             v-slot="{ navigate }"
             :to="{
               name: 'stream',
-              query: { q: $route.query.q, p: $route.query.p },
+              query: {
+                q: $route.query.q,
+                p: $route.query.p,
+                converter: $route.query.converter,
+              },
               params: { streamId: stream.Stream.ID.toString() },
             }"
             custom
@@ -234,7 +244,10 @@
                   v-for="tag in stream.Tags"
                   v-slot="{ hover }"
                   :key="tag"
-                  ><v-chip small :color="tagColors[tag]"
+                  ><v-chip
+                    small
+                    :color="tagColors[tag]"
+                    :text-color="getContrastTextColor(tagColors[tag])"
                     ><template v-if="hover"
                       >{{ capitalize(tagify(tag, "type")) }}
                       {{ tagify(tag, "name") }}</template
@@ -301,6 +314,7 @@ import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router/composables";
 import { Result } from "@/apiClient";
 import { capitalize, formatDate, formatDateLong, tagify } from "@/filters";
+import { getContrastTextColor } from "@/lib/colors";
 
 const store = useRootStore();
 const route = useRoute();
@@ -354,7 +368,7 @@ onMounted(() => {
 
   const handle = (e: KeyboardEvent, pageOffset: number) => {
     if (pageOffset >= 1 && !streams.result?.MoreResults) return;
-    let p = +route.query.p;
+    let p = Number(route.query.p ?? 0);
     p += pageOffset;
     if (p < 0) return;
     e.preventDefault();

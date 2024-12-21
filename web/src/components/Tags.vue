@@ -38,9 +38,12 @@
           <tr v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
             <td>
               <v-icon>mdi-circle-small</v-icon
-              ><v-chip :color="tag.Color" small>{{
-                tag.Name.substring(1 + tagType.key.length)
-              }}</v-chip>
+              ><v-chip
+                :color="tag.Color"
+                small
+                :text-color="getContrastTextColor(tag.Color)"
+                >{{ tag.Name.substring(1 + tagType.key.length) }}</v-chip
+              >
             </td>
             <td>
               <div class="tag_definition" :title="tag.Definition">
@@ -163,6 +166,7 @@ import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
 import ToolBar from "./ToolBar.vue";
+import { getContrastTextColor } from "@/lib/colors";
 
 const tagTypes = [
   {

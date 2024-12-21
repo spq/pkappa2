@@ -8,7 +8,11 @@
             icon
             :to="{
               name: 'search',
-              query: { q: $route.query.q, p: $route.query.p },
+              query: {
+                q: $route.query.q,
+                p: $route.query.p,
+                converter: $route.query.converter,
+              },
             }"
             v-on="on"
           >
@@ -179,7 +183,11 @@
                     ? null
                     : {
                         name: 'stream',
-                        query: { q: $route.query.q, p: $route.query.p },
+                        query: {
+                          q: $route.query.q,
+                          p: $route.query.p,
+                          converter: $route.query.converter,
+                        },
                         params: { streamId: prevStreamId },
                       }
                 "
@@ -202,7 +210,11 @@
                     ? null
                     : {
                         name: 'stream',
-                        query: { q: $route.query.q, p: $route.query.p },
+                        query: {
+                          q: $route.query.q,
+                          p: $route.query.p,
+                          converter: $route.query.converter,
+                        },
                         params: { streamId: nextStreamId },
                       }
                 "
@@ -264,6 +276,7 @@
               :key="`tag/${tag.name}`"
               small
               :color="tag.color"
+              :text-color="getContrastTextColor(tag.color)"
               >{{ tag.name }}</v-chip
             ></v-col
           >
@@ -302,6 +315,7 @@
                 :key="`service/${service.name}`"
                 small
                 :color="service.color"
+                :text-color="getContrastTextColor(service.color)"
                 >{{ service.name }}</v-chip
               >
               ({{ stream.stream.Stream.Protocol }})</span
@@ -314,6 +328,7 @@
               :key="`mark/${mark.name}`"
               small
               :color="mark.color"
+              :text-color="getContrastTextColor(mark.color)"
               >{{ mark.name }}</v-chip
             ></v-col
           >
@@ -326,6 +341,7 @@
               :key="`generated/${generated.name}`"
               small
               :color="generated.color"
+              :text-color="getContrastTextColor(generated.color)"
               >{{ generated.name }}</v-chip
             ></v-col
           >
@@ -335,6 +351,7 @@
         ref="streamData"
         :data="stream.stream.Data"
         :presentation="presentation"
+        :highlight-matches="streams.result?.DataRegexes"
       ></StreamData>
     </div>
   </div>
@@ -361,6 +378,7 @@ import {
   destroySelectionListener,
 } from "./streamSelector";
 import { formatDate, formatDateLong, tagify } from "@/filters";
+import { getContrastTextColor } from "@/lib/colors";
 
 const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
 
@@ -479,7 +497,11 @@ onMounted(() => {
     e.preventDefault();
     void router.push({
       name: "stream",
-      query: { q: route.query.q, p: route.query.p },
+      query: {
+        q: route.query.q,
+        p: route.query.p,
+        converter: route.query.converter,
+      },
       params: { streamId: streamId.toString() },
     });
   };
