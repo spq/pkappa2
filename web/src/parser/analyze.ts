@@ -14,7 +14,7 @@ interface QueryElementValue {
 const queryGrammar: nearley.Grammar = nearley.Grammar.fromCompiled(grammar);
 
 export default function analyze(query: string): {
-  [key: string]: QueryElementValue;
+  [key: string]: Array<QueryElementValue>;
 } {
   const parser: nearley.Parser = new nearley.Parser(queryGrammar);
   try {
@@ -26,7 +26,7 @@ export default function analyze(query: string): {
     return {};
   }
 
-  const result: { [key: string]: QueryElementValue } = {};
+  const result: { [key: string]: QueryElementValue[] } = {};
   const elements = [...(parser.results as QueryElement[])];
   for (;;) {
     const elem = elements.pop();
@@ -36,7 +36,18 @@ export default function analyze(query: string): {
       continue;
     }
     if (!isExpression(elem)) continue;
-    if (!["sort", "limit", "ltime"].includes(elem.keyword.value)) continue;
+    if (
+      ![
+        "sort",
+        "limit",
+        "ltime",
+        "tag",
+        "service",
+        "mark",
+        "generated",
+      ].includes(elem.keyword.value)
+    )
+      continue;
     const pieces: { [key: string]: string } = {};
     let start: number | null = null;
     let end: number | null = null;
@@ -53,7 +64,10 @@ export default function analyze(query: string): {
       }
     }
     if (start == null || end == null) continue;
-    result[elem.keyword.value] = { pieces, start, len: end - start };
+    if (!result[elem.keyword.value]) {
+      result[elem.keyword.value] = [];
+    }
+    result[elem.keyword.value].push({ pieces, start, len: end - start });
   }
   return result;
 }

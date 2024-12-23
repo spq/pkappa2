@@ -131,14 +131,14 @@ const suggestionMenuPosX = ref(0);
 const suggestionMenuPosY = ref(0);
 const queryTimeLimit = computed({
   get(): string | undefined {
-    const ltime = analyze(searchBox.value).ltime;
+    const ltime = analyze(searchBox.value).ltime?.[0] ?? [];
     const v = ltime?.pieces?.value;
     if (v !== undefined && ["-5m:", "-1h:"].includes(v)) return v;
     return undefined;
   },
   set(val: string | undefined) {
     const q = searchBox.value ?? "";
-    const ltime = analyze(q).ltime;
+    const ltime = analyze(q).ltime?.[0] ?? [];
     let old = ltime?.pieces?.value;
     if (old === val) return;
     const infix = val ? `ltime:${val}` : "";

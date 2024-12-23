@@ -9,7 +9,14 @@
         <v-list-item-title>Help</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item link dense exact :to="{ name: 'search', query: { q: '' } }">
+    <v-list-item
+      link
+      dense
+      exact
+      :style="onShiftPressed"
+      :to="{ name: 'search', query: { q: '' } }"
+      @click.shift="appendOrRemoveFilter"
+    >
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
         <v-icon dense>mdi-all-inclusive</v-icon>
@@ -47,12 +54,14 @@
             link
             dense
             exact
+            :style="onShiftPressed"
             :to="{
               name: 'search',
               query: {
                 q: tagForURI(tag.Name),
               },
             }"
+            @click.shift="appendOrRemoveFilter"
           >
             <v-list-item-content>
               <v-list-item-title
@@ -64,6 +73,7 @@
                   tag.Name.substr(tagType.key.length + 1)
                 }}</v-list-item-title
               >
+              <div :style="filterSelected(tag.Name)"></div>
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
@@ -88,12 +98,14 @@
                 <v-list-item
                   link
                   exact
+                  :style="onShiftPressed"
                   :to="{
                     name: 'search',
                     query: {
                       q: tagForURI(tag.Name),
                     },
                   }"
+                  @click.shift="appendOrRemoveFilter"
                 >
                   <v-list-item-icon>
                     <v-icon>mdi-magnify</v-icon>
@@ -246,7 +258,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useRoute } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router/composables";
 import {
   setColorScheme,
   getColorSchemeFromStorage,
@@ -257,11 +269,13 @@ import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
 import { computed, onMounted, ref, watch } from "vue";
 import { getContrastTextColor } from "@/lib/colors";
+import analyze from "@/parser/analyze";
 
 type ColorSchemeButtonTriState = 0 | 1 | 2;
 
 const store = useRootStore();
 const route = useRoute();
+const router = useRouter();
 const schemeInitialisations: Record<
   ColorSchemeConfiguration,
   ColorSchemeButtonTriState
@@ -302,6 +316,45 @@ const moreOpen =
   ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
+const shiftPressed = ref(false);
+const onShiftPressed = computed(() => {
+  return {
+    marginLeft: shiftPressed.value ? "5px" : "0px",
+    marginRight: shiftPressed.value ? "2.5px" : "0px",
+    transition: "margin 100ms, box-shadow 100ms",
+    boxShadow: shiftPressed.value ? "rgb(0, 0, 0, 0.6) 0px 5px 15px" : "none",
+  };
+});
+
+const filterSelected = (tagName: string) => {
+  return {
+    position: "absolute",
+    backgroundColor: "#00000052",
+    width: inQuery(tagForURI(tagName)) ? "20px" : "0px",
+    height: "100%",
+    left: "0px",
+    transition: "width 100ms",
+  };
+};
+
+const inQuery = (name: string) => {
+  return ((route.query?.q ?? "") as string).includes(name);
+};
+
+document.onkeydown = function (e) {
+  if (
+    e.shiftKey &&
+    (e.target as HTMLInputElement).tagName.toUpperCase() != "INPUT"
+  ) {
+    shiftPressed.value = true;
+  }
+};
+
+document.onkeyup = function (e) {
+  if (e.key === "Shift") {
+    shiftPressed.value = false;
+  }
+};
 
 watch(colorscheme, () => {
   const schemes: Record<ColorSchemeButtonTriState, ColorSchemeConfiguration> = {
@@ -352,6 +405,51 @@ function showTagDefinitionChangeDialog(tagId: string) {
 
 function showTagNameChangeDialog(tagId: string) {
   EventBus.emit("showTagNameChangeDialog", tagId);
+}
+
+async function appendOrRemoveFilter(e: Event) {
+  var query = (route?.query?.q as string) ?? "";
+
+  e.preventDefault();
+  const url = ((e.target as HTMLElement).offsetParent as HTMLAnchorElement)
+    .hash;
+  const queryParam = url?.replace("#/search?q=", "") ?? "";
+
+  const newSelected = Object.values(
+    analyze(decodeURIComponent(queryParam).trim()),
+  ).flatMap((e) => e.map((f) => f.pieces))[0];
+  const current = Object.values(analyze(query)).flatMap((e) =>
+    e.map((f) => f.pieces),
+  );
+
+  if (!newSelected || !current) {
+    return;
+  }
+
+  function formatValue(value: string) {
+    return /\s/g.test(value.trim()) ? `"${value}"` : value;
+  }
+
+  function formatTag(entry: { [key: string]: string }) {
+    return entry.keyword.trim() + ":" + formatValue(entry.value);
+  }
+
+  var newQuery = query.trim();
+  if (
+    current.find(
+      (e) => e.keyword === newSelected.keyword && e.value === newSelected.value,
+    ) === undefined
+  ) {
+    newQuery = newQuery + " " + formatTag(newSelected);
+  } else {
+    newQuery = newQuery
+      .replaceAll(" " + formatTag(newSelected), "")
+      .replaceAll(formatTag(newSelected), "");
+  }
+
+  await router
+    .push({ name: "search", query: { q: newQuery.trim() } })
+    .catch(() => console.warn("Duplicated navigation"));
 }
 </script>
 
