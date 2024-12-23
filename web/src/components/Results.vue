@@ -399,7 +399,7 @@ onMounted(() => {
 });
 
 function checkboxAction() {
-  let tmp: boolean[] = [];
+  const tmp: boolean[] = [];
   const v = noneSelected.value;
   for (let i = 0; i < (streams.result?.Results.length || 0); i++) {
     tmp[i] = v;
@@ -428,7 +428,7 @@ function fetchStreams(forceUpdate = false) {
   selected.value = [];
 }
 function createMarkFromSelection() {
-  let ids: number[] = [];
+  const ids: number[] = [];
   for (const s of selectedStreams.value) {
     ids.push(s.Stream.ID);
   }
@@ -436,7 +436,7 @@ function createMarkFromSelection() {
 }
 
 function markSelectedStreams(tagId: string, value: boolean) {
-  let ids: number[] = [];
+  const ids: number[] = [];
   for (const s of selectedStreams.value) {
     ids.push(s.Stream.ID);
   }

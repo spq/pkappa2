@@ -139,7 +139,7 @@ const queryTimeLimit = computed({
   set(val: string | undefined) {
     const q = searchBox.value ?? "";
     const ltime = analyze(q).ltime;
-    let old = ltime?.pieces?.value;
+    const old = ltime?.pieces?.value;
     if (old === val) return;
     const infix = val ? `ltime:${val}` : "";
     if (old === undefined) {
@@ -344,7 +344,7 @@ function historyUp() {
   if (historyIndex.value === -1) {
     pendingSearch.value = searchBox.value;
   }
-  let term = getTermAt(historyIndex.value + 1);
+  const term = getTermAt(historyIndex.value + 1);
   if (term == null) {
     return;
   }

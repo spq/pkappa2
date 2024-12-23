@@ -401,7 +401,7 @@ const converters = computed(() => store.converters);
 const groupedTags = computed(() => store.groupedTags);
 const streamTags = computed(() => {
   if (stream.stream == null) return {};
-  let res: { [key: string]: { name: string; color: string }[] } = {
+  const res: { [key: string]: { name: string; color: string }[] } = {
     service: [],
     tag: [],
     mark: [],
@@ -455,7 +455,7 @@ const streamIndex = computed(() => {
   if (streams.result == null) return null;
   const id = streamId.value;
   let i = 0;
-  for (let r of streams.result.Results) {
+  for (const r of streams.result.Results) {
     if (r.Stream.ID == id) return i;
     i++;
   }

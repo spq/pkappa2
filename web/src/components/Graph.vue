@@ -683,7 +683,7 @@ onMounted(() => {
 function setChartTagOptions(typ: string, active: boolean) {
   nextTick(() => {
     const sel = chartTags.value;
-    for (var i = 0; i < sel.length; i++) {
+    for (let i = 0; i < sel.length; i++) {
       if (sel[i].startsWith(`${typ}/`)) {
         sel.splice(i--, 1);
       }
