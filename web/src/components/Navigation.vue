@@ -106,7 +106,11 @@
                   </v-list-item-icon>
                   <v-list-item-title>Details</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="setQuery(tag.Definition)">
+                <v-list-item
+                  v-if="tag.Definition != '...'"
+                  link
+                  @click="setQuery(tag.Definition)"
+                >
                   <v-list-item-icon>
                     <v-icon>mdi-form-textbox</v-icon>
                   </v-list-item-icon>

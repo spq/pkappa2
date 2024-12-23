@@ -864,9 +864,13 @@ func (mgr *Manager) KnownPcaps() []pcapmetadata.PcapInfo {
 func makeTagInfo(name string, t *tag) *TagInfo {
 	m := t.Matches.Copy()
 	m.Sub(t.Uncertain)
+	definition := t.definition
+	if _, _, mark := parseTagName(name); mark {
+		definition = "..."
+	}
 	return &TagInfo{
 		Name:           name,
-		Definition:     t.definition,
+		Definition:     definition,
 		Color:          t.color,
 		MatchingCount:  uint(m.OnesCount()),
 		UncertainCount: uint(t.Uncertain.OnesCount()),
