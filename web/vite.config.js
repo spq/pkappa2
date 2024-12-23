@@ -21,7 +21,8 @@ export default defineConfig({
     checker({
       typescript: true,
       eslint: {
-        lintCommand: "eslint --ext .js,.ts,.vue .",
+        lintCommand: "eslint .",
+        useFlatConfig: true,
       },
     }),
   ],
