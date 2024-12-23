@@ -318,11 +318,11 @@ onMounted(() => {
     .then(() => {
       if (store.tags?.length === 0) EventBus.emit("showCTFWizard");
     })
-    .catch((err: string) => {
-      EventBus.emit("showError", `Failed to update tags: ${err}`);
+    .catch((err: Error) => {
+      EventBus.emit("showError", `Failed to update tags: ${err.message}`);
     });
-  store.updateStatus().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update status: ${err}`);
+  store.updateStatus().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update status: ${err.message}`);
   });
 });
 

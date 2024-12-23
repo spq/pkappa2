@@ -206,8 +206,8 @@ onMounted(() => {
 });
 
 function updateTags() {
-  store.updateTags().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update tags: ${err}`);
+  store.updateTags().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update tags: ${err.message}`);
   });
 }
 

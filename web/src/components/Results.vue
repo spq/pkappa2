@@ -422,8 +422,8 @@ function fetchStreams(forceUpdate = false) {
     return;
   }
 
-  streams.searchStreams(query, page).catch((err: string) => {
-    EventBus.emit("showError", `Failed to fetch streams: ${err}`);
+  streams.searchStreams(query, page).catch((err: Error) => {
+    EventBus.emit("showError", `Failed to fetch streams: ${err.message}`);
   });
   selected.value = [];
 }
@@ -441,12 +441,18 @@ function markSelectedStreams(tagId: string, value: boolean) {
     ids.push(s.Stream.ID);
   }
   if (value)
-    store.markTagAdd(tagId, ids).catch((err: string) => {
-      EventBus.emit("showError", `Failed to add streams to tag: ${err}`);
+    store.markTagAdd(tagId, ids).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to add streams to tag: ${err.message}`,
+      );
     });
   else
-    store.markTagDel(tagId, ids).catch((err: string) => {
-      EventBus.emit("showError", `Failed to remove streams from tag: ${err}`);
+    store.markTagDel(tagId, ids).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to remove streams from tag: ${err.message}`,
+      );
     });
 }
 

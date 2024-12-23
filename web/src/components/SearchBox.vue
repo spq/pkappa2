@@ -215,8 +215,8 @@ watch(
 );
 
 onMounted(() => {
-  store.updateConverters().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  store.updateConverters().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
   const keyListener = (e: KeyboardEvent) => {
     if (e.target === null || !(e.target instanceof Element)) return;

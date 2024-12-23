@@ -66,7 +66,7 @@ const highlightRegex = (highlight: string[] | null) =>
         return decoded;
       });
       return new RegExp(regex, "g");
-    } catch (e) {
+    } catch {
       console.error(`Invalid regex: ${regex}`);
     }
   });

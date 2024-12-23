@@ -535,8 +535,8 @@ function changeConverter(converter: string) {
 
 function fetchStreamForId() {
   if (streamId.value !== null) {
-    stream.fetchStream(streamId.value, converter.value).catch((err: string) => {
-      EventBus.emit("showError", `Failed to fetch stream: ${err}`);
+    stream.fetchStream(streamId.value, converter.value).catch((err: Error) => {
+      EventBus.emit("showError", `Failed to fetch stream: ${err.message}`);
     });
     document.getSelection()?.empty();
   }
@@ -559,12 +559,18 @@ function createMark() {
 
 function markStream(tagId: string, value: boolean) {
   if (value) {
-    store.markTagAdd(tagId, [streamId.value]).catch((err: string) => {
-      EventBus.emit("showError", `Failed to add stream to mark: ${err}`);
+    store.markTagAdd(tagId, [streamId.value]).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to add stream to mark: ${err.message}`,
+      );
     });
   } else {
-    store.markTagDel(tagId, [streamId.value]).catch((err: string) => {
-      EventBus.emit("showError", `Failed to remove stream from mark: ${err}`);
+    store.markTagDel(tagId, [streamId.value]).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to remove stream from mark: ${err.message}`,
+      );
     });
   }
 }
