@@ -34,7 +34,7 @@
       >
       <template #[`item.Filesize`]="{ value }"
         ><span :title="`${value} Bytes`">{{
-          $options.filters?.prettyBytes(value, 1, true)
+          prettyBytes(value, { maximumFractionDigits: 1, binary: true })
         }}</span></template
       >
     </v-data-table>
@@ -46,6 +46,7 @@ import { onMounted } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";
 import { formatDate, formatDateLong } from "@/filters";
+import prettyBytes from "pretty-bytes";
 
 const store = useRootStore();
 const headers = [

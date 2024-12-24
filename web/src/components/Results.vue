@@ -262,11 +262,10 @@
               </td>
               <td>
                 <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
-                  $options.filters?.prettyBytes(
-                    stream.Stream.Client.Bytes,
-                    1,
-                    true,
-                  )
+                  prettyBytes(stream.Stream.Client.Bytes, {
+                    maximumFractionDigits: 1,
+                    binary: true,
+                  })
                 }}</span>
               </td>
               <td>
@@ -274,11 +273,10 @@
               </td>
               <td>
                 <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
-                  $options.filters?.prettyBytes(
-                    stream.Stream.Server.Bytes,
-                    1,
-                    true,
-                  )
+                  prettyBytes(stream.Stream.Server.Bytes, {
+                    maximumFractionDigits: 1,
+                    binary: true,
+                  })
                 }}</span>
               </td>
               <td
@@ -315,6 +313,7 @@ import { useRoute, useRouter } from "vue-router/composables";
 import { Result } from "@/apiClient";
 import { capitalize, formatDate, formatDateLong, tagify } from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";
+import prettyBytes from "pretty-bytes";
 
 const store = useRootStore();
 const route = useRoute();

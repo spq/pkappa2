@@ -18,23 +18,3 @@ declare module "shims-vue" {
     }
   }
 }
-
-declare module "vue-filter-pretty-bytes" {
-  import { PluginObject } from "vue";
-  type prettyBytes = (
-    bytes: number,
-    decimals: number,
-    kib: boolean,
-    maxuint: string,
-  ) => string;
-  interface VueFilterPrettyBytes extends PluginObject<undefined> {}
-
-  module "vue/types/vue" {
-    interface Vue {
-      $prettyBytes: prettyBytes;
-    }
-  }
-
-  const VueFilterPrettyBytes: VueFilterPrettyBytes;
-  export default VueFilterPrettyBytes;
-}

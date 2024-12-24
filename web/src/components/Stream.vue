@@ -250,11 +250,10 @@
               stream.stream.Stream.Client.Port
             }}
             ({{
-              $options.filters?.prettyBytes(
-                stream.stream.Stream.Client.Bytes,
-                1,
-                true,
-              )
+              prettyBytes(stream.stream.Stream.Client.Bytes, {
+                maximumFractionDigits: 1,
+                binary: true,
+              })
             }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
@@ -291,11 +290,10 @@
               stream.stream.Stream.Server.Port
             }}
             ({{
-              $options.filters?.prettyBytes(
-                stream.stream.Stream.Server.Bytes,
-                1,
-                true,
-              )
+              prettyBytes(stream.stream.Stream.Server.Bytes, {
+                maximumFractionDigits: 1,
+                binary: true,
+              })
             }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
@@ -379,6 +377,7 @@ import {
 } from "./streamSelector";
 import { formatDate, formatDateLong, tagify } from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";
+import prettyBytes from "pretty-bytes";
 
 const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
 
