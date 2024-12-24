@@ -78,7 +78,7 @@
                 </template>
                 <span>Show Streams</span>
               </v-tooltip>
-              <v-tooltip bottom>
+              <v-tooltip v-if="tag.Definition != '...'" bottom>
                 <template #activator="{ on, attrs }">
                   <v-btn
                     v-bind="attrs"
