@@ -5,14 +5,12 @@ import { createPinia, PiniaVuePlugin } from "pinia";
 import App from "./App.vue";
 import router from "./routes";
 import VueApexCharts from "vue-apexcharts";
-import * as VueMoment from "vue-moment";
 
 Vue.config.productionTip = process.env.NODE_ENV == "production";
 
 Vue.use(PiniaVuePlugin);
 Vue.use(Vuetify);
 Vue.use(VueApexCharts);
-Vue.use(VueMoment);
 
 Vue.component("Apexchart", VueApexCharts);
 
