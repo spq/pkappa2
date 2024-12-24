@@ -27,9 +27,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="visible = false">Cancel</v-btn>
+          <v-btn variant="text" @click="visible = false">Cancel</v-btn>
           <v-btn
-            text
+            variant="text"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"

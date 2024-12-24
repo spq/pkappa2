@@ -1,24 +1,24 @@
 <template>
-  <v-list dense nav>
-    <v-list-item link dense exact :to="{ name: 'home' }">
+  <v-list density="compact" nav>
+    <v-list-item link density="compact" exact :to="{ name: 'home' }">
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
-        <v-icon dense>mdi-help-circle-outline</v-icon>
+        <v-icon size="small">mdi-help-circle-outline</v-icon>
       </v-list-item-icon>
-      <v-list-item-content>
+      
         <v-list-item-title>Help</v-list-item-title>
-      </v-list-item-content>
+      
     </v-list-item>
-    <v-list-item link dense exact :to="{ name: 'search', query: { q: '' } }">
+    <v-list-item link density="compact" exact :to="{ name: 'search', query: { q: '' } }">
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
-        <v-icon dense>mdi-all-inclusive</v-icon>
+        <v-icon size="small">mdi-all-inclusive</v-icon>
       </v-list-item-icon>
-      <v-list-item-content>
+      
         <v-list-item-title>All Streams</v-list-item-title>
-      </v-list-item-content>
+      
       <v-list-item-action v-if="status != null"
-        ><v-chip x-small>{{ status.StreamCount }}</v-chip></v-list-item-action
+        ><v-chip variant="flat" size="x-small">{{ status.StreamCount }}</v-chip></v-list-item-action
       >
     </v-list-item>
     <v-list-group
@@ -31,21 +31,20 @@
     >
       <template #activator>
         <v-list-item-icon>
-          <v-icon dense>mdi-{{ tagType.icon }}</v-icon>
+          <v-icon size="small">mdi-{{ tagType.icon }}</v-icon>
         </v-list-item-icon>
-        <v-list-item-content>
+        
           <v-list-item-title>{{ tagType.title }}</v-list-item-title>
-        </v-list-item-content>
+        
       </template>
-      <template v-for="tag in groupedTags[tagType.key]">
+      <template v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
         <v-hover
           v-slot="{ hover }"
-          :key="tag.Name"
           :style="{ backgroundColor: tag.Color }"
         >
           <v-list-item
             link
-            dense
+            density="compact"
             exact
             :to="{
               name: 'search',
@@ -54,7 +53,7 @@
               },
             }"
           >
-            <v-list-item-content>
+            
               <v-list-item-title
                 class="text-truncate"
                 style="max-width: 110px"
@@ -64,27 +63,27 @@
                   tag.Name.substr(tagType.key.length + 1)
                 }}</v-list-item-title
               >
-            </v-list-item-content>
-            <v-menu offset-y bottom open-on-hover right>
-              <template #activator="{ on, attrs }">
-                <v-list-item-action v-bind="attrs" v-on="on">
+            
+            <v-menu offset-y location="bottom right" open-on-hover >
+              <template #activator="{ props }">
+                <v-list-item-action v-bind="props">
                   <v-btn
                     v-if="hover"
                     icon
-                    x-small
+                    size="x-small"
                     :style="{
                       color: getContrastTextColor(tag.Color),
                     }"
                   >
                     <v-icon>mdi-dots-vertical</v-icon>
                   </v-btn>
-                  <v-chip v-else x-small
+                  <v-chip v-else size="x-small" variant="flat"
                     >{{ tag.MatchingCount
                     }}{{ tag.UncertainCount != 0 ? "+" : "" }}</v-chip
                   >
                 </v-list-item-action>
               </template>
-              <v-list dense>
+              <v-list density="compact">
                 <v-list-item
                   link
                   exact
@@ -158,71 +157,71 @@
     <v-list-group v-model="moreOpen" link dense sub-group>
       <template #activator>
         <v-list-item-icon>
-          <v-icon dense>mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon>
+          <v-icon size="small">mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon>
         </v-list-item-icon>
-        <v-list-item-content>
+        
           <v-list-item-title>More</v-list-item-title>
-        </v-list-item-content>
+        
       </template>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'status',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>Status</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'pcaps',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>PCAPs</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'tags',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>Manage Tags</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'converters',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>Manage Converters</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
       <v-list-item
         link
-        dense
+        density="compact"
         exact
         :to="{
           name: 'pcap-over-ip',
         }"
       >
-        <v-list-item-content>
+        
           <v-list-item-title>Manage PCAP-over-IP</v-list-item-title>
-        </v-list-item-content>
+        
       </v-list-item>
 
       <v-btn-toggle
@@ -246,7 +245,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useRoute } from "vue-router/composables";
+import { useRoute } from "vue-router";
 import {
   setColorScheme,
   getColorSchemeFromStorage,

@@ -1,15 +1,15 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
-            v-bind="attrs"
+           
             icon
             :disabled="
               streams.result == null || streams.result.Results.length == 0
             "
-            v-on="on"
+            v-bind="props"
             @click="checkboxAction"
           >
             <v-icon
@@ -26,9 +26,9 @@
         <span>Select</span>
       </v-tooltip>
       <div v-if="noneSelected">
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreams(true)">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn icon v-bind="props" @click="fetchStreams(true)">
               <v-icon>mdi-refresh</v-icon>
             </v-btn>
           </template>
@@ -36,18 +36,18 @@
         </v-tooltip>
       </div>
       <div v-else>
-        <v-menu offset-y right bottom
-          ><template #activator="{ on: onMenu, attrs }">
-            <v-tooltip bottom>
-              <template #activator="{ on: onTooltip }">
-                <v-btn v-bind="attrs" icon v-on="{ ...onMenu, ...onTooltip }">
+        <v-menu offset-y location="right bottom" 
+          ><template #activator="{ props: propsMenu }">
+            <v-tooltip location="bottom">
+              <template #activator="{ props: propsTooltip }">
+                <v-btn icon v-on="{ ...propsMenu, ...propsTooltip }">
                   <v-icon>mdi-checkbox-multiple-outline</v-icon>
                 </v-btn>
               </template>
               <span>Marks</span>
             </v-tooltip>
           </template>
-          <v-list dense>
+          <v-list density="compact">
             <v-list-item
               v-for="tag of groupedTags.mark"
               :key="tag.Name"
@@ -70,11 +70,11 @@
                   }}</v-icon
                 >
               </v-list-item-action>
-              <v-list-item-content>
+              
                 <v-list-item-title>{{
                   tagify(tag.Name, "name")
                 }}</v-list-item-title>
-              </v-list-item-content>
+              
             </v-list-item>
             <v-divider />
             <v-list-item link @click="createMarkFromSelection">
@@ -88,8 +88,8 @@
         v-if="streams.outdated"
         class="toolbar-alert"
         type="info"
-        outlined
-        dense
+        variant="outlined"
+        density="compact"
         >Results might be outdated.</v-alert
       >
       <v-spacer />
@@ -118,13 +118,13 @@
               : streams.result.Results.length + streams.result.Offset
           }}</span
         >
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
             <v-btn
-              v-bind="attrs"
+             
               icon
               :disabled="streams.page == 0"
-              v-on="on"
+              v-bind="props"
               @click="
                 $router.push({
                   name: 'search',
@@ -140,13 +140,13 @@
           </template>
           <span>Previous Page</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
             <v-btn
-              v-bind="attrs"
+             
               icon
               :disabled="!streams.result.MoreResults"
-              v-on="on"
+              v-bind="props"
               @click="
                 $router.push({
                   name: 'search',
@@ -169,8 +169,8 @@
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
     <div v-else-if="streams.error">
-      <v-alert type="error" border="left">{{ streams.error }}</v-alert>
-      <v-alert type="info" border="left"
+      <v-alert type="error" border="start">{{ streams.error }}</v-alert>
+      <v-alert type="info" border="start"
         ><v-row>
           <v-col class="grow"
             >did you mean to search for the text directly?</v-col
@@ -197,7 +197,7 @@
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </center>
-    <v-simple-table v-else dense>
+    <v-table v-else dense>
       <template #default>
         <thead>
           <tr>
@@ -235,9 +235,9 @@
               @keypress.enter="navigate"
             >
               <td style="width: 0" class="pr-0">
-                <v-simple-checkbox
+                <v-checkbox-btn
                   v-model="selected[index]"
-                ></v-simple-checkbox>
+                ></v-checkbox-btn>
               </td>
               <td class="pl-0">
                 <v-hover
@@ -245,7 +245,8 @@
                   v-slot="{ hover }"
                   :key="tag"
                   ><v-chip
-                    small
+                    size="small"
+                    variant="flat"
                     :color="tagColors[tag]"
                     :text-color="getContrastTextColor(tagColors[tag])"
                     ><template v-if="hover"
@@ -298,7 +299,7 @@
           </router-link>
         </tbody>
       </template>
-    </v-simple-table>
+    </v-table>
   </div>
 </template>
 
@@ -309,7 +310,7 @@ import { useRootStore } from "@/stores";
 import { useStreamsStore } from "@/stores/streams";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import { Result } from "@/apiClient";
 import { capitalize, formatDate, formatDateLong, tagify } from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";

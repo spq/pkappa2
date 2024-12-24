@@ -1,7 +1,8 @@
-<template>
+
+q<template>
   <div>
     <v-menu
-      v-model="searchBoxOptionsMenuOpen"
+ asasasdasd     v-model="searchBoxOptionsMenuOpen"
       :close-on-content-click="false"
       open-on-focus
       absolute
@@ -11,27 +12,27 @@
       :max-width="searchBoxFieldRect.width"
     >
       <v-card>
-        <v-btn-toggle v-model="queryTimeLimit" color="primary" density="compact" group>
-          <v-btn variant="text" value="-5m:">Limit to last 5m</v-btn>
-          <v-btn variant="text" value="-1h:">Limit to last 1h</v-btn>
+        <v-btn-toggle v-model="queryTimeLimit" color="primary" dense group>
+          <v-btn text value="-5m:">Limit to last 5m</v-btn>
+          <v-btn text value="-1h:">Limit to last 1h</v-btn>
         </v-btn-toggle>
       </v-card>
-      <template #activator="{ props }">
+      <template #activator="{ on }">
         <v-text-field
           ref="searchBoxField"
           autofocus
           hide-details
           flat
           prepend-inner-icon="mdi-magnify"
-          :model-value="searchBox"
-          @update:model-value="onInput"
+          :value="searchBox"
+          @input="onInput"
           @click.stop
           @keyup.enter="onEnter"
           @keydown.up.prevent="arrowUp"
           @keydown.down.prevent="arrowDown"
           @keydown.tab.exact.prevent.stop="onTab"
           @keydown.esc.exact="suggestionMenuOpen = false"
-          v-bind="props"
+          v-on="on"
         >
         </v-text-field>
       </template>
@@ -62,13 +63,13 @@
         </v-list-item-group>
       </v-list>
     </v-menu>
-    <v-menu offset-y location="right bottom" >
-      <template #activator="{ props }">
-        <v-btn class="textfield-overlay" size="small" icon v-bind="props"
+    <v-menu offset-y right bottom>
+      <template #activator="{ on: on2, attrs }">
+        <v-btn class="textfield-overlay" small icon v-bind="attrs" v-on="on2"
           ><v-icon>mdi-dots-vertical</v-icon></v-btn
         >
       </template>
-      <v-list density="compact">
+      <v-list dense>
         <v-list-item link @click="search('search')">
           <v-list-item-icon><v-icon>mdi-magnify</v-icon></v-list-item-icon>
           <v-list-item-title>Search</v-list-item-title>
@@ -107,7 +108,7 @@ import {
   onBeforeUnmount,
   watch,
 } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router/composables";
 import { useRootStore } from "@/stores";
 import { tagNameForURI } from "@/filters";
 import { VTextField } from "vuetify/components";
@@ -115,7 +116,7 @@ import { VTextField } from "vuetify/components";
 const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
-const searchBoxField = ref<VTextField | null>(null);
+const searchBoxField = ref<InstanceType<typeof VTextField> | null>(null);
 const searchBox = ref<string>(route.query.q as string);
 const historyIndex = ref(-1);
 const pendingSearch = ref("");
@@ -153,12 +154,9 @@ const queryTimeLimit = computed({
       const suffix = q.slice(ltime.start + ltime.len);
       searchBox.value = `${prefix}${infix}${suffix}`;
     }
-    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
-    searchBoxElement.querySelector("input")?.focus();
+    searchBoxField.value?.$el.querySelector("input")?.focus();
     nextTick(() => {
       searchBoxOptionsMenuOpen.value = true;
-    }).catch((err: Error) => {
-      EventBus.emit("showError", `Failed to open search box options: ${err.message}`);
     });
   },
 });
@@ -186,8 +184,7 @@ const searchBoxFieldRect = computed(() => {
       bottom: 0,
     };
   }
-  const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
-  return searchBoxElement.getBoundingClientRect();
+  return searchBoxField.value.$el.getBoundingClientRect();
 });
 
 EventBus.on("setSearchTerm", setSearchTerm);
@@ -205,15 +202,14 @@ watch(
     suggestionMenuOpen.value = suggestionItems.value.length > 0;
     if (suggestionMenuOpen.value) {
       suggestionSelectedIndex.value = 0;
-      const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
       const cursorIndex =
-      searchBoxElement.querySelector("input")?.selectionStart ??
+        searchBoxField.value?.$el.querySelector("input")?.selectionStart ??
         null;
       if (cursorIndex === null) return;
       const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
       suggestionMenuPosX.value =
         cursorIndex * fontWidth +
-        (searchBoxElement.getBoundingClientRect().left ?? 0);
+        (searchBoxField.value?.$el.getBoundingClientRect().left ?? 0);
     }
   },
   { immediate: true },
@@ -228,16 +224,14 @@ onMounted(() => {
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
     if (e.key != "/") return;
     e.preventDefault();
-    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
-    searchBoxElement.querySelector("input")?.focus();
+    searchBoxField.value?.$el.querySelector("input")?.focus();
   };
   document.body.addEventListener("keydown", keyListener);
   onBeforeUnmount(() => {
     document.body.removeEventListener("keydown", keyListener);
   });
-  const searchBoxElement = searchBoxField.value?.$el as HTMLElement | null;
   suggestionMenuPosY.value =
-  searchBoxElement?.getBoundingClientRect().bottom ?? 0;
+    searchBoxField.value?.$el.getBoundingClientRect().bottom ?? 0;
 });
 
 function onTab() {
@@ -286,9 +280,8 @@ function applySuggestion(index: number | null = null) {
 function startSuggestionSearch() {
   const val = searchBox.value;
   typingDelay.value = window.setTimeout(() => {
-    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
     const cursorPosition =
-    searchBoxElement.querySelector("input")?.selectionStart ?? 0;
+      searchBoxField.value?.$el.querySelector("input")?.selectionStart ?? 0;
     const suggestionResult = suggest(
       val,
       cursorPosition,

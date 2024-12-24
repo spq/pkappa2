@@ -2,7 +2,7 @@
   <v-card>
     <v-card-title>Query format</v-card-title>
     <v-card-text>
-      <v-simple-table>
+      <v-table>
         <tbody>
           <tr>
             <th>Operators</th>
@@ -208,7 +208,7 @@
             </td>
           </tr>
         </tbody>
-      </v-simple-table>
+      </v-table>
     </v-card-text>
   </v-card>
 </template>

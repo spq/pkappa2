@@ -23,7 +23,8 @@
             <v-col cols="4" class="text-caption">Color:</v-col>
             <v-col cols="8"
               ><v-chip
-                small
+                size="small"
+                variant="flat"
                 :color="tag.Color"
                 :text-color="getContrastTextColor(tag.Color)"
                 >{{ tag.Color }}</v-chip
@@ -43,7 +44,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn text @click="visible = false">Close</v-btn>
+        <v-btn variant="text" @click="visible = false">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

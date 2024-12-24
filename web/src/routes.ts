@@ -1,5 +1,4 @@
-import Vue from "vue";
-import VueRouter from "vue-router";
+import { createRouter, createWebHashHistory } from "vue-router";
 
 import Base from "./components/Base.vue";
 import Converters from "./components/Converters.vue";
@@ -12,10 +11,8 @@ import Graph from "./components/Graph.vue";
 import Results from "./components/Results.vue";
 import Stream from "./components/Stream.vue";
 
-Vue.use(VueRouter);
-
-export default new VueRouter({
-  mode: "hash",
+export default createRouter({
+  history: createWebHashHistory(),
   routes: [
     {
       path: "/",

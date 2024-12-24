@@ -1,10 +1,10 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
-            v-bind="attrs"
+           
             icon
             :to="{
               name: 'search',
@@ -14,28 +14,28 @@
                 converter: $route.query.converter,
               },
             }"
-            v-on="on"
+            v-bind="props"
           >
             <v-icon>mdi-arrow-left</v-icon>
           </v-btn>
         </template>
         <span>Back to Search Results</span>
       </v-tooltip>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreamForId()">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="fetchStreamForId()">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
         <span>Refresh</span>
       </v-tooltip>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
             :disabled="selectionQuery == ''"
             link
             exact
-            v-bind="attrs"
+           
             icon
             :to="{
               name: 'search',
@@ -43,41 +43,40 @@
                 q: selectionQuery,
               },
             }"
-            v-on="on"
+            v-bind="props"
             ><v-icon>mdi-selection-search</v-icon></v-btn
           >
         </template>
         <span>Search Selection</span>
       </v-tooltip>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
             link
             exact
-            v-bind="attrs"
+           
             icon
             @click="openInCyberChef()"
-            v-on="on"
+            v-bind="props"
             ><v-icon>mdi-chef-hat</v-icon></v-btn
           >
         </template>
         <span>Open in CyberChef</span>
       </v-tooltip>
-      <v-menu offset-y right bottom
-        ><template #activator="{ on: onMenu, attrs }">
-          <v-tooltip bottom>
-            <template #activator="{ on: onTooltip }">
-              <v-btn v-bind="attrs" icon v-on="{ ...onMenu, ...onTooltip }">
+      <v-menu offset-y location="right bottom" 
+        ><template #activator="{ props: propsMenu }">
+          <v-tooltip location="bottom">
+            <template #activator="{ props: propsTooltip }">
+              <v-btn v-bind="{ ...propsMenu, ...propsTooltip }" icon>
                 <v-icon>mdi-checkbox-multiple-outline</v-icon>
               </v-btn>
             </template>
             <span>Marks</span>
           </v-tooltip>
         </template>
-        <v-list v-if="stream.stream !== null" dense>
-          <template v-for="tag of groupedTags.mark">
+        <v-list v-if="stream.stream !== null" density="compact">
+          <template v-for="tag of groupedTags.mark" :key="tag.Name">
             <v-list-item
-              :key="tag.Name"
               link
               @click="
                 markStream(tag.Name, !stream.stream.Tags.includes(tag.Name))
@@ -92,11 +91,11 @@
                   }}</v-icon
                 >
               </v-list-item-action>
-              <v-list-item-content>
+              
                 <v-list-item-title>{{
                   tagify(tag.Name, "name")
                 }}</v-list-item-title>
-              </v-list-item-content>
+              
             </v-list-item>
           </template>
           <v-divider />
@@ -106,38 +105,38 @@
           </v-list-item>
         </v-list>
       </v-menu>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
-            v-bind="attrs"
+           
             icon
             :href="`/api/download/${streamId}.pcap`"
-            v-on="on"
+            v-bind="props"
             ><v-icon>mdi-download</v-icon></v-btn
           >
         </template>
         <span>Download PCAP</span>
       </v-tooltip>
-      <v-btn-toggle v-model="presentation" mandatory dense borderless>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" value="ascii" v-on="on">
+      <v-btn-toggle v-model="presentation" mandatory density="compact" borderless>
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn value="ascii" v-bind="props">
               <v-icon>mdi-text-long</v-icon>
             </v-btn>
           </template>
           <span>ASCII</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" value="hexdump" v-on="on">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn value="hexdump" v-bind="props">
               <v-icon>mdi-format-columns</v-icon>
             </v-btn>
           </template>
           <span>HEXDUMP</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" value="raw" v-on="on">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn value="raw" v-bind="props">
               <v-icon>mdi-hexadecimal</v-icon>
             </v-btn>
           </template>
@@ -146,17 +145,17 @@
       </v-btn-toggle>
       <v-tooltip
         v-if="stream.stream !== null && selectableConverters.length > 1"
-        bottom
+        location="bottom"
       >
-        <template #activator="{ on, attrs }">
+        <template #activator="{ props }">
           <v-select
             hide-details
-            dense
-            v-bind="attrs"
+            density="compact"
+           
             :items="selectableConverters"
-            :value="activeConverter"
-            v-on="on"
-            @change="changeConverter"
+            :model-value="activeConverter"
+            v-bind="props"
+            @update:model-value="changeConverter"
           />
         </template>
         <span>Select converter view</span>
@@ -171,9 +170,9 @@
               : streams.result.Results.length + streams.result.Offset
           }}</span
         >
-        <v-tooltip bottom>
-          <template #activator="{ on }">
-            <span v-on="on">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <span v-bind="props">
               <v-btn
                 ref="prevStream"
                 icon
@@ -198,9 +197,9 @@
           </template>
           <span>Previous Stream</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on }">
-            <span v-on="on">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <span v-bind="props">
               <v-btn
                 ref="nextStream"
                 icon
@@ -235,7 +234,7 @@
       "
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
-    <v-alert v-else-if="stream.error !== null" type="error" dense>{{
+    <v-alert v-else-if="stream.error !== null" type="error" density="compact">{{
       stream.error
     }}</v-alert>
     <div v-else-if="stream.stream !== null">
@@ -273,7 +272,8 @@
             ><v-chip
               v-for="tag in streamTags.tag"
               :key="`tag/${tag.name}`"
-              small
+              size="small"
+              variant="flat"
               :color="tag.color"
               :text-color="getContrastTextColor(tag.color)"
               >{{ tag.name }}</v-chip
@@ -311,7 +311,8 @@
               ><v-chip
                 v-for="service in streamTags.service"
                 :key="`service/${service.name}`"
-                small
+                size="small"
+                variant="flat"
                 :color="service.color"
                 :text-color="getContrastTextColor(service.color)"
                 >{{ service.name }}</v-chip
@@ -324,7 +325,8 @@
             ><v-chip
               v-for="mark in streamTags.mark"
               :key="`mark/${mark.name}`"
-              small
+              size="small"
+              variant="flat"
               :color="mark.color"
               :text-color="getContrastTextColor(mark.color)"
               >{{ mark.name }}</v-chip
@@ -337,7 +339,8 @@
             ><v-chip
               v-for="generated in streamTags.generated"
               :key="`generated/${generated.name}`"
-              small
+              size="small"
+              variant="flat"
               :color="generated.color"
               :text-color="getContrastTextColor(generated.color)"
               >{{ generated.name }}</v-chip
@@ -368,7 +371,7 @@ import {
   onMounted,
   watch,
 } from "vue";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import StreamData from "./StreamData.vue";
 import ToolBar from "./ToolBar.vue";
 import {

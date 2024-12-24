@@ -1,9 +1,9 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="refresh">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="refresh">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -28,9 +28,9 @@
               </v-card-text>
               <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn text @click="addDialogVisible = false">Cancel</v-btn>
+                <v-btn variant="text" @click="addDialogVisible = false">Cancel</v-btn>
                 <v-btn
-                  text
+                  variant="text"
                   :disabled="!goodNewAddress || addDialogLoading"
                   :loading="addDialogLoading"
                   :color="addDialogError ? 'error' : 'primary'"
@@ -42,13 +42,12 @@
             </v-card>
           </v-form>
         </template>
-        <template #activator="{ on: onDialog, attrs: attrsDialog }">
-          <v-tooltip bottom>
-            <template #activator="{ on: onTooltip, attrs: attrsTooltip }">
+        <template #activator="{ props: propsDialog }">
+          <v-tooltip location="bottom">
+            <template #activator="{ props: propsTooltip }">
               <v-btn
-                v-bind="{ ...attrsDialog, ...attrsTooltip }"
+                v-bind="{ ...propsDialog, ...propsTooltip }"
                 icon
-                v-on="{ ...onDialog, ...onTooltip }"
               >
                 <v-icon>mdi-plus</v-icon>
               </v-btn>
@@ -69,8 +68,8 @@
     >
       <template #[`item.status`]="props">
         <v-tooltip>
-          <template #activator="{ on, attrs }">
-            <div v-bind="attrs" v-on="on">
+          <template #activator="{ props: propsTooltip }">
+            <div v-bind="propsTooltip">
               {{
                 props.item.LastConnected === 0 &&
                 props.item.LastDisconnected === 0
@@ -106,12 +105,12 @@
         </v-tooltip>
       </template>
       <template #[`item.delete`]="{ item }">
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
             <v-btn
-              v-bind="attrs"
+             
               icon
-              v-on="on"
+              v-bind="props"
               @click="
                 delDialogAddress = item.Address;
                 delDialogVisible = true;
@@ -138,9 +137,9 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn text @click="delDialogVisible = false">No</v-btn>
+              <v-btn variant="text" @click="delDialogVisible = false">No</v-btn>
               <v-btn
-                text
+                variant="text"
                 :disabled="delDialogLoading"
                 :loading="delDialogLoading"
                 :color="delDialogError ? 'error' : 'primary'"

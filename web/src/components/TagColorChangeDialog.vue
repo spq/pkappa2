@@ -6,6 +6,7 @@
           <span class="text-h5"
             >Change Color of {{ capitalize(tagType) }}
             <v-chip
+              variant="flat"
               :color="tagColor"
               :text-color="getContrastTextColor(tagColor)"
               >{{ tagName }}</v-chip
@@ -17,13 +18,13 @@
             <template #append>
               <v-menu
                 v-model="colorPickerOpen"
-                top
+                location="top"
                 nudge-bottom="182"
                 nudge-left="32"
                 :close-on-content-click="false"
               >
-                <template #activator="{ on }">
-                  <div :style="swatchStyle" v-on="on" />
+                <template #activator="{ props }">
+                  <div :style="swatchStyle" v-bind="props" />
                 </template>
                 <v-card>
                   <v-card-text>
@@ -34,7 +35,7 @@
                       hide-inputs
                       show-swatches
                       flat
-                      @update:color="colorPickerValueUpdate"
+                      @update:model-value="colorPickerValueUpdate"
                     />
                   </v-card-text>
                 </v-card>
@@ -44,9 +45,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="visible = false">Cancel</v-btn>
+          <v-btn variant="text" @click="visible = false">Cancel</v-btn>
           <v-btn
-            text
+            variant="text"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"

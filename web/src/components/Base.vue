@@ -46,9 +46,12 @@ import TagDefinitionChangeDialog from "./TagDefinitionChangeDialog.vue";
 import TagNameChangeDialog from "./TagNameChangeDialog.vue";
 import ErrorBanner from "./ErrorBanner.vue";
 import { ref } from "vue";
+import { useTheme } from "vuetify";
+import { registerVuetifyTheme } from "@/lib/darkmode";
 
 /** @TODO: Only show navigation on larger screens.
  * The navigation overlays on smaller screens.
  * An overlay on first site visit is very disrupting. */
 const showNavigation = ref(true);
+registerVuetifyTheme(useTheme());
 </script>

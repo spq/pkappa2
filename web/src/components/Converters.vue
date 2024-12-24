@@ -1,9 +1,9 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="refreshConverters">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="refreshConverters">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -28,12 +28,13 @@
             label
             link
             class="ma-2"
+            variant="flat"
             :color="process.Running ? 'green' : 'yellow'"
             @click="showErrorLog(process, item.converter)"
           >
-            <v-tooltip bottom>
-              <template #activator="{ on, attrs }">
-                <v-icon v-if="process.Errors > 0" v-bind="attrs" v-on="on">
+            <v-tooltip location="bottom">
+              <template #activator="{ props }">
+                <v-icon v-if="process.Errors > 0" v-bind="props">
                   mdi-alert-outline
                 </v-icon>
               </template>
@@ -44,12 +45,12 @@
             </v-tooltip>
             PID: {{ process.Pid }}
           </v-chip>
-          <v-tooltip bottom>
-            <template #activator="{ on, attrs }">
+          <v-tooltip location="bottom">
+            <template #activator="{ props }">
               <v-btn
-                v-bind="attrs"
+               
                 icon
-                v-on="on"
+                v-bind="props"
                 @click="confirmConverterReset(item.converter)"
               >
                 <v-icon>mdi-restart-alert</v-icon>
@@ -61,7 +62,7 @@
       </template>
     </v-data-table>
     <v-dialog
-      :value="shownProcess !== null"
+      :model-value="shownProcess !== null"
       width="600px"
       @click:outside="shownProcess = null"
     >
@@ -81,7 +82,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="shownProcess = null"> Close </v-btn>
+          <v-btn variant="text" @click="shownProcess = null"> Close </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -98,7 +99,6 @@ import APIClient, {
 import ToolBar from "./ToolBar.vue";
 import { computed, onMounted, ref } from "vue";
 import { useRootStore } from "@/stores";
-import { DataTableItemProps } from "vuetify";
 
 const store = useRootStore();
 const headers = [
@@ -151,7 +151,9 @@ function refreshConverters() {
   });
 }
 
-function rowClick(item: unknown, handler: DataTableItemProps) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowClick(item: unknown, handler: any) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
   handler.expand(!handler.isExpanded);
 }
 

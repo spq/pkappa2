@@ -18,9 +18,6 @@
     },
     "lib": ["esnext", "dom", "dom.iterable"]
   },
-  "vueCompilerOptions": {
-    "target": 2.7
-  },
   "include": [
     "src/**/*.ts",
     "src/*.ts",

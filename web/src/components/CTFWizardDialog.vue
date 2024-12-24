@@ -4,7 +4,7 @@
       <v-card-title>
         <span class="text-h5">CTF Setup Wizards</span>
       </v-card-title>
-      <v-tabs v-model="tab" icons-and-text>
+      <v-tabs v-model="tab" stacked>
         <v-tab href="#tab_flag_regex">
           Setup Flag tags
           <v-icon>mdi-flag</v-icon>
@@ -36,9 +36,9 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn text @click="visible = false">Cancel</v-btn>
+              <v-btn variant="text" @click="visible = false">Cancel</v-btn>
               <v-btn
-                text
+                variant="text"
                 :disabled="
                   serviceName == '' ||
                   !goodServicePorts ||
@@ -70,9 +70,9 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn text @click="visible = false">Cancel</v-btn>
+              <v-btn variant="text" @click="visible = false">Cancel</v-btn>
               <v-btn
-                text
+                variant="text"
                 :disabled="!goodFlagRegex || flag_regex_loading"
                 :loading="flag_regex_loading"
                 :color="flag_regex_error ? 'error' : 'primary'"

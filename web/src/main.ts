@@ -1,29 +1,25 @@
-import { getColorScheme, registerVuetifyTheme } from "@/lib/darkmode";
-import Vue from "vue";
-import Vuetify from "vuetify";
-import { createPinia, PiniaVuePlugin } from "pinia";
+import { getColorScheme } from "@/lib/darkmode";
+import { createApp, h } from "vue";
+import { createVuetify } from "vuetify";
+import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./routes";
-import VueApexCharts from "vue-apexcharts";
+import VueApexCharts from "vue3-apexcharts";
 
-Vue.config.productionTip = process.env.NODE_ENV == "production";
-
-Vue.use(PiniaVuePlugin);
-Vue.use(Vuetify);
-Vue.use(VueApexCharts);
-
-Vue.component("Apexchart", VueApexCharts);
+// Vue.config.productionTip = process.env.NODE_ENV == "production";
 
 const pinia = createPinia();
-const vue = new Vue({
-  vuetify: new Vuetify({ theme: { dark: getColorScheme() === "dark" } }),
-  router,
-  render: (h) => h(App),
-  pinia,
+const app = createApp({
+  MODE: 3,
+  render: () => h(App),
 });
+const vuetify = createVuetify({ theme: { defaultTheme: getColorScheme() } });
 
-registerVuetifyTheme(vue.$vuetify);
+app.use(vuetify);
+app.use(router);
+app.use(pinia);
+app.use(VueApexCharts);
 
-vue.$mount("#app");
+app.mount("#app");
 
-export default vue;
+export default app;

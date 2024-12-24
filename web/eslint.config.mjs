@@ -3,6 +3,7 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 import pluginVue from "eslint-plugin-vue";
+import vuetify from 'eslint-plugin-vuetify'
 import vueParser from "vue-eslint-parser";
 import vueTsEslintConfig from "@vue/eslint-config-typescript";
 
@@ -18,7 +19,8 @@ export default tseslint.config(
   {
     extends: [
       eslint.configs.recommended,
-      ...pluginVue.configs["flat/vue2-strongly-recommended"],
+      ...pluginVue.configs["flat/strongly-recommended"],
+      ...vuetify.configs["flat/base"],
       ...vueTsEslintConfig(),
       ...tseslint.configs.recommendedTypeChecked,
     ],
@@ -40,6 +42,7 @@ export default tseslint.config(
       "no-debugger": process.env.NODE_ENV === "production" ? "warn" : "off",
       "vue/multi-word-component-names": "off",
       "vue/no-reserved-component-names": "off",
+      "vue/prefer-import-from-vue": "off",
     },
   },
   eslintConfigPrettier,
