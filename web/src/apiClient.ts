@@ -331,7 +331,7 @@ const APIClient = {
     if (guard(response.data)) {
       return response.data;
     }
-    throw "Unexpected response, types mismatch";
+    throw new Error("Unexpected response, types mismatch");
   },
 };
 

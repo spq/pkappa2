@@ -398,7 +398,7 @@ onMounted(() => {
 });
 
 function checkboxAction() {
-  let tmp: boolean[] = [];
+  const tmp: boolean[] = [];
   const v = noneSelected.value;
   for (let i = 0; i < (streams.result?.Results.length || 0); i++) {
     tmp[i] = v;
@@ -421,13 +421,13 @@ function fetchStreams(forceUpdate = false) {
     return;
   }
 
-  streams.searchStreams(query, page).catch((err: string) => {
-    EventBus.emit("showError", `Failed to fetch streams: ${err}`);
+  streams.searchStreams(query, page).catch((err: Error) => {
+    EventBus.emit("showError", `Failed to fetch streams: ${err.message}`);
   });
   selected.value = [];
 }
 function createMarkFromSelection() {
-  let ids: number[] = [];
+  const ids: number[] = [];
   for (const s of selectedStreams.value) {
     ids.push(s.Stream.ID);
   }
@@ -435,17 +435,23 @@ function createMarkFromSelection() {
 }
 
 function markSelectedStreams(tagId: string, value: boolean) {
-  let ids: number[] = [];
+  const ids: number[] = [];
   for (const s of selectedStreams.value) {
     ids.push(s.Stream.ID);
   }
   if (value)
-    store.markTagAdd(tagId, ids).catch((err: string) => {
-      EventBus.emit("showError", `Failed to add streams to tag: ${err}`);
+    store.markTagAdd(tagId, ids).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to add streams to tag: ${err.message}`,
+      );
     });
   else
-    store.markTagDel(tagId, ids).catch((err: string) => {
-      EventBus.emit("showError", `Failed to remove streams from tag: ${err}`);
+    store.markTagDel(tagId, ids).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to remove streams from tag: ${err.message}`,
+      );
     });
 }
 

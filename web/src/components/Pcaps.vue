@@ -87,8 +87,8 @@ const headers = [
 ];
 
 onMounted(() => {
-  store.updatePcaps().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update pcaps: ${err}`);
+  store.updatePcaps().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update pcaps: ${err.message}`);
   });
 });
 </script>

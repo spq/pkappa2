@@ -167,10 +167,10 @@ function createService() {
       service_by_port_loading.value = false;
       EventBus.emit("showMessage", `Service ${serviceName.value} created.`);
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       service_by_port_error.value = true;
       service_by_port_loading.value = false;
-      EventBus.emit("showError", err);
+      EventBus.emit("showError", err.message);
     });
 }
 
@@ -192,15 +192,15 @@ function createFlagTags() {
     .then((res) => {
       const rejected = res.filter((r) => r.status === "rejected");
       if (rejected.length != 0) {
-        throw rejected.map((r) => r.reason as string).join("; ");
+        throw new Error(rejected.map((r) => r.reason as string).join("; "));
       }
       visible.value = false;
       flag_regex_loading.value = false;
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       flag_regex_error.value = true;
       flag_regex_loading.value = false;
-      EventBus.emit("showError", err);
+      EventBus.emit("showError", err.message);
     });
 }
 </script>

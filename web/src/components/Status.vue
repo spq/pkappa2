@@ -37,8 +37,8 @@ onMounted(() => {
 });
 
 function updateStatus() {
-  store.updateStatus().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update status: ${err}`);
+  store.updateStatus().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update status: ${err.message}`);
   });
 }
 </script>

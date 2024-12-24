@@ -24,7 +24,7 @@ type EventTypes =
 
 /** @see {isEvent} ts-auto-guard:type-guard */
 export type Event = {
-  Type: EventTypes | string;
+  Type: EventTypes | string; // eslint-disable-line @typescript-eslint/no-redundant-type-constituents
 };
 
 /** @see {isTagEvent} ts-auto-guard:type-guard */

@@ -120,10 +120,10 @@ function updateColor() {
     .then(() => {
       visible.value = false;
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       error.value = true;
       loading.value = false;
-      EventBus.emit("showError", err);
+      EventBus.emit("showError", err.message);
     });
 }
 </script>

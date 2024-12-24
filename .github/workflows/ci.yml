@@ -101,5 +101,5 @@ jobs:
       - name: Lint frontend
         working-directory: ./web
         run: |
-          yarn lint
+          yarn run eslint
           yarn prettier --check .

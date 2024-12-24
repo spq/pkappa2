@@ -5,7 +5,6 @@ declare module "*.vue" {
   export default component;
 }
 
-/* eslint-disable @typescript-eslint/no-namespace */
 declare module "shims-vue" {
   global {
     namespace NodeJS {
