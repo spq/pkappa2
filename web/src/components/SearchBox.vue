@@ -1,27 +1,12 @@
 <template>
   <div>
-    <v-menu
-      v-model="searchBoxOptionsMenuOpen"
-      :close-on-content-click="false"
-      open-on-focus
-      absolute
-      :position-x="searchBoxFieldRect.left"
-      :position-y="searchBoxFieldRect.bottom"
-      :min-width="searchBoxFieldRect.width"
-      :max-width="searchBoxFieldRect.width"
-    >
-      <v-card>
-        <v-btn-toggle v-model="queryTimeLimit" color="primary" density="compact" group>
-          <v-btn variant="text" value="-5m:">Limit to last 5m</v-btn>
-          <v-btn variant="text" value="-1h:">Limit to last 1h</v-btn>
-        </v-btn-toggle>
-      </v-card>
-      <template #activator="{ props }">
-        <v-text-field
+    <v-text-field
           ref="searchBoxField"
           autofocus
           hide-details
           flat
+          variant="underlined"
+          color="primary"
           prepend-inner-icon="mdi-magnify"
           :model-value="searchBox"
           @update:model-value="onInput"
@@ -31,35 +16,47 @@
           @keydown.down.prevent="arrowDown"
           @keydown.tab.exact.prevent.stop="onTab"
           @keydown.esc.exact="suggestionMenuOpen = false"
+          @focus="searchBoxOptionsMenuOpen = true"
           v-bind="props"
         >
         </v-text-field>
-      </template>
+    <v-menu
+      v-model="searchBoxOptionsMenuOpen"
+      :close-on-content-click="false"
+      open-on-focus
+      absolute
+      :target="[searchBoxFieldRect.left, searchBoxFieldRect.bottom]"
+      :min-width="searchBoxFieldRect.width"
+      :max-width="searchBoxFieldRect.width"
+    >
+      <v-card>
+        <v-btn-toggle v-model="queryTimeLimit" color="primary" density="compact" group>
+          <v-btn variant="text" value="-5m:">Limit to last 5m</v-btn>
+          <v-btn variant="text" value="-1h:">Limit to last 1h</v-btn>
+        </v-btn-toggle>
+      </v-card>
     </v-menu>
     <v-menu
       ref="suggestionMenu"
       v-model="suggestionMenuOpen"
-      :position-x="suggestionMenuPosX"
-      :position-y="suggestionMenuPosY"
+      :target="[suggestionMenuPosX, suggestionMenuPosY]"
       absolute
       dense
     >
-      <v-list>
-        <v-list-item-group
-          :value="suggestionSelectedIndex"
-          color="primary"
-          mandatory
+      <v-list
+        :value="suggestionSelectedIndex"
+        color="primary"
+        mandatory
+      >
+        <v-list-item
+          v-for="(item, index) in suggestionItems"
+          :key="index"
+          active-class="font-white"
+          :style="{ backgroundColor: suggestionColor(suggestionType, item) }"
+          @click="applySuggestion(index)"
         >
-          <v-list-item
-            v-for="(item, index) in suggestionItems"
-            :key="index"
-            active-class="font-white"
-            :style="{ backgroundColor: suggestionColor(suggestionType, item) }"
-            @click="applySuggestion(index)"
-          >
-            <v-list-item-title>{{ item }}</v-list-item-title>
-          </v-list-item>
-        </v-list-item-group>
+          <v-list-item-title>{{ item }}</v-list-item-title>
+        </v-list-item>
       </v-list>
     </v-menu>
     <v-menu offset-y location="right bottom" >
@@ -69,24 +66,16 @@
         >
       </template>
       <v-list density="compact">
-        <v-list-item link @click="search('search')">
-          <v-list-item-icon><v-icon>mdi-magnify</v-icon></v-list-item-icon>
+        <v-list-item prepend-icon="mdi-magnify" link @click="search('search')">
           <v-list-item-title>Search</v-list-item-title>
         </v-list-item>
-        <v-list-item link @click="search('graph')">
-          <v-list-item-icon><v-icon>mdi-finance</v-icon></v-list-item-icon>
+        <v-list-item prepend-icon="mdi-finance" link @click="search('graph')">
           <v-list-item-title>Graph</v-list-item-title>
         </v-list-item>
-        <v-list-item link @click="createTag('service', searchBox)">
-          <v-list-item-icon
-            ><v-icon>mdi-cloud-outline</v-icon></v-list-item-icon
-          >
+        <v-list-item prepend-icon="mdi-cloud-outline" link @click="createTag('service', searchBox)">
           <v-list-item-title>Save as Service</v-list-item-title>
         </v-list-item>
-        <v-list-item link @click="createTag('tag', searchBox)">
-          <v-list-item-icon
-            ><v-icon>mdi-tag-multiple-outline</v-icon></v-list-item-icon
-          >
+        <v-list-item prepend-icon="mdi-tag-multiple-outline" link @click="createTag('tag', searchBox)">
           <v-list-item-title>Save as Tag</v-list-item-title>
         </v-list-item>
       </v-list>
@@ -105,6 +94,7 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
+  useTemplateRef,
   watch,
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -115,8 +105,8 @@ import { VTextField } from "vuetify/components";
 const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
-const searchBoxField = ref<VTextField | null>(null);
-const searchBox = ref<string>(route.query.q as string);
+const searchBoxField = useTemplateRef("searchBoxField");
+const searchBox = ref<string>(route.query.q as string ?? "");
 const historyIndex = ref(-1);
 const pendingSearch = ref("");
 const typingDelay = ref<number | null>(null);
@@ -235,6 +225,7 @@ onMounted(() => {
   onBeforeUnmount(() => {
     document.body.removeEventListener("keydown", keyListener);
   });
+  console.log(searchBoxField.value);
   const searchBoxElement = searchBoxField.value?.$el as HTMLElement | null;
   suggestionMenuPosY.value =
   searchBoxElement?.getBoundingClientRect().bottom ?? 0;

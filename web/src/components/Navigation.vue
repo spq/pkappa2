@@ -1,21 +1,16 @@
 <template>
   <v-list density="compact" nav>
-    <v-list-item link density="compact" exact :to="{ name: 'home' }">
-      <v-list-item-icon></v-list-item-icon>
-      <v-list-item-icon>
+    <v-list-item variant="flat" link density="compact" exact :to="{ name: 'home' }">
+      <template #prepend>
         <v-icon size="small">mdi-help-circle-outline</v-icon>
-      </v-list-item-icon>
-      
-        <v-list-item-title>Help</v-list-item-title>
-      
+      </template>
+      <v-list-item-title>Help</v-list-item-title>
     </v-list-item>
     <v-list-item link density="compact" exact :to="{ name: 'search', query: { q: '' } }">
-      <v-list-item-icon></v-list-item-icon>
-      <v-list-item-icon>
+      <template #prepend>
         <v-icon size="small">mdi-all-inclusive</v-icon>
-      </v-list-item-icon>
-      
-        <v-list-item-title>All Streams</v-list-item-title>
+      </template>
+      <v-list-item-title>All Streams</v-list-item-title>
       
       <v-list-item-action v-if="status != null"
         ><v-chip variant="flat" size="x-small">{{ status.StreamCount }}</v-chip></v-list-item-action
@@ -27,25 +22,25 @@
       link
       dense
       :value="true"
-      sub-group
     >
-      <template #activator>
-        <v-list-item-icon>
-          <v-icon size="small">mdi-{{ tagType.icon }}</v-icon>
-        </v-list-item-icon>
-        
+      <template #activator="{ props }">
+        <v-list-item v-bind="props" link>
+          <template #prepend>
+            <v-icon size="small">mdi-{{ tagType.icon }}</v-icon>
+          </template>
           <v-list-item-title>{{ tagType.title }}</v-list-item-title>
-        
+        </v-list-item>
       </template>
       <template v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
         <v-hover
-          v-slot="{ hover }"
+          v-slot="{ isHovering }"
           :style="{ backgroundColor: tag.Color }"
         >
           <v-list-item
             link
             density="compact"
             exact
+            :style="{ backgroundColor: tag.Color }"
             :to="{
               name: 'search',
               query: {
@@ -58,9 +53,9 @@
                 class="text-truncate"
                 style="max-width: 110px"
                 :style="{ color: getContrastTextColor(tag.Color) }"
-                :title="tag.Name.substr(tagType.key.length + 1)"
+                :title="tag.Name.substring(tagType.key.length + 1)"
                 >{{
-                  tag.Name.substr(tagType.key.length + 1)
+                  tag.Name.substring(tagType.key.length + 1)
                 }}</v-list-item-title
               >
             
@@ -68,7 +63,7 @@
               <template #activator="{ props }">
                 <v-list-item-action v-bind="props">
                   <v-btn
-                    v-if="hover"
+                    v-if="isHovering"
                     icon
                     size="x-small"
                     :style="{
@@ -93,59 +88,34 @@
                       q: tagForURI(tag.Name),
                     },
                   }"
+                  prepend-icon="mdi-magnify"
                 >
-                  <v-list-item-icon>
-                    <v-icon>mdi-magnify</v-icon>
-                  </v-list-item-icon>
                   <v-list-item-title>Show Streams</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagDetailsDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-clipboard-list-outline</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-clipboard-list-outline" link @click="showTagDetailsDialog(tag.Name)">
                   <v-list-item-title>Details</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="setQuery(tag.Definition)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-form-textbox</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-form-textbox" link @click="setQuery(tag.Definition)">
                   <v-list-item-title>Use Query</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagColorChangeDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-palette</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-palette" link @click="showTagColorChangeDialog(tag.Name)">
                   <v-list-item-title>Change Color</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagNameChangeDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-rename-outline</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-rename-outline" link @click="showTagNameChangeDialog(tag.Name)">
                   <v-list-item-title>Change Name</v-list-item-title>
                 </v-list-item>
-                <v-list-item
-                  link
-                  @click="showTagDefinitionChangeDialog(tag.Name)"
-                >
-                  <v-list-item-icon>
-                    <v-icon>mdi-text-search-variant</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-text-search-variant" link @click="showTagDefinitionChangeDialog(tag.Name)">
                   <v-list-item-title>Change Definition</v-list-item-title>
                 </v-list-item>
-                <v-list-item link @click="showTagSetConvertersDialog(tag.Name)">
-                  <v-list-item-icon>
-                    <v-icon>mdi-file-replace-outline</v-icon>
-                  </v-list-item-icon>
+                <v-list-item prepend-icon="mdi-file-replace-outline" link @click="showTagSetConvertersDialog(tag.Name)">
                   <v-list-item-title>Attach converter</v-list-item-title>
                 </v-list-item>
                 <v-list-item
+                  prepend-icon="mdi-delete-outline"
                   link
                   :disabled="tag.Referenced"
                   @click="confirmTagDeletion(tag.Name)"
                 >
-                  <v-list-item-icon>
-                    <v-icon>mdi-delete-outline</v-icon>
-                  </v-list-item-icon>
                   <v-list-item-title>Delete</v-list-item-title>
                 </v-list-item>
               </v-list>
@@ -154,14 +124,15 @@
         </v-hover>
       </template>
     </v-list-group>
-    <v-list-group v-model="moreOpen" link dense sub-group>
-      <template #activator>
-        <v-list-item-icon>
+    <v-list-group v-model="moreOpen" link dense subgroup>
+      <template #activator="{ props }">
+        <v-list-item v-bind="props" link density="compact">
+        <template #prepend>
           <v-icon size="small">mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon>
-        </v-list-item-icon>
+        </template>
         
           <v-list-item-title>More</v-list-item-title>
-        
+        </v-list-item>
       </template>
       <v-list-item
         link
@@ -298,7 +269,7 @@ const tagTypes = [
 const moreOpen =
   route.name !== null &&
   route.name !== undefined &&
-  ["converters", "status", "tags", "pcaps"].includes(route.name); // FIXME: type route
+  ["converters", "status", "tags", "pcaps"].includes(route.name.toString()); // FIXME: type route
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
 

@@ -26,7 +26,7 @@
                 size="small"
                 variant="flat"
                 :color="tag.Color"
-                :text-color="getContrastTextColor(tag.Color)"
+                :style="{ color: getContrastTextColor(tag.Color) }"
                 >{{ tag.Color }}</v-chip
               ></v-col
             >

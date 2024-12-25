@@ -518,12 +518,12 @@ const chartTagOptions = computed(() => {
         if (first) {
           first = false;
           options.push({
-            text: typ.charAt(0).toUpperCase() + typ.substring(1) + "s",
+            title: typ.charAt(0).toUpperCase() + typ.substring(1) + "s",
             value: `header/${typ}`,
           });
         }
         options.push({
-          text: t.Name,
+          title: t.Name,
           value: t.Name,
         });
       }

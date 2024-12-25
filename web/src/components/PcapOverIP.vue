@@ -186,7 +186,7 @@ const headers = [
   { text: "", value: "delete", sortable: false, cellClass: "cursor-pointer" },
 ];
 
-const ticker = ref<NodeJS.Timeout | null>(null);
+const ticker = ref<ReturnType<typeof setTimeout> | null>(null);
 const currentTime = ref(new Date().getTime());
 
 onMounted(() => {

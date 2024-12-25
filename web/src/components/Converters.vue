@@ -48,7 +48,6 @@
           <v-tooltip location="bottom">
             <template #activator="{ props }">
               <v-btn
-               
                 icon
                 v-bind="props"
                 @click="confirmConverterReset(item.converter)"

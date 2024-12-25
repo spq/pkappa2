@@ -8,7 +8,7 @@
             <v-chip
               variant="flat"
               :color="tagColor"
-              :text-color="getContrastTextColor(tagColor)"
+              :style="{ color: getContrastTextColor(tagColor) }"
               >{{ tagName }}</v-chip
             ></span
           >

@@ -8,13 +8,13 @@
         itemsPerPageOptions: [20, 50, 100, -1],
         showFirstLastPage: true,
       }"
-      dense
+      density="compact"
     >
       <template #[`item.download`]="{ item }"
         ><v-btn
+          variant="plain"
           :href="`/api/download/pcap/${item.Filename}`"
           icon
-          @click.native.stop
         >
           <v-icon>mdi-download</v-icon>
         </v-btn></template
@@ -51,34 +51,34 @@ import prettyBytes from "pretty-bytes";
 const store = useRootStore();
 const headers = [
   {
-    text: "File Name",
+    title: "File Name",
     value: "Filename",
   },
   {
-    text: "First Packet Time",
+    title: "First Packet Time",
     value: "PacketTimestampMin",
   },
   {
-    text: "Last Packet Time",
+    title: "Last Packet Time",
     value: "PacketTimestampMax",
   },
   {
-    text: "Packet Count",
+    title: "Packet Count",
     value: "PacketCount",
   },
   {
-    text: "File Size",
+    title: "File Size",
     value: "Filesize",
   },
   {
-    text: "Parse Time",
+    title: "Parse Time",
     value: "ParseTime",
     align: "end",
     class: "pr-0",
     cellClass: "pr-0",
   },
   {
-    text: "",
+    title: "",
     value: "download",
     sortable: false,
     class: ["px-0", "w0"],

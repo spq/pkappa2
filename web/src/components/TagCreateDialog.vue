@@ -12,8 +12,7 @@
               <v-menu
                 v-model="colorPickerOpen"
                 location="top"
-                nudge-bottom="182"
-                nudge-left="32"
+                :offset="[-226, 30]"
                 :close-on-content-click="false"
               >
                 <template #activator="{ props }">
@@ -24,10 +23,8 @@
                     <v-color-picker
                       v-model="colorPickerValue"
                       mode="hexa"
-                      hide-mode-switch
                       hide-inputs
                       show-swatches
-                      flat
                       @update:model-value="colorPickerValueUpdate"
                     />
                   </v-card-text>
@@ -107,8 +104,8 @@ function openDialog(
   error.value = false;
 }
 
-function colorPickerValueUpdate(color: { hex: string }) {
-  if (colorPickerOpen.value) tagColor.value = color.hex;
+function colorPickerValueUpdate(color: string) {
+  if (colorPickerOpen.value) tagColor.value = color;
 }
 
 function createTag() {

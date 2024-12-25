@@ -1,19 +1,20 @@
 <template>
   <v-app>
     <v-app-bar
-      app
-      clipped-left
-      flat
+      elevation="0"
       style="border-bottom: 1px solid #eee !important"
     >
-      <v-app-bar-nav-icon
-        @click="showNavigation = !showNavigation"
-      ></v-app-bar-nav-icon>
+      <template #prepend>
+        <v-app-bar-nav-icon
+          
+          @click="showNavigation = !showNavigation"
+        ></v-app-bar-nav-icon>
+      </template>
       <v-responsive>
         <SearchBox></SearchBox>
       </v-responsive>
     </v-app-bar>
-    <v-navigation-drawer v-model="showNavigation" app clipped>
+    <v-navigation-drawer v-model="showNavigation">
       <Navigation></Navigation>
     </v-navigation-drawer>
     <v-main>

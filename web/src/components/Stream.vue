@@ -275,7 +275,7 @@
               size="small"
               variant="flat"
               :color="tag.color"
-              :text-color="getContrastTextColor(tag.color)"
+              :style="{ color: getContrastTextColor(tag.color) }"
               >{{ tag.name }}</v-chip
             ></v-col
           >
@@ -314,7 +314,7 @@
                 size="small"
                 variant="flat"
                 :color="service.color"
-                :text-color="getContrastTextColor(service.color)"
+                :style="{ color: getContrastTextColor(service.color) }"
                 >{{ service.name }}</v-chip
               >
               ({{ stream.stream.Stream.Protocol }})</span
@@ -328,7 +328,7 @@
               size="small"
               variant="flat"
               :color="mark.color"
-              :text-color="getContrastTextColor(mark.color)"
+             :style="{ color: getContrastTextColor(mark.color) }"
               >{{ mark.name }}</v-chip
             ></v-col
           >
@@ -342,7 +342,7 @@
               size="small"
               variant="flat"
               :color="generated.color"
-              :text-color="getContrastTextColor(generated.color)"
+              :style="{ color: getContrastTextColor(generated.color) }"
               >{{ generated.name }}</v-chip
             ></v-col
           >
@@ -437,16 +437,16 @@ const selectableConverters = computed(() => {
   if (stream.stream === null) return [];
   const availableConverters =
     converters.value?.map((converter) => ({
-      text: converter.Name,
+      title: converter.Name,
       value: "converter:" + converter.Name,
     })) ?? [];
   return [
     {
-      text: "* none",
+      title: "* none",
       value: "none",
     },
     ...stream.stream.Converters.map((converter) => ({
-      text: `* ${converter}`,
+      title: `* ${converter}`,
       value: "converter:" + converter,
     })),
     ...availableConverters,
@@ -488,7 +488,7 @@ watch(presentation, (v) => {
 onMounted(() => {
   fetchStreamForId();
   const proxy = {
-    proxy: getCurrentInstance()!.proxy,
+    proxy: getCurrentInstance()?.proxy,
     selectionData,
     selectionQuery,
   };

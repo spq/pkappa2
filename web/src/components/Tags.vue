@@ -42,7 +42,7 @@
                 :color="tag.Color"
                 size="small"
                 variant="flat"
-                :text-color="getContrastTextColor(tag.Color)"
+                :style="{ color: getContrastTextColor(tag.Color) }"
                 >{{ tag.Name.substring(1 + tagType.key.length) }}</v-chip
               >
             </td>
@@ -64,7 +64,7 @@
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
                   <v-btn
-                   
+                    variant="plain"
                     icon
                     exact
                     :to="{
@@ -82,7 +82,7 @@
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
                   <v-btn
-                   
+                    variant="plain"
                     icon
                     v-bind="props"
                     @click="setQuery(tag.Definition)"
@@ -94,7 +94,7 @@
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
                   <v-btn
-                   
+                    variant="plain"
                     icon
                     v-bind="props"
                     @click="showTagColorChangeDialog(tag.Name)"
@@ -106,7 +106,7 @@
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
                   <v-btn
-                   
+                    variant="plain"
                     :disabled="tag.Referenced"
                     icon
                     v-bind="props"
@@ -119,7 +119,7 @@
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
                   <v-btn
-                   
+                    variant="plain"
                     icon
                     v-bind="props"
                     @click="showTagDefinitionChangeDialog(tag.Name)"
@@ -131,7 +131,7 @@
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
                   <v-btn
-                   
+                    variant="plain"
                     icon
                     v-bind="props"
                     @click="showTagSetConvertersDialog(tag.Name)"
@@ -143,7 +143,7 @@
               <v-tooltip location="bottom">
                 <template #activator="{ props }">
                   <v-btn
-                   
+                    variant="plain"
                     :disabled="tag.Referenced"
                     icon
                     v-bind="props"

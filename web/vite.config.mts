@@ -1,30 +1,47 @@
-import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import vuetify from "vite-plugin-vuetify";
-import { fileURLToPath } from "url";
-import path from "path";
+import vuetify, { transformAssetUrls } from "vite-plugin-vuetify";
 import checker from "vite-plugin-checker";
+import Fonts from 'unplugin-fonts/vite'
+
+import { defineConfig } from "vite";
+import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    vue(),
-    vuetify({ autoImport: true }),
+    vue({
+      template: { transformAssetUrls },
+    }),
+    vuetify({
+      autoImport: true,
+      styles: {
+        configFile: 'src/styles/settings.scss',
+      },
+    }),
     nodePolyfills({
       include: ["events"], // tiny-typed-emitter
     }),
     checker({
       typescript: true,
+      vueTsc: true,
       eslint: {
         lintCommand: "eslint .",
         useFlatConfig: true,
       },
     }),
+    Fonts({
+      google: {
+        families: [ {
+          name: 'Roboto',
+          styles: 'wght@100;300;400;500;700;900',
+        }],
+      },
+    }),
   ],
   resolve: {
     alias: {
-      "@": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "./src"),
+      "@": fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
@@ -38,6 +55,13 @@ export default defineConfig({
         target: "ws://localhost:8081",
         ws: true,
         changeOrigin: false,
+      },
+    },
+  },
+  css: {
+    preprocessorOptions: {
+      sass: {
+        api: 'modern-compiler',
       },
     },
   },

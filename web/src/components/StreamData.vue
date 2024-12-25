@@ -96,9 +96,9 @@ const inlineAscii = (chunk: Data) => {
     const highlights: number[][] = [];
     for (const regex of highlightMatches) {
       if (regex === undefined) continue;
-      chunkData.matchAll(regex)?.forEach((match) => {
+      for (const match of chunkData.matchAll(regex)) {
         highlights.push([match.index, match[0].length]);
-      });
+      }
     }
     highlights.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     let highlightIndex = 0;

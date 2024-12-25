@@ -197,7 +197,7 @@
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </center>
-    <v-table v-else dense>
+    <v-table v-else density="compact">
       <template #default>
         <thead>
           <tr>
@@ -248,7 +248,7 @@
                     size="small"
                     variant="flat"
                     :color="tagColors[tag]"
-                    :text-color="getContrastTextColor(tagColors[tag])"
+                    :style="{ color: getContrastTextColor(tagColors[tag]) }"
                     ><template v-if="hover"
                       >{{ capitalize(tagify(tag, "type")) }}
                       {{ tagify(tag, "name") }}</template
@@ -289,10 +289,9 @@
               <td style="width: 0" class="px-0">
                 <v-btn
                   :href="`/api/download/${stream.Stream.ID}.pcap`"
-                  icon
-                  @click.native.stop
+                  icon="mdi-download"
+                  variant="plain"
                 >
-                  <v-icon>mdi-download</v-icon>
                 </v-btn>
               </td>
             </tr>

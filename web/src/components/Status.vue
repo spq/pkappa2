@@ -1,6 +1,6 @@
 <template>
   <div>
-    <ToolBar>
+    <ToolBar density="compact" dense>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
           <v-btn icon v-bind="props" @click="updateStatus">

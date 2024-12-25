@@ -36,7 +36,7 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    files: ["**/*.{ts,vue}"],
+    files: ["**/*.{ts,mts,tsx,vue}"],
     rules: {
       "no-console": "off",
       "no-debugger": process.env.NODE_ENV === "production" ? "warn" : "off",
