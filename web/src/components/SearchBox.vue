@@ -17,7 +17,6 @@
           @keydown.tab.exact.prevent.stop="onTab"
           @keydown.esc.exact="suggestionMenuOpen = false"
           @focus="searchBoxOptionsMenuOpen = true"
-          v-bind="props"
         >
         </v-text-field>
     <v-menu
@@ -225,7 +224,6 @@ onMounted(() => {
   onBeforeUnmount(() => {
     document.body.removeEventListener("keydown", keyListener);
   });
-  console.log(searchBoxField.value);
   const searchBoxElement = searchBoxField.value?.$el as HTMLElement | null;
   suggestionMenuPosY.value =
   searchBoxElement?.getBoundingClientRect().bottom ?? 0;

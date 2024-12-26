@@ -21,6 +21,9 @@
       expand-on-click
       density="compact"
       disable-pagination
+      disable-filtering
+      hide-default-footer
+      hover
     >
       <template #expanded-row="{ item }">
         <td colspan="4">

@@ -65,6 +65,7 @@
       disable-pagination
       disable-filtering
       hide-default-footer
+      hover
     >
       <template #[`item.status`]="props">
         <v-tooltip>

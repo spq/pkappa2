@@ -115,7 +115,7 @@
         </template>
         <span>Download PCAP</span>
       </v-tooltip>
-      <v-btn-toggle v-model="presentation" mandatory density="compact" variant="plain">
+      <v-btn-toggle v-model="presentation" mandatory density="compact" variant="text" color="primary">
         <v-tooltip location="bottom">
           <template #activator="{ props }">
             <v-btn value="ascii" v-bind="props">
@@ -177,7 +177,7 @@
                 :disabled="prevStreamId == null"
                 :to="
                   prevStreamId == null
-                    ? null
+                    ? {}
                     : {
                         name: 'stream',
                         query: {
@@ -204,7 +204,7 @@
                 :disabled="nextStreamId == null"
                 :to="
                   nextStreamId == null
-                    ? null
+                    ? {}
                     : {
                         name: 'stream',
                         query: {
@@ -417,7 +417,7 @@ const streamTags = computed(() => {
 });
 
 const streamId = computed(() => {
-  return parseInt(route.params.streamId, 10);
+  return parseInt(route.params.streamId as string, 10);
 });
 
 const converter = computed(() => {

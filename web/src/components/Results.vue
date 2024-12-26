@@ -197,7 +197,7 @@
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </center>
-    <v-table v-else density="compact">
+    <v-table v-else density="compact" hover>
       <template #default>
         <thead>
           <tr>
@@ -227,12 +227,12 @@
             }"
             custom
             style="cursor: pointer"
-            :class="{ blue: selected[index], 'lighten-5': selected[index] }"
+            :class="{ 'blue-lighten-5': selected[index] }"
           >
             <tr
               role="link"
-              @click="isTextSelected() || navigate($event)"
-              @keypress.enter="navigate"
+              @click="isTextSelected() || navigate()"
+              @keypress.enter="navigate()"
             >
               <td style="width: 0" class="pr-0">
                 <v-checkbox-btn

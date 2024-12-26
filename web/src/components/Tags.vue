@@ -18,7 +18,7 @@
         <span>CTF Setup Wizards</span>
       </v-tooltip>
     </ToolBar>
-    <v-table density="compact">
+    <v-table density="compact" hover>
       <thead>
         <tr>
           <th class="text-left" width="20%">Name</th>

@@ -8,6 +8,7 @@
         itemsPerPageOptions: [20, 50, 100, -1],
         showFirstLastPage: true,
       }"
+      hover
       density="compact"
     >
       <template #[`item.download`]="{ item }"
