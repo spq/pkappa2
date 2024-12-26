@@ -28,11 +28,13 @@
       </template>
       <v-list-item-title>All Streams</v-list-item-title>
 
-      <v-list-item-action v-if="status != null"
-        ><v-chip variant="flat" size="x-small">{{
-          status.StreamCount
-        }}</v-chip></v-list-item-action
-      >
+      <template #append>
+        <v-list-item-action v-if="status != null"
+          ><v-chip variant="flat" size="x-small">{{
+            status.StreamCount
+          }}</v-chip></v-list-item-action
+        >
+      </template>
     </v-list-item>
     <v-list-group
       v-for="tagType in tagTypes"
@@ -50,14 +52,12 @@
         </v-list-item>
       </template>
       <template v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
-        <v-hover
-          v-slot="{ isHovering }"
-          :style="{ backgroundColor: tag.Color }"
-        >
+        <v-hover v-slot="{ isHovering, props: hoverProps }">
           <v-list-item
             link
             density="compact"
             exact
+            v-bind="hoverProps"
             :style="{ backgroundColor: tag.Color }"
             :to="{
               name: 'search',
@@ -75,92 +75,94 @@
                 tag.Name.substring(tagType.key.length + 1)
               }}</v-list-item-title
             >
-
-            <v-menu location="bottom right" open-on-hover>
-              <template #activator="{ props }">
-                <v-list-item-action v-bind="props">
-                  <v-btn
-                    v-if="isHovering"
-                    icon
-                    size="x-small"
-                    :style="{
-                      color: getContrastTextColor(tag.Color),
+            <template #append>
+              <v-menu location="bottom left" open-on-hover>
+                <template #activator="{ props }">
+                  <v-list-item-action v-bind="props">
+                    <v-btn
+                      v-if="isHovering"
+                      icon
+                      size="x-small"
+                      variant="plain"
+                      :style="{
+                        color: getContrastTextColor(tag.Color),
+                      }"
+                    >
+                      <v-icon>mdi-dots-vertical</v-icon>
+                    </v-btn>
+                    <v-chip v-else size="x-small" variant="flat"
+                      >{{ tag.MatchingCount
+                      }}{{ tag.UncertainCount != 0 ? "+" : "" }}</v-chip
+                    >
+                  </v-list-item-action>
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    link
+                    exact
+                    :to="{
+                      name: 'search',
+                      query: {
+                        q: tagForURI(tag.Name),
+                      },
                     }"
+                    prepend-icon="mdi-magnify"
                   >
-                    <v-icon>mdi-dots-vertical</v-icon>
-                  </v-btn>
-                  <v-chip v-else size="x-small" variant="flat"
-                    >{{ tag.MatchingCount
-                    }}{{ tag.UncertainCount != 0 ? "+" : "" }}</v-chip
+                    <v-list-item-title>Show Streams</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    prepend-icon="mdi-clipboard-list-outline"
+                    link
+                    @click="showTagDetailsDialog(tag.Name)"
                   >
-                </v-list-item-action>
-              </template>
-              <v-list density="compact">
-                <v-list-item
-                  link
-                  exact
-                  :to="{
-                    name: 'search',
-                    query: {
-                      q: tagForURI(tag.Name),
-                    },
-                  }"
-                  prepend-icon="mdi-magnify"
-                >
-                  <v-list-item-title>Show Streams</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-clipboard-list-outline"
-                  link
-                  @click="showTagDetailsDialog(tag.Name)"
-                >
-                  <v-list-item-title>Details</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-form-textbox"
-                  link
-                  @click="setQuery(tag.Definition)"
-                >
-                  <v-list-item-title>Use Query</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-palette"
-                  link
-                  @click="showTagColorChangeDialog(tag.Name)"
-                >
-                  <v-list-item-title>Change Color</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-rename-outline"
-                  link
-                  @click="showTagNameChangeDialog(tag.Name)"
-                >
-                  <v-list-item-title>Change Name</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-text-search-variant"
-                  link
-                  @click="showTagDefinitionChangeDialog(tag.Name)"
-                >
-                  <v-list-item-title>Change Definition</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-file-replace-outline"
-                  link
-                  @click="showTagSetConvertersDialog(tag.Name)"
-                >
-                  <v-list-item-title>Attach converter</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-delete-outline"
-                  link
-                  :disabled="tag.Referenced"
-                  @click="confirmTagDeletion(tag.Name)"
-                >
-                  <v-list-item-title>Delete</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
+                    <v-list-item-title>Details</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    prepend-icon="mdi-form-textbox"
+                    link
+                    @click="setQuery(tag.Definition)"
+                  >
+                    <v-list-item-title>Use Query</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    prepend-icon="mdi-palette"
+                    link
+                    @click="showTagColorChangeDialog(tag.Name)"
+                  >
+                    <v-list-item-title>Change Color</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    prepend-icon="mdi-rename-outline"
+                    link
+                    @click="showTagNameChangeDialog(tag.Name)"
+                  >
+                    <v-list-item-title>Change Name</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    prepend-icon="mdi-text-search-variant"
+                    link
+                    @click="showTagDefinitionChangeDialog(tag.Name)"
+                  >
+                    <v-list-item-title>Change Definition</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    prepend-icon="mdi-file-replace-outline"
+                    link
+                    @click="showTagSetConvertersDialog(tag.Name)"
+                  >
+                    <v-list-item-title>Attach converter</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    link
+                    :disabled="tag.Referenced"
+                    @click="confirmTagDeletion(tag.Name)"
+                  >
+                    <v-list-item-title>Delete</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </template>
           </v-list-item>
         </v-hover>
       </template>
