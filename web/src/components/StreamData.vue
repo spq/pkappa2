@@ -191,14 +191,14 @@ const hexdump = (b64: string) => {
     margin-left: 2em;
   }
 }
-.server >>> .mark {
+.server :deep(.mark) {
   background-color: #9090ff;
 }
 .client {
   color: #800000;
   background-color: #faeeed;
 }
-.client >>> .mark {
+.client :deep(.mark) {
   background-color: #ff8e5e;
 }
 
