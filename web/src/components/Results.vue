@@ -231,14 +231,18 @@
               @keypress.enter="navigate()"
             >
               <td style="width: 0" class="pr-0">
-                <v-checkbox-btn v-model="selected[index]"></v-checkbox-btn>
+                <v-checkbox-btn
+                  v-model="selected[index]"
+                  @click.stop
+                ></v-checkbox-btn>
               </td>
               <td class="pl-0">
                 <v-hover
                   v-for="tag in stream.Tags"
-                  v-slot="{ isHovering }"
+                  v-slot="{ isHovering, props }"
                   :key="tag"
                   ><v-chip
+                    v-bind="props"
                     size="small"
                     variant="flat"
                     :color="tagColors[tag]"
