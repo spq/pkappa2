@@ -4,7 +4,6 @@
       <v-tooltip location="bottom">
         <template #activator="{ props }">
           <v-btn
-           
             icon
             :disabled="
               streams.result == null || streams.result.Results.length == 0
@@ -36,7 +35,7 @@
         </v-tooltip>
       </div>
       <div v-else>
-        <v-menu location="bottom left" 
+        <v-menu location="bottom left"
           ><template #activator="{ props: propsMenu }">
             <v-tooltip location="bottom">
               <template #activator="{ props: propsTooltip }">
@@ -70,11 +69,10 @@
                   }}</v-icon
                 >
               </v-list-item-action>
-              
-                <v-list-item-title>{{
-                  tagify(tag.Name, "name")
-                }}</v-list-item-title>
-              
+
+              <v-list-item-title>{{
+                tagify(tag.Name, "name")
+              }}</v-list-item-title>
             </v-list-item>
             <v-divider />
             <v-list-item link @click="createMarkFromSelection">
@@ -121,7 +119,6 @@
         <v-tooltip location="bottom">
           <template #activator="{ props }">
             <v-btn
-             
               icon
               :disabled="streams.page == 0"
               v-bind="props"
@@ -143,7 +140,6 @@
         <v-tooltip location="bottom">
           <template #activator="{ props }">
             <v-btn
-             
               icon
               :disabled="!streams.result.MoreResults"
               v-bind="props"
@@ -235,9 +231,7 @@
               @keypress.enter="navigate()"
             >
               <td style="width: 0" class="pr-0">
-                <v-checkbox-btn
-                  v-model="selected[index]"
-                ></v-checkbox-btn>
+                <v-checkbox-btn v-model="selected[index]"></v-checkbox-btn>
               </td>
               <td class="pl-0">
                 <v-hover

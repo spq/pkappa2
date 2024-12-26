@@ -16,7 +16,7 @@
       // Bump to ES2021 to overwrite Vite default https://vite.dev/config/build-options.html#build-target
       "ES2021",
       "DOM",
-      "DOM.Iterable",
+      "DOM.Iterable"
     ]
   }
 }

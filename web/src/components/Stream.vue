@@ -4,7 +4,6 @@
       <v-tooltip location="bottom">
         <template #activator="{ props }">
           <v-btn
-           
             icon
             :to="{
               name: 'search',
@@ -34,7 +33,6 @@
           <v-btn
             :disabled="selectionQuery == ''"
             exact
-           
             icon
             :to="{
               name: 'search',
@@ -50,18 +48,13 @@
       </v-tooltip>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
-          <v-btn
-            exact
-           
-            icon
-            @click="openInCyberChef()"
-            v-bind="props"
+          <v-btn exact icon @click="openInCyberChef()" v-bind="props"
             ><v-icon>mdi-chef-hat</v-icon></v-btn
           >
         </template>
         <span>Open in CyberChef</span>
       </v-tooltip>
-      <v-menu location="bottom left" 
+      <v-menu location="bottom left"
         ><template #activator="{ props: propsMenu }">
           <v-tooltip location="bottom">
             <template #activator="{ props: propsTooltip }">
@@ -89,11 +82,10 @@
                   }}</v-icon
                 >
               </v-list-item-action>
-              
-                <v-list-item-title>{{
-                  tagify(tag.Name, "name")
-                }}</v-list-item-title>
-              
+
+              <v-list-item-title>{{
+                tagify(tag.Name, "name")
+              }}</v-list-item-title>
             </v-list-item>
           </template>
           <v-divider />
@@ -105,17 +97,19 @@
       </v-menu>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
-          <v-btn
-           
-            icon
-            :href="`/api/download/${streamId}.pcap`"
-            v-bind="props"
+          <v-btn icon :href="`/api/download/${streamId}.pcap`" v-bind="props"
             ><v-icon>mdi-download</v-icon></v-btn
           >
         </template>
         <span>Download PCAP</span>
       </v-tooltip>
-      <v-btn-toggle v-model="presentation" mandatory density="compact" variant="text" color="primary">
+      <v-btn-toggle
+        v-model="presentation"
+        mandatory
+        density="compact"
+        variant="text"
+        color="primary"
+      >
         <v-tooltip location="bottom">
           <template #activator="{ props }">
             <v-btn value="ascii" v-bind="props">
@@ -149,7 +143,6 @@
           <v-select
             hide-details
             density="compact"
-           
             :items="selectableConverters"
             :model-value="activeConverter"
             v-bind="props"
@@ -326,7 +319,7 @@
               size="small"
               variant="flat"
               :color="mark.color"
-             :style="{ color: getContrastTextColor(mark.color) }"
+              :style="{ color: getContrastTextColor(mark.color) }"
               >{{ mark.name }}</v-chip
             ></v-col
           >

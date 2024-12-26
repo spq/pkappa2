@@ -2,10 +2,10 @@ import vue from "@vitejs/plugin-vue";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import vuetify, { transformAssetUrls } from "vite-plugin-vuetify";
 import checker from "vite-plugin-checker";
-import Fonts from 'unplugin-fonts/vite'
+import Fonts from "unplugin-fonts/vite";
 
 import { defineConfig } from "vite";
-import { fileURLToPath, URL } from 'node:url'
+import { fileURLToPath, URL } from "node:url";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -16,7 +16,7 @@ export default defineConfig({
     vuetify({
       autoImport: true,
       styles: {
-        configFile: 'src/styles/settings.scss',
+        configFile: "src/styles/settings.scss",
       },
     }),
     nodePolyfills({
@@ -32,16 +32,18 @@ export default defineConfig({
     }),
     Fonts({
       google: {
-        families: [ {
-          name: 'Roboto',
-          styles: 'wght@100;300;400;500;700;900',
-        }],
+        families: [
+          {
+            name: "Roboto",
+            styles: "wght@100;300;400;500;700;900",
+          },
+        ],
       },
     }),
   ],
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL('./src', import.meta.url)),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   server: {
@@ -61,7 +63,7 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       sass: {
-        api: 'modern-compiler',
+        api: "modern-compiler",
       },
     },
   },

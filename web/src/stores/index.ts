@@ -186,4 +186,4 @@ export function handleAxiosDefaultError(err: unknown) {
   else throw err;
 }
 
-export default createPinia()
+export default createPinia();

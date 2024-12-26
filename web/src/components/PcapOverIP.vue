@@ -28,7 +28,9 @@
               </v-card-text>
               <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn variant="text" @click="addDialogVisible = false">Cancel</v-btn>
+                <v-btn variant="text" @click="addDialogVisible = false"
+                  >Cancel</v-btn
+                >
                 <v-btn
                   variant="text"
                   :disabled="!goodNewAddress || addDialogLoading"
@@ -45,10 +47,7 @@
         <template #activator="{ props: propsDialog }">
           <v-tooltip location="bottom">
             <template #activator="{ props: propsTooltip }">
-              <v-btn
-                v-bind="{ ...propsDialog, ...propsTooltip }"
-                icon
-              >
+              <v-btn v-bind="{ ...propsDialog, ...propsTooltip }" icon>
                 <v-icon>mdi-plus</v-icon>
               </v-btn>
             </template>

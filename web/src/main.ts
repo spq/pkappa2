@@ -1,5 +1,5 @@
 import { createApp, h } from "vue";
-import { registerPlugins } from '@/plugins'
+import { registerPlugins } from "@/plugins";
 import App from "./App.vue";
 
 // Vue.config.productionTip = process.env.NODE_ENV == "production";

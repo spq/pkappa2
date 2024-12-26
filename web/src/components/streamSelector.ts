@@ -1,7 +1,7 @@
 import ListenerBag from "./listenerBag";
 import { useStreamStore } from "@/stores/stream";
 import { Ref } from "vue";
-import type { ComponentPublicInstance } from 'vue'
+import type { ComponentPublicInstance } from "vue";
 import { Data } from "@/apiClient";
 
 const listenerBag = new ListenerBag();

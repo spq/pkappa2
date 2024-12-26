@@ -30,28 +30,32 @@
           label="Grouping"
         >
           <template #item="{ item, props }">
-            <v-list-item v-if="item.value.startsWith('header/')" density="compact">
-              
-                <v-list-subheader
-                  >{{ item.title }}
-                  <v-btn
-                    size="x-small"
-                    variant="text"
-                    @click="setChartTagOptions(item.value.substring(7), true)"
-                    >All</v-btn
-                  >
-                  <v-btn
-                    size="x-small"
-                    variant="text"
-                    @click="setChartTagOptions(item.value.substring(7), false)"
-                    >None</v-btn
-                  ></v-list-subheader
+            <v-list-item
+              v-if="item.value.startsWith('header/')"
+              density="compact"
+            >
+              <v-list-subheader
+                >{{ item.title }}
+                <v-btn
+                  size="x-small"
+                  variant="text"
+                  @click="setChartTagOptions(item.value.substring(7), true)"
+                  >All</v-btn
                 >
-              
+                <v-btn
+                  size="x-small"
+                  variant="text"
+                  @click="setChartTagOptions(item.value.substring(7), false)"
+                  >None</v-btn
+                ></v-list-subheader
+              >
             </v-list-item>
             <v-list-item v-else v-slot="{ isActive }" v-bind="props">
               <v-list-item-action>
-                <v-checkbox :ripple="false" :model-value="isActive"></v-checkbox>
+                <v-checkbox
+                  :ripple="false"
+                  :model-value="isActive"
+                ></v-checkbox>
               </v-list-item-action>
               {{ item.title }}
             </v-list-item>

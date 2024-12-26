@@ -1,19 +1,37 @@
 <template>
-  <v-list density="compact" nav v-model:opened="tagTypesKeys" open-strategy="multiple">
-    <v-list-item variant="flat" link density="compact" exact :to="{ name: 'home' }">
+  <v-list
+    density="compact"
+    nav
+    v-model:opened="tagTypesKeys"
+    open-strategy="multiple"
+  >
+    <v-list-item
+      variant="flat"
+      link
+      density="compact"
+      exact
+      :to="{ name: 'home' }"
+    >
       <template #prepend>
         <v-icon size="small">mdi-help-circle-outline</v-icon>
       </template>
       <v-list-item-title>Help</v-list-item-title>
     </v-list-item>
-    <v-list-item link density="compact" exact :to="{ name: 'search', query: { q: '' } }">
+    <v-list-item
+      link
+      density="compact"
+      exact
+      :to="{ name: 'search', query: { q: '' } }"
+    >
       <template #prepend>
         <v-icon size="small">mdi-all-inclusive</v-icon>
       </template>
       <v-list-item-title>All Streams</v-list-item-title>
-      
+
       <v-list-item-action v-if="status != null"
-        ><v-chip variant="flat" size="x-small">{{ status.StreamCount }}</v-chip></v-list-item-action
+        ><v-chip variant="flat" size="x-small">{{
+          status.StreamCount
+        }}</v-chip></v-list-item-action
       >
     </v-list-item>
     <v-list-group
@@ -48,18 +66,17 @@
               },
             }"
           >
-            
-              <v-list-item-title
-                class="text-truncate"
-                style="max-width: 110px"
-                :style="{ color: getContrastTextColor(tag.Color) }"
-                :title="tag.Name.substring(tagType.key.length + 1)"
-                >{{
-                  tag.Name.substring(tagType.key.length + 1)
-                }}</v-list-item-title
-              >
-            
-            <v-menu location="bottom right" open-on-hover >
+            <v-list-item-title
+              class="text-truncate"
+              style="max-width: 110px"
+              :style="{ color: getContrastTextColor(tag.Color) }"
+              :title="tag.Name.substring(tagType.key.length + 1)"
+              >{{
+                tag.Name.substring(tagType.key.length + 1)
+              }}</v-list-item-title
+            >
+
+            <v-menu location="bottom right" open-on-hover>
               <template #activator="{ props }">
                 <v-list-item-action v-bind="props">
                   <v-btn
@@ -92,22 +109,46 @@
                 >
                   <v-list-item-title>Show Streams</v-list-item-title>
                 </v-list-item>
-                <v-list-item prepend-icon="mdi-clipboard-list-outline" link @click="showTagDetailsDialog(tag.Name)">
+                <v-list-item
+                  prepend-icon="mdi-clipboard-list-outline"
+                  link
+                  @click="showTagDetailsDialog(tag.Name)"
+                >
                   <v-list-item-title>Details</v-list-item-title>
                 </v-list-item>
-                <v-list-item prepend-icon="mdi-form-textbox" link @click="setQuery(tag.Definition)">
+                <v-list-item
+                  prepend-icon="mdi-form-textbox"
+                  link
+                  @click="setQuery(tag.Definition)"
+                >
                   <v-list-item-title>Use Query</v-list-item-title>
                 </v-list-item>
-                <v-list-item prepend-icon="mdi-palette" link @click="showTagColorChangeDialog(tag.Name)">
+                <v-list-item
+                  prepend-icon="mdi-palette"
+                  link
+                  @click="showTagColorChangeDialog(tag.Name)"
+                >
                   <v-list-item-title>Change Color</v-list-item-title>
                 </v-list-item>
-                <v-list-item prepend-icon="mdi-rename-outline" link @click="showTagNameChangeDialog(tag.Name)">
+                <v-list-item
+                  prepend-icon="mdi-rename-outline"
+                  link
+                  @click="showTagNameChangeDialog(tag.Name)"
+                >
                   <v-list-item-title>Change Name</v-list-item-title>
                 </v-list-item>
-                <v-list-item prepend-icon="mdi-text-search-variant" link @click="showTagDefinitionChangeDialog(tag.Name)">
+                <v-list-item
+                  prepend-icon="mdi-text-search-variant"
+                  link
+                  @click="showTagDefinitionChangeDialog(tag.Name)"
+                >
                   <v-list-item-title>Change Definition</v-list-item-title>
                 </v-list-item>
-                <v-list-item prepend-icon="mdi-file-replace-outline" link @click="showTagSetConvertersDialog(tag.Name)">
+                <v-list-item
+                  prepend-icon="mdi-file-replace-outline"
+                  link
+                  @click="showTagSetConvertersDialog(tag.Name)"
+                >
                   <v-list-item-title>Attach converter</v-list-item-title>
                 </v-list-item>
                 <v-list-item
@@ -127,10 +168,12 @@
     <v-list-group v-model="moreOpen" link dense subgroup>
       <template #activator="{ props }">
         <v-list-item v-bind="props" link density="compact">
-        <template #prepend>
-          <v-icon size="small">mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon>
-        </template>
-        
+          <template #prepend>
+            <v-icon size="small"
+              >mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon
+            >
+          </template>
+
           <v-list-item-title>More</v-list-item-title>
         </v-list-item>
       </template>
@@ -142,9 +185,7 @@
           name: 'status',
         }"
       >
-        
-          <v-list-item-title>Status</v-list-item-title>
-        
+        <v-list-item-title>Status</v-list-item-title>
       </v-list-item>
       <v-list-item
         link
@@ -154,9 +195,7 @@
           name: 'pcaps',
         }"
       >
-        
-          <v-list-item-title>PCAPs</v-list-item-title>
-        
+        <v-list-item-title>PCAPs</v-list-item-title>
       </v-list-item>
       <v-list-item
         link
@@ -166,9 +205,7 @@
           name: 'tags',
         }"
       >
-        
-          <v-list-item-title>Manage Tags</v-list-item-title>
-        
+        <v-list-item-title>Manage Tags</v-list-item-title>
       </v-list-item>
       <v-list-item
         link
@@ -178,9 +215,7 @@
           name: 'converters',
         }"
       >
-        
-          <v-list-item-title>Manage Converters</v-list-item-title>
-        
+        <v-list-item-title>Manage Converters</v-list-item-title>
       </v-list-item>
       <v-list-item
         link
@@ -190,16 +225,10 @@
           name: 'pcap-over-ip',
         }"
       >
-        
-          <v-list-item-title>Manage PCAP-over-IP</v-list-item-title>
-        
+        <v-list-item-title>Manage PCAP-over-IP</v-list-item-title>
       </v-list-item>
 
-      <v-btn-toggle
-        v-model="colorscheme"
-        mandatory
-        class="pl-9 pt-2"
-      >
+      <v-btn-toggle v-model="colorscheme" mandatory class="pl-9 pt-2">
         <v-btn>
           <v-icon>mdi-weather-sunny</v-icon>
         </v-btn>

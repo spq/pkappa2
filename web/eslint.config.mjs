@@ -3,7 +3,7 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 import pluginVue from "eslint-plugin-vue";
-import vuetify from 'eslint-plugin-vuetify'
+import vuetify from "eslint-plugin-vuetify";
 import vueParser from "vue-eslint-parser";
 import vueTsEslintConfig from "@vue/eslint-config-typescript";
 

@@ -1,12 +1,8 @@
 <template>
   <v-app>
-    <v-app-bar
-      elevation="0"
-      style="border-bottom: 1px solid #eee !important"
-    >
+    <v-app-bar elevation="0" style="border-bottom: 1px solid #eee !important">
       <template #prepend>
         <v-app-bar-nav-icon
-          
           @click="showNavigation = !showNavigation"
         ></v-app-bar-nav-icon>
       </template>
