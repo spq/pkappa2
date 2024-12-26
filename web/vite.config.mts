@@ -24,7 +24,9 @@ export default defineConfig({
     }),
     checker({
       typescript: true,
-      vueTsc: true,
+      vueTsc: {
+        tsconfigPath: "tsconfig.app.json",
+      },
       eslint: {
         lintCommand: "eslint .",
         useFlatConfig: true,

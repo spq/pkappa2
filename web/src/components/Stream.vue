@@ -165,7 +165,6 @@
           <template #activator="{ props }">
             <span v-bind="props">
               <v-btn
-                ref="prevStream"
                 icon
                 :disabled="prevStreamId == null"
                 :to="
@@ -192,7 +191,6 @@
           <template #activator="{ props }">
             <span v-bind="props">
               <v-btn
-                ref="nextStream"
                 icon
                 :disabled="nextStreamId == null"
                 :to="

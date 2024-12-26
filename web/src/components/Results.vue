@@ -177,7 +177,7 @@
                 $router.push({
                   name: 'search',
                   query: {
-                    q: `data:\x22${regexEscape($route.query.q)}\x22`,
+                    q: `data:\x22${regexEscape($route.query.q as string)}\x22`,
                   },
                 })
               "

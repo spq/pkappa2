@@ -41,7 +41,6 @@
       </v-card>
     </v-menu>
     <v-menu
-      ref="suggestionMenu"
       v-model="suggestionMenuOpen"
       :target="[suggestionMenuPosX, suggestionMenuPosY]"
       absolute
@@ -108,7 +107,6 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useRootStore } from "@/stores";
 import { tagNameForURI } from "@/filters";
-import { VTextField } from "vuetify/components";
 
 const store = useRootStore();
 const route = useRoute();

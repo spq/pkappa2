@@ -87,7 +87,7 @@ const headers = [
     class: ["px-0", "w0"],
     cellClass: ["px-0", "w0"],
   },
-];
+] as const;
 
 onMounted(() => {
   store.updatePcaps().catch((err: Error) => {
