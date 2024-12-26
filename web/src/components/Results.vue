@@ -36,11 +36,11 @@
         </v-tooltip>
       </div>
       <div v-else>
-        <v-menu offset-y location="right bottom" 
+        <v-menu location="bottom left" 
           ><template #activator="{ props: propsMenu }">
             <v-tooltip location="bottom">
               <template #activator="{ props: propsTooltip }">
-                <v-btn icon v-on="{ ...propsMenu, ...propsTooltip }">
+                <v-btn icon v-bind="{ ...propsMenu, ...propsTooltip }">
                   <v-icon>mdi-checkbox-multiple-outline</v-icon>
                 </v-btn>
               </template>
@@ -242,14 +242,14 @@
               <td class="pl-0">
                 <v-hover
                   v-for="tag in stream.Tags"
-                  v-slot="{ hover }"
+                  v-slot="{ isHovering }"
                   :key="tag"
                   ><v-chip
                     size="small"
                     variant="flat"
                     :color="tagColors[tag]"
                     :style="{ color: getContrastTextColor(tagColors[tag]) }"
-                    ><template v-if="hover"
+                    ><template v-if="isHovering"
                       >{{ capitalize(tagify(tag, "type")) }}
                       {{ tagify(tag, "name") }}</template
                     ><template v-else>{{
@@ -291,6 +291,7 @@
                   :href="`/api/download/${stream.Stream.ID}.pcap`"
                   icon="mdi-download"
                   variant="plain"
+                  density="compact"
                 >
                 </v-btn>
               </td>

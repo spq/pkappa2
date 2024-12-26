@@ -13,12 +13,14 @@
       <template #[`item.download`]="{ item }"
         ><v-btn
           variant="plain"
+          density="compact"
           :href="`/api/download/pcap/${item.Filename}`"
           icon
         >
           <v-icon>mdi-download</v-icon>
         </v-btn></template
       >
+      <!-- eslint-disable vue/no-v-for-template-key-on-child -->
       <template
         v-for="field of [
           'ParseTime',

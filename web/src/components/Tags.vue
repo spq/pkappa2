@@ -18,7 +18,7 @@
         <span>CTF Setup Wizards</span>
       </v-tooltip>
     </ToolBar>
-    <v-table dense>
+    <v-table density="compact">
       <thead>
         <tr>
           <th class="text-left" width="20%">Name</th>
@@ -65,6 +65,7 @@
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"
+                    density="compact"
                     icon
                     exact
                     :to="{
@@ -83,6 +84,7 @@
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"
+                    density="compact"
                     icon
                     v-bind="props"
                     @click="setQuery(tag.Definition)"
@@ -95,6 +97,7 @@
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"
+                    density="compact"
                     icon
                     v-bind="props"
                     @click="showTagColorChangeDialog(tag.Name)"
@@ -107,6 +110,7 @@
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"
+                    density="compact"
                     :disabled="tag.Referenced"
                     icon
                     v-bind="props"
@@ -120,6 +124,7 @@
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"
+                    density="compact"
                     icon
                     v-bind="props"
                     @click="showTagDefinitionChangeDialog(tag.Name)"
@@ -132,6 +137,7 @@
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"
+                    density="compact"
                     icon
                     v-bind="props"
                     @click="showTagSetConvertersDialog(tag.Name)"
@@ -144,6 +150,7 @@
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"
+                    density="compact"
                     :disabled="tag.Referenced"
                     icon
                     v-bind="props"

@@ -61,7 +61,7 @@
       :headers="headers"
       :items="store.pcapOverIPEndpoints || []"
       item-key="address"
-      dense
+      density="compact"
       disable-pagination
       disable-filtering
       hide-default-footer
@@ -108,7 +108,8 @@
         <v-tooltip location="bottom">
           <template #activator="{ props }">
             <v-btn
-             
+              variant="plain"
+              density="compact"
               icon
               v-bind="props"
               @click="

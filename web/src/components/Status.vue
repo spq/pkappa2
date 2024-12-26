@@ -1,6 +1,6 @@
 <template>
   <div>
-    <ToolBar density="compact" dense>
+    <ToolBar>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
           <v-btn icon v-bind="props" @click="updateStatus">
@@ -12,7 +12,7 @@
     </ToolBar>
     <v-card>
       <v-card-title>Status</v-card-title>
-      <v-table>
+      <v-table density="compact">
         <tbody>
           <tr v-for="(value, name) in store.status || []" :key="name">
             <th>{{ name }}</th>

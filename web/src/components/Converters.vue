@@ -13,14 +13,16 @@
     <v-data-table
       :headers="headers"
       :items="items"
-      item-key="name"
+      v-model:expanded="expanded"
+      item-value="name"
+      items-per-page="-1"
       single-expand
       show-expand
-      dense
+      expand-on-click
+      density="compact"
       disable-pagination
-      @click:row="rowClick"
     >
-      <template #expanded-item="{ item }">
+      <template #expanded-row="{ item }">
         <td colspan="4">
           <v-chip
             v-for="process in item.converter.Processes"
@@ -48,12 +50,12 @@
           <v-tooltip location="bottom">
             <template #activator="{ props }">
               <v-btn
-                icon
+                variant="plain"
+                density="compact"
+                icon="mdi-restart-alert"
                 v-bind="props"
                 @click="confirmConverterReset(item.converter)"
-              >
-                <v-icon>mdi-restart-alert</v-icon>
-              </v-btn>
+              ></v-btn>
             </template>
             <span>Reset Converter</span>
           </v-tooltip>
@@ -118,6 +120,7 @@ const headers = [
     cellClass: "cursor-pointer",
   },
 ];
+const expanded = ref<string[]>([]);
 const shownProcess = ref<ProcessStats | null>(null);
 const loadingStderr = ref(false);
 const fetchStderrError = ref<string | null>(null);
@@ -148,12 +151,6 @@ function refreshConverters() {
   store.updateConverters().catch((err: Error) => {
     EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowClick(item: unknown, handler: any) {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-  handler.expand(!handler.isExpanded);
 }
 
 function confirmConverterReset(converter: ConverterStatistics) {

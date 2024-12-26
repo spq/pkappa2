@@ -7,7 +7,7 @@ import { Data } from "@/apiClient";
 const listenerBag = new ListenerBag();
 
 type ThisProxy = {
-  streamData: Ref<ComponentPublicInstance  | null>;
+  streamData: ComponentPublicInstance | null;
   selectionData: Ref<string>;
   selectionQuery: Ref<string>;
 };
@@ -95,7 +95,7 @@ function onSelectionChange(this: ThisProxy) {
     return;
   }
 
-  const streamData = this.streamData.value;
+  const streamData = this.streamData;
   const streamDataNode = streamData?.$el as HTMLElement | null;
   // Do not support multi-range selection
   if (selection.rangeCount !== 1 || streamDataNode == null) {

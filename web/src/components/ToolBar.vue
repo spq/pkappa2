@@ -2,7 +2,7 @@
   <div>
     <v-toolbar
       id="toolbarReal"
-      dense
+      density="compact"
       flat
       :style="{
         position: 'fixed',
@@ -44,5 +44,7 @@ function onToolbarResize() {
   if (tbd) toolbarWidth.value = tbd.offsetWidth;
   const tbr = document.getElementById("toolbarReal");
   if (tbr) toolbarHeight.value = tbr.offsetHeight;
+  console.log("toolbarWidth", toolbarWidth.value);
+  console.log("toolbarHeight", toolbarHeight.value);
 }
 </script>

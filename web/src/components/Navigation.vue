@@ -1,5 +1,5 @@
 <template>
-  <v-list density="compact" nav>
+  <v-list density="compact" nav v-model:opened="tagTypesKeys" open-strategy="multiple">
     <v-list-item variant="flat" link density="compact" exact :to="{ name: 'home' }">
       <template #prepend>
         <v-icon size="small">mdi-help-circle-outline</v-icon>
@@ -20,8 +20,8 @@
       v-for="tagType in tagTypes"
       :key="tagType.key"
       link
-      dense
-      :value="true"
+      density="compact"
+      :value="tagType.key"
     >
       <template #activator="{ props }">
         <v-list-item v-bind="props" link>
@@ -59,7 +59,7 @@
                 }}</v-list-item-title
               >
             
-            <v-menu offset-y location="bottom right" open-on-hover >
+            <v-menu location="bottom right" open-on-hover >
               <template #activator="{ props }">
                 <v-list-item-action v-bind="props">
                   <v-btn
@@ -198,7 +198,6 @@
       <v-btn-toggle
         v-model="colorscheme"
         mandatory
-        background-color="transparent"
         class="pl-9 pt-2"
       >
         <v-btn>
@@ -265,6 +264,7 @@ const tagTypes = [
     key: "generated",
   },
 ];
+const tagTypesKeys = ref(tagTypes.map((tagType) => tagType.key));
 
 const moreOpen =
   route.name !== null &&

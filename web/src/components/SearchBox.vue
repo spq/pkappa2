@@ -41,7 +41,7 @@
       v-model="suggestionMenuOpen"
       :target="[suggestionMenuPosX, suggestionMenuPosY]"
       absolute
-      dense
+      density="compact"
     >
       <v-list
         :value="suggestionSelectedIndex"
@@ -59,7 +59,7 @@
         </v-list-item>
       </v-list>
     </v-menu>
-    <v-menu offset-y location="right bottom" >
+    <v-menu location="bottom" >
       <template #activator="{ props }">
         <v-btn class="textfield-overlay" size="small" icon v-bind="props"
           ><v-icon>mdi-dots-vertical</v-icon></v-btn

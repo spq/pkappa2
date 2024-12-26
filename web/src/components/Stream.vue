@@ -33,7 +33,6 @@
         <template #activator="{ props }">
           <v-btn
             :disabled="selectionQuery == ''"
-            link
             exact
            
             icon
@@ -52,7 +51,6 @@
       <v-tooltip location="bottom">
         <template #activator="{ props }">
           <v-btn
-            link
             exact
            
             icon
@@ -63,7 +61,7 @@
         </template>
         <span>Open in CyberChef</span>
       </v-tooltip>
-      <v-menu offset-y location="right bottom" 
+      <v-menu location="bottom left" 
         ><template #activator="{ props: propsMenu }">
           <v-tooltip location="bottom">
             <template #activator="{ props: propsTooltip }">
@@ -117,7 +115,7 @@
         </template>
         <span>Download PCAP</span>
       </v-tooltip>
-      <v-btn-toggle v-model="presentation" mandatory density="compact" borderless>
+      <v-btn-toggle v-model="presentation" mandatory density="compact" variant="plain">
         <v-tooltip location="bottom">
           <template #activator="{ props }">
             <v-btn value="ascii" v-bind="props">
@@ -488,7 +486,7 @@ watch(presentation, (v) => {
 onMounted(() => {
   fetchStreamForId();
   const proxy = {
-    proxy: getCurrentInstance()?.proxy,
+    streamData: getCurrentInstance()!.proxy,
     selectionData,
     selectionQuery,
   };
