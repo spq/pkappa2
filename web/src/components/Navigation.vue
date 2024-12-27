@@ -338,7 +338,8 @@ const filterSelected = (tagName: string) => {
 };
 
 const inQuery = (name: string) => {
-  return ((route.query?.q ?? "") as string).includes(name);
+  console.log(name);
+  return analyze(route.query?.q as string).tag.filter(entry => entry.pieces.values.includes(name));
 };
 
 document.onkeydown = function (e) {
