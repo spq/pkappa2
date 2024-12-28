@@ -13,7 +13,6 @@
       link
       dense
       exact
-      :style="onShiftPressed"
       :to="{ name: 'search', query: { q: '' } }"
       @click.shift="appendOrRemoveFilter"
     >
@@ -338,8 +337,15 @@ const filterSelected = (tagName: string) => {
 };
 
 const inQuery = (name: string) => {
-  console.log(name);
-  return analyze(route.query?.q as string).tag.filter(entry => entry.pieces.values.includes(name));
+  if (name.split(":")[1]) {
+    var [key, val] = name.split(":");
+    //Replace `"` from passed tags with spaces
+    return analyze(route.query?.q as string)[key]?.find(
+      (value) => value?.pieces?.value === (val.replaceAll('"', "") ?? ""),
+    );
+  } else {
+    return false;
+  }
 };
 
 document.onkeydown = function (e) {
