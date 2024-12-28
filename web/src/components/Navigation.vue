@@ -53,7 +53,7 @@
             link
             dense
             exact
-            :style="onShiftPressed"
+            :style="shiftPressedIndicator"
             :to="{
               name: 'search',
               query: {
@@ -97,7 +97,7 @@
                 <v-list-item
                   link
                   exact
-                  :style="onShiftPressed"
+                  :style="shiftPressedIndicator"
                   :to="{
                     name: 'search',
                     query: {
@@ -316,7 +316,7 @@ const moreOpen =
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
 const shiftPressed = ref(false);
-const onShiftPressed = computed(() => {
+const shiftPressedIndicator = computed(() => {
   return {
     marginLeft: shiftPressed.value ? "5px" : "0px",
     marginRight: shiftPressed.value ? "2.5px" : "0px",
