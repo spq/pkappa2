@@ -190,10 +190,14 @@ func TestTags(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Manager.AddTag failed with error: %v", err)
 			}
+			wantQuery := tc.query
+			if prefix, _, _ := strings.Cut(tc.tag, "/"); prefix == "mark" || prefix == "generated" {
+				wantQuery = "..."
+			}
 			if got, want := mgr.ListTags(), []TagInfo{{
 				Name:           tc.tag,
 				Color:          "blue",
-				Definition:     tc.query,
+				Definition:     wantQuery,
 				MatchingCount:  0,
 				UncertainCount: 0,
 				Referenced:     false,
@@ -219,16 +223,19 @@ func TestTags(t *testing.T) {
 	if err := mgr.AddTag("mark/foo", "blue", "id:0"); err != nil {
 		t.Fatalf("Manager.AddTag failed with error: %v", err)
 	}
+	if got, want := mgr.ListTags()[0].Definition, "..."; got != want {
+		t.Fatalf("Manager.ListTags()[0].Definition = %v, want %v", got, want)
+	}
 	if err := mgr.UpdateTag("mark/foo", UpdateTagOperationMarkAddStream([]uint64{2, 3})); err != nil {
 		t.Fatalf("Manager.UpdateTag failed with error: %v", err)
 	}
-	if got, want := mgr.ListTags()[0].Definition, "id:0,2,3"; got != want {
+	if got, want := mgr.tags["mark/foo"].definition, "id:0,2,3"; got != want {
 		t.Fatalf("Manager.ListTags()[0].Definition = %v, want %v", got, want)
 	}
 	if err := mgr.UpdateTag("mark/foo", UpdateTagOperationMarkDelStream([]uint64{2})); err != nil {
 		t.Fatalf("Manager.UpdateTag failed with error: %v", err)
 	}
-	if got, want := mgr.ListTags()[0].Definition, "id:0,3"; got != want {
+	if got, want := mgr.tags["mark/foo"].definition, "id:0,3"; got != want {
 		t.Fatalf("Manager.ListTags()[0].Definition = %v, want %v", got, want)
 	}
 	if err := mgr.UpdateTag("mark/foo", UpdateTagOperationUpdateName("mark/bar")); err != nil {
@@ -283,7 +290,7 @@ func TestManagerRestartKeepsState(t *testing.T) {
 		{
 			Name:           "mark/foo",
 			Color:          "red",
-			Definition:     "id:-1",
+			Definition:     "...",
 			MatchingCount:  0,
 			UncertainCount: 0,
 			Referenced:     false,
