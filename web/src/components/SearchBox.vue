@@ -408,9 +408,4 @@ function createTag(tagType: string, tagQuery: string) {
   color: black;
   font-weight: bold;
 }
-.textfield-overlay {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
 </style>
