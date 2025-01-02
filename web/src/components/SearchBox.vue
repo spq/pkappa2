@@ -184,7 +184,9 @@ const tagColors = computed(() => {
   return tags;
 });
 const searchBoxFieldRect = computed(() => {
-  if (searchBoxField.value == null) {
+  const searchBoxContainer = searchBoxField.value?.$el as HTMLElement;
+  const searchBoxElement = searchBoxContainer?.querySelector("div.v-input__control");
+  if (!searchBoxElement) {
     return {
       width: 0,
       height: 0,
@@ -194,7 +196,6 @@ const searchBoxFieldRect = computed(() => {
       bottom: 0,
     };
   }
-  const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
   return searchBoxElement.getBoundingClientRect();
 });
 
@@ -242,9 +243,7 @@ onMounted(() => {
   onBeforeUnmount(() => {
     document.body.removeEventListener("keydown", keyListener);
   });
-  const searchBoxElement = searchBoxField.value?.$el as HTMLElement | null;
-  suggestionMenuPosY.value =
-    searchBoxElement?.getBoundingClientRect().bottom ?? 0;
+  suggestionMenuPosY.value = searchBoxFieldRect.value.bottom ?? 0;
 });
 
 function onTab() {
