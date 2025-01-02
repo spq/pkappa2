@@ -3,7 +3,6 @@
     <v-text-field
       ref="searchBoxField"
       autofocus
-      hide-details
       flat
       variant="underlined"
       color="primary"
@@ -18,6 +17,45 @@
       @keydown.esc.exact="suggestionMenuOpen = false"
       @focus="searchBoxOptionsMenuOpen = true"
     >
+      <template #append-inner>
+        <v-menu location="bottom">
+          <template #activator="{ props }">
+            <v-btn size="small" icon v-bind="props" class="mt-n2"
+              ><v-icon>mdi-dots-vertical</v-icon></v-btn
+            >
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              prepend-icon="mdi-magnify"
+              link
+              @click="search('search')"
+            >
+              <v-list-item-title>Search</v-list-item-title>
+            </v-list-item>
+            <v-list-item
+              prepend-icon="mdi-finance"
+              link
+              @click="search('graph')"
+            >
+              <v-list-item-title>Graph</v-list-item-title>
+            </v-list-item>
+            <v-list-item
+              prepend-icon="mdi-cloud-outline"
+              link
+              @click="createTag('service', searchBox)"
+            >
+              <v-list-item-title>Save as Service</v-list-item-title>
+            </v-list-item>
+            <v-list-item
+              prepend-icon="mdi-tag-multiple-outline"
+              link
+              @click="createTag('tag', searchBox)"
+            >
+              <v-list-item-title>Save as Tag</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </template>
     </v-text-field>
     <v-menu
       v-model="searchBoxOptionsMenuOpen"
@@ -55,35 +93,6 @@
           @click="applySuggestion(index)"
         >
           <v-list-item-title>{{ item }}</v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-menu>
-    <v-menu location="bottom">
-      <template #activator="{ props }">
-        <v-btn class="textfield-overlay" size="small" icon v-bind="props"
-          ><v-icon>mdi-dots-vertical</v-icon></v-btn
-        >
-      </template>
-      <v-list density="compact">
-        <v-list-item prepend-icon="mdi-magnify" link @click="search('search')">
-          <v-list-item-title>Search</v-list-item-title>
-        </v-list-item>
-        <v-list-item prepend-icon="mdi-finance" link @click="search('graph')">
-          <v-list-item-title>Graph</v-list-item-title>
-        </v-list-item>
-        <v-list-item
-          prepend-icon="mdi-cloud-outline"
-          link
-          @click="createTag('service', searchBox)"
-        >
-          <v-list-item-title>Save as Service</v-list-item-title>
-        </v-list-item>
-        <v-list-item
-          prepend-icon="mdi-tag-multiple-outline"
-          link
-          @click="createTag('tag', searchBox)"
-        >
-          <v-list-item-title>Save as Tag</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-menu>
