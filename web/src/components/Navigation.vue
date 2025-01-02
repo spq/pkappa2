@@ -82,17 +82,14 @@
               <v-menu location="bottom left" open-on-hover>
                 <template #activator="{ isActive, props }">
                   <v-list-item-action v-bind="props">
-                    <v-btn
+                    <v-icon
                       v-if="isHovering || isActive"
-                      icon
                       size="x-small"
-                      variant="plain"
                       :style="{
                         color: getContrastTextColor(tag.Color),
                       }"
+                      >mdi-dots-vertical</v-icon
                     >
-                      <v-icon>mdi-dots-vertical</v-icon>
-                    </v-btn>
                     <v-chip v-else size="x-small" variant="flat"
                       >{{ tag.MatchingCount
                       }}{{ tag.UncertainCount != 0 ? "+" : "" }}</v-chip
