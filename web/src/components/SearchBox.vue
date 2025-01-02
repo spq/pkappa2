@@ -88,7 +88,8 @@
         <v-list-item
           v-for="(item, index) in suggestionItems"
           :key="index"
-          active-class="font-white"
+          :active="index === suggestionSelectedIndex"
+          active-class="selected-suggestion"
           :style="{ backgroundColor: suggestionColor(suggestionType, item) }"
           @click="applySuggestion(index)"
         >
@@ -404,8 +405,8 @@ function createTag(tagType: string, tagQuery: string) {
 </script>
 
 <style scoped>
-.font-white {
+.selected-suggestion div.v-list-item-title {
   color: black;
-  font-weight: bold;
+  font-weight: bolder;
 }
 </style>
