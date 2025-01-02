@@ -13,9 +13,7 @@
     <v-navigation-drawer v-model="showNavigation">
       <Navigation></Navigation>
     </v-navigation-drawer>
-    <v-main>
-      <router-view></router-view>
-    </v-main>
+    <router-view></router-view>
     <CTFWizardDialog />
     <ConverterResetDialog />
     <TagDeleteDialog />
