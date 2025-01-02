@@ -50,14 +50,15 @@
                 ></v-list-subheader
               >
             </v-list-item>
-            <v-list-item v-else v-slot="{ isActive }" v-bind="props">
-              <v-list-item-action>
-                <v-checkbox
-                  :ripple="false"
-                  :model-value="isActive"
-                ></v-checkbox>
-              </v-list-item-action>
-              {{ item.title }}
+            <v-list-item density="compact" v-else v-bind="props">
+              <template #prepend="{ isActive }">
+                <v-list-item-action start>
+                  <v-checkbox-btn
+                    :ripple="false"
+                    :model-value="isActive"
+                  ></v-checkbox-btn>
+                </v-list-item-action>
+              </template>
             </v-list-item>
           </template>
         </v-select>
