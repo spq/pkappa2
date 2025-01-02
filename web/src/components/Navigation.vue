@@ -6,6 +6,7 @@
     open-strategy="multiple"
   >
     <v-list-item
+      slim
       variant="flat"
       link
       density="compact"
@@ -18,6 +19,7 @@
       <v-list-item-title>Help</v-list-item-title>
     </v-list-item>
     <v-list-item
+      slim
       link
       density="compact"
       exact
@@ -44,7 +46,7 @@
       :value="tagType.key"
     >
       <template #activator="{ props }">
-        <v-list-item v-bind="props" link>
+        <v-list-item v-bind="props" slim link>
           <template #prepend>
             <v-icon size="small">mdi-{{ tagType.icon }}</v-icon>
           </template>
@@ -54,6 +56,7 @@
       <template v-for="tag in groupedTags[tagType.key]" :key="tag.Name">
         <v-hover v-slot="{ isHovering, props: hoverProps }">
           <v-list-item
+            slim
             link
             density="compact"
             exact
@@ -169,7 +172,7 @@
     </v-list-group>
     <v-list-group v-model="moreOpen" link dense subgroup>
       <template #activator="{ props }">
-        <v-list-item v-bind="props" link density="compact">
+        <v-list-item v-bind="props" slim link density="compact">
           <template #prepend>
             <v-icon size="small"
               >mdi-chevron-{{ moreOpen ? "up" : "down" }}</v-icon
