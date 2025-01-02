@@ -80,10 +80,10 @@
             >
             <template #append>
               <v-menu location="bottom left" open-on-hover>
-                <template #activator="{ props }">
+                <template #activator="{ isActive, props }">
                   <v-list-item-action v-bind="props">
                     <v-btn
-                      v-if="isHovering"
+                      v-if="isHovering || isActive"
                       icon
                       size="x-small"
                       variant="plain"
