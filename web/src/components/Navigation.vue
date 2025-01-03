@@ -344,7 +344,9 @@ const inQuery = (name: string) => {
 document.onkeydown = function (e) {
   if (
     e.shiftKey &&
-    (e.target as HTMLInputElement).tagName.toUpperCase() != "INPUT"
+    ((e.target as HTMLElement).tagName.toUpperCase() != "INPUT" ||
+      (e.target as HTMLElement).tagName === "TEXTAREA" ||
+      (e.target as HTMLElement).isContentEditable)
   ) {
     shiftPressed.value = true;
   }
