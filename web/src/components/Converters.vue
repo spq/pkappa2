@@ -100,7 +100,6 @@ import APIClient, {
   ProcessStats,
   ProcessStderr,
 } from "@/apiClient";
-import ToolBar from "./ToolBar.vue";
 import { computed, onMounted, ref } from "vue";
 import { useRootStore } from "@/stores";
 

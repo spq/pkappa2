@@ -305,7 +305,6 @@
 
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
-import ToolBar from "./ToolBar.vue";
 import { useRootStore } from "@/stores";
 import { useStreamsStore } from "@/stores/streams";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";

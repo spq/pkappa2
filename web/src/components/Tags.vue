@@ -173,7 +173,6 @@ import { computed, onMounted } from "vue";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
-import ToolBar from "./ToolBar.vue";
 import { getContrastTextColor } from "@/lib/colors";
 
 const tagTypes = [

@@ -3,6 +3,7 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 import vuetify, { transformAssetUrls } from "vite-plugin-vuetify";
 import checker from "vite-plugin-checker";
 import Fonts from "unplugin-fonts/vite";
+import Components from 'unplugin-vue-components/vite';
 
 import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
@@ -13,12 +14,14 @@ export default defineConfig({
     vue({
       template: { transformAssetUrls },
     }),
+    // https://github.com/vuetifyjs/vuetify-loader/tree/master/packages/vite-plugin#readme
     vuetify({
       autoImport: true,
       styles: {
         configFile: "src/styles/settings.scss",
       },
     }),
+    Components(),
     nodePolyfills({
       include: ["events"], // tiny-typed-emitter
     }),

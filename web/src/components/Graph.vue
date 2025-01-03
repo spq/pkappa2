@@ -85,7 +85,6 @@
 </template>
 
 <script lang="ts" setup>
-import ToolBar from "./ToolBar.vue";
 import { computed, nextTick, ref, onMounted, watch } from "vue";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";

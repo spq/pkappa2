@@ -25,7 +25,6 @@
 </template>
 
 <script lang="ts" setup>
-import ToolBar from "./ToolBar.vue";
 import { onMounted } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";

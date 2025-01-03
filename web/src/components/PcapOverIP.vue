@@ -157,7 +157,6 @@
 
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
-import ToolBar from "./ToolBar.vue";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRootStore } from "@/stores";
 import moment from "moment";
