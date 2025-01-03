@@ -290,6 +290,7 @@
                   icon="mdi-download"
                   variant="plain"
                   density="compact"
+                  @click.stop
                 >
                 </v-btn>
               </td>
