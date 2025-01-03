@@ -57,8 +57,9 @@
                   tagStatusForSelection[tag.Name] !== true,
                 )
               "
+              slim
             >
-              <v-list-item-action>
+              <template #prepend>
                 <v-icon
                   >mdi-{{
                     tagStatusForSelection[tag.Name] === true
@@ -68,7 +69,7 @@
                         : "checkbox-blank-outline"
                   }}</v-icon
                 >
-              </v-list-item-action>
+              </template>
 
               <v-list-item-title>{{
                 tagify(tag.Name, "name")
