@@ -23,6 +23,7 @@
             :label="converter.Name"
             :value="converter.Name"
             hide-details
+            density="compact"
           ></v-checkbox>
         </v-card-text>
         <v-card-actions>
