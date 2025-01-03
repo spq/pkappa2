@@ -53,7 +53,7 @@
             link
             dense
             exact
-            :style="shiftPressedIndicator"
+            :class="shiftPressedIndicator"
             :to="{
               name: 'search',
               query: {
@@ -97,7 +97,7 @@
                 <v-list-item
                   link
                   exact
-                  :style="shiftPressedIndicator"
+                  :class="shiftPressedIndicator"
                   :to="{
                     name: 'search',
                     query: {
@@ -317,12 +317,7 @@ const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
 const shiftPressed = ref(false);
 const shiftPressedIndicator = computed(() => {
-  return {
-    marginLeft: shiftPressed.value ? "5px" : "0px",
-    marginRight: shiftPressed.value ? "2.5px" : "0px",
-    transition: "margin 100ms, box-shadow 100ms",
-    boxShadow: shiftPressed.value ? "rgb(0, 0, 0, 0.6) 0px 5px 15px" : "none",
-  };
+  return shiftPressed.value ? "shiftPressed" : "shiftNotPressed";
 });
 
 const filterSelected = (tagName: string) => {
@@ -481,5 +476,23 @@ async function appendOrRemoveFilter(e: Event) {
 .v-application--is-ltr .v-navigation-drawer .v-list-item__action {
   margin-top: 0;
   margin-bottom: 0;
+}
+
+.shiftPressed {
+  margin-left: 5px;
+  margin-right: 2.5px;
+  transition:
+    margin 100ms,
+    box-shadow 100ms;
+  box-shadow: rgb(0, 0, 0, 0.6) 0px 5px 15px;
+}
+
+.shiftNotPressed {
+  margin-left: 0px;
+  margin-right: 0px;
+  transition:
+    margin 100ms,
+    box-shadow 100ms;
+  box-shadow: none;
 }
 </style>
