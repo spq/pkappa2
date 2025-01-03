@@ -68,12 +68,13 @@
         <v-list v-if="stream.stream !== null" density="compact">
           <template v-for="tag of groupedTags.mark" :key="tag.Name">
             <v-list-item
+              slim
               link
               @click="
                 markStream(tag.Name, !stream.stream.Tags.includes(tag.Name))
               "
             >
-              <v-list-item-action>
+              <template #prepend>
                 <v-icon
                   >mdi-{{
                     stream.stream.Tags.includes(tag.Name)
@@ -81,8 +82,7 @@
                       : "checkbox-blank-outline"
                   }}</v-icon
                 >
-              </v-list-item-action>
-
+              </template>
               <v-list-item-title>{{
                 tagify(tag.Name, "name")
               }}</v-list-item-title>
