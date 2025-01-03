@@ -97,14 +97,12 @@
                 <v-list-item
                   link
                   exact
-                  :class="shiftPressedIndicator"
                   :to="{
                     name: 'search',
                     query: {
                       q: tagForURI(tag.Name),
                     },
                   }"
-                  @click.shift="appendOrRemoveFilter"
                 >
                   <v-list-item-icon>
                     <v-icon>mdi-magnify</v-icon>
@@ -413,8 +411,9 @@ async function appendOrRemoveFilter(e: Event) {
   var query = (route?.query?.q as string) ?? "";
 
   e.preventDefault();
-  const url = ((e.target as HTMLElement).offsetParent as HTMLAnchorElement)
-    .hash;
+  const url =
+    (e.target as HTMLAnchorElement).hash ??
+    ((e.target as HTMLElement).offsetParent as HTMLAnchorElement).hash;
   const queryParam = url?.replace("#/search?q=", "") ?? "";
 
   const newSelected = Object.values(
