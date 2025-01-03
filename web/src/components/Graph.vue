@@ -519,19 +519,19 @@ const chartTagOptions = computed(() => {
   for (const typ of types) {
     let first = true;
     for (const t of store.tags) {
-      if (t.Name.startsWith(typ.toLowerCase() + "/")) {
-        if (first) {
-          first = false;
-          options.push({
-            title: typ.charAt(0).toUpperCase() + typ.substring(1) + "s",
-            value: `header/${typ}`,
-          });
-        }
+      const pos = t.Name.indexOf("/");
+      if (t.Name.slice(0, pos) != typ) continue;
+      if (first) {
+        first = false;
         options.push({
-          title: t.Name,
-          value: t.Name,
+          title: typ.charAt(0).toUpperCase() + typ.substring(1) + "s",
+          value: `header/${typ}`,
         });
       }
+      options.push({
+        title: t.Name.slice(pos + 1),
+        value: t.Name,
+      });
     }
   }
   return options;
