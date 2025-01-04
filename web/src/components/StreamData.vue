@@ -103,11 +103,11 @@ const inlineAscii = (chunk: Data) => {
     highlights.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     let highlightIndex = 0;
     for (const [index, length] of highlights) {
+      asciiEscaped[index] =
+        `<span class="mark" data-offset="${index}">${asciiEscaped[index]}`;
       if (highlightIndex > 0) {
         asciiEscaped[index] = `</span>${asciiEscaped[index]}`;
       }
-      asciiEscaped[index] =
-        `<span class="mark" data-offset="${index}">${asciiEscaped[index]}`;
       asciiEscaped[index + length - 1] =
         `${asciiEscaped[index + length - 1]}</span>`;
       if (highlightIndex < highlights.length - 1) {
