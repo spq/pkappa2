@@ -104,6 +104,18 @@
                   </v-list-item-icon>
                   <v-list-item-title>Show Streams</v-list-item-title>
                 </v-list-item>
+                <v-list-item link exact @click="appendOrRemoveFilter(tag.Name)">
+                  <v-list-item-icon>
+                    <v-icon v-if="inQuery(tag.Name)">mdi-minus</v-icon>
+                    <v-icon v-else>mdi-plus</v-icon>
+                  </v-list-item-icon>
+                  <v-list-item-title v-if="inQuery(tag.Name)"
+                    >Remove tag from search</v-list-item-title
+                  >
+                  <v-list-item-title v-else
+                    >Add tag to search</v-list-item-title
+                  >
+                </v-list-item>
                 <v-list-item link @click="showTagDetailsDialog(tag.Name)">
                   <v-list-item-icon>
                     <v-icon>mdi-clipboard-list-outline</v-icon>
