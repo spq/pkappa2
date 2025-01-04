@@ -212,8 +212,7 @@ watch(
     if (suggestionMenuOpen.value) {
       suggestionSelectedIndex.value = 0;
       const searchBoxElement = searchBoxField.value;
-      const cursorIndex =
-        searchBoxElement?.selectionStart ?? null;
+      const cursorIndex = searchBoxElement?.selectionStart ?? null;
       if (cursorIndex === null) return;
       const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
       suggestionMenuPosX.value =
@@ -225,7 +224,9 @@ watch(
 );
 
 onMounted(() => {
-  searchBoxField.value = document.getElementById("searchBoxField") as HTMLInputElement;
+  searchBoxField.value = document.getElementById(
+    "searchBoxField",
+  ) as HTMLInputElement;
   store.updateConverters().catch((err: Error) => {
     EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
@@ -289,8 +290,7 @@ function applySuggestion(index: number | null = null) {
 function startSuggestionSearch() {
   const val = searchBox.value;
   typingDelay.value = window.setTimeout(() => {
-    const cursorPosition =
-    searchBoxField.value?.selectionStart ?? 0;
+    const cursorPosition = searchBoxField.value?.selectionStart ?? 0;
     const suggestionResult = suggest(
       val,
       cursorPosition,
