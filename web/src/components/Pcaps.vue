@@ -4,10 +4,8 @@
       :headers="headers"
       :items="store.pcaps || []"
       :loading="store.pcaps === null"
-      :footer-props="{
-        itemsPerPageOptions: [20, 50, 100, -1],
-        showFirstLastPage: true,
-      }"
+      :items-per-page="20"
+      :items-per-page-options="[20, 50, 100, -1]"
       hover
       density="compact"
     >
