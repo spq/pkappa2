@@ -1,7 +1,7 @@
 <template>
   <div>
     <v-text-field
-      ref="searchBoxField"
+      id="searchBoxField"
       autofocus
       flat
       variant="underlined"
@@ -111,7 +111,6 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
-  useTemplateRef,
   watch,
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -121,7 +120,7 @@ import { tagNameForURI } from "@/filters";
 const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
-const searchBoxField = useTemplateRef("searchBoxField");
+const searchBoxField = ref<HTMLInputElement | null>(null);
 const searchBox = ref<string>((route.query.q as string) ?? "");
 const historyIndex = ref(-1);
 const pendingSearch = ref("");
@@ -159,8 +158,7 @@ const queryTimeLimit = computed({
       const suffix = q.slice(ltime.start + ltime.len);
       searchBox.value = `${prefix}${infix}${suffix}`;
     }
-    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
-    searchBoxElement.querySelector("input")?.focus();
+    searchBoxField.value?.focus();
     nextTick(() => {
       searchBoxOptionsMenuOpen.value = true;
     }).catch((err: Error) => {
@@ -185,11 +183,7 @@ const tagColors = computed(() => {
   return tags;
 });
 const searchBoxFieldRect = computed(() => {
-  const searchBoxContainer = searchBoxField.value?.$el as HTMLElement;
-  const searchBoxElement = searchBoxContainer?.querySelector(
-    "div.v-input__control",
-  );
-  if (!searchBoxElement) {
+  if (!searchBoxField.value) {
     return {
       width: 0,
       height: 0,
@@ -199,7 +193,7 @@ const searchBoxFieldRect = computed(() => {
       bottom: 0,
     };
   }
-  return searchBoxElement.getBoundingClientRect();
+  return searchBoxField.value.getBoundingClientRect();
 });
 
 EventBus.on("setSearchTerm", setSearchTerm);
@@ -217,20 +211,21 @@ watch(
     suggestionMenuOpen.value = suggestionItems.value.length > 0;
     if (suggestionMenuOpen.value) {
       suggestionSelectedIndex.value = 0;
-      const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
+      const searchBoxElement = searchBoxField.value;
       const cursorIndex =
-        searchBoxElement.querySelector("input")?.selectionStart ?? null;
+        searchBoxElement?.selectionStart ?? null;
       if (cursorIndex === null) return;
       const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
       suggestionMenuPosX.value =
         cursorIndex * fontWidth +
-        (searchBoxElement.getBoundingClientRect().left ?? 0);
+        (searchBoxElement?.getBoundingClientRect().left ?? 0);
     }
   },
   { immediate: true },
 );
 
 onMounted(() => {
+  searchBoxField.value = document.getElementById("searchBoxField") as HTMLInputElement;
   store.updateConverters().catch((err: Error) => {
     EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
@@ -239,8 +234,7 @@ onMounted(() => {
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
     if (e.key != "/") return;
     e.preventDefault();
-    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
-    searchBoxElement.querySelector("input")?.focus();
+    searchBoxField.value?.focus();
   };
   document.body.addEventListener("keydown", keyListener);
   onBeforeUnmount(() => {
@@ -295,9 +289,8 @@ function applySuggestion(index: number | null = null) {
 function startSuggestionSearch() {
   const val = searchBox.value;
   typingDelay.value = window.setTimeout(() => {
-    const searchBoxElement = searchBoxField.value?.$el as HTMLElement;
     const cursorPosition =
-      searchBoxElement.querySelector("input")?.selectionStart ?? 0;
+    searchBoxField.value?.selectionStart ?? 0;
     const suggestionResult = suggest(
       val,
       cursorPosition,
