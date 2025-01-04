@@ -105,19 +105,19 @@ import { useRootStore } from "@/stores";
 
 const store = useRootStore();
 const headers = [
-  { text: "Name", value: "name", cellClass: "cursor-pointer" },
+  { title: "Name", value: "name", cellClass: "cursor-pointer" },
   {
-    text: "Cached Stream Count",
+    title: "Cached Stream Count",
     value: "cachedStreamCount",
     cellClass: "cursor-pointer",
   },
   {
-    text: "Running Processes",
+    title: "Running Processes",
     value: "runningProcesses",
     cellClass: "cursor-pointer",
   },
   {
-    text: "Failed Processes",
+    title: "Failed Processes",
     value: "failedProcesses",
     cellClass: "cursor-pointer",
   },

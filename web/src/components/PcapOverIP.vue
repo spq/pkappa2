@@ -176,14 +176,14 @@ const goodNewAddress = computed(() => {
 
 const store = useRootStore();
 const headers = [
-  { text: "Address", value: "Address", cellClass: "cursor-pointer" },
-  { text: "Status", value: "status", cellClass: "cursor-pointer" },
+  { title: "Address", value: "Address", cellClass: "cursor-pointer" },
+  { title: "Status", value: "status", cellClass: "cursor-pointer" },
   {
-    text: "Packets Received",
+    title: "Packets Received",
     value: "ReceivedPackets",
     cellClass: "cursor-pointer",
   },
-  { text: "", value: "delete", sortable: false, cellClass: "cursor-pointer" },
+  { title: "", value: "delete", sortable: false, cellClass: "cursor-pointer" },
 ];
 
 const ticker = ref<ReturnType<typeof setTimeout> | null>(null);
