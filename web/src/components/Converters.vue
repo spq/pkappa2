@@ -143,11 +143,11 @@ onMounted(() => {
 });
 
 function refreshConverters() {
-  store.updateTags().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update tags: ${err}`);
+  store.updateTags().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update tags: ${err.message}`);
   });
-  store.updateConverters().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  store.updateConverters().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
 }
 
@@ -170,8 +170,8 @@ function showErrorLog(process: ProcessStats, converter: ConverterStatistics) {
         fetchStderrError.value = "Stderr is empty";
       }
     })
-    .catch((err: string | Error) => {
-      fetchStderrError.value = err.toString();
+    .catch((err: Error) => {
+      fetchStderrError.value = err.message;
     })
     .finally(() => {
       loadingStderr.value = false;

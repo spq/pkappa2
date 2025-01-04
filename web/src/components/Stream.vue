@@ -250,11 +250,10 @@
               stream.stream.Stream.Client.Port
             }}
             ({{
-              $options.filters?.prettyBytes(
-                stream.stream.Stream.Client.Bytes,
-                1,
-                true,
-              )
+              prettyBytes(stream.stream.Stream.Client.Bytes, {
+                maximumFractionDigits: 1,
+                binary: true,
+              })
             }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
@@ -291,11 +290,10 @@
               stream.stream.Stream.Server.Port
             }}
             ({{
-              $options.filters?.prettyBytes(
-                stream.stream.Stream.Server.Bytes,
-                1,
-                true,
-              )
+              prettyBytes(stream.stream.Stream.Server.Bytes, {
+                maximumFractionDigits: 1,
+                binary: true,
+              })
             }})</v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
@@ -379,6 +377,7 @@ import {
 } from "./streamSelector";
 import { formatDate, formatDateLong, tagify } from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";
+import prettyBytes from "pretty-bytes";
 
 const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
 
@@ -401,7 +400,7 @@ const converters = computed(() => store.converters);
 const groupedTags = computed(() => store.groupedTags);
 const streamTags = computed(() => {
   if (stream.stream == null) return {};
-  let res: { [key: string]: { name: string; color: string }[] } = {
+  const res: { [key: string]: { name: string; color: string }[] } = {
     service: [],
     tag: [],
     mark: [],
@@ -455,7 +454,7 @@ const streamIndex = computed(() => {
   if (streams.result == null) return null;
   const id = streamId.value;
   let i = 0;
-  for (let r of streams.result.Results) {
+  for (const r of streams.result.Results) {
     if (r.Stream.ID == id) return i;
     i++;
   }
@@ -535,8 +534,8 @@ function changeConverter(converter: string) {
 
 function fetchStreamForId() {
   if (streamId.value !== null) {
-    stream.fetchStream(streamId.value, converter.value).catch((err: string) => {
-      EventBus.emit("showError", `Failed to fetch stream: ${err}`);
+    stream.fetchStream(streamId.value, converter.value).catch((err: Error) => {
+      EventBus.emit("showError", `Failed to fetch stream: ${err.message}`);
     });
     document.getSelection()?.empty();
   }
@@ -559,12 +558,18 @@ function createMark() {
 
 function markStream(tagId: string, value: boolean) {
   if (value) {
-    store.markTagAdd(tagId, [streamId.value]).catch((err: string) => {
-      EventBus.emit("showError", `Failed to add stream to mark: ${err}`);
+    store.markTagAdd(tagId, [streamId.value]).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to add stream to mark: ${err.message}`,
+      );
     });
   } else {
-    store.markTagDel(tagId, [streamId.value]).catch((err: string) => {
-      EventBus.emit("showError", `Failed to remove stream from mark: ${err}`);
+    store.markTagDel(tagId, [streamId.value]).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to remove stream from mark: ${err.message}`,
+      );
     });
   }
 }

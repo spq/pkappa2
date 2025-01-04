@@ -205,10 +205,10 @@ onMounted(() => {
 });
 
 function refresh() {
-  store.updatePcapOverIPEndpoints().catch((err: string) => {
+  store.updatePcapOverIPEndpoints().catch((err: Error) => {
     EventBus.emit(
       "showError",
-      `Failed to update PCAP-over-IP endpoints: ${err}`,
+      `Failed to update PCAP-over-IP endpoints: ${err.message}`,
     );
   });
 }
@@ -224,10 +224,13 @@ function add() {
       newAddress.value = "";
       refresh();
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       addDialogLoading.value = false;
       addDialogError.value = true;
-      EventBus.emit("showError", `Failed to add PCAP-over-IP endpoint: ${err}`);
+      EventBus.emit(
+        "showError",
+        `Failed to add PCAP-over-IP endpoint: ${err.message}`,
+      );
     });
 }
 function del() {
@@ -240,10 +243,10 @@ function del() {
       delDialogLoading.value = false;
       refresh();
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       EventBus.emit(
         "showError",
-        `Failed to delete PCAP-over-IP endpoint: ${err}`,
+        `Failed to delete PCAP-over-IP endpoint: ${err.message}`,
       );
       delDialogError.value = true;
       delDialogLoading.value = false;

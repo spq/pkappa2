@@ -668,8 +668,8 @@ graphStore.$subscribe((_mutation, state) => {
           theme: colorscheme,
         },
       } as ApexCharts.ApexOptions)
-      .catch((err: string) => {
-        EventBus.emit("showError", `Failed to update graph: ${err}`);
+      .catch((err: Error) => {
+        EventBus.emit("showError", `Failed to update graph: ${err.message}`);
       });
   });
   chartData.value = [];
@@ -683,7 +683,7 @@ onMounted(() => {
 function setChartTagOptions(typ: string, active: boolean) {
   nextTick(() => {
     const sel = chartTags.value;
-    for (var i = 0; i < sel.length; i++) {
+    for (let i = 0; i < sel.length; i++) {
       if (sel[i].startsWith(`${typ}/`)) {
         sel.splice(i--, 1);
       }
@@ -716,8 +716,8 @@ function fetchGraphLocal() {
       query as string,
       type as GraphType,
     )
-    .catch((err: string) => {
-      EventBus.emit("showError", `Failed to update graph: ${err}`);
+    .catch((err: Error) => {
+      EventBus.emit("showError", `Failed to update graph: ${err.message}`);
     });
 }
 </script>

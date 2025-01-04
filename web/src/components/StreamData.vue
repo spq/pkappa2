@@ -66,7 +66,7 @@ const highlightRegex = (highlight: string[] | null) =>
         return decoded;
       });
       return new RegExp(regex, "g");
-    } catch (e) {
+    } catch {
       console.error(`Invalid regex: ${regex}`);
     }
   });
@@ -84,7 +84,7 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
 });
 
 const inlineAscii = (chunk: Data) => {
-  let chunkData = atob(chunk.Content);
+  const chunkData = atob(chunk.Content);
   const asciiEscaped = chunkData
     .split("")
     .map((c) => asciiMap[c.charCodeAt(0)]);
@@ -133,7 +133,7 @@ const inlineHex = (b64: string) => {
       .split("")
       .map((char) => char.charCodeAt(0)),
   );
-  var str = ([] as number[]).slice
+  const str = ([] as number[]).slice
     .call(ui8)
     .map((i) => i.toString(16).padStart(2, "0"))
     .join("");
@@ -146,7 +146,7 @@ const hexdump = (b64: string) => {
       .split("")
       .map((char) => char.charCodeAt(0)),
   );
-  var str = ([] as number[]).slice
+  const str = ([] as number[]).slice
     .call(ui8)
     .map((i) => i.toString(16).padStart(2, "0"))
     .join("")
@@ -157,12 +157,12 @@ const hexdump = (b64: string) => {
       while (str.length < 48) {
         str += " ";
       }
-      var ascii =
+      let ascii =
         str
           .replace(/ /g, "")
           .match(/.{1,2}/g)
           ?.map(function (ch) {
-            var c = String.fromCharCode(parseInt(ch, 16));
+            let c = String.fromCharCode(parseInt(ch, 16));
             if (!/[ -~]/.test(c)) {
               c = ".";
             }

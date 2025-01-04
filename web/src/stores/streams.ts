@@ -44,7 +44,7 @@ export const useStreamsStore = defineStore("streams", {
           this.page = page;
           this.running = false;
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           if (axios.isCancel(err)) return;
           if (axios.isAxiosError<string, unknown>(err)) {
             this.query = query;
