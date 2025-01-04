@@ -4,6 +4,7 @@
     nav
     v-model:opened="tagTypesKeys"
     open-strategy="multiple"
+    :class="{ shiftPressed: shiftPressed }"
   >
     <v-list-item
       slim
@@ -60,6 +61,8 @@
             link
             density="compact"
             exact
+            class="tagButton"
+            :class="{ tagSelected: inQuery(tag.Name) }"
             v-bind="hoverProps"
             :style="{ backgroundColor: tag.Color }"
             :to="{
@@ -68,6 +71,7 @@
                 q: tagForURI(tag.Name),
               },
             }"
+            @click.shift.prevent="appendOrRemoveFilter(tag.Name)"
           >
             <v-list-item-title
               class="text-truncate"
@@ -78,6 +82,9 @@
                 tag.Name.substring(tagType.key.length + 1)
               }}</v-list-item-title
             >
+            <template #prepend>
+              <div class="tagButtonCorner"></div>
+            </template>
             <template #append>
               <v-menu location="bottom left" open-on-hover>
                 <template #activator="{ isActive, props }">
@@ -109,6 +116,22 @@
                     prepend-icon="mdi-magnify"
                   >
                     <v-list-item-title>Show Streams</v-list-item-title>
+                  </v-list-item>
+                  <v-list-item
+                    link
+                    exact
+                    @click="appendOrRemoveFilter(tag.Name)"
+                  >
+                    <template #prepend>
+                      <v-icon v-if="inQuery(tag.Name)">mdi-minus</v-icon>
+                      <v-icon v-else>mdi-plus</v-icon>
+                    </template>
+                    <v-list-item-title v-if="inQuery(tag.Name)"
+                      >Remove tag from search</v-list-item-title
+                    >
+                    <v-list-item-title v-else
+                      >Add tag to search</v-list-item-title
+                    >
                   </v-list-item>
                   <v-list-item
                     prepend-icon="mdi-clipboard-list-outline"
@@ -246,7 +269,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   setColorScheme,
   getColorSchemeFromStorage,
@@ -257,11 +280,13 @@ import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
 import { computed, onMounted, ref, watch } from "vue";
 import { getContrastTextColor } from "@/lib/colors";
+import analyze from "@/parser/analyze";
 
 type ColorSchemeButtonTriState = 0 | 1 | 2;
 
 const store = useRootStore();
 const route = useRoute();
+const router = useRouter();
 const schemeInitialisations: Record<
   ColorSchemeConfiguration,
   ColorSchemeButtonTriState
@@ -303,6 +328,32 @@ const moreOpen =
   ["converters", "status", "tags", "pcaps"].includes(route.name.toString()); // FIXME: type route
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
+const shiftPressed = ref(false);
+
+const inQuery = (name: string) => {
+  name = tagForURI(name);
+  if (!name.split(":")[1]) return false;
+  const [key, val] = name.split(":");
+  //Replace `"` from passed tags with spaces
+  return analyze(route.query?.q as string)[key]?.find(
+    (value) => value?.pieces?.value === (val.replaceAll('"', "") ?? ""),
+  );
+};
+
+document.onkeydown = function (e) {
+  if (!e.shiftKey) return;
+  const t = e.target as HTMLElement;
+  const tn = t.tagName.toLowerCase();
+  if (tn === "input") return;
+  if (tn === "textarea" && t.isContentEditable) return;
+  shiftPressed.value = true;
+};
+
+document.onkeyup = function (e) {
+  if (e.key === "Shift") {
+    shiftPressed.value = false;
+  }
+};
 
 watch(colorscheme, () => {
   const schemes: Record<ColorSchemeButtonTriState, ColorSchemeConfiguration> = {
@@ -354,6 +405,46 @@ function showTagDefinitionChangeDialog(tagId: string) {
 function showTagNameChangeDialog(tagId: string) {
   EventBus.emit("showTagNameChangeDialog", tagId);
 }
+
+async function appendOrRemoveFilter(name: string) {
+  const query = (route?.query?.q as string) ?? "";
+
+  const newSelected = Object.values(
+    analyze(decodeURIComponent(tagForURI(name)).trim()),
+  ).flatMap((e) => e.map((f) => f.pieces))[0];
+  const current = Object.values(analyze(query)).flatMap((e) =>
+    e.map((f) => f.pieces),
+  );
+
+  if (!newSelected || !current) {
+    return;
+  }
+
+  function formatValue(value: string) {
+    return /\s/g.test(value.trim()) ? `"${value}"` : value;
+  }
+
+  function formatTag(entry: { [key: string]: string }) {
+    return entry.keyword.trim() + ":" + formatValue(entry.value);
+  }
+
+  let newQuery = query.trim();
+  if (
+    current.find(
+      (e) => e.keyword === newSelected.keyword && e.value === newSelected.value,
+    ) === undefined
+  ) {
+    newQuery = newQuery + " " + formatTag(newSelected);
+  } else {
+    newQuery = newQuery
+      .replaceAll(" " + formatTag(newSelected), "")
+      .replaceAll(formatTag(newSelected), "");
+  }
+
+  await router
+    .push({ name: "search", query: { q: newQuery.trim() } })
+    .catch(() => console.warn("Duplicated navigation"));
+}
 </script>
 
 <style>
@@ -377,5 +468,26 @@ function showTagNameChangeDialog(tagId: string) {
 .v-application--is-ltr .v-navigation-drawer .v-list-item__action {
   margin-top: 0;
   margin-bottom: 0;
+}
+
+.tagButton .tagButtonCorner {
+  position: absolute;
+  background-color: #00000052;
+  height: 100%;
+  left: 0;
+  transition: width 100ms;
+}
+
+.v-list--nav:not(.shiftPressed) .tagButton:not(.tagSelected) .tagButtonCorner {
+  width: 0;
+}
+.v-list--nav:not(.shiftPressed) .tagButton.tagSelected .tagButtonCorner {
+  width: 20px;
+}
+.v-list--nav.shiftPressed .tagButton:not(.tagSelected) .tagButtonCorner {
+  width: 5px;
+}
+.v-list--nav.shiftPressed .tagButton.tagSelected .tagButtonCorner {
+  width: 15px;
 }
 </style>
