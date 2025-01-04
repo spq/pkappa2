@@ -163,53 +163,49 @@
         >
         <v-tooltip location="bottom">
           <template #activator="{ props }">
-            <span v-bind="props">
-              <v-btn
-                icon
-                :disabled="prevStreamId == null"
-                :to="
-                  prevStreamId == null
-                    ? {}
-                    : {
-                        name: 'stream',
-                        query: {
-                          q: $route.query.q,
-                          p: $route.query.p,
-                          converter: $route.query.converter,
-                        },
-                        params: { streamId: prevStreamId },
-                      }
-                "
-              >
-                <v-icon>mdi-chevron-left</v-icon>
-              </v-btn>
-            </span>
+            <v-btn
+              variant="plain"
+              icon="mdi-chevron-left"
+              v-bind="props"
+              :disabled="prevStreamId == null"
+              :to="
+                prevStreamId == null
+                  ? {}
+                  : {
+                      name: 'stream',
+                      query: {
+                        q: $route.query.q,
+                        p: $route.query.p,
+                        converter: $route.query.converter,
+                      },
+                      params: { streamId: prevStreamId },
+                    }
+              "
+            />
           </template>
           <span>Previous Stream</span>
         </v-tooltip>
         <v-tooltip location="bottom">
           <template #activator="{ props }">
-            <span v-bind="props">
-              <v-btn
-                icon
-                :disabled="nextStreamId == null"
-                :to="
-                  nextStreamId == null
-                    ? {}
-                    : {
-                        name: 'stream',
-                        query: {
-                          q: $route.query.q,
-                          p: $route.query.p,
-                          converter: $route.query.converter,
-                        },
-                        params: { streamId: nextStreamId },
-                      }
-                "
-              >
-                <v-icon>mdi-chevron-right</v-icon>
-              </v-btn>
-            </span>
+            <v-btn
+              variant="plain"
+              icon="mdi-chevron-right"
+              v-bind="props"
+              :disabled="nextStreamId == null"
+              :to="
+                nextStreamId == null
+                  ? {}
+                  : {
+                      name: 'stream',
+                      query: {
+                        q: $route.query.q,
+                        p: $route.query.p,
+                        converter: $route.query.converter,
+                      },
+                      params: { streamId: nextStreamId },
+                    }
+              "
+            />
           </template>
           <span>Next Stream</span>
         </v-tooltip>

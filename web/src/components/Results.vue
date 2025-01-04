@@ -123,14 +123,14 @@
               icon
               :disabled="streams.page == 0"
               v-bind="props"
-              @click="
-                $router.push({
+              variant="plain"
+              :to="{
                   name: 'search',
                   query: {
                     q: $route.query.q,
                     p: (Number($route.query.p ?? 0) - 1).toString(),
                   },
-                })
+                }
               "
             >
               <v-icon>mdi-chevron-left</v-icon>
@@ -144,14 +144,14 @@
               icon
               :disabled="!streams.result.MoreResults"
               v-bind="props"
-              @click="
-                $router.push({
+              variant="plain"
+              :to="{
                   name: 'search',
                   query: {
                     q: $route.query.q,
                     p: (Number($route.query.p ?? 0) + 1).toString(),
                   },
-                })
+                }
               "
             >
               <v-icon>mdi-chevron-right</v-icon>
@@ -174,13 +174,12 @@
           >
           <v-col class="shrink">
             <v-btn
-              @click="
-                $router.push({
+              :to="{
                   name: 'search',
                   query: {
                     q: `data:\x22${regexEscape($route.query.q as string)}\x22`,
                   },
-                })
+                }
               "
               >Search for the input</v-btn
             >
