@@ -321,14 +321,12 @@ const inQuery = (name: string) => {
 };
 
 document.onkeydown = function (e) {
-  if (
-    e.shiftKey &&
-    ((e.target as HTMLElement).tagName.toUpperCase() != "INPUT" ||
-      (e.target as HTMLElement).tagName === "TEXTAREA" ||
-      (e.target as HTMLElement).isContentEditable)
-  ) {
-    shiftPressed.value = true;
-  }
+  if (!e.shiftKey) return;
+  const t = e.target as HTMLElement;
+  const tn = t.tagName.toLowerCase();
+  if (tn === "input") return;
+  if (tn === "textarea" && t.isContentEditable) return;
+  shiftPressed.value = true;
 };
 
 document.onkeyup = function (e) {
