@@ -29,9 +29,7 @@ export default defineConfig({
     }),
     checker({
       typescript: true,
-      vueTsc: {
-        tsconfigPath: "tsconfig.app.json",
-      },
+      vueTsc: true,
       eslint: {
         lintCommand: "eslint .",
         useFlatConfig: true,
@@ -48,6 +46,7 @@ export default defineConfig({
       },
     }),
   ],
+  define: { 'process.env': {} },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

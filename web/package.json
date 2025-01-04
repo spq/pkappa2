@@ -29,14 +29,13 @@
     "vuetify": "^3.7.6"
   },
   "devDependencies": {
-    "@tsconfig/node20": "^20.1.4",
+    "@eslint/js": "^9.17.0",
+    "@tsconfig/node22": "^22.0.0",
     "@types/eslint": "^9.6.1",
     "@types/moo": "^0.5.9",
     "@types/nearley": "^2.11.5",
     "@types/node": "^22.10.2",
     "@types/webpack-env": "^1.18.5",
-    "@typescript-eslint/eslint-plugin": "^8.18.2",
-    "@typescript-eslint/parser": "^8.18.2",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/eslint-config-typescript": "^14.1.4",
     "@vue/tsconfig": "^0.7.0",
@@ -44,7 +43,6 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-vue": "^9.32.0",
     "eslint-plugin-vuetify": "^2.5.1",
-    "globals": "^15.14.0",
     "npm-run-all2": "^7.0.2",
     "pinia": "^2.3.0",
     "prettier": "^3.4.2",
@@ -59,7 +57,6 @@
     "vite-plugin-checker": "^0.8.0",
     "vite-plugin-node-polyfills": "^0.22.0",
     "vite-plugin-vuetify": "^2.0.4",
-    "vue-eslint-parser": "^9.4.3",
     "vue-router": "^4.5.0",
     "vue-tsc": "^2.2.0"
   }
