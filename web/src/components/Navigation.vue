@@ -1,5 +1,5 @@
 <template>
-  <v-list dense nav>
+  <v-list dense nav :class="{ shiftPressed: shiftPressed }">
     <v-list-item link dense exact :to="{ name: 'home' }">
       <v-list-item-icon></v-list-item-icon>
       <v-list-item-icon>
@@ -47,7 +47,8 @@
             link
             dense
             exact
-            :class="shiftPressedIndicator"
+            class="tagButton"
+            :class="{ tagSelected: inQuery(tag.Name) }"
             :to="{
               name: 'search',
               query: {
@@ -66,7 +67,7 @@
                   tag.Name.substr(tagType.key.length + 1)
                 }}</v-list-item-title
               >
-              <div :style="filterSelected(tag.Name)"></div>
+              <div class="tagButtonCorner"></div>
             </v-list-item-content>
             <v-menu offset-y bottom open-on-hover right>
               <template #activator="{ on, attrs }">
@@ -308,31 +309,15 @@ const moreOpen =
 const groupedTags = computed(() => store.groupedTags);
 const status = computed(() => store.status);
 const shiftPressed = ref(false);
-const shiftPressedIndicator = computed(() => {
-  return shiftPressed.value ? "shiftPressed" : "shiftNotPressed";
-});
-
-const filterSelected = (tagName: string) => {
-  return {
-    position: "absolute",
-    backgroundColor: "#00000052",
-    width: inQuery(tagForURI(tagName)) ? "20px" : "0px",
-    height: "100%",
-    left: "0px",
-    transition: "width 100ms",
-  };
-};
 
 const inQuery = (name: string) => {
-  if (name.split(":")[1]) {
-    var [key, val] = name.split(":");
-    //Replace `"` from passed tags with spaces
-    return analyze(route.query?.q as string)[key]?.find(
-      (value) => value?.pieces?.value === (val.replaceAll('"', "") ?? ""),
-    );
-  } else {
-    return false;
-  }
+  name = tagForURI(name);
+  if (!name.split(":")[1]) return false;
+  var [key, val] = name.split(":");
+  //Replace `"` from passed tags with spaces
+  return analyze(route.query?.q as string)[key]?.find(
+    (value) => value?.pieces?.value === (val.replaceAll('"', "") ?? ""),
+  );
 };
 
 document.onkeydown = function (e) {
@@ -473,21 +458,24 @@ async function appendOrRemoveFilter(e: Event) {
   margin-bottom: 0;
 }
 
-.shiftPressed {
-  margin-left: 5px;
-  margin-right: 2.5px;
-  transition:
-    margin 100ms,
-    box-shadow 100ms;
-  box-shadow: rgb(0, 0, 0, 0.6) 0px 5px 15px;
+.tagButton .tagButtonCorner {
+  position: absolute;
+  background-color: #00000052;
+  height: 100%;
+  left: 0;
+  transition: width 100ms;
 }
 
-.shiftNotPressed {
-  margin-left: 0px;
-  margin-right: 0px;
-  transition:
-    margin 100ms,
-    box-shadow 100ms;
-  box-shadow: none;
+.v-list--nav:not(.shiftPressed) .tagButton:not(.tagSelected) .tagButtonCorner {
+  width: 0;
+}
+.v-list--nav:not(.shiftPressed) .tagButton.tagSelected .tagButtonCorner {
+  width: 20px;
+}
+.v-list--nav.shiftPressed .tagButton:not(.tagSelected) .tagButtonCorner {
+  width: 5px;
+}
+.v-list--nav.shiftPressed .tagButton.tagSelected .tagButtonCorner {
+  width: 15px;
 }
 </style>
