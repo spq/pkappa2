@@ -55,7 +55,7 @@
                 q: tagForURI(tag.Name),
               },
             }"
-            @click.shift="appendOrRemoveFilter"
+            @click.shift.prevent="appendOrRemoveFilter(tag.Name)"
           >
             <v-list-item-content>
               <v-list-item-title
@@ -386,17 +386,11 @@ function showTagNameChangeDialog(tagId: string) {
   EventBus.emit("showTagNameChangeDialog", tagId);
 }
 
-async function appendOrRemoveFilter(e: Event) {
+async function appendOrRemoveFilter(name: string) {
   var query = (route?.query?.q as string) ?? "";
 
-  e.preventDefault();
-  const url =
-    (e.target as HTMLAnchorElement).hash ??
-    ((e.target as HTMLElement).offsetParent as HTMLAnchorElement).hash;
-  const queryParam = url?.replace("#/search?q=", "") ?? "";
-
   const newSelected = Object.values(
-    analyze(decodeURIComponent(queryParam).trim()),
+    analyze(decodeURIComponent(tagForURI(name)).trim()),
   ).flatMap((e) => e.map((f) => f.pieces))[0];
   const current = Object.values(analyze(query)).flatMap((e) =>
     e.map((f) => f.pieces),
