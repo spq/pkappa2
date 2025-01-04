@@ -481,7 +481,7 @@ const chartTypes: { [key: string]: ChartType } = {
 
 const chartType = computed({
   get: () => {
-    return route.query.t as string || Object.keys(chartTypes)[0];
+    return (route.query.t as string) || Object.keys(chartTypes)[0];
   },
   set: (v: string) => {
     void router.push({

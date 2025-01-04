@@ -186,7 +186,9 @@ const tagColors = computed(() => {
 });
 const searchBoxFieldRect = computed(() => {
   const searchBoxContainer = searchBoxField.value?.$el as HTMLElement;
-  const searchBoxElement = searchBoxContainer?.querySelector("div.v-input__control");
+  const searchBoxElement = searchBoxContainer?.querySelector(
+    "div.v-input__control",
+  );
   if (!searchBoxElement) {
     return {
       width: 0,
