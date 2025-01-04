@@ -1,13 +1,10 @@
-import { createApp, h } from "vue";
+import { createApp } from "vue";
 import { registerPlugins } from "@/plugins";
 import App from "./App.vue";
 
 // Vue.config.productionTip = process.env.NODE_ENV == "production";
 
-const app = createApp({
-  MODE: 3,
-  render: () => h(App),
-});
+const app = createApp(App);
 
 registerPlugins(app);
 
