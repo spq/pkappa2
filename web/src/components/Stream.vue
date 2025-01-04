@@ -230,26 +230,25 @@
       <v-container fluid>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Client:</v-col>
-          <v-col
-            cols="2"
-            class="text-body-2"
-            :title="`${stream.stream.Stream.Client.Host}:${stream.stream.Stream.Client.Port} (${stream.stream.Stream.Client.Bytes} Bytes)`"
-            >{{ stream.stream.Stream.Client.Host }}:{{
-              stream.stream.Stream.Client.Port
-            }}
-            ({{
-              prettyBytes(stream.stream.Stream.Client.Bytes, {
-                maximumFractionDigits: 1,
-                binary: true,
-              })
-            }})</v-col
+          <v-col cols="2" class="text-body-2"
+            ><span
+              :title="`${stream.stream.Stream.Client.Host}:${stream.stream.Stream.Client.Port} (${stream.stream.Stream.Client.Bytes} Bytes)`"
+              >{{ stream.stream.Stream.Client.Host }}:{{
+                stream.stream.Stream.Client.Port
+              }}
+              ({{
+                prettyBytes(stream.stream.Stream.Client.Bytes, {
+                  maximumFractionDigits: 1,
+                  binary: true,
+                })
+              }})</span
+            ></v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
-          <v-col
-            cols="3"
-            class="text-body-2"
-            :title="formatDateLong(stream.stream.Stream.FirstPacket)"
-            >{{ formatDate(stream.stream.Stream.FirstPacket) }}</v-col
+          <v-col cols="3" class="text-body-2"
+            ><span :title="formatDateLong(stream.stream.Stream.FirstPacket)">{{
+              formatDate(stream.stream.Stream.FirstPacket)
+            }}</span></v-col
           >
           <v-col cols="1" class="text-subtitle-2"
             >{{
@@ -271,26 +270,25 @@
         </v-row>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Server:</v-col>
-          <v-col
-            cols="2"
-            class="text-body-2"
-            :title="`${stream.stream.Stream.Server.Host}:${stream.stream.Stream.Server.Port} (${stream.stream.Stream.Server.Bytes} Bytes)`"
-            >{{ stream.stream.Stream.Server.Host }}:{{
-              stream.stream.Stream.Server.Port
-            }}
-            ({{
-              prettyBytes(stream.stream.Stream.Server.Bytes, {
-                maximumFractionDigits: 1,
-                binary: true,
-              })
-            }})</v-col
+          <v-col cols="2" class="text-body-2"
+            ><span
+              :title="`${stream.stream.Stream.Server.Host}:${stream.stream.Stream.Server.Port} (${stream.stream.Stream.Server.Bytes} Bytes)`"
+              >{{ stream.stream.Stream.Server.Host }}:{{
+                stream.stream.Stream.Server.Port
+              }}
+              ({{
+                prettyBytes(stream.stream.Stream.Server.Bytes, {
+                  maximumFractionDigits: 1,
+                  binary: true,
+                })
+              }})</span
+            ></v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
-          <v-col
-            cols="3"
-            class="text-body-2"
-            :title="formatDateLong(stream.stream.Stream.LastPacket)"
-            >{{ formatDate(stream.stream.Stream.LastPacket) }}</v-col
+          <v-col cols="3" class="text-body-2"
+            ><span :title="formatDateLong(stream.stream.Stream.LastPacket)">{{
+              formatDate(stream.stream.Stream.LastPacket)
+            }}</span></v-col
           >
           <v-col cols="1" class="text-body-2"
             ><span v-if="streamTags.service.length == 0">{{

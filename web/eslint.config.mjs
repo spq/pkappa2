@@ -19,7 +19,7 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...pluginVue.configs["flat/strongly-recommended"],
-  ...vuetify.configs["flat/base"],
+  ...vuetify.configs["flat/recommended"],
   ...vueTsEslintConfig({ extends: ["recommendedTypeChecked"] }),
   {
     // https://typescript-eslint.io/rules/
