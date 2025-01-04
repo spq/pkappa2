@@ -1,4 +1,4 @@
-import { defineStore } from "pinia";
+import { createPinia, defineStore } from "pinia";
 import axios from "axios";
 import { useStreamsStore } from "./streams";
 import { useStreamStore } from "./stream";
@@ -185,3 +185,5 @@ export function handleAxiosDefaultError(err: unknown) {
     );
   else throw err;
 }
+
+export default createPinia();

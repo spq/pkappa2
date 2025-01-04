@@ -1,9 +1,9 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="refreshConverters">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="refreshConverters">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -13,14 +13,19 @@
     <v-data-table
       :headers="headers"
       :items="items"
-      item-key="name"
+      v-model:expanded="expanded"
+      item-value="name"
+      items-per-page="-1"
       single-expand
       show-expand
-      dense
+      expand-on-click
+      density="compact"
       disable-pagination
-      @click:row="rowClick"
+      disable-filtering
+      hide-default-footer
+      hover
     >
-      <template #expanded-item="{ item }">
+      <template #expanded-row="{ item }">
         <td colspan="4">
           <v-chip
             v-for="process in item.converter.Processes"
@@ -28,12 +33,13 @@
             label
             link
             class="ma-2"
+            variant="flat"
             :color="process.Running ? 'green' : 'yellow'"
             @click="showErrorLog(process, item.converter)"
           >
-            <v-tooltip bottom>
-              <template #activator="{ on, attrs }">
-                <v-icon v-if="process.Errors > 0" v-bind="attrs" v-on="on">
+            <v-tooltip location="bottom">
+              <template #activator="{ props }">
+                <v-icon v-if="process.Errors > 0" v-bind="props">
                   mdi-alert-outline
                 </v-icon>
               </template>
@@ -44,16 +50,15 @@
             </v-tooltip>
             PID: {{ process.Pid }}
           </v-chip>
-          <v-tooltip bottom>
-            <template #activator="{ on, attrs }">
+          <v-tooltip location="bottom">
+            <template #activator="{ props }">
               <v-btn
-                v-bind="attrs"
-                icon
-                v-on="on"
+                variant="plain"
+                density="compact"
+                icon="mdi-restart-alert"
+                v-bind="props"
                 @click="confirmConverterReset(item.converter)"
-              >
-                <v-icon>mdi-restart-alert</v-icon>
-              </v-btn>
+              ></v-btn>
             </template>
             <span>Reset Converter</span>
           </v-tooltip>
@@ -61,7 +66,7 @@
       </template>
     </v-data-table>
     <v-dialog
-      :value="shownProcess !== null"
+      :model-value="shownProcess !== null"
       width="600px"
       @click:outside="shownProcess = null"
     >
@@ -81,7 +86,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="shownProcess = null"> Close </v-btn>
+          <v-btn variant="text" @click="shownProcess = null"> Close </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -95,30 +100,29 @@ import APIClient, {
   ProcessStats,
   ProcessStderr,
 } from "@/apiClient";
-import ToolBar from "./ToolBar.vue";
 import { computed, onMounted, ref } from "vue";
 import { useRootStore } from "@/stores";
-import { DataTableItemProps } from "vuetify";
 
 const store = useRootStore();
 const headers = [
-  { text: "Name", value: "name", cellClass: "cursor-pointer" },
+  { title: "Name", value: "name", cellClass: "cursor-pointer" },
   {
-    text: "Cached Stream Count",
+    title: "Cached Stream Count",
     value: "cachedStreamCount",
     cellClass: "cursor-pointer",
   },
   {
-    text: "Running Processes",
+    title: "Running Processes",
     value: "runningProcesses",
     cellClass: "cursor-pointer",
   },
   {
-    text: "Failed Processes",
+    title: "Failed Processes",
     value: "failedProcesses",
     cellClass: "cursor-pointer",
   },
 ];
+const expanded = ref<string[]>([]);
 const shownProcess = ref<ProcessStats | null>(null);
 const loadingStderr = ref(false);
 const fetchStderrError = ref<string | null>(null);
@@ -149,10 +153,6 @@ function refreshConverters() {
   store.updateConverters().catch((err: Error) => {
     EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
-}
-
-function rowClick(item: unknown, handler: DataTableItemProps) {
-  handler.expand(!handler.isExpanded);
 }
 
 function confirmConverterReset(converter: ConverterStatistics) {

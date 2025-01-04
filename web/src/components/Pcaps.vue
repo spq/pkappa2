@@ -4,21 +4,22 @@
       :headers="headers"
       :items="store.pcaps || []"
       :loading="store.pcaps === null"
-      :footer-props="{
-        itemsPerPageOptions: [20, 50, 100, -1],
-        showFirstLastPage: true,
-      }"
-      dense
+      :items-per-page="20"
+      :items-per-page-options="[20, 50, 100, -1]"
+      hover
+      density="compact"
     >
       <template #[`item.download`]="{ item }"
         ><v-btn
+          variant="plain"
+          density="compact"
           :href="`/api/download/pcap/${item.Filename}`"
           icon
-          @click.native.stop
         >
           <v-icon>mdi-download</v-icon>
         </v-btn></template
       >
+      <!-- eslint-disable vue/no-v-for-template-key-on-child -->
       <template
         v-for="field of [
           'ParseTime',
@@ -51,40 +52,40 @@ import prettyBytes from "pretty-bytes";
 const store = useRootStore();
 const headers = [
   {
-    text: "File Name",
+    title: "File Name",
     value: "Filename",
   },
   {
-    text: "First Packet Time",
+    title: "First Packet Time",
     value: "PacketTimestampMin",
   },
   {
-    text: "Last Packet Time",
+    title: "Last Packet Time",
     value: "PacketTimestampMax",
   },
   {
-    text: "Packet Count",
+    title: "Packet Count",
     value: "PacketCount",
   },
   {
-    text: "File Size",
+    title: "File Size",
     value: "Filesize",
   },
   {
-    text: "Parse Time",
+    title: "Parse Time",
     value: "ParseTime",
     align: "end",
     class: "pr-0",
     cellClass: "pr-0",
   },
   {
-    text: "",
+    title: "",
     value: "download",
     sortable: false,
     class: ["px-0", "w0"],
     cellClass: ["px-0", "w0"],
   },
-];
+] as const;
 
 onMounted(() => {
   store.updatePcaps().catch((err: Error) => {

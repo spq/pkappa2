@@ -1,9 +1,9 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="updateStatus">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="updateStatus">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -12,20 +12,19 @@
     </ToolBar>
     <v-card>
       <v-card-title>Status</v-card-title>
-      <v-simple-table>
+      <v-table density="compact">
         <tbody>
           <tr v-for="(value, name) in store.status || []" :key="name">
             <th>{{ name }}</th>
             <td width="100%">{{ value }}</td>
           </tr>
         </tbody>
-      </v-simple-table>
+      </v-table>
     </v-card>
   </div>
 </template>
 
 <script lang="ts" setup>
-import ToolBar from "./ToolBar.vue";
 import { onMounted } from "vue";
 import { useRootStore } from "@/stores";
 import { EventBus } from "./EventBus";

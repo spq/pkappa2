@@ -1,12 +1,14 @@
-import globals from "globals";
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 import pluginVue from "eslint-plugin-vue";
-import vueParser from "vue-eslint-parser";
+import vuetify from "eslint-plugin-vuetify";
 import vueTsEslintConfig from "@vue/eslint-config-typescript";
 
 export default tseslint.config(
+  {
+    files: ["**/*.{ts,mts,tsx,vue}"],
+  },
   {
     ignores: [
       "**/*.guard.ts",
@@ -15,31 +17,17 @@ export default tseslint.config(
       "src/parser/query.ts",
     ],
   },
+  eslint.configs.recommended,
+  ...pluginVue.configs["flat/strongly-recommended"],
+  ...vuetify.configs["flat/recommended"],
+  ...vueTsEslintConfig({ extends: ["recommendedTypeChecked"] }),
   {
-    extends: [
-      eslint.configs.recommended,
-      ...pluginVue.configs["flat/vue2-strongly-recommended"],
-      ...vueTsEslintConfig(),
-      ...tseslint.configs.recommendedTypeChecked,
-    ],
-    languageOptions: {
-      parser: vueParser,
-      globals: globals.browser,
-      parserOptions: {
-        ecmaVersion: 2021,
-        extraFileExtensions: [".vue"],
-        sourceType: "module",
-        parser: tseslint.parser,
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-    files: ["**/*.{ts,vue}"],
+    // https://typescript-eslint.io/rules/
     rules: {
       "no-console": "off",
-      "no-debugger": process.env.NODE_ENV === "production" ? "warn" : "off",
       "vue/multi-word-component-names": "off",
       "vue/no-reserved-component-names": "off",
+      "vue/prefer-import-from-vue": "off",
     },
   },
   eslintConfigPrettier,

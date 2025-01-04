@@ -18,10 +18,6 @@ updates:
     groups:
       production-dependencies:
         dependency-type: "production"
-        exclude-patterns:
-          - "vue"
-          - "vue-router"
-          - "vuetify"
       development-dependencies:
         dependency-type: "development"
 

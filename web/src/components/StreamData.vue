@@ -96,18 +96,18 @@ const inlineAscii = (chunk: Data) => {
     const highlights: number[][] = [];
     for (const regex of highlightMatches) {
       if (regex === undefined) continue;
-      chunkData.matchAll(regex)?.forEach((match) => {
+      for (const match of chunkData.matchAll(regex)) {
         highlights.push([match.index, match[0].length]);
-      });
+      }
     }
     highlights.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     let highlightIndex = 0;
     for (const [index, length] of highlights) {
+      asciiEscaped[index] =
+        `<span class="mark" data-offset="${index}">${asciiEscaped[index]}`;
       if (highlightIndex > 0) {
         asciiEscaped[index] = `</span>${asciiEscaped[index]}`;
       }
-      asciiEscaped[index] =
-        `<span class="mark" data-offset="${index}">${asciiEscaped[index]}`;
       asciiEscaped[index + length - 1] =
         `${asciiEscaped[index + length - 1]}</span>`;
       if (highlightIndex < highlights.length - 1) {
@@ -191,14 +191,14 @@ const hexdump = (b64: string) => {
     margin-left: 2em;
   }
 }
-.server >>> .mark {
+.server :deep(.mark) {
   background-color: #9090ff;
 }
 .client {
   color: #800000;
   background-color: #faeeed;
 }
-.client >>> .mark {
+.client :deep(.mark) {
   background-color: #ff8e5e;
 }
 
