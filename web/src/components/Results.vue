@@ -125,13 +125,12 @@
               v-bind="props"
               variant="plain"
               :to="{
-                  name: 'search',
-                  query: {
-                    q: $route.query.q,
-                    p: (Number($route.query.p ?? 0) - 1).toString(),
-                  },
-                }
-              "
+                name: 'search',
+                query: {
+                  q: $route.query.q,
+                  p: (Number($route.query.p ?? 0) - 1).toString(),
+                },
+              }"
             >
               <v-icon>mdi-chevron-left</v-icon>
             </v-btn>
@@ -146,13 +145,12 @@
               v-bind="props"
               variant="plain"
               :to="{
-                  name: 'search',
-                  query: {
-                    q: $route.query.q,
-                    p: (Number($route.query.p ?? 0) + 1).toString(),
-                  },
-                }
-              "
+                name: 'search',
+                query: {
+                  q: $route.query.q,
+                  p: (Number($route.query.p ?? 0) + 1).toString(),
+                },
+              }"
             >
               <v-icon>mdi-chevron-right</v-icon>
             </v-btn>
@@ -175,12 +173,11 @@
           <v-col class="shrink">
             <v-btn
               :to="{
-                  name: 'search',
-                  query: {
-                    q: `data:\x22${regexEscape($route.query.q as string)}\x22`,
-                  },
-                }
-              "
+                name: 'search',
+                query: {
+                  q: `data:\x22${regexEscape($route.query.q as string)}\x22`,
+                },
+              }"
               >Search for the input</v-btn
             >
           </v-col></v-row
