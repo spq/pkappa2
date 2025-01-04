@@ -1,9 +1,9 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="fetchGraphLocal">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="fetchGraphLocal">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
@@ -14,8 +14,9 @@
           v-model="chartType"
           :items="Object.keys(chartTypes)"
           flat
-          solo
-          dense
+          variant="plain"
+          density="compact"
+          min-width="200px"
           label="Type"
         ></v-select>
         <v-select
@@ -23,37 +24,41 @@
           :items="chartTagOptions"
           multiple
           flat
-          solo
-          dense
+          variant="plain"
+          density="compact"
+          min-width="200px"
           label="Grouping"
         >
-          <template #item="{ item, attrs, on }">
-            <v-list-item v-if="item.value.startsWith('header/')" dense>
-              <v-list-item-content>
-                <v-subheader
-                  >{{ item.text }}
-                  <v-btn
-                    x-small
-                    link
-                    text
-                    @click="setChartTagOptions(item.value.substring(7), true)"
-                    >All</v-btn
-                  >
-                  <v-btn
-                    x-small
-                    link
-                    text
-                    @click="setChartTagOptions(item.value.substring(7), false)"
-                    >None</v-btn
-                  ></v-subheader
+          <template #item="{ item, props }">
+            <v-list-item
+              v-if="item.value.startsWith('header/')"
+              density="compact"
+            >
+              <v-list-subheader
+                >{{ item.title }}
+                <v-btn
+                  size="x-small"
+                  variant="text"
+                  @click="setChartTagOptions(item.value.substring(7), true)"
+                  >All</v-btn
                 >
-              </v-list-item-content>
+                <v-btn
+                  size="x-small"
+                  variant="text"
+                  @click="setChartTagOptions(item.value.substring(7), false)"
+                  >None</v-btn
+                ></v-list-subheader
+              >
             </v-list-item>
-            <v-list-item v-else v-slot="{ active }" v-bind="attrs" v-on="on">
-              <v-list-item-action>
-                <v-checkbox :ripple="false" :input-value="active"></v-checkbox>
-              </v-list-item-action>
-              <v-list-item-content>{{ item.text }}</v-list-item-content>
+            <v-list-item density="compact" v-else v-bind="props">
+              <template #prepend="{ isActive }">
+                <v-list-item-action start>
+                  <v-checkbox-btn
+                    :ripple="false"
+                    :model-value="isActive"
+                  ></v-checkbox-btn>
+                </v-list-item-action>
+              </template>
             </v-list-item>
           </template>
         </v-select>
@@ -63,7 +68,7 @@
       v-if="graphStore.running"
       type="image"
     ></v-skeleton-loader>
-    <v-alert v-else-if="graphStore.error" type="error" dense>{{
+    <v-alert v-else-if="graphStore.error" type="error" density="compact">{{
       graphStore.error
     }}</v-alert>
     <div v-else-if="chartData != null && chartOptions != null">
@@ -80,16 +85,15 @@
 </template>
 
 <script lang="ts" setup>
-import ToolBar from "./ToolBar.vue";
 import { computed, nextTick, ref, onMounted, watch } from "vue";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { GraphType, useGraphStore } from "@/stores/graph";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import {
   default as VueApexCharts,
   VueApexChartsComponent,
-} from "vue-apexcharts";
+} from "vue3-apexcharts";
 import * as ApexCharts from "apexcharts";
 import { getColorScheme, onColorSchemeChange } from "../lib/darkmode";
 
@@ -477,7 +481,7 @@ const chartTypes: { [key: string]: ChartType } = {
 
 const chartType = computed({
   get: () => {
-    return route.query.t as string;
+    return (route.query.t as string) || Object.keys(chartTypes)[0];
   },
   set: (v: string) => {
     void router.push({
@@ -514,19 +518,19 @@ const chartTagOptions = computed(() => {
   for (const typ of types) {
     let first = true;
     for (const t of store.tags) {
-      if (t.Name.startsWith(typ.toLowerCase() + "/")) {
-        if (first) {
-          first = false;
-          options.push({
-            text: typ.charAt(0).toUpperCase() + typ.substring(1) + "s",
-            value: `header/${typ}`,
-          });
-        }
+      const pos = t.Name.indexOf("/");
+      if (t.Name.slice(0, pos) != typ) continue;
+      if (first) {
+        first = false;
         options.push({
-          text: t.Name,
-          value: t.Name,
+          title: typ.charAt(0).toUpperCase() + typ.substring(1) + "s",
+          value: `header/${typ}`,
         });
       }
+      options.push({
+        title: t.Name.slice(pos + 1),
+        value: t.Name,
+      });
     }
   }
   return options;
@@ -696,6 +700,8 @@ function setChartTagOptions(typ: string, active: boolean) {
       }
     }
     chartTags.value = sel;
+  }).catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update tags: ${err.message}`);
   });
 }
 

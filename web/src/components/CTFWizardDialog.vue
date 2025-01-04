@@ -4,18 +4,18 @@
       <v-card-title>
         <span class="text-h5">CTF Setup Wizards</span>
       </v-card-title>
-      <v-tabs v-model="tab" icons-and-text>
-        <v-tab href="#tab_flag_regex">
+      <v-tabs v-model="tab" stacked color="primary">
+        <v-tab value="tab_flag_regex">
           Setup Flag tags
           <v-icon>mdi-flag</v-icon>
         </v-tab>
-        <v-tab href="#tab_service_by_port">
+        <v-tab value="tab_service_by_port">
           Setup Service ports
           <v-icon>mdi-cloud-outline</v-icon>
         </v-tab>
       </v-tabs>
-      <v-tabs-items v-model="tab">
-        <v-tab-item value="tab_service_by_port">
+      <v-tabs-window v-model="tab">
+        <v-tabs-window-item value="tab_service_by_port">
           <v-form>
             <v-card-text>
               This wizard will create a service with the given port(s). Enter
@@ -36,9 +36,9 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn text @click="visible = false">Cancel</v-btn>
+              <v-btn variant="text" @click="visible = false">Cancel</v-btn>
               <v-btn
-                text
+                variant="text"
                 :disabled="
                   serviceName == '' ||
                   !goodServicePorts ||
@@ -52,8 +52,8 @@
               >
             </v-card-actions>
           </v-form>
-        </v-tab-item>
-        <v-tab-item value="tab_flag_regex">
+        </v-tabs-window-item>
+        <v-tabs-window-item value="tab_flag_regex">
           <v-form>
             <v-card-text>
               This wizard will create the two tags {{ flagInName }} and
@@ -70,9 +70,9 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn text @click="visible = false">Cancel</v-btn>
+              <v-btn variant="text" @click="visible = false">Cancel</v-btn>
               <v-btn
-                text
+                variant="text"
                 :disabled="!goodFlagRegex || flag_regex_loading"
                 :loading="flag_regex_loading"
                 :color="flag_regex_error ? 'error' : 'primary'"
@@ -82,8 +82,8 @@
               >
             </v-card-actions>
           </v-form>
-        </v-tab-item>
-      </v-tabs-items>
+        </v-tabs-window-item>
+      </v-tabs-window>
     </v-card>
   </v-dialog>
 </template>
@@ -135,7 +135,7 @@ const goodFlagRegex = computed(() => {
 
 function openDialog() {
   visible.value = true;
-  tab.value = "flag_regex";
+  tab.value = "tab_flag_regex";
 
   flag_regex_loading.value = false;
   flag_regex_error.value = false;

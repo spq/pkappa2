@@ -2,7 +2,7 @@
   <div>
     <v-toolbar
       id="toolbarReal"
-      dense
+      density="compact"
       flat
       :style="{
         position: 'fixed',

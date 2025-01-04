@@ -91,7 +91,6 @@ export function setupWebsocket() {
       const store = useRootStore();
       const streamStore = useStreamStore();
       const streamsStore = useStreamsStore();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const e = JSON.parse(event.data);
       if (!isEvent(e)) {
         console.error("Invalid event:", event.data);
