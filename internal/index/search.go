@@ -748,7 +748,7 @@ conditions:
 		lookups = append(lookups, func() ([]uint32, error) {
 			return []uint32{idx}, nil
 		})
-	} else {
+	} else if minIDFilter != 0 || maxIDFilter != math.MaxUint64 {
 		lookups = append(lookups, func() ([]uint32, error) {
 			lookup := []uint32(nil)
 			for id, index := range r.containedStreamIds {
