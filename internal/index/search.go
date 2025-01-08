@@ -1103,12 +1103,9 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 				if err != nil {
 					return nil, false, nil, err
 				}
-				if queryPart.possible && len(queryPart.lookups) == 0 && sortingLookup != nil {
-					queryPart.lookups = append(queryPart.lookups, sortingLookup)
-				}
 				queryParts = append(queryParts, queryPart)
 			}
-			err := idx.searchStreams(ctx, &results, allResults, queryParts, groupingData, sorter, resultLimit)
+			err := idx.searchStreams(ctx, &results, allResults, queryParts, groupingData, sorter, resultLimit, sortingLookup)
 			if err != nil {
 				return nil, false, nil, err
 			}
@@ -1129,20 +1126,28 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 	return results.streams[skip:], results.resultDropped != 0, dataRegexes, nil
 }
 
-func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
+func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint, sortingLookup func() ([]uint32, error)) error {
 	// check if all queries use lookups, if not don't evaluate them
 	useLookups := true
-	allImpossible := true
+	possibleQueryParts := 0
 	for _, qp := range queryParts {
-		if qp.possible {
-			allImpossible = false
+		if !qp.possible {
+			continue
 		}
+		possibleQueryParts++
 		if len(qp.lookups) == 0 {
 			useLookups = false
 		}
 	}
-	if allImpossible {
+	switch possibleQueryParts {
+	case 0:
 		return nil
+	case 1:
+		if sortingLookup != nil {
+			useLookups = true
+		}
+	default:
+		sortingLookup = nil
 	}
 	// a map of index to list of sub-queries that matched this id
 	type streamIndex struct {
@@ -1157,6 +1162,13 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 				continue
 			}
 			streamIndexesOfQuery := []uint32(nil)
+			if sortingLookup != nil {
+				newStreamIndexes, err := sortingLookup()
+				if err != nil {
+					return err
+				}
+				streamIndexesOfQuery = newStreamIndexes
+			}
 			for _, l := range qp.lookups {
 				newStreamIndexes, err := l()
 				if err != nil {
@@ -1210,22 +1222,29 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 	}
 
 	// apply filters to lookup results or all streams, if no lookups could be used
-	filterAndAddToResult := func(activeQueryParts bitmask.ShortBitmask, si uint32) error {
+	filterAndAddToResult := func(activeQueryParts bitmask.ShortBitmask, si uint32) (bool, error) {
 		if err := ctx.Err(); err != nil {
-			return err
+			return false, err
 		}
+
+		// check if the sorting and limit would allow any stream
+		limitReached := result.resultDropped != 0 && limit != 0 && uint(len(result.streams)) >= limit
+		if limitReached && sortingLess == nil {
+			return true, nil
+		}
+
 		s, err := r.streamByIndex(si)
 		if err != nil {
-			return err
+			return false, err
 		}
 		ss, err := s.wrap(r, si)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		// check if the sorting and limit would allow this stream
-		if result.resultDropped != 0 && limit != 0 && uint(len(result.streams)) >= limit && (sortingLess == nil || !sortingLess(ss, result.streams[limit-1])) {
-			return nil
+		if limitReached && !sortingLess(ss, result.streams[limit-1]) {
+			return true, nil
 		}
 
 		// check if the sorting within the groupKey allow this stream
@@ -1237,7 +1256,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			if ok {
 				groupPos = pos
 				if sortingLess == nil || !sortingLess(ss, result.streams[pos]) {
-					return nil
+					return false, nil
 				}
 			}
 		}
@@ -1265,7 +1284,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			for _, f := range queryParts[qpIdx].filters {
 				matching, err := f(sc, s)
 				if err != nil {
-					return err
+					return false, err
 				}
 				if !matching {
 					continue queryPart
@@ -1275,7 +1294,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			matchingSearchContexts = append(matchingSearchContexts, sc)
 		}
 		if matchingQueryParts.IsZero() {
-			return nil
+			return false, nil
 		}
 
 		if grouper != nil && len(grouper.vars) != 0 {
@@ -1306,7 +1325,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 				groupPos = pos
 				if sortingLess == nil || !sortingLess(ss, result.streams[pos]) {
 					result.resultDropped++
-					return nil
+					return false, nil
 				}
 			}
 		}
@@ -1323,7 +1342,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			} else {
 				// we have a limit and are worse than the last
 				result.resultDropped++
-				return nil
+				return true, nil
 			}
 		}
 
@@ -1415,7 +1434,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			}
 		}
 		if len(vdv) == 0 {
-			return nil
+			return false, nil
 		}
 		sort.Slice(vdv, func(i, j int) bool {
 			a, b := &vdv[i], &vdv[j]
@@ -1450,7 +1469,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			}
 			d.uses++
 			result.variableAssociation[s.StreamID] = i
-			return nil
+			return false, nil
 		}
 		if freeSlot == len(result.variableData) {
 			result.variableData = append(result.variableData, variableDataCollection{})
@@ -1460,12 +1479,14 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			data: vdv,
 		}
 		result.variableAssociation[s.StreamID] = freeSlot
-		return nil
+		return false, nil
 	}
 	if len(streamIndexes) != 0 {
 		for _, si := range streamIndexes {
-			if err := filterAndAddToResult(si.activeQueryParts, si.si); err != nil {
+			if limitReached, err := filterAndAddToResult(si.activeQueryParts, si.si); err != nil {
 				return err
+			} else if sortingLookup != nil && limitReached {
+				break
 			}
 		}
 	} else {
@@ -1476,7 +1497,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			}
 		}
 		for si, sc := 0, r.StreamCount(); si < sc; si++ {
-			if err := filterAndAddToResult(activeQueryParts, uint32(si)); err != nil {
+			if _, err := filterAndAddToResult(activeQueryParts, uint32(si)); err != nil {
 				return err
 			}
 		}
