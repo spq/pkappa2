@@ -95,8 +95,46 @@ func (r *Reader) readAt(offset int64, d interface{}) error {
 	return err
 }
 
-func (r *Reader) readObject(section section, objectSize, index int, d interface{}) error {
-	return r.readAt(r.calculateOffset(section, objectSize, index), d)
+var isLittleEndian bool
+
+func init() {
+	isLittleEndian = binary.NativeEndian.Uint16([]byte("AB")) == binary.LittleEndian.Uint16([]byte("AB"))
+}
+
+func (r *Reader) streamByIndex(index uint32) (*stream, error) {
+	obj := stream{}
+	var err error
+	var d interface{}
+	if isLittleEndian {
+		d = (*[unsafe.Sizeof(obj)]byte)(unsafe.Pointer(&obj))
+	} else {
+		d = obj
+	}
+	err = r.readAt(r.calculateOffset(sectionStreams, int(unsafe.Sizeof(obj)), int(index)), d)
+	return &obj, err
+}
+
+func (r *Reader) packetByIndex(index uint64) (*packet, error) {
+	obj := packet{}
+	var err error
+	var d interface{}
+	if isLittleEndian {
+		d = (*[unsafe.Sizeof(obj)]byte)(unsafe.Pointer(&obj))
+	} else {
+		d = obj
+	}
+	err = r.readAt(r.calculateOffset(sectionPackets, int(unsafe.Sizeof(obj)), int(index)), d)
+	return &obj, err
+}
+
+func (r *Reader) readLookup(lookup section, index int) (uint32, error) {
+	streamIndex := uint32(0)
+	err := r.readAt(r.calculateOffset(lookup, 4, index), &streamIndex)
+	return streamIndex, err
+}
+
+func (r *Reader) readObjects(section section, d interface{}) error {
+	return r.readAt(r.calculateOffset(section, 0, 0), d)
 }
 
 func (r *Reader) objectCount(section section, objectSize int) int {
@@ -135,11 +173,11 @@ func NewReader(filename string) (*Reader, error) {
 
 		// read imports
 		importFilenames := make([]byte, r.header.Sections[sectionImportFilenames].size())
-		if err := r.readObject(sectionImportFilenames, 0, 0, importFilenames); err != nil {
+		if err := r.readObjects(sectionImportFilenames, importFilenames); err != nil {
 			return err
 		}
 		importEntries := make([]importEntry, r.header.Sections[sectionImports].size()/int64(unsafe.Sizeof(importEntry{})))
-		if err := r.readObject(sectionImports, 0, 0, importEntries); err != nil {
+		if err := r.readObjects(sectionImports, importEntries); err != nil {
 			return err
 		}
 		for _, ie := range importEntries {
@@ -153,15 +191,15 @@ func NewReader(filename string) (*Reader, error) {
 
 		// read hosts
 		v4hosts := make([]byte, r.header.Sections[sectionV4Hosts].size())
-		if err := r.readObject(sectionV4Hosts, 0, 0, v4hosts); err != nil {
+		if err := r.readObjects(sectionV4Hosts, v4hosts); err != nil {
 			return err
 		}
 		v6hosts := make([]byte, r.header.Sections[sectionV6Hosts].size())
-		if err := r.readObject(sectionV6Hosts, 0, 0, v6hosts); err != nil {
+		if err := r.readObjects(sectionV6Hosts, v6hosts); err != nil {
 			return err
 		}
 		hostGroups := make([]hostGroupEntry, r.header.Sections[sectionHostGroups].size()/int64(unsafe.Sizeof(hostGroupEntry{})))
-		if err := r.readObject(sectionHostGroups, 0, 0, hostGroups); err != nil {
+		if err := r.readObjects(sectionHostGroups, hostGroups); err != nil {
 			return err
 		}
 		for _, hg := range hostGroups {
@@ -241,12 +279,6 @@ func (r *Reader) PacketCount() int {
 	return r.objectCount(sectionPackets, int(unsafe.Sizeof(packet{})))
 }
 
-func (r *Reader) readLookup(lookup section, index int) (uint32, error) {
-	streamIndex := uint32(0)
-	err := r.readObject(lookup, 4, index, &streamIndex)
-	return streamIndex, err
-}
-
 func (r *Reader) minStream(lookup section) (*stream, error) {
 	i, err := r.readLookup(lookup, 0)
 	if err != nil {
@@ -273,22 +305,6 @@ func (r *Reader) MaxStreamID() uint64 {
 
 func (r *Reader) StreamIDs() map[uint64]uint32 {
 	return r.containedStreamIds
-}
-
-func (r *Reader) streamByIndex(index uint32) (*stream, error) {
-	s := stream{}
-	if err := r.readObject(sectionStreams, int(unsafe.Sizeof(stream{})), int(index), &s); err != nil {
-		return nil, err
-	}
-	return &s, nil
-}
-
-func (r *Reader) packetByIndex(index uint64) (*packet, error) {
-	p := packet{}
-	if err := r.readObject(sectionPackets, int(unsafe.Sizeof(packet{})), int(index), &p); err != nil {
-		return nil, err
-	}
-	return &p, nil
 }
 
 func (s stream) wrap(r *Reader, idx uint32) (*Stream, error) {
@@ -320,8 +336,8 @@ func (r *Reader) streamIndexByLookup(section section, f func(s *stream) (bool, e
 		if firstError != nil {
 			return false
 		}
-		streamIndex := uint32(0)
-		if err := r.readObject(section, 4, i, &streamIndex); err != nil {
+		streamIndex, err := r.readLookup(section, i)
+		if err != nil {
 			firstError = err
 			return false
 		}
@@ -343,8 +359,8 @@ func (r *Reader) streamIndexByLookup(section section, f func(s *stream) (bool, e
 	if idx >= r.StreamCount() {
 		return 0, false, nil
 	}
-	streamIndex := uint32(0)
-	if err := r.readObject(section, 4, idx, &streamIndex); err != nil {
+	streamIndex, err := r.readLookup(section, idx)
+	if err != nil {
 		return 0, false, err
 	}
 	return streamIndex, true, firstError

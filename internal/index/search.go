@@ -1080,7 +1080,7 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 					sortingLookup = func() ([]uint32, error) {
 						if res == nil {
 							res = make([]uint32, idx.StreamCount())
-							if err := idx.readObject(section, 0, 0, res); err != nil {
+							if err := idx.readObjects(section, res); err != nil {
 								return nil, err
 							}
 							if reverse {
