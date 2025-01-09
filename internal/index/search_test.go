@@ -474,6 +474,50 @@ func TestSearchStreams(t *testing.T) {
 			"sort:cport,sport",
 			[]uint64{1, 2, 0},
 		},
+		{
+			"impossible filter",
+			[]streamInfo{
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*1), []string{"foo"}),
+			},
+			"id:123",
+			nil,
+		},
+		{
+			"partially impossible filter",
+			[]streamInfo{
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*1), []string{"foo"}),
+			},
+			"id:123 or id::100",
+			[]uint64{0},
+		},
+		{
+			"sort with allowed early exit",
+			[]streamInfo{
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"sort:id limit:2",
+			[]uint64{0, 1},
+		},
+		{
+			"sort with allowed early exit",
+			[]streamInfo{
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*1), []string{"foo"}),
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*2), []string{"foo"}),
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*3), []string{"foo"}),
+			},
+			"id:0:2 sort:id limit:2",
+			[]uint64{0, 1},
+		},
+		{
+			"impossible filter supporting lookup",
+			[]streamInfo{
+				makeStream("1.2.3.4:1234", "1.2.3.4:1234", t1.Add(time.Hour*1), []string{"foo"}),
+			},
+			"id:123: limit:2",
+			nil,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -493,7 +537,11 @@ func TestSearchStreams(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error parsing query: %v", err)
 			}
-			results, _, _, err := SearchStreams(context.Background(), []*Reader{r}, nil, q.ReferenceTime, q.Conditions, q.Grouping, q.Sorting, 100, 0, nil, converters, false)
+			l := uint(100)
+			if q.Limit != nil {
+				l = *q.Limit
+			}
+			results, _, _, err := SearchStreams(context.Background(), []*Reader{r}, nil, q.ReferenceTime, q.Conditions, q.Grouping, q.Sorting, l, 0, nil, converters, false)
 			if err != nil {
 				t.Fatalf("Error searching streams: %v", err)
 			}
@@ -506,4 +554,8 @@ func TestSearchStreams(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSearch(t *testing.T) {
+
 }
