@@ -1,24 +1,24 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="updateTags">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="updateTags">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
         <span>Refresh</span>
       </v-tooltip>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="setupCTF">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="setupCTF">
             <v-icon>mdi-wizard-hat</v-icon>
           </v-btn>
         </template>
         <span>CTF Setup Wizards</span>
       </v-tooltip>
     </ToolBar>
-    <v-simple-table dense>
+    <v-table density="compact" hover>
       <thead>
         <tr>
           <th class="text-left" width="20%">Name</th>
@@ -28,8 +28,8 @@
         </tr>
       </thead>
       <tbody>
-        <template v-for="tagType in tagTypes">
-          <tr :key="tagType.key">
+        <template v-for="tagType in tagTypes" :key="tagType.key">
+          <tr>
             <th colspan="5">
               <v-icon>mdi-{{ tagType.icon }}</v-icon>
               {{ tagType.title }}
@@ -40,8 +40,9 @@
               <v-icon>mdi-circle-small</v-icon
               ><v-chip
                 :color="tag.Color"
-                small
-                :text-color="getContrastTextColor(tag.Color)"
+                size="small"
+                variant="flat"
+                :style="{ color: getContrastTextColor(tag.Color) }"
                 >{{ tag.Name.substring(1 + tagType.key.length) }}</v-chip
               >
             </td>
@@ -60,10 +61,11 @@
               <span>{{ converterList[tag.Name] }}</span>
             </td>
             <td style="text-align: right">
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                    variant="plain"
+                    density="compact"
                     icon
                     exact
                     :to="{
@@ -72,80 +74,86 @@
                         q: tagForURI(tag.Name),
                       },
                     }"
-                    v-on="on"
+                    v-bind="props"
                     ><v-icon>mdi-magnify</v-icon></v-btn
                   >
                 </template>
                 <span>Show Streams</span>
               </v-tooltip>
-              <v-tooltip v-if="tag.Definition != '...'" bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip v-if="tag.Definition != '...'" location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                    variant="plain"
+                    density="compact"
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="setQuery(tag.Definition)"
                     ><v-icon>mdi-form-textbox</v-icon></v-btn
                   >
                 </template>
                 <span>Use Query</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                    variant="plain"
+                    density="compact"
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="showTagColorChangeDialog(tag.Name)"
                     ><v-icon>mdi-palette</v-icon></v-btn
                   >
                 </template>
                 <span>Change Color</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                    variant="plain"
+                    density="compact"
                     :disabled="tag.Referenced"
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="showTagNameChangeDialog(tag.Name)"
                     ><v-icon>mdi-rename-outline</v-icon></v-btn
                   >
                 </template>
                 <span>Change Name</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                    variant="plain"
+                    density="compact"
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="showTagDefinitionChangeDialog(tag.Name)"
                     ><v-icon>mdi-text-search-variant</v-icon></v-btn
                   >
                 </template>
                 <span>Change Definition</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                    variant="plain"
+                    density="compact"
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="showTagSetConvertersDialog(tag.Name)"
                     ><v-icon>mdi-file-replace-outline</v-icon></v-btn
                   >
                 </template>
                 <span>Attach Converter</span>
               </v-tooltip>
-              <v-tooltip bottom>
-                <template #activator="{ on, attrs }">
+              <v-tooltip location="bottom">
+                <template #activator="{ props }">
                   <v-btn
-                    v-bind="attrs"
+                    variant="plain"
+                    density="compact"
                     :disabled="tag.Referenced"
                     icon
-                    v-on="on"
+                    v-bind="props"
                     @click="confirmTagDeletion(tag.Name)"
                     ><v-icon>mdi-delete</v-icon></v-btn
                   >
@@ -156,7 +164,7 @@
           </tr>
         </template>
       </tbody>
-    </v-simple-table>
+    </v-table>
   </div>
 </template>
 
@@ -165,7 +173,6 @@ import { computed, onMounted } from "vue";
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { tagForURI } from "@/filters";
-import ToolBar from "./ToolBar.vue";
 import { getContrastTextColor } from "@/lib/colors";
 
 const tagTypes = [
@@ -206,8 +213,8 @@ onMounted(() => {
 });
 
 function updateTags() {
-  store.updateTags().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update tags: ${err}`);
+  store.updateTags().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update tags: ${err.message}`);
   });
 }
 

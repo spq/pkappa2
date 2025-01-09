@@ -30,7 +30,7 @@ export const useStreamStore = defineStore("stream", {
           this.stream = data;
           this.running = false;
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           if (axios.isAxiosError<string, unknown>(err)) {
             this.id = id;
             this.error =

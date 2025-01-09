@@ -1,4 +1,4 @@
-import { defineStore } from "pinia";
+import { createPinia, defineStore } from "pinia";
 import axios from "axios";
 import { useStreamsStore } from "./streams";
 import { useStreamStore } from "./stream";
@@ -98,11 +98,7 @@ export const useRootStore = defineStore("root", {
     },
     async delPcapOverIPEndpoint(address: string) {
       return APIClient.delPcapOverIPEndpoint(address)
-        .then(() => {
-          this.updatePcapOverIPEndpoints().catch((err) => {
-            throw err;
-          });
-        })
+        .then(() => this.updatePcapOverIPEndpoints())
         .catch(handleAxiosDefaultError);
     },
     async updateConverters() {
@@ -124,9 +120,7 @@ export const useRootStore = defineStore("root", {
       return APIClient.delTag(name)
         .then(() => {
           this.updateMark(name, undefined, false);
-          this.updateTags().catch((err) => {
-            throw err;
-          }); // TODO: not required with websocket?
+          return this.updateTags(); // TODO: not required with websocket?
         })
         .catch(handleAxiosDefaultError);
     },
@@ -159,9 +153,7 @@ export const useRootStore = defineStore("root", {
       return APIClient.markTagNew(name, streams, color)
         .then(() => {
           this.updateMark(name, streams, true);
-          this.updateTags().catch((err) => {
-            throw err;
-          }); // TODO: not required with websocket?
+          return this.updateTags(); // TODO: not required with websocket?
         })
         .catch(handleAxiosDefaultError);
     },
@@ -169,9 +161,7 @@ export const useRootStore = defineStore("root", {
       return APIClient.markTagAdd(name, streams)
         .then(() => {
           this.updateMark(name, streams, true);
-          this.updateTags().catch((err) => {
-            throw err;
-          }); // TODO: not required with websocket?
+          return this.updateTags(); // TODO: not required with websocket?
         })
         .catch(handleAxiosDefaultError);
     },
@@ -179,9 +169,7 @@ export const useRootStore = defineStore("root", {
       return APIClient.markTagDel(name, streams)
         .then(() => {
           this.updateMark(name, streams, false);
-          this.updateTags().catch((err) => {
-            throw err;
-          }); // TODO: not required with websocket?
+          return this.updateTags(); // TODO: not required with websocket?
         })
         .catch(handleAxiosDefaultError);
     },
@@ -190,8 +178,12 @@ export const useRootStore = defineStore("root", {
 
 export function handleAxiosDefaultError(err: unknown) {
   if (axios.isAxiosError<string, unknown>(err))
-    throw err.response !== undefined && err.response.data !== ""
-      ? err.response.data
-      : err.message;
+    throw new Error(
+      err.response !== undefined && err.response.data !== ""
+        ? err.response.data
+        : err.message,
+    );
   else throw err;
 }
+
+export default createPinia();

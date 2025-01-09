@@ -66,7 +66,7 @@ const highlightRegex = (highlight: string[] | null) =>
         return decoded;
       });
       return new RegExp(regex, "g");
-    } catch (e) {
+    } catch {
       console.error(`Invalid regex: ${regex}`);
     }
   });
@@ -84,7 +84,7 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
 });
 
 const inlineAscii = (chunk: Data) => {
-  let chunkData = atob(chunk.Content);
+  const chunkData = atob(chunk.Content);
   const asciiEscaped = chunkData
     .split("")
     .map((c) => asciiMap[c.charCodeAt(0)]);
@@ -96,18 +96,18 @@ const inlineAscii = (chunk: Data) => {
     const highlights: number[][] = [];
     for (const regex of highlightMatches) {
       if (regex === undefined) continue;
-      chunkData.matchAll(regex)?.forEach((match) => {
+      for (const match of chunkData.matchAll(regex)) {
         highlights.push([match.index, match[0].length]);
-      });
+      }
     }
     highlights.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     let highlightIndex = 0;
     for (const [index, length] of highlights) {
+      asciiEscaped[index] =
+        `<span class="mark" data-offset="${index}">${asciiEscaped[index]}`;
       if (highlightIndex > 0) {
         asciiEscaped[index] = `</span>${asciiEscaped[index]}`;
       }
-      asciiEscaped[index] =
-        `<span class="mark" data-offset="${index}">${asciiEscaped[index]}`;
       asciiEscaped[index + length - 1] =
         `${asciiEscaped[index + length - 1]}</span>`;
       if (highlightIndex < highlights.length - 1) {
@@ -133,7 +133,7 @@ const inlineHex = (b64: string) => {
       .split("")
       .map((char) => char.charCodeAt(0)),
   );
-  var str = ([] as number[]).slice
+  const str = ([] as number[]).slice
     .call(ui8)
     .map((i) => i.toString(16).padStart(2, "0"))
     .join("");
@@ -146,7 +146,7 @@ const hexdump = (b64: string) => {
       .split("")
       .map((char) => char.charCodeAt(0)),
   );
-  var str = ([] as number[]).slice
+  const str = ([] as number[]).slice
     .call(ui8)
     .map((i) => i.toString(16).padStart(2, "0"))
     .join("")
@@ -157,12 +157,12 @@ const hexdump = (b64: string) => {
       while (str.length < 48) {
         str += " ";
       }
-      var ascii =
+      let ascii =
         str
           .replace(/ /g, "")
           .match(/.{1,2}/g)
           ?.map(function (ch) {
-            var c = String.fromCharCode(parseInt(ch, 16));
+            let c = String.fromCharCode(parseInt(ch, 16));
             if (!/[ -~]/.test(c)) {
               c = ".";
             }
@@ -191,14 +191,14 @@ const hexdump = (b64: string) => {
     margin-left: 2em;
   }
 }
-.server >>> .mark {
+.server :deep(.mark) {
   background-color: #9090ff;
 }
 .client {
   color: #800000;
   background-color: #faeeed;
 }
-.client >>> .mark {
+.client :deep(.mark) {
   background-color: #ff8e5e;
 }
 
