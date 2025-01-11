@@ -748,7 +748,7 @@ conditions:
 		lookups = append(lookups, func() ([]uint32, error) {
 			return []uint32{idx}, nil
 		})
-	} else {
+	} else if minIDFilter != 0 || maxIDFilter != math.MaxUint64 {
 		lookups = append(lookups, func() ([]uint32, error) {
 			lookup := []uint32(nil)
 			for id, index := range r.containedStreamIds {
@@ -1080,7 +1080,7 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 					sortingLookup = func() ([]uint32, error) {
 						if res == nil {
 							res = make([]uint32, idx.StreamCount())
-							if err := idx.readObject(section, 0, 0, res); err != nil {
+							if err := idx.readObjects(section, res); err != nil {
 								return nil, err
 							}
 							if reverse {
@@ -1103,12 +1103,9 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 				if err != nil {
 					return nil, false, nil, err
 				}
-				if queryPart.possible && len(queryPart.lookups) == 0 && sortingLookup != nil {
-					queryPart.lookups = append(queryPart.lookups, sortingLookup)
-				}
 				queryParts = append(queryParts, queryPart)
 			}
-			err := idx.searchStreams(ctx, &results, allResults, queryParts, groupingData, sorter, resultLimit)
+			err := idx.searchStreams(ctx, &results, allResults, queryParts, groupingData, sorter, resultLimit, sortingLookup)
 			if err != nil {
 				return nil, false, nil, err
 			}
@@ -1129,103 +1126,31 @@ func SearchStreams(ctx context.Context, indexes []*Reader, limitIDs *bitmask.Lon
 	return results.streams[skip:], results.resultDropped != 0, dataRegexes, nil
 }
 
-func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint) error {
-	// check if all queries use lookups, if not don't evaluate them
-	useLookups := true
-	allImpossible := true
-	for _, qp := range queryParts {
-		if qp.possible {
-			allImpossible = false
-		}
-		if len(qp.lookups) == 0 {
-			useLookups = false
-		}
-	}
-	if allImpossible {
-		return nil
-	}
-	// a map of index to list of sub-queries that matched this id
-	type streamIndex struct {
-		si               uint32
-		activeQueryParts bitmask.ShortBitmask
-	}
-	streamIndexes := []streamIndex(nil)
-	if useLookups {
-		streamIndexesPosition := map[uint32]int{}
-		for qpIdx, qp := range queryParts {
-			if !qp.possible {
-				continue
-			}
-			streamIndexesOfQuery := []uint32(nil)
-			for _, l := range qp.lookups {
-				newStreamIndexes, err := l()
-				if err != nil {
-					return err
-				}
-				if len(newStreamIndexes) == 0 {
-					streamIndexesOfQuery = nil
-					break
-				}
-				if len(streamIndexesOfQuery) == 0 {
-					streamIndexesOfQuery = newStreamIndexes
-					continue
-				}
-				newStreamIndexesMap := make(map[uint32]struct{}, len(newStreamIndexes))
-				for _, si := range newStreamIndexes {
-					newStreamIndexesMap[si] = struct{}{}
-				}
-				// filter out old stream indexes with the new lookup
-				removed := 0
-				for i := 0; i < len(streamIndexesOfQuery); i++ {
-					si := streamIndexesOfQuery[i]
-					if _, ok := newStreamIndexesMap[si]; !ok {
-						removed++
-					} else if removed != 0 {
-						streamIndexesOfQuery[i-removed] = si
-					}
-				}
-				streamIndexesOfQuery = streamIndexesOfQuery[:len(streamIndexesOfQuery)-removed]
-				if len(streamIndexesOfQuery) == 0 {
-					break
-				}
-			}
-			for _, si := range streamIndexesOfQuery {
-				pos, ok := streamIndexesPosition[si]
-				if ok {
-					sis := &streamIndexes[pos]
-					sis.activeQueryParts.Set(uint(qpIdx))
-				} else {
-					streamIndexesPosition[si] = len(streamIndexes)
-					streamIndexes = append(streamIndexes, streamIndex{
-						si:               si,
-						activeQueryParts: bitmask.ShortBitmask{},
-					})
-					streamIndexes[len(streamIndexes)-1].activeQueryParts.Set(uint(qpIdx))
-				}
-			}
-		}
-		if len(streamIndexes) == 0 {
-			return nil
-		}
-	}
-
+func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQueryResults map[string]resultData, queryParts []queryPart, grouper *grouper, sortingLess func(a, b *Stream) bool, limit uint, sortingLookup func() ([]uint32, error)) error {
 	// apply filters to lookup results or all streams, if no lookups could be used
-	filterAndAddToResult := func(activeQueryParts bitmask.ShortBitmask, si uint32) error {
+	filterAndAddToResult := func(activeQueryParts bitmask.ShortBitmask, si uint32) (bool, error) {
 		if err := ctx.Err(); err != nil {
-			return err
+			return false, err
 		}
+
+		// check if the sorting and limit would allow any stream
+		limitReached := result.resultDropped != 0 && limit != 0 && uint(len(result.streams)) >= limit
+		if limitReached && sortingLess == nil {
+			return true, nil
+		}
+
 		s, err := r.streamByIndex(si)
 		if err != nil {
-			return err
+			return false, err
 		}
 		ss, err := s.wrap(r, si)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		// check if the sorting and limit would allow this stream
-		if result.resultDropped != 0 && limit != 0 && uint(len(result.streams)) >= limit && (sortingLess == nil || !sortingLess(ss, result.streams[limit-1])) {
-			return nil
+		if limitReached && !sortingLess(ss, result.streams[limit-1]) {
+			return true, nil
 		}
 
 		// check if the sorting within the groupKey allow this stream
@@ -1237,7 +1162,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			if ok {
 				groupPos = pos
 				if sortingLess == nil || !sortingLess(ss, result.streams[pos]) {
-					return nil
+					return false, nil
 				}
 			}
 		}
@@ -1265,7 +1190,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			for _, f := range queryParts[qpIdx].filters {
 				matching, err := f(sc, s)
 				if err != nil {
-					return err
+					return false, err
 				}
 				if !matching {
 					continue queryPart
@@ -1275,7 +1200,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			matchingSearchContexts = append(matchingSearchContexts, sc)
 		}
 		if matchingQueryParts.IsZero() {
-			return nil
+			return false, nil
 		}
 
 		if grouper != nil && len(grouper.vars) != 0 {
@@ -1306,7 +1231,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 				groupPos = pos
 				if sortingLess == nil || !sortingLess(ss, result.streams[pos]) {
 					result.resultDropped++
-					return nil
+					return false, nil
 				}
 			}
 		}
@@ -1323,7 +1248,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			} else {
 				// we have a limit and are worse than the last
 				result.resultDropped++
-				return nil
+				return true, nil
 			}
 		}
 
@@ -1415,7 +1340,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			}
 		}
 		if len(vdv) == 0 {
-			return nil
+			return false, nil
 		}
 		sort.Slice(vdv, func(i, j int) bool {
 			a, b := &vdv[i], &vdv[j]
@@ -1450,7 +1375,7 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			}
 			d.uses++
 			result.variableAssociation[s.StreamID] = i
-			return nil
+			return false, nil
 		}
 		if freeSlot == len(result.variableData) {
 			result.variableData = append(result.variableData, variableDataCollection{})
@@ -1460,25 +1385,152 @@ func (r *Reader) searchStreams(ctx context.Context, result *resultData, subQuery
 			data: vdv,
 		}
 		result.variableAssociation[s.StreamID] = freeSlot
+		return false, nil
+	}
+
+	// check if all queries use lookups, if not don't use lookups
+	activeQueryParts := bitmask.ShortBitmask{}
+	lookupMissing := false
+	for qpIdx, qp := range queryParts {
+		if !qp.possible {
+			continue
+		}
+		activeQueryParts.Set(uint(qpIdx))
+		if len(qp.lookups) == 0 {
+			lookupMissing = true
+		}
+	}
+	if activeQueryParts.OnesCount() == 0 {
 		return nil
 	}
-	if len(streamIndexes) != 0 {
+
+	// if we don't have a limit, we should not use the sorting lookup as no early exit is possible
+	if limit == 0 {
+		sortingLookup = nil
+	}
+
+	if lookupMissing {
+		// we miss a lookup for at least one query part, so we will be doing a full table scan
+
+		// without sorting lookup, we will evaluate in file order without early exit
+		if sortingLookup == nil {
+			for si, sc := 0, r.StreamCount(); si < sc; si++ {
+				if _, err := filterAndAddToResult(activeQueryParts, uint32(si)); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		// with sorting lookup, we might be able to exit early if we reach the limit
+		sortedStreamIndexes, err := sortingLookup()
+		if err != nil {
+			return err
+		}
+		for _, si := range sortedStreamIndexes {
+			if limitReached, err := filterAndAddToResult(activeQueryParts, si); err != nil {
+				return err
+			} else if limitReached {
+				break
+			}
+		}
+	}
+
+	// all query parts have lookups, build a map of stream indexes to active query parts
+	type streamIndex struct {
+		si               uint32
+		activeQueryParts bitmask.ShortBitmask
+	}
+	streamIndexes := []streamIndex(nil)
+
+	// build a list of stream indexes that match any query part
+	streamIndexesPosition := map[uint32]int{}
+	for qpIdx, qp := range queryParts {
+		if !qp.possible {
+			continue
+		}
+		streamIndexesOfQuery := []uint32(nil)
+		for _, l := range qp.lookups {
+			newStreamIndexes, err := l()
+			if err != nil {
+				return err
+			}
+			if len(newStreamIndexes) == 0 {
+				streamIndexesOfQuery = nil
+				break
+			}
+			if len(streamIndexesOfQuery) == 0 {
+				streamIndexesOfQuery = newStreamIndexes
+				continue
+			}
+			newStreamIndexesMap := make(map[uint32]struct{}, len(newStreamIndexes))
+			for _, si := range newStreamIndexes {
+				newStreamIndexesMap[si] = struct{}{}
+			}
+			// filter out old stream indexes with the new lookup
+			removed := 0
+			for i := 0; i < len(streamIndexesOfQuery); i++ {
+				si := streamIndexesOfQuery[i]
+				if _, ok := newStreamIndexesMap[si]; !ok {
+					removed++
+				} else if removed != 0 {
+					streamIndexesOfQuery[i-removed] = si
+				}
+			}
+			streamIndexesOfQuery = streamIndexesOfQuery[:len(streamIndexesOfQuery)-removed]
+			if len(streamIndexesOfQuery) == 0 {
+				break
+			}
+		}
+		for _, si := range streamIndexesOfQuery {
+			pos, ok := streamIndexesPosition[si]
+			if ok {
+				sis := &streamIndexes[pos]
+				sis.activeQueryParts.Set(uint(qpIdx))
+			} else {
+				streamIndexesPosition[si] = len(streamIndexes)
+				streamIndexes = append(streamIndexes, streamIndex{
+					si:               si,
+					activeQueryParts: bitmask.ShortBitmask{},
+				})
+				streamIndexes[len(streamIndexes)-1].activeQueryParts.Set(uint(qpIdx))
+			}
+		}
+	}
+
+	// without sorting lookup, we can just evaluate the streams potentially matching
+	// any of the query parts in file order, no early exit is possible
+	if sortingLookup == nil {
+		// sort the stream indexes to allow evaluating the streams in file order
+		sort.Slice(streamIndexes, func(i, j int) bool {
+			return streamIndexes[i].si < streamIndexes[j].si
+		})
 		for _, si := range streamIndexes {
-			if err := filterAndAddToResult(si.activeQueryParts, si.si); err != nil {
+			_, err := filterAndAddToResult(si.activeQueryParts, si.si)
+			if err != nil {
 				return err
 			}
 		}
-	} else {
-		activeQueryParts := bitmask.ShortBitmask{}
-		for qpIdx, qp := range queryParts {
-			if qp.possible {
-				activeQueryParts.Set(uint(qpIdx))
-			}
+		return nil
+	}
+
+	sortedStreamIndexes, err := sortingLookup()
+	if err != nil {
+		return err
+	}
+
+	// evaluate the steams using the sort order lookup and test
+	// each index against the information from the lookups
+	for _, si := range sortedStreamIndexes {
+		pos, ok := streamIndexesPosition[si]
+		if !ok {
+			continue
 		}
-		for si, sc := 0, r.StreamCount(); si < sc; si++ {
-			if err := filterAndAddToResult(activeQueryParts, uint32(si)); err != nil {
-				return err
-			}
+		aqp := streamIndexes[pos].activeQueryParts
+		if limitReached, err := filterAndAddToResult(aqp, si); err != nil {
+			return err
+		} else if limitReached {
+			break
 		}
 	}
 	return nil
