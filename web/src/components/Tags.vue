@@ -80,7 +80,7 @@
                 </template>
                 <span>Show Streams</span>
               </v-tooltip>
-              <v-tooltip location="bottom">
+              <v-tooltip v-if="tag.Definition != '...'" location="bottom">
                 <template #activator="{ props }">
                   <v-btn
                     variant="plain"

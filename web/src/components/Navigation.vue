@@ -141,6 +141,7 @@
                     <v-list-item-title>Details</v-list-item-title>
                   </v-list-item>
                   <v-list-item
+                    :disabled="tag.Definition == '...'"
                     prepend-icon="mdi-form-textbox"
                     link
                     @click="setQuery(tag.Definition)"
