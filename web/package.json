@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
-    "apexcharts": "^4.3.0",
+    "apexcharts": "^4.4.0",
     "axios": "^1.7.9",
     "core-js": "^3.40.0",
     "moment": "^2.30.1",
