@@ -110,8 +110,9 @@ All command line options can be specified using environment variables.
 
 You likely want to add some arguments to the `go run` command, check `-help`
 
-### Reverse proxy for SSL
-You can add a reverse proxy in front of pkappa2 to add TLS encryption:
+### Reverse proxy
+You can add a reverse proxy in front of pkappa2 to add TLS encryption or other options. Here is a nginx config which includes the `/ws` Websocket endpoint. You can bind the port to 127.0.0.1 in the docker-compose.yml to not expose the internal server when using a reverse proxy.
+
 ```
 server {
     listen 80;
@@ -146,6 +147,8 @@ The standard way to get pcaps into pkappa2 is using a `-z` completion script of 
 
 pkappa2 supports two different HTTP basic auth passwords. One for accessing the user interface and another one for uploading pcaps to the `/upload/[filename]` endpoint only. Make sure to use the correct pcap password here.
 
+Add these scripts to your vulnbox and run `tcpdump.sh` as root. Make sure the `tcpdump_complete.sh` script is executable and the `pcaps` folder is only readable by root. 😉
+
 **tcpdump.sh**:
 ```shell
 #!/bin/bash
@@ -169,6 +172,8 @@ PKAPPA2_PASSWD="your_pcap_password"
 echo "FINISHED $1"
 
 curl --data-binary "@$1" http://"${PKAPPA2_USER}":${PKAPPA2_PASSWD}@${PKAPPA2_IP}:${PKAPPA2_PORT}/upload/`basename $1`
+
+rm "$1"
 ```
 
 #### PCAP-over-IP
