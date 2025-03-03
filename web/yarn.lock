@@ -552,10 +552,10 @@
   resolved "https://registry.yarnpkg.com/@types/nearley/-/nearley-2.11.5.tgz#9087e1634e1c90efb25d661390702381789685cb"
   integrity sha512-dM7TrN0bVxGGXTYGx4YhGear8ysLO5SOuouAWM9oltjQ3m9oYa13qi8Z1DJp5zxVMPukvQdsrnZmgzpeuTSEQA==
 
-"@types/node@^22.13.5":
-  version "22.13.5"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-22.13.5.tgz#23add1d71acddab2c6a4d31db89c0f98d330b511"
-  integrity sha512-+lTU0PxZXn0Dr1NBtC7Y8cR21AJr87dLLU953CWA6pMxxv/UDc7jYAY90upcrie1nRcD6XNG5HOYEDtgW5TxAg==
+"@types/node@^22.13.8":
+  version "22.13.8"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-22.13.8.tgz#57e2450295b33a6518d6fd4f65f47236d3e41d8d"
+  integrity sha512-G3EfaZS+iOGYWLLRCEAXdWK9my08oHNZ+FHluRiggIYJPOXzhOiDgpVCUHaUvyIC5/fj7C/p637jdzC666AOKQ==
   dependencies:
     undici-types "~6.20.0"
 
@@ -773,10 +773,10 @@
     typescript-eslint "^8.23.0"
     vue-eslint-parser "^9.4.3"
 
-"@vue/language-core@2.2.4":
-  version "2.2.4"
-  resolved "https://registry.yarnpkg.com/@vue/language-core/-/language-core-2.2.4.tgz#5cad43a4cd6f388bebc3e8c6f303df489f5e8829"
-  integrity sha512-eGGdw7eWUwdIn9Fy/irJ7uavCGfgemuHQABgJ/hU1UgZFnbTg9VWeXvHQdhY+2SPQZWJqWXvRWIg67t4iWEa+Q==
+"@vue/language-core@2.2.8":
+  version "2.2.8"
+  resolved "https://registry.yarnpkg.com/@vue/language-core/-/language-core-2.2.8.tgz#05befa390399fbd4409bc703ee0520b8ac1b7088"
+  integrity sha512-rrzB0wPGBvcwaSNRriVWdNAbHQWSf0NlGqgKHK5mEkXpefjUlVRP62u03KvwZpvKVjRnBIQ/Lwre+Mx9N6juUQ==
   dependencies:
     "@volar/language-core" "~2.4.11"
     "@vue/compiler-dom" "^3.5.0"
@@ -2485,10 +2485,10 @@ prelude-ls@^1.2.1:
   resolved "https://registry.yarnpkg.com/prelude-ls/-/prelude-ls-1.2.1.tgz#debc6489d7a6e6b0e7611888cec880337d316396"
   integrity sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==
 
-prettier@^3.5.2:
-  version "3.5.2"
-  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.5.2.tgz#d066c6053200da0234bf8fa1ef45168abed8b914"
-  integrity sha512-lc6npv5PH7hVqozBR7lkBNOGXV9vMwROAPlumdBkX0wTbbzPu/U1hk5yL8p2pt4Xoc+2mkT8t/sow2YrV/M5qg==
+prettier@^3.5.3:
+  version "3.5.3"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.5.3.tgz#4fc2ce0d657e7a02e602549f053b239cb7dfe1b5"
+  integrity sha512-QQtaxnoDJeAkDvDKWCLiwIXkTgRhwYDEQCghU9Z6q03iyek/rxRh/2lC3HB7P8sWT2xC/y5JDctPLBIGzHKbhw==
 
 pretty-bytes@^6.1.1:
   version "6.1.1"
@@ -3132,10 +3132,10 @@ typescript-eslint@^8.22.0, typescript-eslint@^8.23.0:
     "@typescript-eslint/parser" "8.25.0"
     "@typescript-eslint/utils" "8.25.0"
 
-typescript@~5.7.3:
-  version "5.7.3"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.7.3.tgz#919b44a7dbb8583a9b856d162be24a54bf80073e"
-  integrity sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==
+typescript@~5.8.2:
+  version "5.8.2"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.8.2.tgz#8170b3702f74b79db2e5a96207c15e65807999e4"
+  integrity sha512-aJn6wq13/afZp/jT9QZmwEjDqqvSGp1VT5GVg+f/t6/oVyrgXM6BY1h9BRh/O5p3PlUPAe+WuiEZOmb/49RqoQ==
 
 typical@^7.1.1:
   version "7.1.1"
@@ -3317,13 +3317,13 @@ vue-router@^4.5.0:
   dependencies:
     "@vue/devtools-api" "^6.6.4"
 
-vue-tsc@^2.2.4:
-  version "2.2.4"
-  resolved "https://registry.yarnpkg.com/vue-tsc/-/vue-tsc-2.2.4.tgz#1e87eebbdde3078333304b9e5499b67157040305"
-  integrity sha512-3EVHlxtpMXcb5bCaK7QDFTbEkMusDfVk0HVRrkv5hEb+Clpu9a96lKUXJAeD/akRlkoA4H8MCHgBDN19S6FnzA==
+vue-tsc@^2.2.8:
+  version "2.2.8"
+  resolved "https://registry.yarnpkg.com/vue-tsc/-/vue-tsc-2.2.8.tgz#7c8e1bd9333d25241a7f9988eedf08c65483158c"
+  integrity sha512-jBYKBNFADTN+L+MdesNX/TB3XuDSyaWynKMDgR+yCSln0GQ9Tfb7JS2lr46s2LiFUT1WsmfWsSvIElyxzOPqcQ==
   dependencies:
     "@volar/typescript" "~2.4.11"
-    "@vue/language-core" "2.2.4"
+    "@vue/language-core" "2.2.8"
 
 vue3-apexcharts@^1.8.0:
   version "1.8.0"
