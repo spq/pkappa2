@@ -1,11 +1,13 @@
 import eslint from "@eslint/js";
-import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 import pluginVue from "eslint-plugin-vue";
-import vuetify from "eslint-plugin-vuetify";
-import vueTsEslintConfig from "@vue/eslint-config-typescript";
+import globals from "globals";
+import {
+  defineConfigWithVueTs,
+  vueTsConfigs,
+} from "@vue/eslint-config-typescript";
 
-export default tseslint.config(
+export default defineConfigWithVueTs(
   {
     files: ["**/*.{ts,mts,tsx,vue}"],
   },
@@ -18,9 +20,8 @@ export default tseslint.config(
     ],
   },
   eslint.configs.recommended,
-  ...pluginVue.configs["flat/strongly-recommended"],
-  ...vuetify.configs["flat/recommended"],
-  ...vueTsEslintConfig({ extends: ["recommendedTypeChecked"] }),
+  pluginVue.configs["flat/strongly-recommended"],
+  vueTsConfigs.recommendedTypeChecked,
   {
     // https://typescript-eslint.io/rules/
     rules: {
@@ -28,6 +29,12 @@ export default tseslint.config(
       "vue/multi-word-component-names": "off",
       "vue/no-reserved-component-names": "off",
       "vue/prefer-import-from-vue": "off",
+    },
+    languageOptions: {
+      sourceType: "module",
+      globals: {
+        ...globals.browser,
+      },
     },
   },
   eslintConfigPrettier,

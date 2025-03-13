@@ -42,7 +42,6 @@
     "eslint": "^9.22.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-vue": "^10.0.0",
-    "eslint-plugin-vuetify": "^2.5.1",
     "npm-run-all2": "^7.0.2",
     "pinia": "^3.0.1",
     "prettier": "^3.5.3",
