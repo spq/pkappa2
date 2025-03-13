@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.23", "1.22"]
+        go: ["1.24", "1.23"]
         node: [22, 20]
         exclude:
-          - go: 1.23
+          - go: 1.24
             node: 20
-          - go: 1.22
+          - go: 1.23
             node: 22
     name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
@@ -57,7 +57,7 @@ jobs:
           chart: true
           amend: true
         if: |
-          matrix.go == '1.22' &&
+          matrix.go == '1.24' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main'
 
@@ -69,7 +69,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.22
+          go-version: 1.24
 
       - name: Install dependencies
         run: sudo apt-get install -y libpcap-dev
@@ -87,10 +87,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: "yarn"
           cache-dependency-path: "web/yarn.lock"
 
