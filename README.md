@@ -190,6 +190,7 @@ Add the `localhost:4200` endpoint in pkappa2 on the `Manage PCAP-over-IP` page a
 - Run `go run cmd/pkappa2/main.go -address :8081` in `/`
 - Visit http://localhost:8080/ in your web browser
 - Enjoy frontend development using hot-reloading changes
+- Use `yarn lint && yarn type-check && yarn format` before commiting your changes
 
 You can import multiple .pcap files in the current folder using:
 `for f in *.pcap; do curl --data-binary "@$f" "http://localhost:8081/upload/$f"; done`

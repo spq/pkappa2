@@ -31,7 +31,7 @@ export default defineConfig({
       typescript: true,
       vueTsc: true,
       eslint: {
-        lintCommand: "eslint .",
+        lintCommand: "eslint",
         useFlatConfig: true,
       },
     }),
