@@ -1,8 +1,8 @@
 module github.com/spq/pkappa2
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.22.9
+toolchain go1.23.7
 
 require (
 	github.com/alecthomas/participle/v2 v2.1.1
@@ -11,7 +11,7 @@ require (
 	github.com/gopacket/gopacket v1.3.1
 	github.com/gorilla/websocket v1.5.3
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.31.0
 	rsc.io/binaryregexp v0.2.0
 )
 
