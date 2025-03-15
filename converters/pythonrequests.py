@@ -42,8 +42,8 @@ class PythonRequestsConverter(HTTPConverter):
 import requests
 import sys
 
-IP = '{stream.Metadata.ServerHost}'
-# IP = sys.argv[1]
+IP = sys.argv[1]
+# IP = '{stream.Metadata.ServerHost}'
 
 # Generated from stream {stream.Metadata.StreamID}
 s = requests.Session()
