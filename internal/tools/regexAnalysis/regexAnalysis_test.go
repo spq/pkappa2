@@ -63,5 +63,4 @@ func TestAcceptedLength(t *testing.T) {
 			}
 		})
 	}
-	AcceptedLength("")
 }
