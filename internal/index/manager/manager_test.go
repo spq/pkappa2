@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/spq/pkappa2/internal/index/converters"
 	"github.com/spq/pkappa2/internal/query"
 )
@@ -190,10 +190,14 @@ func TestTags(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Manager.AddTag failed with error: %v", err)
 			}
+			wantQuery := tc.query
+			if prefix, _, _ := strings.Cut(tc.tag, "/"); prefix == "mark" || prefix == "generated" {
+				wantQuery = "..."
+			}
 			if got, want := mgr.ListTags(), []TagInfo{{
 				Name:           tc.tag,
 				Color:          "blue",
-				Definition:     tc.query,
+				Definition:     wantQuery,
 				MatchingCount:  0,
 				UncertainCount: 0,
 				Referenced:     false,
@@ -219,16 +223,19 @@ func TestTags(t *testing.T) {
 	if err := mgr.AddTag("mark/foo", "blue", "id:0"); err != nil {
 		t.Fatalf("Manager.AddTag failed with error: %v", err)
 	}
+	if got, want := mgr.ListTags()[0].Definition, "..."; got != want {
+		t.Fatalf("Manager.ListTags()[0].Definition = %v, want %v", got, want)
+	}
 	if err := mgr.UpdateTag("mark/foo", UpdateTagOperationMarkAddStream([]uint64{2, 3})); err != nil {
 		t.Fatalf("Manager.UpdateTag failed with error: %v", err)
 	}
-	if got, want := mgr.ListTags()[0].Definition, "id:0,2,3"; got != want {
+	if got, want := mgr.tags["mark/foo"].definition, "id:0,2,3"; got != want {
 		t.Fatalf("Manager.ListTags()[0].Definition = %v, want %v", got, want)
 	}
 	if err := mgr.UpdateTag("mark/foo", UpdateTagOperationMarkDelStream([]uint64{2})); err != nil {
 		t.Fatalf("Manager.UpdateTag failed with error: %v", err)
 	}
-	if got, want := mgr.ListTags()[0].Definition, "id:0,3"; got != want {
+	if got, want := mgr.tags["mark/foo"].definition, "id:0,3"; got != want {
 		t.Fatalf("Manager.ListTags()[0].Definition = %v, want %v", got, want)
 	}
 	if err := mgr.UpdateTag("mark/foo", UpdateTagOperationUpdateName("mark/bar")); err != nil {
@@ -283,7 +290,7 @@ func TestManagerRestartKeepsState(t *testing.T) {
 		{
 			Name:           "mark/foo",
 			Color:          "red",
-			Definition:     "id:-1",
+			Definition:     "...",
 			MatchingCount:  0,
 			UncertainCount: 0,
 			Referenced:     false,
@@ -512,7 +519,7 @@ func TestManagerView(t *testing.T) {
 	if err := mgr.AddTag("tag/bar", "red", ""); err != nil {
 		t.Fatalf("Manager.AddTag failed with error: %v", err)
 	}
-	if m, n, err := view.SearchStreams(context.Background(), q, func(StreamContext) error {
+	if m, n, _, err := view.SearchStreams(context.Background(), q, func(StreamContext) error {
 		return nil
 	}, Limit(1, 1), PrefetchAllTags()); err != nil || n != 1 || !m {
 		t.Fatalf("View.SearchStreams() = %v, %v, %v, want true, 1, nil", m, n, err)

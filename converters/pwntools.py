@@ -10,6 +10,9 @@ from pkappa2lib import (
 from dataclasses import dataclass
 
 
+# Maximum number of bytes to receive until
+RECEIVE_UNTIL_MAX = 40
+
 @dataclass
 class Chunk:
     data: bytes
@@ -28,8 +31,8 @@ from pwn import *
 import sys
 
 # Generated from stream {stream.Metadata.StreamID}
-# io = remote(sys.argv[1], {stream.Metadata.ServerPort}{typ})
-io = remote({stream.Metadata.ServerHost!r}, {stream.Metadata.ServerPort}{typ})
+# io = remote({stream.Metadata.ServerHost!r}, {stream.Metadata.ServerPort}{typ})
+io = remote(sys.argv[1], {stream.Metadata.ServerPort}{typ})
 """
         chunks: list[Chunk] = []
         for i, chunk in enumerate(stream.Chunks):
@@ -45,7 +48,7 @@ io = remote({stream.Metadata.ServerHost!r}, {stream.Metadata.ServerPort}{typ})
                 data_recvuntil = no_end + end_newlines
 
             # truncate long data arbitrarily
-            data_recvuntil = data_recvuntil[-40:]
+            data_recvuntil = data_recvuntil[-RECEIVE_UNTIL_MAX:]
             chunks.append(
                 Chunk(
                     chunk.Content,
@@ -75,11 +78,7 @@ io = remote({stream.Metadata.ServerHost!r}, {stream.Metadata.ServerPort}{typ})
                 output += f"io.{fn}({after_data}{data!r})\n"
                 after_data = ""
 
-        if len(stream.Chunks) > 0:
-            if stream.Chunks[-1].Direction == Direction.CLIENTTOSERVER:
-                output += "io.interactive()\n"
-            else:
-                output += "io.stream()\n"
+        output += "io.stream()\n"
         return Result([StreamChunk(Direction.CLIENTTOSERVER, output.encode())])
 
 

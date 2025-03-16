@@ -1,93 +1,99 @@
 <template>
   <div>
+    <v-text-field
+      id="searchBoxField"
+      autofocus
+      flat
+      variant="underlined"
+      color="primary"
+      prepend-inner-icon="mdi-magnify"
+      :model-value="searchBox"
+      @update:model-value="onInput"
+      @click.stop
+      @keyup.enter="onEnter"
+      @keydown.up.prevent="arrowUp"
+      @keydown.down.prevent="arrowDown"
+      @keydown.tab.exact.prevent.stop="onTab"
+      @keydown.esc.exact="suggestionMenuOpen = false"
+      @focus="searchBoxOptionsMenuOpen = true"
+    >
+      <template #append-inner>
+        <v-menu location="bottom">
+          <template #activator="{ props }">
+            <v-btn size="small" icon v-bind="props" class="mt-n2"
+              ><v-icon>mdi-dots-vertical</v-icon></v-btn
+            >
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              prepend-icon="mdi-magnify"
+              link
+              @click="search('search')"
+            >
+              <v-list-item-title>Search</v-list-item-title>
+            </v-list-item>
+            <v-list-item
+              prepend-icon="mdi-finance"
+              link
+              @click="search('graph')"
+            >
+              <v-list-item-title>Graph</v-list-item-title>
+            </v-list-item>
+            <v-list-item
+              prepend-icon="mdi-cloud-outline"
+              link
+              @click="createTag('service', searchBox)"
+            >
+              <v-list-item-title>Save as Service</v-list-item-title>
+            </v-list-item>
+            <v-list-item
+              prepend-icon="mdi-tag-multiple-outline"
+              link
+              @click="createTag('tag', searchBox)"
+            >
+              <v-list-item-title>Save as Tag</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </template>
+    </v-text-field>
     <v-menu
       v-model="searchBoxOptionsMenuOpen"
       :close-on-content-click="false"
       open-on-focus
       absolute
-      :position-x="searchBoxFieldRect.left"
-      :position-y="searchBoxFieldRect.bottom"
+      :target="[searchBoxFieldRect.left, searchBoxFieldRect.bottom]"
       :min-width="searchBoxFieldRect.width"
       :max-width="searchBoxFieldRect.width"
     >
       <v-card>
-        <v-btn-toggle v-model="queryTimeLimit" color="primary" dense group>
-          <v-btn text value="-5m:">Limit to last 5m</v-btn>
-          <v-btn text value="-1h:">Limit to last 1h</v-btn>
+        <v-btn-toggle
+          v-model="queryTimeLimit"
+          color="primary"
+          density="compact"
+          group
+        >
+          <v-btn variant="text" value="-5m:">Limit to last 5m</v-btn>
+          <v-btn variant="text" value="-1h:">Limit to last 1h</v-btn>
         </v-btn-toggle>
       </v-card>
-      <template #activator="{ on }">
-        <v-text-field
-          ref="searchBoxField"
-          autofocus
-          hide-details
-          flat
-          prepend-inner-icon="mdi-magnify"
-          :value="searchBox"
-          @input="onInput"
-          @click.stop
-          @keyup.enter="onEnter"
-          @keydown.up.prevent="arrowUp"
-          @keydown.down.prevent="arrowDown"
-          @keydown.tab.exact.prevent.stop="onTab"
-          @keydown.esc.exact="suggestionMenuOpen = false"
-          v-on="on"
-        >
-        </v-text-field>
-      </template>
     </v-menu>
     <v-menu
-      ref="suggestionMenu"
       v-model="suggestionMenuOpen"
-      :position-x="suggestionMenuPosX"
-      :position-y="suggestionMenuPosY"
+      :target="[suggestionMenuPosX, suggestionMenuPosY]"
       absolute
-      dense
+      density="compact"
     >
-      <v-list>
-        <v-list-item-group
-          :value="suggestionSelectedIndex"
-          color="primary"
-          mandatory
+      <v-list :value="suggestionSelectedIndex" color="primary" mandatory>
+        <v-list-item
+          v-for="(item, index) in suggestionItems"
+          :key="index"
+          :active="index === suggestionSelectedIndex"
+          active-class="selected-suggestion"
+          :style="{ backgroundColor: suggestionColor(suggestionType, item) }"
+          @click="applySuggestion(index)"
         >
-          <v-list-item
-            v-for="(item, index) in suggestionItems"
-            :key="index"
-            active-class="font-white"
-            :style="{ backgroundColor: suggestionColor(suggestionType, item) }"
-            @click="applySuggestion(index)"
-          >
-            <v-list-item-title>{{ item }}</v-list-item-title>
-          </v-list-item>
-        </v-list-item-group>
-      </v-list>
-    </v-menu>
-    <v-menu offset-y right bottom>
-      <template #activator="{ on: on2, attrs }">
-        <v-btn class="textfield-overlay" small icon v-bind="attrs" v-on="on2"
-          ><v-icon>mdi-dots-vertical</v-icon></v-btn
-        >
-      </template>
-      <v-list dense>
-        <v-list-item link @click="search('search')">
-          <v-list-item-icon><v-icon>mdi-magnify</v-icon></v-list-item-icon>
-          <v-list-item-title>Search</v-list-item-title>
-        </v-list-item>
-        <v-list-item link @click="search('graph')">
-          <v-list-item-icon><v-icon>mdi-finance</v-icon></v-list-item-icon>
-          <v-list-item-title>Graph</v-list-item-title>
-        </v-list-item>
-        <v-list-item link @click="createTag('service', searchBox)">
-          <v-list-item-icon
-            ><v-icon>mdi-cloud-outline</v-icon></v-list-item-icon
-          >
-          <v-list-item-title>Save as Service</v-list-item-title>
-        </v-list-item>
-        <v-list-item link @click="createTag('tag', searchBox)">
-          <v-list-item-icon
-            ><v-icon>mdi-tag-multiple-outline</v-icon></v-list-item-icon
-          >
-          <v-list-item-title>Save as Tag</v-list-item-title>
+          <v-list-item-title>{{ item }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-menu>
@@ -107,17 +113,16 @@ import {
   onBeforeUnmount,
   watch,
 } from "vue";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import { useRootStore } from "@/stores";
 import { tagNameForURI } from "@/filters";
-import { VTextField } from "vuetify/lib";
 
 const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
 const config = computed(() => store.clientConfig);
-const searchBoxField = ref<InstanceType<typeof VTextField> | null>(null);
-const searchBox = ref<string>(route.query.q as string);
+const searchBoxField = ref<HTMLInputElement | null>(null);
+const searchBox = ref<string>((route.query.q as string) ?? "");
 const historyIndex = ref(-1);
 const pendingSearch = ref("");
 const typingDelay = ref<number | null>(null);
@@ -132,15 +137,15 @@ const suggestionMenuPosX = ref(0);
 const suggestionMenuPosY = ref(0);
 const queryTimeLimit = computed({
   get(): string | undefined {
-    const ltime = analyze(searchBox.value).ltime;
+    const ltime = analyze(searchBox.value).ltime?.[0] ?? {};
     const v = ltime?.pieces?.value;
     if (v !== undefined && ["-5m:", "-1h:"].includes(v)) return v;
     return undefined;
   },
   set(val: string | undefined) {
     const q = searchBox.value ?? "";
-    const ltime = analyze(q).ltime;
-    let old = ltime?.pieces?.value;
+    const ltime = analyze(q).ltime?.[0] ?? {};
+    const old = ltime?.pieces?.value;
     if (old === val) return;
     const infix = val ? `ltime:${val}` : "";
     if (old === undefined) {
@@ -154,9 +159,14 @@ const queryTimeLimit = computed({
       const suffix = q.slice(ltime.start + ltime.len);
       searchBox.value = `${prefix}${infix}${suffix}`;
     }
-    searchBoxField.value?.$el.querySelector("input")?.focus();
+    searchBoxField.value?.focus();
     nextTick(() => {
       searchBoxOptionsMenuOpen.value = true;
+    }).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to open search box options: ${err.message}`,
+      );
     });
   },
 });
@@ -174,7 +184,7 @@ const tagColors = computed(() => {
   return tags;
 });
 const searchBoxFieldRect = computed(() => {
-  if (searchBoxField.value == null) {
+  if (!searchBoxField.value) {
     return {
       width: 0,
       height: 0,
@@ -184,7 +194,7 @@ const searchBoxFieldRect = computed(() => {
       bottom: 0,
     };
   }
-  return searchBoxField.value.$el.getBoundingClientRect();
+  return searchBoxField.value.getBoundingClientRect();
 });
 
 EventBus.on("setSearchTerm", setSearchTerm);
@@ -202,22 +212,24 @@ watch(
     suggestionMenuOpen.value = suggestionItems.value.length > 0;
     if (suggestionMenuOpen.value) {
       suggestionSelectedIndex.value = 0;
-      const cursorIndex =
-        searchBoxField.value?.$el.querySelector("input")?.selectionStart ??
-        null;
+      const searchBoxElement = searchBoxField.value;
+      const cursorIndex = searchBoxElement?.selectionStart ?? null;
       if (cursorIndex === null) return;
       const fontWidth = 7.05; // @TODO: Calculate the absolute cursor position correctly
       suggestionMenuPosX.value =
         cursorIndex * fontWidth +
-        (searchBoxField.value?.$el.getBoundingClientRect().left ?? 0);
+        (searchBoxElement?.getBoundingClientRect().left ?? 0);
     }
   },
   { immediate: true },
 );
 
 onMounted(() => {
-  store.updateConverters().catch((err: string) => {
-    EventBus.emit("showError", `Failed to update converters: ${err}`);
+  searchBoxField.value = document.getElementById(
+    "searchBoxField",
+  ) as HTMLInputElement;
+  store.updateConverters().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
 
   const keyListener = (e: KeyboardEvent) => {
@@ -225,14 +237,13 @@ onMounted(() => {
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
     if (e.key != "/") return;
     e.preventDefault();
-    searchBoxField.value?.$el.querySelector("input")?.focus();
+    searchBoxField.value?.focus();
   };
   document.body.addEventListener("keydown", keyListener);
   onBeforeUnmount(() => {
     document.body.removeEventListener("keydown", keyListener);
   });
-  suggestionMenuPosY.value =
-    searchBoxField.value?.$el.getBoundingClientRect().bottom ?? 0;
+  suggestionMenuPosY.value = searchBoxFieldRect.value.bottom ?? 0;
 });
 
 function onTab() {
@@ -281,8 +292,7 @@ function applySuggestion(index: number | null = null) {
 function startSuggestionSearch() {
   const val = searchBox.value;
   typingDelay.value = window.setTimeout(() => {
-    const cursorPosition =
-      searchBoxField.value?.$el.querySelector("input")?.selectionStart ?? 0;
+    const cursorPosition = searchBoxField.value?.selectionStart ?? 0;
     const suggestionResult = suggest(
       val,
       cursorPosition,
@@ -346,7 +356,7 @@ function historyUp() {
   if (historyIndex.value === -1) {
     pendingSearch.value = searchBox.value;
   }
-  let term = getTermAt(historyIndex.value + 1);
+  const term = getTermAt(historyIndex.value + 1);
   if (term == null) {
     return;
   }
@@ -383,7 +393,7 @@ function search(type: string | null) {
   }
   addSearch(searchBox.value);
   historyIndex.value = -1;
-  let newQuery = {
+  const newQuery = {
     name: type,
     query: q,
   };
@@ -396,13 +406,8 @@ function createTag(tagType: string, tagQuery: string) {
 </script>
 
 <style scoped>
-.font-white {
+.selected-suggestion div.v-list-item-title {
   color: black;
-  font-weight: bold;
-}
-.textfield-overlay {
-  position: absolute;
-  top: 0;
-  right: 0;
+  font-weight: bolder;
 }
 </style>

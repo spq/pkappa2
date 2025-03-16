@@ -6,8 +6,9 @@
           <span class="text-h5"
             >Change Definition of {{ capitalize(tagType) }}
             <v-chip
+              variant="flat"
               :color="tagColor"
-              :text-color="getContrastTextColor(tagColor)"
+              :style="{ color: getContrastTextColor(tagColor) }"
               >{{ tagName }}</v-chip
             ></span
           >
@@ -18,9 +19,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="visible = false">Cancel</v-btn>
+          <v-btn variant="text" @click="visible = false">Cancel</v-btn>
           <v-btn
-            text
+            variant="text"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
@@ -72,10 +73,10 @@ function updateDefinition() {
     .then(() => {
       visible.value = false;
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       error.value = true;
       loading.value = false;
-      EventBus.emit("showError", err);
+      EventBus.emit("showError", err.message);
     });
 }
 </script>

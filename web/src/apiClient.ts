@@ -43,12 +43,19 @@ export type Error = {
   Error: string;
 };
 
+export type DataRegexes = {
+  Client: string[] | null;
+  Server: string[] | null;
+};
+
 /** @see {isSearchResult} ts-auto-guard:type-guard */
 export type SearchResult = {
   Debug: string[];
   Results: Result[];
+  Elapsed: number;
   Offset: number;
   MoreResults: boolean;
+  DataRegexes: DataRegexes;
 };
 
 /** @see {isSearchResponse} ts-auto-guard:type-guard */
@@ -341,7 +348,7 @@ const APIClient = {
     if (guard(response.data)) {
       return response.data;
     }
-    throw "Unexpected response, types mismatch";
+    throw new Error("Unexpected response, types mismatch");
   },
 };
 

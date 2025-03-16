@@ -26,7 +26,7 @@ type EventTypes =
 
 /** @see {isEvent} ts-auto-guard:type-guard */
 export type Event = {
-  Type: EventTypes | string;
+  Type: EventTypes | string; // eslint-disable-line @typescript-eslint/no-redundant-type-constituents
 };
 
 /** @see {isTagEvent} ts-auto-guard:type-guard */
@@ -99,7 +99,6 @@ export function setupWebsocket() {
       const store = useRootStore();
       const streamStore = useStreamStore();
       const streamsStore = useStreamsStore();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const e = JSON.parse(event.data);
       if (!isEvent(e)) {
         console.error("Invalid event:", event.data);

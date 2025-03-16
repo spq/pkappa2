@@ -61,7 +61,7 @@ export const useGraphStore = defineStore("graph", {
           this.graph = data;
           this.running = false;
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           if (axios.isCancel(err)) return;
           if (axios.isAxiosError<string, unknown>(err)) {
             this.delta = delta;

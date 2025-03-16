@@ -1,37 +1,38 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
-            v-bind="attrs"
             icon
             :to="{
               name: 'search',
-              query: { q: $route.query.q, p: $route.query.p },
+              query: {
+                q: $route.query.q,
+                p: $route.query.p,
+                converter: $route.query.converter,
+              },
             }"
-            v-on="on"
+            v-bind="props"
           >
             <v-icon>mdi-arrow-left</v-icon>
           </v-btn>
         </template>
         <span>Back to Search Results</span>
       </v-tooltip>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreamForId()">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="fetchStreamForId()">
             <v-icon>mdi-refresh</v-icon>
           </v-btn>
         </template>
         <span>Refresh</span>
       </v-tooltip>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
             :disabled="selectionQuery == ''"
-            link
             exact
-            v-bind="attrs"
             icon
             :to="{
               name: 'search',
@@ -39,47 +40,41 @@
                 q: selectionQuery,
               },
             }"
-            v-on="on"
+            v-bind="props"
             ><v-icon>mdi-selection-search</v-icon></v-btn
           >
         </template>
         <span>Search Selection</span>
       </v-tooltip>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn
-            link
-            exact
-            v-bind="attrs"
-            icon
-            @click="openInCyberChef()"
-            v-on="on"
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn exact icon @click="openInCyberChef()" v-bind="props"
             ><v-icon>mdi-chef-hat</v-icon></v-btn
           >
         </template>
         <span>Open in CyberChef</span>
       </v-tooltip>
-      <v-menu offset-y right bottom
-        ><template #activator="{ on: onMenu, attrs }">
-          <v-tooltip bottom>
-            <template #activator="{ on: onTooltip }">
-              <v-btn v-bind="attrs" icon v-on="{ ...onMenu, ...onTooltip }">
+      <v-menu location="bottom left"
+        ><template #activator="{ props: propsMenu }">
+          <v-tooltip location="bottom">
+            <template #activator="{ props: propsTooltip }">
+              <v-btn v-bind="{ ...propsMenu, ...propsTooltip }" icon>
                 <v-icon>mdi-checkbox-multiple-outline</v-icon>
               </v-btn>
             </template>
             <span>Marks</span>
           </v-tooltip>
         </template>
-        <v-list v-if="stream.stream !== null" dense>
-          <template v-for="tag of groupedTags.mark">
+        <v-list v-if="stream.stream !== null" density="compact">
+          <template v-for="tag of groupedTags.mark" :key="tag.Name">
             <v-list-item
-              :key="tag.Name"
+              slim
               link
               @click="
                 markStream(tag.Name, !stream.stream.Tags.includes(tag.Name))
               "
             >
-              <v-list-item-action>
+              <template #prepend>
                 <v-icon
                   >mdi-{{
                     stream.stream.Tags.includes(tag.Name)
@@ -87,12 +82,10 @@
                       : "checkbox-blank-outline"
                   }}</v-icon
                 >
-              </v-list-item-action>
-              <v-list-item-content>
-                <v-list-item-title>{{
-                  tagify(tag.Name, "name")
-                }}</v-list-item-title>
-              </v-list-item-content>
+              </template>
+              <v-list-item-title>{{
+                tagify(tag.Name, "name")
+              }}</v-list-item-title>
             </v-list-item>
           </template>
           <v-divider />
@@ -102,38 +95,40 @@
           </v-list-item>
         </v-list>
       </v-menu>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
-          <v-btn
-            v-bind="attrs"
-            icon
-            :href="`/api/download/${streamId}.pcap`"
-            v-on="on"
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon :href="`/api/download/${streamId}.pcap`" v-bind="props"
             ><v-icon>mdi-download</v-icon></v-btn
           >
         </template>
         <span>Download PCAP</span>
       </v-tooltip>
-      <v-btn-toggle v-model="presentation" mandatory dense borderless>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" value="ascii" v-on="on">
+      <v-btn-toggle
+        v-model="presentation"
+        mandatory
+        density="compact"
+        variant="text"
+        color="primary"
+      >
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn value="ascii" v-bind="props">
               <v-icon>mdi-text-long</v-icon>
             </v-btn>
           </template>
           <span>ASCII</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" value="hexdump" v-on="on">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn value="hexdump" v-bind="props">
               <v-icon>mdi-format-columns</v-icon>
             </v-btn>
           </template>
           <span>HEXDUMP</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" value="raw" v-on="on">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn value="raw" v-bind="props">
               <v-icon>mdi-hexadecimal</v-icon>
             </v-btn>
           </template>
@@ -142,17 +137,16 @@
       </v-btn-toggle>
       <v-tooltip
         v-if="stream.stream !== null && selectableConverters.length > 1"
-        bottom
+        location="bottom"
       >
-        <template #activator="{ on, attrs }">
+        <template #activator="{ props }">
           <v-select
             hide-details
-            dense
-            v-bind="attrs"
+            density="compact"
             :items="selectableConverters"
-            :value="activeConverter"
-            v-on="on"
-            @change="changeConverter"
+            :model-value="activeConverter"
+            v-bind="props"
+            @update:model-value="changeConverter"
           />
         </template>
         <span>Select converter view</span>
@@ -167,49 +161,51 @@
               : streams.result.Results.length + streams.result.Offset
           }}</span
         >
-        <v-tooltip bottom>
-          <template #activator="{ on }">
-            <span v-on="on">
-              <v-btn
-                ref="prevStream"
-                icon
-                :disabled="prevStreamId == null"
-                :to="
-                  prevStreamId == null
-                    ? null
-                    : {
-                        name: 'stream',
-                        query: { q: $route.query.q, p: $route.query.p },
-                        params: { streamId: prevStreamId },
-                      }
-                "
-              >
-                <v-icon>mdi-chevron-left</v-icon>
-              </v-btn>
-            </span>
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn
+              variant="plain"
+              icon="mdi-chevron-left"
+              v-bind="props"
+              :disabled="prevStreamId == null"
+              :to="
+                prevStreamId == null
+                  ? {}
+                  : {
+                      name: 'stream',
+                      query: {
+                        q: $route.query.q,
+                        p: $route.query.p,
+                        converter: $route.query.converter,
+                      },
+                      params: { streamId: prevStreamId },
+                    }
+              "
+            />
           </template>
           <span>Previous Stream</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on }">
-            <span v-on="on">
-              <v-btn
-                ref="nextStream"
-                icon
-                :disabled="nextStreamId == null"
-                :to="
-                  nextStreamId == null
-                    ? null
-                    : {
-                        name: 'stream',
-                        query: { q: $route.query.q, p: $route.query.p },
-                        params: { streamId: nextStreamId },
-                      }
-                "
-              >
-                <v-icon>mdi-chevron-right</v-icon>
-              </v-btn>
-            </span>
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn
+              variant="plain"
+              icon="mdi-chevron-right"
+              v-bind="props"
+              :disabled="nextStreamId == null"
+              :to="
+                nextStreamId == null
+                  ? {}
+                  : {
+                      name: 'stream',
+                      query: {
+                        q: $route.query.q,
+                        p: $route.query.p,
+                        converter: $route.query.converter,
+                      },
+                      params: { streamId: nextStreamId },
+                    }
+              "
+            />
           </template>
           <span>Next Stream</span>
         </v-tooltip>
@@ -223,34 +219,32 @@
       "
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
-    <v-alert v-else-if="stream.error !== null" type="error" dense>{{
+    <v-alert v-else-if="stream.error !== null" type="error" density="compact">{{
       stream.error
     }}</v-alert>
     <div v-else-if="stream.stream !== null">
       <v-container fluid>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Client:</v-col>
-          <v-col
-            cols="2"
-            class="text-body-2"
-            :title="`${stream.stream.Stream.Client.Host}:${stream.stream.Stream.Client.Port} (${stream.stream.Stream.Client.Bytes} Bytes)`"
-            >{{ stream.stream.Stream.Client.Host }}:{{
-              stream.stream.Stream.Client.Port
-            }}
-            ({{
-              $options.filters?.prettyBytes(
-                stream.stream.Stream.Client.Bytes,
-                1,
-                true,
-              )
-            }})</v-col
+          <v-col cols="2" class="text-body-2"
+            ><span
+              :title="`${stream.stream.Stream.Client.Host}:${stream.stream.Stream.Client.Port} (${stream.stream.Stream.Client.Bytes} Bytes)`"
+              >{{ stream.stream.Stream.Client.Host }}:{{
+                stream.stream.Stream.Client.Port
+              }}
+              ({{
+                prettyBytes(stream.stream.Stream.Client.Bytes, {
+                  maximumFractionDigits: 1,
+                  binary: true,
+                })
+              }})</span
+            ></v-col
           >
           <v-col cols="1" class="text-subtitle-2">First Packet:</v-col>
-          <v-col
-            cols="3"
-            class="text-body-2"
-            :title="formatDateLong(stream.stream.Stream.FirstPacket)"
-            >{{ formatDate(stream.stream.Stream.FirstPacket) }}</v-col
+          <v-col cols="3" class="text-body-2"
+            ><span :title="formatDateLong(stream.stream.Stream.FirstPacket)">{{
+              formatDate(stream.stream.Stream.FirstPacket)
+            }}</span></v-col
           >
           <v-col cols="1" class="text-subtitle-2"
             >{{
@@ -262,36 +256,35 @@
             ><v-chip
               v-for="tag in streamTags.tag"
               :key="`tag/${tag.name}`"
-              small
+              size="small"
+              variant="flat"
               :color="tag.color"
-              :text-color="getContrastTextColor(tag.color)"
+              :style="{ color: getContrastTextColor(tag.color) }"
               >{{ tag.name }}</v-chip
             ></v-col
           >
         </v-row>
         <v-row>
           <v-col cols="1" class="text-subtitle-2">Server:</v-col>
-          <v-col
-            cols="2"
-            class="text-body-2"
-            :title="`${stream.stream.Stream.Server.Host}:${stream.stream.Stream.Server.Port} (${stream.stream.Stream.Server.Bytes} Bytes)`"
-            >{{ stream.stream.Stream.Server.Host }}:{{
-              stream.stream.Stream.Server.Port
-            }}
-            ({{
-              $options.filters?.prettyBytes(
-                stream.stream.Stream.Server.Bytes,
-                1,
-                true,
-              )
-            }})</v-col
+          <v-col cols="2" class="text-body-2"
+            ><span
+              :title="`${stream.stream.Stream.Server.Host}:${stream.stream.Stream.Server.Port} (${stream.stream.Stream.Server.Bytes} Bytes)`"
+              >{{ stream.stream.Stream.Server.Host }}:{{
+                stream.stream.Stream.Server.Port
+              }}
+              ({{
+                prettyBytes(stream.stream.Stream.Server.Bytes, {
+                  maximumFractionDigits: 1,
+                  binary: true,
+                })
+              }})</span
+            ></v-col
           >
           <v-col cols="1" class="text-subtitle-2">Last Packet:</v-col>
-          <v-col
-            cols="3"
-            class="text-body-2"
-            :title="formatDateLong(stream.stream.Stream.LastPacket)"
-            >{{ formatDate(stream.stream.Stream.LastPacket) }}</v-col
+          <v-col cols="3" class="text-body-2"
+            ><span :title="formatDateLong(stream.stream.Stream.LastPacket)">{{
+              formatDate(stream.stream.Stream.LastPacket)
+            }}</span></v-col
           >
           <v-col cols="1" class="text-body-2"
             ><span v-if="streamTags.service.length == 0">{{
@@ -301,9 +294,10 @@
               ><v-chip
                 v-for="service in streamTags.service"
                 :key="`service/${service.name}`"
-                small
+                size="small"
+                variant="flat"
                 :color="service.color"
-                :text-color="getContrastTextColor(service.color)"
+                :style="{ color: getContrastTextColor(service.color) }"
                 >{{ service.name }}</v-chip
               >
               ({{ stream.stream.Stream.Protocol }})</span
@@ -314,9 +308,10 @@
             ><v-chip
               v-for="mark in streamTags.mark"
               :key="`mark/${mark.name}`"
-              small
+              size="small"
+              variant="flat"
               :color="mark.color"
-              :text-color="getContrastTextColor(mark.color)"
+              :style="{ color: getContrastTextColor(mark.color) }"
               >{{ mark.name }}</v-chip
             ></v-col
           >
@@ -327,9 +322,10 @@
             ><v-chip
               v-for="generated in streamTags.generated"
               :key="`generated/${generated.name}`"
-              small
+              size="small"
+              variant="flat"
               :color="generated.color"
-              :text-color="getContrastTextColor(generated.color)"
+              :style="{ color: getContrastTextColor(generated.color) }"
               >{{ generated.name }}</v-chip
             ></v-col
           >
@@ -339,6 +335,7 @@
         ref="streamData"
         :data="stream.stream.Data"
         :presentation="presentation"
+        :highlight-matches="streams.result?.DataRegexes"
       ></StreamData>
     </div>
   </div>
@@ -357,15 +354,14 @@ import {
   onMounted,
   watch,
 } from "vue";
-import { useRoute, useRouter } from "vue-router/composables";
-import StreamData from "./StreamData.vue";
-import ToolBar from "./ToolBar.vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   registerSelectionListener,
   destroySelectionListener,
 } from "./streamSelector";
 import { formatDate, formatDateLong, tagify } from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";
+import prettyBytes from "pretty-bytes";
 
 const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
 
@@ -388,7 +384,7 @@ const converters = computed(() => store.converters);
 const groupedTags = computed(() => store.groupedTags);
 const streamTags = computed(() => {
   if (stream.stream == null) return {};
-  let res: { [key: string]: { name: string; color: string }[] } = {
+  const res: { [key: string]: { name: string; color: string }[] } = {
     service: [],
     tag: [],
     mark: [],
@@ -404,7 +400,7 @@ const streamTags = computed(() => {
 });
 
 const streamId = computed(() => {
-  return parseInt(route.params.streamId, 10);
+  return parseInt(route.params.streamId as string, 10);
 });
 
 const converter = computed(() => {
@@ -422,16 +418,16 @@ const selectableConverters = computed(() => {
   if (stream.stream === null) return [];
   const availableConverters =
     converters.value?.map((converter) => ({
-      text: converter.Name,
+      title: converter.Name,
       value: "converter:" + converter.Name,
     })) ?? [];
   return [
     {
-      text: "* none",
+      title: "* none",
       value: "none",
     },
     ...stream.stream.Converters.map((converter) => ({
-      text: `* ${converter}`,
+      title: `* ${converter}`,
       value: "converter:" + converter,
     })),
     ...availableConverters,
@@ -442,7 +438,7 @@ const streamIndex = computed(() => {
   if (streams.result == null) return null;
   const id = streamId.value;
   let i = 0;
-  for (let r of streams.result.Results) {
+  for (const r of streams.result.Results) {
     if (r.Stream.ID == id) return i;
     i++;
   }
@@ -473,7 +469,7 @@ watch(presentation, (v) => {
 onMounted(() => {
   fetchStreamForId();
   const proxy = {
-    proxy: getCurrentInstance()!.proxy,
+    streamData: getCurrentInstance()!.proxy,
     selectionData,
     selectionQuery,
   };
@@ -484,7 +480,11 @@ onMounted(() => {
     e.preventDefault();
     void router.push({
       name: "stream",
-      query: { q: route.query.q, p: route.query.p },
+      query: {
+        q: route.query.q,
+        p: route.query.p,
+        converter: route.query.converter,
+      },
       params: { streamId: streamId.toString() },
     });
   };
@@ -518,8 +518,8 @@ function changeConverter(converter: string) {
 
 function fetchStreamForId() {
   if (streamId.value !== null) {
-    stream.fetchStream(streamId.value, converter.value).catch((err: string) => {
-      EventBus.emit("showError", `Failed to fetch stream: ${err}`);
+    stream.fetchStream(streamId.value, converter.value).catch((err: Error) => {
+      EventBus.emit("showError", `Failed to fetch stream: ${err.message}`);
     });
     document.getSelection()?.empty();
   }
@@ -542,12 +542,18 @@ function createMark() {
 
 function markStream(tagId: string, value: boolean) {
   if (value) {
-    store.markTagAdd(tagId, [streamId.value]).catch((err: string) => {
-      EventBus.emit("showError", `Failed to add stream to mark: ${err}`);
+    store.markTagAdd(tagId, [streamId.value]).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to add stream to mark: ${err.message}`,
+      );
     });
   } else {
-    store.markTagDel(tagId, [streamId.value]).catch((err: string) => {
-      EventBus.emit("showError", `Failed to remove stream from mark: ${err}`);
+    store.markTagDel(tagId, [streamId.value]).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to remove stream from mark: ${err.message}`,
+      );
     });
   }
 }

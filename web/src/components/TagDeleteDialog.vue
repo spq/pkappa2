@@ -14,9 +14,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="visible = false">No</v-btn>
+          <v-btn variant="text" @click="visible = false">No</v-btn>
           <v-btn
-            text
+            variant="text"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
@@ -62,10 +62,10 @@ function deleteTag() {
     .then(() => {
       visible.value = false;
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       error.value = true;
       loading.value = false;
-      EventBus.emit("showError", err);
+      EventBus.emit("showError", err.message);
     });
 }
 </script>

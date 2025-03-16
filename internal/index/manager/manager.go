@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/pcapgo"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcap"
+	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
 	"github.com/spq/pkappa2/internal/index/converters"
@@ -58,7 +58,7 @@ type (
 		Type      string
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
-		PcapStats PcapStatistics         `json:",omitempty"`
+		PcapStats *PcapStatistics        `json:",omitempty"`
 		Config    *ClientConfig          `json:",omitempty"`
 	}
 
@@ -638,7 +638,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		}
 		mgr.event(Event{
 			Type: "pcapProcessed",
-			PcapStats: PcapStatistics{
+			PcapStats: &PcapStatistics{
 				PcapCount:         len(mgr.builder.KnownPcaps()),
 				ImportJobCount:    len(mgr.importJobs),
 				StreamCount:       int(mgr.nextStreamID),
@@ -743,7 +743,7 @@ func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, release
 		releaser.release(mgr)
 		mgr.event(Event{
 			Type: "indexesMerged",
-			PcapStats: PcapStatistics{
+			PcapStats: &PcapStatistics{
 				PcapCount:         len(mgr.builder.KnownPcaps()),
 				ImportJobCount:    len(mgr.importJobs),
 				StreamCount:       int(mgr.nextStreamID),
@@ -762,7 +762,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(context.Background(), indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters)
+		streams, _, _, err := index.SearchStreams(context.Background(), indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters, false)
 		if err != nil {
 			return err
 		}
@@ -898,9 +898,13 @@ func (mgr *Manager) KnownPcaps() []pcapmetadata.PcapInfo {
 func makeTagInfo(name string, t *tag) *TagInfo {
 	m := t.Matches.Copy()
 	m.Sub(t.Uncertain)
+	definition := t.definition
+	if _, _, mark := parseTagName(name); mark {
+		definition = "..."
+	}
 	return &TagInfo{
 		Name:           name,
-		Definition:     t.definition,
+		Definition:     definition,
 		Color:          t.color,
 		MatchingCount:  uint(m.OnesCount()),
 		UncertainCount: uint(t.Uncertain.OnesCount()),
@@ -2281,7 +2285,7 @@ func (v *View) prefetchTags(ctx context.Context, tags []string, bm bitmask.LongB
 					continue outer
 				}
 			}
-			matches, _, err := index.SearchStreams(ctx, v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters)
+			matches, _, _, err := index.SearchStreams(ctx, v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters, false)
 			if err != nil {
 				return err
 			}
@@ -2337,13 +2341,13 @@ func (v *View) AllStreams(ctx context.Context, f func(StreamContext) error, opti
 	return nil
 }
 
-func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, uint, error) {
+func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, uint, *index.DataRegexes, error) {
 	opts := streamsOptions{}
 	for _, o := range options {
 		o(&opts)
 	}
 	if err := v.fetch(); err != nil {
-		return false, 0, err
+		return false, 0, nil, err
 	}
 	if opts.prefetchAllTags {
 		for tn := range v.tagDetails {
@@ -2355,12 +2359,12 @@ func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(St
 		limit = *filter.Limit
 	}
 	offset := opts.page * limit
-	res, hasMore, err := index.SearchStreams(ctx, v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters)
+	res, hasMore, dataRegexes, err := index.SearchStreams(ctx, v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters, true)
 	if err != nil {
-		return false, 0, err
+		return false, 0, nil, err
 	}
 	if len(res) == 0 {
-		return hasMore, offset, nil
+		return hasMore, offset, dataRegexes, nil
 	}
 	if len(opts.prefetchTags) != 0 {
 		searchedStreams := bitmask.LongBitmask{}
@@ -2368,7 +2372,7 @@ func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(St
 			searchedStreams.Set(uint(s.StreamID))
 		}
 		if err := v.prefetchTags(ctx, opts.prefetchTags, searchedStreams); err != nil {
-			return false, 0, err
+			return false, 0, nil, err
 		}
 	}
 	for _, s := range res {
@@ -2376,10 +2380,10 @@ func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(St
 			s: s,
 			v: v,
 		}); err != nil {
-			return false, 0, err
+			return false, 0, nil, err
 		}
 	}
-	return hasMore, offset, nil
+	return hasMore, offset, dataRegexes, nil
 }
 
 func (v *View) ReferenceTime() (time.Time, error) {

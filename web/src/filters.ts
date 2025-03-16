@@ -1,4 +1,4 @@
-import vue from "./main";
+import moment from "moment";
 
 export function capitalize(value: string | null) {
   if (!value) return "";
@@ -13,21 +13,21 @@ export function tagify(id: string, what: "id" | "type" | "name") {
 }
 
 export function formatDuration(seconds: number) {
-  return vue.$moment.duration(seconds, "seconds").humanize();
+  return moment.duration(seconds, "seconds").humanize();
 }
 
 export function formatDate(time: string | Date | null) {
   if (time === null) return undefined;
-  const moment = vue.$moment(time).local();
+  const date = moment(time).local();
   let format = "HH:mm:ss.SSS";
-  if (!moment.isSame(vue.$moment(), "day")) format = `YYYY-MM-DD ${format}`;
-  return moment.format(format);
+  if (!date.isSame(moment(), "day")) format = `YYYY-MM-DD ${format}`;
+  return date.format(format);
 }
 
 export function formatDateLong(time: string | Date | null) {
   if (time === null) return undefined;
-  const moment = vue.$moment(time).local();
-  return moment.format("YYYY-MM-DD HH:mm:ss.SSS ZZ");
+  const date = moment(time).local();
+  return date.format("YYYY-MM-DD HH:mm:ss.SSS ZZ");
 }
 
 export function tagForURI(tagId: string) {
