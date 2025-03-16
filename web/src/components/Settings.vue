@@ -30,14 +30,12 @@ import { EventBus } from "./EventBus";
 import { ref } from "vue";
 
 const store = useRootStore();
-const autoInsertLimitToQuery = ref(
-  store.clientConfig?.AutoInsertLimitToQuery ?? false,
-);
+const autoInsertLimitToQuery = ref(store.clientConfig.AutoInsertLimitToQuery);
 
 //TODO find a way to only listen to clientconfig
 watch(store, (newValue) => {
   autoInsertLimitToQuery.value =
-    newValue?.clientConfig?.AutoInsertLimitToQuery ?? false;
+    newValue?.clientConfig.AutoInsertLimitToQuery ?? false;
 });
 
 function save() {

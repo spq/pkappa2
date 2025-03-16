@@ -17,7 +17,7 @@ interface State {
   pcaps: PcapInfo[] | null;
   tags: TagInfo[] | null;
   converters: ConverterStatistics[] | null;
-  clientConfig: ClientConfig | null;
+  clientConfig: ClientConfig;
   pcapOverIPEndpoints: PcapOverIPEndpoint[] | null;
 }
 
@@ -30,7 +30,9 @@ export const useRootStore = defineStore("root", {
       tags: null,
       converters: null,
       pcapOverIPEndpoints: null,
-      clientConfig: null,
+      clientConfig: {
+        AutoInsertLimitToQuery: false,
+      },
     };
   },
   getters: {

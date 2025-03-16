@@ -205,10 +205,8 @@ export function setupWebsocket() {
             console.error("Invalid config event:", e);
             return;
           }
-          if (store.clientConfig != null) {
-            store.clientConfig.AutoInsertLimitToQuery =
-              e.Config.AutoInsertLimitToQuery;
-          }
+          store.clientConfig.AutoInsertLimitToQuery =
+            e.Config.AutoInsertLimitToQuery;
           break;
         default:
           console.log(`Unhandled event type: ${e.Type}`);
