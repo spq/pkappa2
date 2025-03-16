@@ -2,23 +2,27 @@
   <div>
     <v-card>
       <v-card-title>Global Settings</v-card-title>
-      <v-simple-table>
+      <v-card-text>
+        These settings are global and will affect all users immediately.
+      </v-card-text>
+      <v-table density="compact">
         <tbody>
           <tr>
-            <th scope="row">AutoInsertLimitToQuery</th>
-            <td>
-              <input
+            <th scope="row">
+              <v-switch
                 v-model="autoInsertLimitToQuery"
-                type="checkbox"
+                color="primary"
                 @change="save"
               />
-            </td>
+            </th>
             <td>
-              When checked auto appends limit to queries clicked on in navbar
+              Limit tag queries to the last hour by default. When checked auto
+              appends <code>ltime:-1h:</code> to queries clicked on in the
+              navbar.
             </td>
           </tr>
         </tbody>
-      </v-simple-table>
+      </v-table>
     </v-card>
   </div>
 </template>
