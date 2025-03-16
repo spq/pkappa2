@@ -120,7 +120,6 @@ import { tagNameForURI } from "@/filters";
 const store = useRootStore();
 const route = useRoute();
 const router = useRouter();
-const config = computed(() => store.clientConfig);
 const searchBoxField = ref<HTMLInputElement | null>(null);
 const searchBox = ref<string>((route.query.q as string) ?? "");
 const historyIndex = ref(-1);
@@ -231,7 +230,6 @@ onMounted(() => {
   store.updateConverters().catch((err: Error) => {
     EventBus.emit("showError", `Failed to update converters: ${err.message}`);
   });
-
   const keyListener = (e: KeyboardEvent) => {
     if (e.target === null || !(e.target instanceof Element)) return;
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
@@ -388,16 +386,14 @@ function search(type: string | null) {
       q = JSON.parse(JSON.stringify(route.query)) as typeof route.query;
   }
   q.q = searchBox.value;
-  if (config.value?.AutoInsertLimitToQuery) {
-    q.manualSearch = "true";
-  }
   addSearch(searchBox.value);
   historyIndex.value = -1;
-  const newQuery = {
-    name: type,
-    query: q,
-  };
-  void router.push(newQuery).catch((e) => console.warn(e));
+  void router
+    .push({
+      name: type,
+      query: q,
+    })
+    .catch((e) => console.warn(e));
 }
 
 function createTag(tagType: string, tagQuery: string) {

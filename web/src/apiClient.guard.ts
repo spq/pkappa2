@@ -2,7 +2,7 @@
  * Generated type guards for "apiClient.ts".
  * WARNING: Do not manually change this file.
  */
-import { Error, SearchResult, SearchResponse, StreamData, Statistics, ClientConfig, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, TagsResponse, GraphResponse } from "./apiClient";
+import { Error, SearchResult, SearchResponse, StreamData, Statistics, Config, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, TagsResponse, GraphResponse } from "./apiClient";
 
 export function isError(obj: unknown): obj is Error {
     const typedObj = obj as Error
@@ -147,8 +147,8 @@ export function isStatistics(obj: unknown): obj is Statistics {
     )
 }
 
-export function isClientConfig(obj: unknown): obj is ClientConfig {
-    const typedObj = obj as ClientConfig
+export function isConfig(obj: unknown): obj is Config {
+    const typedObj = obj as Config
     return (
         (typedObj !== null &&
             typeof typedObj === "object" ||

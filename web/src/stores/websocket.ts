@@ -1,4 +1,4 @@
-import { ClientConfig, ConverterStatistics, TagInfo } from "@/apiClient";
+import { Config, ConverterStatistics, TagInfo } from "@/apiClient";
 import { useRootStore } from ".";
 import { useStreamStore } from "./stream";
 import { useStreamsStore } from "./streams";
@@ -64,7 +64,7 @@ export type PcapStatsEvent = {
 /** @see {isConfigEvent} ts-auto-guard:type-guard */
 export type ConfigEvent = {
   Type: "configUpdated";
-  Config: ClientConfig;
+  Config: Config;
 };
 
 export function setupWebsocket() {
@@ -205,8 +205,7 @@ export function setupWebsocket() {
             console.error("Invalid config event:", e);
             return;
           }
-          store.clientConfig.AutoInsertLimitToQuery =
-            e.Config.AutoInsertLimitToQuery;
+          store.config.AutoInsertLimitToQuery = e.Config.AutoInsertLimitToQuery;
           break;
         default:
           console.log(`Unhandled event type: ${e.Type}`);

@@ -59,7 +59,7 @@ type (
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
 		PcapStats *PcapStatistics        `json:",omitempty"`
-		Config    *ClientConfig          `json:",omitempty"`
+		Config    *Config                `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -142,7 +142,7 @@ type (
 
 		listeners map[chan Event]listener
 
-		clientConfig ClientConfig
+		config Config
 	}
 
 	Statistics struct {
@@ -159,7 +159,7 @@ type (
 		ConverterJobRunning bool
 	}
 
-	ClientConfig struct {
+	Config struct {
 		AutoInsertLimitToQuery bool
 	}
 
@@ -229,7 +229,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		jobs:             make(chan func()),
 		listeners:        make(map[chan Event]listener),
 
-		clientConfig: ClientConfig{AutoInsertLimitToQuery: false},
+		config: Config{AutoInsertLimitToQuery: false},
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -830,10 +830,10 @@ func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	return indexes, mgr.lock(indexes)
 }
 
-func (mgr *Manager) SetClientConfig(config ClientConfig) {
+func (mgr *Manager) SetConfig(config Config) {
 	c := make(chan struct{})
 	mgr.jobs <- func() {
-		mgr.clientConfig = config
+		mgr.config = config
 
 		mgr.event(Event{
 			Type:   "configUpdated",
@@ -845,14 +845,13 @@ func (mgr *Manager) SetClientConfig(config ClientConfig) {
 	<-c
 }
 
-func (mgr *Manager) ClientConfig() ClientConfig {
-	c := make(chan ClientConfig)
+func (mgr *Manager) Config() Config {
+	c := make(chan Config)
 	mgr.jobs <- func() {
-		c <- mgr.clientConfig
+		c <- mgr.config
 		close(c)
 	}
-	res := <-c
-	return res
+	return <-c
 }
 
 func (mgr *Manager) Status() Statistics {

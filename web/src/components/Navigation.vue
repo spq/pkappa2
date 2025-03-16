@@ -25,7 +25,7 @@
       density="compact"
       exact
       :to="
-        store.clientConfig.AutoInsertLimitToQuery
+        store.config.AutoInsertLimitToQuery
           ? { name: 'search', query: { q: 'ltime:-1h:' } }
           : { name: 'search', query: { q: '' } }
       "
@@ -70,7 +70,7 @@
             v-bind="hoverProps"
             :style="{ backgroundColor: tag.Color }"
             :to="
-              store.clientConfig.AutoInsertLimitToQuery
+              store.config.AutoInsertLimitToQuery
                 ? {
                     name: 'search',
                     query: {
@@ -121,7 +121,7 @@
                     link
                     exact
                     :to="
-                      store.clientConfig.AutoInsertLimitToQuery
+                      store.config.AutoInsertLimitToQuery
                         ? {
                             name: 'search',
                             query: {
@@ -398,7 +398,7 @@ watch(colorscheme, () => {
 });
 
 onMounted(() => {
-  store.getClientConfig().catch((err: string) => {
+  store.getConfig().catch((err: string) => {
     EventBus.emit("showError", `Failed to get config: ${err}`);
   });
   store

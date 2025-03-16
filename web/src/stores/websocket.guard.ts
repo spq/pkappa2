@@ -3,7 +3,7 @@
  * WARNING: Do not manually change this file.
  */
 import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent } from "./websocket";
-import { isClientConfig } from "../apiClient.guard";
+import { isConfig } from "../apiClient.guard";
 
 export function isEvent(obj: unknown): obj is Event {
     const typedObj = obj as Event
@@ -97,6 +97,6 @@ export function isConfigEvent(obj: unknown): obj is ConfigEvent {
             typeof typedObj === "object" ||
             typeof typedObj === "function") &&
         typedObj["Type"] === "configUpdated" &&
-        isClientConfig(typedObj["Config"]) as boolean
+        isConfig(typedObj["Config"]) as boolean
     )
 }

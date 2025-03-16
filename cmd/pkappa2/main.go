@@ -183,14 +183,14 @@ func main() {
 		http.Error(w, "OK", http.StatusOK)
 	})
 	rUser.Mount("/debug", middleware.Profiler())
-	rUser.Get("/api/clientconfig", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Get("/api/config", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		if err := json.NewEncoder(w).Encode(mgr.ClientConfig()); err != nil {
+		if err := json.NewEncoder(w).Encode(mgr.Config()); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 		}
 	})
-	rUser.Post("/api/clientconfig", func(w http.ResponseWriter, r *http.Request) {
+	rUser.Post("/api/config", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		body, err := io.ReadAll(r.Body)
@@ -199,14 +199,13 @@ func main() {
 			return
 		}
 
-		var config manager.ClientConfig
-		err2 := json.Unmarshal([]byte(body), &config)
-		if err2 != nil {
+		var config manager.Config
+		if err = json.Unmarshal([]byte(body), &config); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		mgr.SetClientConfig(config)
+		mgr.SetConfig(config)
 	})
 	rUser.Get("/api/status.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
