@@ -2,7 +2,8 @@
  * Generated type guards for "websocket.ts".
  * WARNING: Do not manually change this file.
  */
-import { Event, TagEvent, ConverterEvent, PcapStatsEvent } from "./websocket";
+import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent } from "./websocket";
+import { isConfig } from "../apiClient.guard";
 
 export function isEvent(obj: unknown): obj is Event {
     const typedObj = obj as Event
@@ -86,5 +87,16 @@ export function isPcapStatsEvent(obj: unknown): obj is PcapStatsEvent {
         typeof typedObj["PcapStats"]["StreamCount"] === "number" &&
         typeof typedObj["PcapStats"]["StreamRecordCount"] === "number" &&
         typeof typedObj["PcapStats"]["PacketRecordCount"] === "number"
+    )
+}
+
+export function isConfigEvent(obj: unknown): obj is ConfigEvent {
+    const typedObj = obj as ConfigEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["Type"] === "configUpdated" &&
+        isConfig(typedObj["Config"]) as boolean
     )
 }

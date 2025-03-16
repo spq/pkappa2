@@ -388,10 +388,12 @@ function search(type: string | null) {
   q.q = searchBox.value;
   addSearch(searchBox.value);
   historyIndex.value = -1;
-  void router.push({
-    name: type,
-    query: q,
-  });
+  void router
+    .push({
+      name: type,
+      query: q,
+    })
+    .catch((e) => console.warn(e));
 }
 
 function createTag(tagType: string, tagQuery: string) {

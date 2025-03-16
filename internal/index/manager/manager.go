@@ -59,6 +59,7 @@ type (
 		Tag       *TagInfo               `json:",omitempty"`
 		Converter *converters.Statistics `json:",omitempty"`
 		PcapStats *PcapStatistics        `json:",omitempty"`
+		Config    *Config                `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -140,6 +141,8 @@ type (
 		watcher     *fsnotify.Watcher
 
 		listeners map[chan Event]listener
+
+		config Config
 	}
 
 	Statistics struct {
@@ -154,6 +157,10 @@ type (
 		MergeJobRunning     bool
 		TaggingJobRunning   bool
 		ConverterJobRunning bool
+	}
+
+	Config struct {
+		AutoInsertLimitToQuery bool
 	}
 
 	indexReleaser []*index.Reader
@@ -221,6 +228,8 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		streamsToConvert: make(map[string]*bitmask.LongBitmask),
 		jobs:             make(chan func()),
 		listeners:        make(map[chan Event]listener),
+
+		config: Config{AutoInsertLimitToQuery: false},
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -819,6 +828,30 @@ func (mgr *Manager) ImportPcaps(filenames []string) {
 func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	indexes := append([]*index.Reader(nil), mgr.indexes[start:]...)
 	return indexes, mgr.lock(indexes)
+}
+
+func (mgr *Manager) SetConfig(config Config) {
+	c := make(chan struct{})
+	mgr.jobs <- func() {
+		mgr.config = config
+
+		mgr.event(Event{
+			Type:   "configUpdated",
+			Config: &config,
+		})
+		close(c)
+	}
+
+	<-c
+}
+
+func (mgr *Manager) Config() Config {
+	c := make(chan Config)
+	mgr.jobs <- func() {
+		c <- mgr.config
+		close(c)
+	}
+	return <-c
 }
 
 func (mgr *Manager) Status() Statistics {

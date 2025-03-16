@@ -9,6 +9,7 @@ import APIClient, {
   PcapOverIPEndpoint,
   Statistics,
   TagInfo,
+  Config,
 } from "@/apiClient";
 
 interface State {
@@ -16,6 +17,7 @@ interface State {
   pcaps: PcapInfo[] | null;
   tags: TagInfo[] | null;
   converters: ConverterStatistics[] | null;
+  config: Config;
   pcapOverIPEndpoints: PcapOverIPEndpoint[] | null;
 }
 
@@ -28,6 +30,10 @@ export const useRootStore = defineStore("root", {
       tags: null,
       converters: null,
       pcapOverIPEndpoints: null,
+      config: {
+        // Default should match the ones in the backend at Manager::New
+        AutoInsertLimitToQuery: false,
+      },
     };
   },
   getters: {
@@ -104,6 +110,16 @@ export const useRootStore = defineStore("root", {
     async updateConverters() {
       return APIClient.getConverters()
         .then((data) => (this.converters = data))
+        .catch(handleAxiosDefaultError);
+    },
+    async getConfig() {
+      return APIClient.getConfig()
+        .then((data) => (this.config = data))
+        .catch(handleAxiosDefaultError);
+    },
+    async updateConfig(config: Config) {
+      return APIClient.updateConfig(config)
+        .then(() => (this.config = config))
         .catch(handleAxiosDefaultError);
     },
     async updatePcaps() {

@@ -24,7 +24,11 @@
       link
       density="compact"
       exact
-      :to="{ name: 'search', query: { q: '' } }"
+      :to="
+        store.config.AutoInsertLimitToQuery
+          ? { name: 'search', query: { q: 'ltime:-1h:' } }
+          : { name: 'search', query: { q: '' } }
+      "
     >
       <template #prepend>
         <v-icon size="small">mdi-all-inclusive</v-icon>
@@ -65,12 +69,21 @@
             :class="{ tagSelected: inQuery(tag.Name) }"
             v-bind="hoverProps"
             :style="{ backgroundColor: tag.Color }"
-            :to="{
-              name: 'search',
-              query: {
-                q: tagForURI(tag.Name),
-              },
-            }"
+            :to="
+              store.config.AutoInsertLimitToQuery
+                ? {
+                    name: 'search',
+                    query: {
+                      q: tagForURI(tag.Name) + ' ltime:-1h:',
+                    },
+                  }
+                : {
+                    name: 'search',
+                    query: {
+                      q: tagForURI(tag.Name),
+                    },
+                  }
+            "
             @click.shift.prevent="appendOrRemoveFilter(tag.Name)"
           >
             <v-list-item-title
@@ -107,12 +120,21 @@
                   <v-list-item
                     link
                     exact
-                    :to="{
-                      name: 'search',
-                      query: {
-                        q: tagForURI(tag.Name),
-                      },
-                    }"
+                    :to="
+                      store.config.AutoInsertLimitToQuery
+                        ? {
+                            name: 'search',
+                            query: {
+                              q: tagForURI(tag.Name) + ' ltime:-1h:',
+                            },
+                          }
+                        : {
+                            name: 'search',
+                            query: {
+                              q: tagForURI(tag.Name),
+                            },
+                          }
+                    "
                     prepend-icon="mdi-magnify"
                   >
                     <v-list-item-title>Show Streams</v-list-item-title>
@@ -212,6 +234,16 @@
         }"
       >
         <v-list-item-title>Status</v-list-item-title>
+      </v-list-item>
+      <v-list-item
+        link
+        density="compact"
+        exact
+        :to="{
+          name: 'settings',
+        }"
+      >
+        <v-list-item-title>Settings</v-list-item-title>
       </v-list-item>
       <v-list-item
         link
@@ -366,6 +398,9 @@ watch(colorscheme, () => {
 });
 
 onMounted(() => {
+  store.getConfig().catch((err: string) => {
+    EventBus.emit("showError", `Failed to get config: ${err}`);
+  });
   store
     .updateTags()
     .then(() => {

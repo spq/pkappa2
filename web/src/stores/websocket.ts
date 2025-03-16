@@ -1,8 +1,9 @@
-import { ConverterStatistics, TagInfo } from "@/apiClient";
+import { Config, ConverterStatistics, TagInfo } from "@/apiClient";
 import { useRootStore } from ".";
 import { useStreamStore } from "./stream";
 import { useStreamsStore } from "./streams";
 import {
+  isConfigEvent,
   isConverterEvent,
   isEvent,
   isPcapStatsEvent,
@@ -10,6 +11,7 @@ import {
 } from "./websocket.guard";
 
 type EventTypes =
+  | "configUpdated"
   | "converterCompleted"
   | "converterDeleted"
   | "converterAdded"
@@ -57,6 +59,12 @@ export type PcapStats = {
 export type PcapStatsEvent = {
   Type: "pcapProcessed" | "indexesMerged";
   PcapStats: PcapStats;
+};
+
+/** @see {isConfigEvent} ts-auto-guard:type-guard */
+export type ConfigEvent = {
+  Type: "configUpdated";
+  Config: Config;
 };
 
 export function setupWebsocket() {
@@ -191,6 +199,13 @@ export function setupWebsocket() {
             store.status.StreamRecordCount = e.PcapStats.StreamRecordCount;
             store.status.PacketRecordCount = e.PcapStats.PacketRecordCount;
           }
+          break;
+        case "configUpdated":
+          if (!isConfigEvent(e)) {
+            console.error("Invalid config event:", e);
+            return;
+          }
+          store.config.AutoInsertLimitToQuery = e.Config.AutoInsertLimitToQuery;
           break;
         default:
           console.log(`Unhandled event type: ${e.Type}`);
