@@ -205,7 +205,10 @@ func main() {
 			return
 		}
 
-		mgr.SetConfig(config)
+		if err = mgr.SetConfig(config); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	})
 	rUser.Get("/api/status.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

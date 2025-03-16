@@ -178,6 +178,7 @@ type (
 		Pcaps                    []*pcapmetadata.PcapInfo
 		PcapProcessorWebhookUrls []string
 		PcapOverIPEndpoints      []string
+		Config                   Config
 	}
 
 	updateTagOperationInfo struct {
@@ -401,6 +402,7 @@ nextStateFile:
 		mgr.tags = newTags
 		mgr.pcapProcessorWebhookUrls = s.PcapProcessorWebhookUrls
 		mgr.stateFilename = fn
+		mgr.config = s.Config
 		pcapOverIPEndpoints = pcapOverIPEndpointsTemp
 		stateTimestamp = s.Saved
 		cachedKnownPcapData = s.Pcaps
@@ -488,6 +490,7 @@ func (mgr *Manager) saveState() error {
 		Pcaps:                    mgr.builder.KnownPcaps(),
 		PcapProcessorWebhookUrls: mgr.pcapProcessorWebhookUrls,
 		PcapOverIPEndpoints:      make([]string, 0, len(mgr.pcapOverIPEndpoints)),
+		Config:                   mgr.config,
 	}
 	for _, e := range mgr.pcapOverIPEndpoints {
 		j.PcapOverIPEndpoints = append(j.PcapOverIPEndpoints, e.Address)
@@ -830,8 +833,8 @@ func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	return indexes, mgr.lock(indexes)
 }
 
-func (mgr *Manager) SetConfig(config Config) {
-	c := make(chan struct{})
+func (mgr *Manager) SetConfig(config Config) error {
+	c := make(chan error)
 	mgr.jobs <- func() {
 		mgr.config = config
 
@@ -839,10 +842,10 @@ func (mgr *Manager) SetConfig(config Config) {
 			Type:   "configUpdated",
 			Config: &config,
 		})
+		c <- mgr.saveState()
 		close(c)
 	}
-
-	<-c
+	return <-c
 }
 
 func (mgr *Manager) Config() Config {
