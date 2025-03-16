@@ -11,7 +11,9 @@
     "type-check": "vue-tsc --build --force",
     "lint": "eslint --fix .",
     "format": "prettier --check --write .",
-    "nearley": "nearleyc src/parser/query.ne -o src/parser/query.ts"
+    "nearley": "nearleyc src/parser/query.ne -o src/parser/query.ts",
+    "auto-guard": "ts-auto-guard --project tsconfig.app.json",
+    "auto-guard-debug": "ts-auto-guard --project tsconfig.app.json --debug"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
