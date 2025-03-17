@@ -951,10 +951,10 @@ available-typed-arrays@^1.0.7:
   dependencies:
     possible-typed-array-names "^1.0.0"
 
-axios@^1.8.2:
-  version "1.8.2"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-1.8.2.tgz#fabe06e241dfe83071d4edfbcaa7b1c3a40f7979"
-  integrity sha512-ls4GYBm5aig9vWx8AWDSGLpnpDQRtWAfrjU+EuytuODrFBkqesN2RkOQCBzrA1RQNHw1SmRMSDDDSwzNAYQ6Rg==
+axios@^1.8.3:
+  version "1.8.3"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.8.3.tgz#9ebccd71c98651d547162a018a1a95a4b4ed4de8"
+  integrity sha512-iP4DebzoNlP/YN2dpwCgb8zoCmhtkajzS48JvwmkSkXvPI3DHc7m+XYL5tGnSlJtR6nImXZmdCuN5aP8dh1d8A==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.0"
@@ -3303,10 +3303,10 @@ vue@^3.5.13:
     "@vue/server-renderer" "3.5.13"
     "@vue/shared" "3.5.13"
 
-vuetify@^3.7.15:
-  version "3.7.15"
-  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.7.15.tgz#f0f9944c9e4c3cac311dae94fee5348c59b054ce"
-  integrity sha512-kBZzwXI5EcAMiW5TRMgK1reXQd0K/PpUt+ekX4Alvm7n09uzJ1my1TLNbX1sQ8/0KYgoxOf17C8qOJzBGkT+PA==
+vuetify@^3.7.16:
+  version "3.7.16"
+  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.7.16.tgz#64ea3cd834f8c9fab6e5bc58f67a11daab06231d"
+  integrity sha512-Few/cBtgJYgdkzi0LWmVy67G5uc2+q7oWcadbcTUPAtEtGYNh2AM28h01Fk+ScJgfxkA077//ZDff1rh3jYG/w==
 
 webpack-virtual-modules@^0.6.2:
   version "0.6.2"
