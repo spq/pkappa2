@@ -3,6 +3,7 @@ package regexanalysis
 import (
 	"fmt"
 	"math"
+	"math/bits"
 
 	"rsc.io/binaryregexp/syntax"
 )
@@ -104,14 +105,25 @@ func AcceptedLength(regexString string) (AcceptedLengths, error) {
 	if err != nil {
 		return AcceptedLengths{}, err
 	}
-	evaluate := (func(a *AcceptedLengths, pos uint32, seen []uint32) error)(nil)
-	evaluate = func(a *AcceptedLengths, pos uint32, seen []uint32) error {
+	cache := map[uint32]AcceptedLengths{}
+	evaluate := (func(entry uint32, seen []uint32) (AcceptedLengths, error))(nil)
+	evaluate = func(entry uint32, seen []uint32) (AcceptedLengths, error) {
+		if r, ok := cache[entry]; ok {
+			return r, nil
+		}
+		r := AcceptedLengths{}
+		pos := entry
 		for {
 			i := p.Inst[pos]
 			switch i.Op {
 			case syntax.InstRune1, syntax.InstRune, syntax.InstRuneAny, syntax.InstRuneAnyNotNL:
-				a.MinLength++
-				a.MaxLength++
+				inc := func(v *uint) {
+					if *v != math.MaxUint {
+						(*v)++
+					}
+				}
+				inc(&r.MinLength)
+				inc(&r.MaxLength)
 				fallthrough
 			case syntax.InstNop, syntax.InstEmptyWidth, syntax.InstCapture:
 				pos = i.Out
@@ -119,36 +131,44 @@ func AcceptedLength(regexString string) (AcceptedLengths, error) {
 			case syntax.InstAlt, syntax.InstAltMatch:
 				for _, s := range seen {
 					if s == pos {
-						a.MinLength = math.MaxUint64
-						a.MaxLength = math.MaxUint64
-						return nil
+						cache[entry] = AcceptedLengths{math.MaxUint64, math.MaxUint64}
+						return AcceptedLengths{math.MaxUint64, math.MaxUint64}, nil
 					}
 				}
 				seen = append(seen, pos)
-				a2 := *a
-				if err := evaluate(&a2, i.Out, seen); err != nil {
-					return err
+				r1, err := evaluate(i.Out, seen)
+				if err != nil {
+					return AcceptedLengths{}, err
 				}
-				if err := evaluate(a, i.Arg, seen); err != nil {
-					return err
+				r2, err := evaluate(i.Arg, seen)
+				if err != nil {
+					return AcceptedLengths{}, err
 				}
-				if a.MinLength > a2.MinLength {
-					a.MinLength = a2.MinLength
+				if r1.MinLength > r2.MinLength {
+					r1.MinLength, r2.MinLength = r2.MinLength, r1.MinLength
 				}
-				if a.MaxLength < a2.MaxLength {
-					a.MaxLength = a2.MaxLength
+				if r1.MaxLength < r2.MaxLength {
+					r1.MaxLength, r2.MaxLength = r2.MaxLength, r1.MaxLength
 				}
-				return nil
+				add := func(a, b uint) uint {
+					c := ((a >> 1) + (b >> 1) + (a & b & 1)) >> (bits.UintSize - 1)
+					if c != 0 {
+						return math.MaxUint
+					}
+					return a + b
+				}
+				r.MinLength = add(r.MinLength, r1.MinLength)
+				r.MaxLength = add(r.MaxLength, r1.MaxLength)
+				fallthrough
 			case syntax.InstMatch:
-				return nil
+				cache[entry] = r
+				return r, nil
 			case syntax.InstFail:
-				a.MinLength = math.MaxUint64
-				a.MaxLength = math.MaxUint64
-				return nil
+				cache[entry] = AcceptedLengths{math.MaxUint64, math.MaxUint64}
+				return AcceptedLengths{math.MaxUint64, math.MaxUint64}, nil
 			}
-			return fmt.Errorf("unsupported regex op %q", i.String())
+			return AcceptedLengths{}, fmt.Errorf("unsupported regex op %q", i.String())
 		}
 	}
-	a := AcceptedLengths{}
-	return a, evaluate(&a, uint32(p.Start), nil)
+	return evaluate(uint32(p.Start), nil)
 }
