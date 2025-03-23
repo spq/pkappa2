@@ -1,10 +1,14 @@
 import base64
 import datetime
 import json
+import os
+import requests
 import sys
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
+
+ATTACK_INFO_URL = os.getenv("ATTACK_INFO_URL", "")
 
 
 class Protocol(Enum):
@@ -109,6 +113,11 @@ class Pkappa2Converter:
     """
 
     current_stream_id: int
+    session: requests.Session
+
+    def __init__(self):
+        self.current_stream_id = -1
+        self.session = requests.Session()
 
     def log(self, message: str):
         """
@@ -176,3 +185,22 @@ class Pkappa2Converter:
             in the UI.
         """
         raise NotImplementedError
+
+    def get_attackinfo(self, stream: Stream) -> list[str]:
+        """
+        Fetch the attackinfo for the service on the host:port combination.
+        Sorted by newest round's info to oldest.
+        """
+        if not ATTACK_INFO_URL:
+            return []
+        r = self.session.get(
+            ATTACK_INFO_URL,
+            params={
+                "service_host": stream.Metadata.ServerHost,
+                "service_port": stream.Metadata.ServerPort,
+                "own_history": True,
+            },
+            timeout=2,
+        )
+        r.raise_for_status()
+        return r.json()
