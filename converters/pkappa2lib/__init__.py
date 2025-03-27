@@ -9,6 +9,7 @@ from enum import Enum
 from typing import List
 
 ATTACK_INFO_URL = os.getenv("ATTACK_INFO_URL", "")
+ATTACK_INFO_CACHE_TIME = int(os.getenv("ATTACK_INFO_CACHE_TIME", "10"))
 
 
 class Protocol(Enum):
@@ -114,10 +115,14 @@ class Pkappa2Converter:
 
     current_stream_id: int
     session: requests.Session
+    last_attackinfo: list[str]
+    last_attackinfo_time: datetime.datetime
 
     def __init__(self):
         self.current_stream_id = -1
         self.session = requests.Session()
+        self.last_attackinfo = {}
+        self.last_attackinfo_time = datetime.datetime.fromtimestamp(0)
 
     def log(self, message: str):
         """
@@ -193,6 +198,12 @@ class Pkappa2Converter:
         """
         if not ATTACK_INFO_URL:
             return []
+
+        # Assume we're always requesting the same service.
+        now = datetime.datetime.now()
+        if (now - self.last_attackinfo_time).total_seconds() < ATTACK_INFO_CACHE_TIME:
+            return self.last_attackinfo
+
         r = self.session.get(
             ATTACK_INFO_URL,
             params={
@@ -203,4 +214,6 @@ class Pkappa2Converter:
             timeout=2,
         )
         r.raise_for_status()
-        return r.json()
+        self.last_attackinfo = r.json()
+        self.last_attackinfo_time = now
+        return self.last_attackinfo
