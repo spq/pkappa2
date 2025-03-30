@@ -2,10 +2,10 @@ module github.com/spq/pkappa2
 
 go 1.23.0
 
-toolchain go1.23.7
+toolchain go1.24.1
 
 require (
-	github.com/alecthomas/participle/v2 v2.1.2
+	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/gopacket/gopacket v1.3.1
