@@ -151,6 +151,22 @@
         </template>
         <span>Select converter view</span>
       </v-tooltip>
+
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-checkbox
+            v-model="urlDecode"
+            label="URL Decode"
+            density="compact"
+            hide-details
+            color="primary"
+            style="max-width: fit-content;"
+            v-bind="props"
+          />
+        </template>
+        <span>URL Decode</span>
+      </v-tooltip>
+
       <v-spacer />
       <div v-if="streamIndex !== null && streams.result !== null">
         <span class="text-caption"
@@ -336,6 +352,7 @@
         :data="stream.stream.Data"
         :presentation="presentation"
         :highlight-matches="streams.result?.DataRegexes"
+        :url-decode="urlDecode"
       ></StreamData>
     </div>
   </div>
@@ -372,6 +389,7 @@ const presentation = ref("ascii");
 const selectionData = ref("");
 const selectionQuery = ref("");
 const streamData = ref<HTMLElement | null>(null);
+const urlDecode = ref(false);
 
 if (localStorage.streamPresentation) {
   presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";

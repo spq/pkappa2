@@ -52,6 +52,11 @@ const props = defineProps({
     required: false,
     default: () => ({ Client: null, Server: null }),
   },
+  urlDecode: {
+    type: Boolean,
+    required: false,
+    default: false,
+  },
 });
 const presentation = computed(() => props.presentation);
 const data = computed(() => props.data);
@@ -84,10 +89,27 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
 });
 
 const inlineAscii = (chunk: Data) => {
-  const chunkData = atob(chunk.Content);
-  const asciiEscaped = chunkData
-    .split("")
-    .map((c) => asciiMap[c.charCodeAt(0)]);
+  let chunkData = atob(chunk.Content);
+  const bytes = new Uint8Array([...chunkData].map(c => c.charCodeAt(0)));
+  try {
+    chunkData = new TextDecoder("utf-8").decode(bytes);
+  } catch (e) {
+    console.error('Failed to decode UTF-8 chunk data:', e);
+  }
+
+  if (props.urlDecode) {
+    try {
+      chunkData = decodeURI(chunkData);
+    } catch (e) {
+      console.error('Failed to URL decode chunk:', e);
+    }
+  }
+
+  const asciiEscaped = chunkData.split("").map((c) => {
+    const charCode = c.charCodeAt(0);
+    return asciiMap[charCode] !== undefined ? asciiMap[charCode] : c;
+  });
+  
   const highlightMatches =
     chunk.Direction === 0
       ? highlightMatchesClient.value
