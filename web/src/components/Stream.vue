@@ -160,7 +160,7 @@
             density="compact"
             hide-details
             color="primary"
-            style="max-width: fit-content;"
+            style="max-width: fit-content"
             v-bind="props"
           />
         </template>
