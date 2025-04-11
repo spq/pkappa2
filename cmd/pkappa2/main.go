@@ -48,6 +48,7 @@ var (
 	snapshotDir  = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
 	stateDir     = flag.String("state_dir", "", "Path where state files will be stored")
 	converterDir = flag.String("converter_dir", "./converters", "Path where converter executables are searched")
+	watchDir     = flag.String("watch_dir", "", "Path where new pcap files are searched and imported")
 
 	userPassword = flag.String("user_password", "", "HTTP auth password for users")
 	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
@@ -101,6 +102,7 @@ func main() {
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
 		*converterDir,
+		*watchDir,
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)
