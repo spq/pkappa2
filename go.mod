@@ -15,4 +15,4 @@ require (
 	rsc.io/binaryregexp v0.2.0
 )
 
-require golang.org/x/net v0.36.0 // indirect
+require golang.org/x/net v0.38.0 // indirect
