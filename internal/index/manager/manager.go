@@ -1735,15 +1735,29 @@ func (mgr *Manager) startMonitoringPcaps(watcher *fsnotify.Watcher) {
 							return
 						}
 						defer src.Close()
-						dst, err := os.Create(filepath.Join(mgr.PcapDir, fileInfo.Name()))
+
+						dstFilename := filepath.Join(mgr.PcapDir, fileInfo.Name())
+						dst, err := os.OpenFile(dstFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 						if err != nil {
 							log.Printf("error while copying new pcap to PcapDir: %v", err)
 							return
 						}
-						defer dst.Close()
 
 						if _, err := io.Copy(dst, src); err != nil {
 							log.Printf("error while copying new pcap to PcapDir: %v", err)
+							if err := dst.Close(); err != nil {
+								log.Printf("error while closing empty new pcap: %v", err)
+							}
+							if err := os.Remove(dstFilename); err != nil {
+								log.Printf("error while removing empty new pcap file: %v", err)
+							}
+							return
+						}
+						if err := dst.Close(); err != nil {
+							log.Printf("error while closing new pcap: %v", err)
+							if err := os.Remove(dstFilename); err != nil {
+								log.Printf("error while removing new pcap file after failed save: %v", err)
+							}
 							return
 						}
 						mgr.ImportPcaps([]string{fileInfo.Name()})
