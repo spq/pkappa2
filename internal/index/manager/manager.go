@@ -1714,7 +1714,7 @@ func (mgr *Manager) startMonitoringPcaps(watcher *fsnotify.Watcher) {
 				}
 				log.Println("event:", event)
 
-				if !(event.Has(fsnotify.Create|fsnotify.Write|fsnotify.Chmod) && filepath.Ext(event.Name) == ".pcap") {
+				if !(event.Has(fsnotify.Create|fsnotify.Write|fsnotify.Chmod) && strings.HasPrefix(filepath.Ext(event.Name), ".pcap")) {
 					continue
 				}
 
