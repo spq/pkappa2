@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net"
@@ -107,6 +108,7 @@ type (
 		IndexDir     string
 		SnapshotDir  string
 		ConverterDir string
+		WatchDir     string
 
 		jobs                chan func()
 		mergeJobRunning     bool
@@ -137,8 +139,9 @@ type (
 		tags       map[string]*tag
 		converters map[string]*converters.CachedConverter
 
-		usedIndexes map[*index.Reader]uint
-		watcher     *fsnotify.Watcher
+		usedIndexes       map[*index.Reader]uint
+		convertersWatcher *fsnotify.Watcher
+		pcapsWatcher      *fsnotify.Watcher
 
 		listeners map[chan Event]listener
 
@@ -214,7 +217,7 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir, watchDir string) (*Manager, error) {
 	ctx := context.Background()
 	mgr := Manager{
 		PcapDir:      pcapDir,
@@ -222,6 +225,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		SnapshotDir:  snapshotDir,
 		StateDir:     stateDir,
 		ConverterDir: converterDir,
+		WatchDir:     watchDir,
 
 		usedIndexes:      make(map[*index.Reader]uint),
 		tags:             make(map[string]*tag),
@@ -233,12 +237,21 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		config: Config{AutoInsertLimitToQuery: false},
 	}
 
-	watcher, err := fsnotify.NewWatcher()
+	convertersWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
+		return nil, fmt.Errorf("failed to create fsnotify watcher for converters: %w", err)
 	}
-	mgr.watcher = watcher
-	mgr.startMonitoringConverters(watcher)
+	mgr.convertersWatcher = convertersWatcher
+	mgr.startMonitoringConverters(convertersWatcher)
+
+	if watchDir != "" {
+		pcapsWatcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create fsnotify watcher for pcaps: %w", err)
+		}
+		mgr.pcapsWatcher = pcapsWatcher
+		mgr.startMonitoringPcaps(pcapsWatcher)
+	}
 
 	// Lookup all available converter binaries
 	entries, err := os.ReadDir(mgr.ConverterDir)
@@ -456,9 +469,14 @@ func (t tag) converterNames() []string {
 }
 
 func (mgr *Manager) Close() {
-	if mgr.watcher != nil {
-		if err := mgr.watcher.Close(); err != nil {
-			log.Printf("Failed to close watcher: %v", err)
+	if mgr.convertersWatcher != nil {
+		if err := mgr.convertersWatcher.Close(); err != nil {
+			log.Printf("Failed to close converters watcher: %v", err)
+		}
+	}
+	if mgr.pcapsWatcher != nil {
+		if err := mgr.pcapsWatcher.Close(); err != nil {
+			log.Printf("Failed to close pcaps watcher: %v", err)
 		}
 	}
 	c := make(chan struct{})
@@ -1672,6 +1690,95 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 	err := watcher.Add(mgr.ConverterDir)
 	if err != nil {
 		log.Fatal(fmt.Errorf("error while adding converter dir to watcher %v: %w", mgr.ConverterDir, err))
+	}
+}
+
+func (mgr *Manager) startMonitoringPcaps(watcher *fsnotify.Watcher) {
+	go func() {
+		var (
+			waitFor = 500 * time.Millisecond
+			mu      sync.Mutex
+			timers  = make(map[string]*time.Timer)
+		)
+		for {
+			select {
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("error:", err)
+
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				log.Println("event:", event)
+
+				if !(event.Has(fsnotify.Create|fsnotify.Write|fsnotify.Chmod) && strings.HasPrefix(filepath.Ext(event.Name), ".pcap")) {
+					continue
+				}
+
+				mu.Lock()
+				timer, ok := timers[event.Name]
+				mu.Unlock()
+
+				if !ok {
+					timer = time.AfterFunc(math.MaxInt64, func() {
+						fileInfo, err := os.Stat(event.Name)
+						if err != nil || fileInfo.IsDir() {
+							return
+						}
+
+						src, err := os.Open(event.Name)
+						if err != nil {
+							log.Printf("error while opening new pcap: %v", err)
+							return
+						}
+						defer src.Close()
+
+						dstFilename := filepath.Join(mgr.PcapDir, fileInfo.Name())
+						dst, err := os.OpenFile(dstFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
+						if err != nil {
+							log.Printf("error while copying new pcap to PcapDir: %v", err)
+							return
+						}
+
+						if _, err := io.Copy(dst, src); err != nil {
+							log.Printf("error while copying new pcap to PcapDir: %v", err)
+							if err := dst.Close(); err != nil {
+								log.Printf("error while closing empty new pcap: %v", err)
+							}
+							if err := os.Remove(dstFilename); err != nil {
+								log.Printf("error while removing empty new pcap file: %v", err)
+							}
+							return
+						}
+						if err := dst.Close(); err != nil {
+							log.Printf("error while closing new pcap: %v", err)
+							if err := os.Remove(dstFilename); err != nil {
+								log.Printf("error while removing new pcap file after failed save: %v", err)
+							}
+							return
+						}
+						mgr.ImportPcaps([]string{fileInfo.Name()})
+
+						mu.Lock()
+						delete(timers, event.Name)
+						mu.Unlock()
+					})
+					timer.Stop()
+
+					mu.Lock()
+					timers[event.Name] = timer
+					mu.Unlock()
+				}
+				timer.Reset(waitFor)
+			}
+		}
+	}()
+	err := watcher.Add(mgr.WatchDir)
+	if err != nil {
+		log.Fatal(fmt.Errorf("error while adding pcaps dir to watcher %v: %w", mgr.WatchDir, err))
 	}
 }
 
