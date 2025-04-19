@@ -471,12 +471,12 @@ func (t tag) converterNames() []string {
 func (mgr *Manager) Close() {
 	if mgr.convertersWatcher != nil {
 		if err := mgr.convertersWatcher.Close(); err != nil {
-			log.Printf("Failed to close watcher: %v", err)
+			log.Printf("Failed to close converters watcher: %v", err)
 		}
 	}
 	if mgr.pcapsWatcher != nil {
 		if err := mgr.pcapsWatcher.Close(); err != nil {
-			log.Printf("Failed to close watcher: %v", err)
+			log.Printf("Failed to close pcaps watcher: %v", err)
 		}
 	}
 	c := make(chan struct{})
