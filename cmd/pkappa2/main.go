@@ -51,7 +51,7 @@ var (
 	watchDir     = flag.String("watch_dir", "", "Path where new pcap files are searched and imported")
 
 	userPassword = flag.String("user_password", "", "HTTP auth password for users")
-	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
+	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps (/upload endpoint)")
 
 	listenAddress = flag.String("address", ":8080", "Listen address")
 

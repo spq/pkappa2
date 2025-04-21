@@ -8,19 +8,12 @@ services:
     volumes:
       - pkappa2-data:/data
       - ./converters:/app/converters
+      # Uncomment the following line to use a local directory for new pcap files
+      # - ./pcaps_incoming:/pcaps_in
     restart: unless-stopped
-    environment:
+    env_file:
       # Change values in .env file
-      - PKAPPA2_USER_PASSWORD
-      - PKAPPA2_PCAP_PASSWORD
-      - PKAPPA2_BASE_DIR
-      - PKAPPA2_PCAP_DIR
-      - PKAPPA2_INDEX_DIR
-      - PKAPPA2_SNAPSHOT_DIR
-      - PKAPPA2_STATE_DIR
-      - PKAPPA2_CONVERTER_DIR
-      - PKAPPA2_TCP_CHECK_OPTIONS
-      - PKAPPA2_TCP_CHECK_STATE
+      - .env
 
 volumes:
   pkappa2-data:

@@ -3,7 +3,7 @@
 [![Go Coverage](https://github.com/spq/pkappa2/wiki/coverage.svg)](https://raw.githack.com/wiki/spq/pkappa2/coverage.html)
 
 Pkappa2 is a packet stream analysis tool intended for Attack & Defense CTF competitions.
-It receives pcap files via a http upload, usually send by a tcpdump-complete script, or using Pcap-over-IP.
+It receives pcap files via a http upload, usually send by a tcpdump-complete script, moving .pcap files into a monitored folder, or using PCAP-over-IP.
 The received pcaps are processed and using the web interface, users can run queries over the streams.
 Streams matching the query are displayed, and their content can be viewed in multiple formats.
 
@@ -20,7 +20,7 @@ curl --data-binary @some-file.pcap http://localhost:8080/upload/some-file.pcap
 - Structured search over TCP/UDP streams
     - Match on stream data as well as metadata
 - Setup wizard on first use
-- Ingest traffic using PCAP-over-IP or HTTP POST requests
+- Ingest traffic using PCAP-over-IP, moving .pcap files into a monitored folder, or HTTP POST requests
 - Support IPv4 and IPv6
 - Save queries as services or tags for quick lookup
 - Scriptable stream [data converters](./converters/pkappa2lib/README.md)
@@ -55,7 +55,7 @@ After saving a query as a service or tag, you can include that service in your q
 ```
 service:MouseAndScreen cdata:websocket
 ```
-This matches all streams matching the `MouseAndScreen` query and containing the word `websocket`.
+This matches all streams matching the `MouseAndScreen` query and containing the word `websocket` in the client's data.
 
 ### Saving queries as services or tags
 You can save a query in different types of named tags. The `service` tags are used to separate traffic of the tasks in the CTF. They are usually queries involving the server port like `sport:8080`, but can take other factors like the server's IP into account too `sport:8008 shost:10.1.7.1`.
@@ -95,6 +95,7 @@ $ docker compose up -d
 ```
 Open http://localhost:8080/ to access the web interface.
 The `converters` folder is mapped into the container for you to tweak.
+You can modify the `docker-compose.yml` file and uncomment the `./pcaps_incoming` volume bind mount to allow to ingest pcaps by moving them into the mounted directory.
 All command line options can be specified using environment variables.
 
 ### Manually
@@ -141,9 +142,18 @@ server {
     }
 }
 ```
+### Adding network traffic
+There are multiple ways to tell pkappa2 about network traffic you want to be able to search in:
+
+1. Sending a POST request to the `/upload/[filename.pcap]` endpoint
+    - `curl --data-binary @some-file.pcap http://localhost:8080/upload/some-file.pcap`
+2. Monitor a folder for new `.pcap*` files and ingest them automatically once they appear
+    - By setting the `-watch_dir /some/path` commandline option or `PKAPPA2_WATCH_DIR` environment variable
+3. Streaming packets over TCP using PCAP-over-IP
+    - Using e.g. [foxit-it/pcap-broker](https://github.com/fox-it/pcap-broker) and adding the endpoint in the pkappa2 UI
 
 ### Collecting traffic on the vulnbox
-The standard way to get pcaps into pkappa2 is using a `-z` completion script of `tcpdump`. The following scripts can be adjusted for your needs. It's important to exclude any traffic that's generated while uploading the pcaps, you'll get exponential pcap file size growth otherwise. Limiting the capture to the game VPN interface and uploading pcaps to an external IP works for separation. Edit the tcpdump filter according to your setup.
+The standard way to get pcaps into pkappa2 is using a `-z` completion script of `tcpdump`. The following scripts can be adjusted for your needs. It's important to exclude any traffic that's generated while uploading the pcaps to pkappa2, you'll get exponential pcap file size growth otherwise. Limiting the capture to the game VPN interface and uploading pcaps to an external IP works for separation. Edit the tcpdump filter according to your setup.
 
 pkappa2 supports two different HTTP basic auth passwords. One for accessing the user interface and another one for uploading pcaps to the `/upload/[filename]` endpoint only. Make sure to use the correct pcap password here.
 
