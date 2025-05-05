@@ -120,6 +120,14 @@
         </v-tooltip>
         <v-tooltip location="bottom">
           <template #activator="{ props }">
+            <v-btn value="utf-8" v-bind="props">
+              <v-icon>mdi-format-font</v-icon>
+            </v-btn>
+          </template>
+          <span>UTF-8</span>
+        </v-tooltip>
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
             <v-btn value="hexdump" v-bind="props">
               <v-icon>mdi-format-columns</v-icon>
             </v-btn>
@@ -143,9 +151,11 @@
           <v-select
             hide-details
             density="compact"
+            label="Converter"
             :items="selectableConverters"
             :model-value="activeConverter"
             v-bind="props"
+            :style="{ maxWidth: 'fit-content', minWidth: '200px' }"
             @update:model-value="changeConverter"
           />
         </template>
@@ -487,6 +497,8 @@ onMounted(() => {
   fetchStreamForId();
   const proxy = {
     streamData: getCurrentInstance()!.proxy,
+    presentation,
+    urlDecode,
     selectionData,
     selectionQuery,
   };
