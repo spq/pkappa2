@@ -52,6 +52,11 @@ const props = defineProps({
     required: false,
     default: () => ({ Client: null, Server: null }),
   },
+  urlDecode: {
+    type: Boolean,
+    required: false,
+    default: false,
+  },
 });
 const presentation = computed(() => props.presentation);
 const data = computed(() => props.data);
@@ -83,8 +88,20 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
   return `&#x${i.toString(16).padStart(2, "0")};`;
 });
 
+const handleURLEncode = (chunkData: string) => {
+  if (!props.urlDecode) {
+    return chunkData;
+  }
+  try {
+    return decodeURIComponent(chunkData);
+  } catch (e) {
+    console.error("Failed to URL decode chunk:", e);
+    return chunkData;
+  }
+};
+
 const inlineAscii = (chunk: Data) => {
-  const chunkData = atob(chunk.Content);
+  const chunkData = handleURLEncode(atob(chunk.Content));
   const asciiEscaped = chunkData
     .split("")
     .map((c) => asciiMap[c.charCodeAt(0)]);
