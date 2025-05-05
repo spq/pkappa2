@@ -1,5 +1,13 @@
 version: "2"
 linters:
+  enable:
+    - bodyclose
+    - exptostd
   exclusions:
     presets:
       - std-error-handling
+    rules:
+      - text: "QF1001:"
+        linters:
+          - staticcheck
+      

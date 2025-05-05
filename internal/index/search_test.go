@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 	"testing"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/spq/pkappa2/internal/query"
 	"github.com/spq/pkappa2/internal/tools"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
-	"golang.org/x/exp/slices"
 )
 
 type (

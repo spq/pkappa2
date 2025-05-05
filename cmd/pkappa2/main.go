@@ -479,15 +479,16 @@ func main() {
 			http.Error(w, fmt.Sprintf("AllConverters() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
-		if converter == "auto" {
+		switch converter {
+		case "auto":
 			if len(converters) == 1 {
 				converter = converters[0]
 			} else {
 				converter = ""
 			}
-		} else if converter == "none" {
+		case "none":
 			converter = ""
-		} else {
+		default:
 			if !strings.HasPrefix(converter, "converter:") {
 				http.Error(w, fmt.Sprintf("invalid converter %q", converter), http.StatusBadRequest)
 				return
