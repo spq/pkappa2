@@ -88,28 +88,23 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
   return `&#x${i.toString(16).padStart(2, "0")};`;
 });
 
-const inlineAscii = (chunk: Data) => {
-  let chunkData = atob(chunk.Content);
-  const bytes = new Uint8Array([...chunkData].map((c) => c.charCodeAt(0)));
+const handleURLEncode = (chunkData: string) => {
+  if (!props.urlDecode) {
+    return chunkData;
+  }
   try {
-    chunkData = new TextDecoder("utf-8").decode(bytes);
+    return decodeURIComponent(chunkData);
   } catch (e) {
-    console.error("Failed to decode UTF-8 chunk data:", e);
+    console.error("Failed to URL decode chunk:", e);
+    return chunkData;
   }
+};
 
-  if (props.urlDecode) {
-    try {
-      chunkData = decodeURI(chunkData);
-    } catch (e) {
-      console.error("Failed to URL decode chunk:", e);
-    }
-  }
-
-  const asciiEscaped = chunkData.split("").map((c) => {
-    const charCode = c.charCodeAt(0);
-    return asciiMap[charCode] !== undefined ? asciiMap[charCode] : c;
-  });
-
+const inlineAscii = (chunk: Data) => {
+  const chunkData = handleURLEncode(atob(chunk.Content));
+  const asciiEscaped = chunkData
+    .split("")
+    .map((c) => asciiMap[c.charCodeAt(0)]);
   const highlightMatches =
     chunk.Direction === 0
       ? highlightMatchesClient.value

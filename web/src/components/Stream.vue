@@ -154,13 +154,12 @@
 
       <v-tooltip location="bottom">
         <template #activator="{ props }">
-          <v-checkbox
+          <v-switch
             v-model="urlDecode"
             label="URL Decode"
             density="compact"
             hide-details
             color="primary"
-            style="max-width: fit-content"
             v-bind="props"
           />
         </template>
