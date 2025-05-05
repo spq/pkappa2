@@ -11,13 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.24", "1.23"]
-        node: [22, 20]
-        exclude:
-          - go: 1.24
-            node: 20
-          - go: 1.23
-            node: 22
+        go: ["1.24"]
+        node: [22]
     name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +64,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.24
+          go-version: "1.24"
 
       - name: Install dependencies
         run: sudo apt-get install -y libpcap-dev

@@ -29,14 +29,17 @@ COPY --from=backend_builder /app/web/dist ./web/dist
 
 RUN adduser pkappa2
 RUN mkdir /data && chown pkappa2:pkappa2 /data
+RUN mkdir /pcaps_in && chown pkappa2:pkappa2 /pcaps_in
 RUN mkdir /app/converters && chown pkappa2:pkappa2 /app/converters
 USER pkappa2
 
 EXPOSE 8080
 VOLUME /data
+VOLUME /pcaps_in
 VOLUME /app/converters
 
 ENV PKAPPA2_BASE_DIR="/data"
+ENV PKAPPA2_WATCH_DIR="/pcaps_in"
 ENV PKAPPA2_ADDRESS=":8080"
 
 ENTRYPOINT [ "/app/pkappa2" ]

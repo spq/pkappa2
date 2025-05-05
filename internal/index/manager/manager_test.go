@@ -27,7 +27,7 @@ import (
 
 type (
 	dirs struct {
-		base, pcap, index, snapshot, state, converter string
+		base, pcap, index, snapshot, state, converter, watch string
 	}
 )
 
@@ -55,7 +55,8 @@ func makeTempdirs(t *testing.T) dirs {
 	dirs.state = path.Join(dirs.base, "state") + "/"
 	dirs.snapshot = path.Join(dirs.base, "snapshot") + "/"
 	dirs.converter = path.Join(dirs.base, "converter") + "/"
-	for _, p := range []string{dirs.pcap, dirs.index, dirs.snapshot, dirs.state, dirs.converter} {
+	dirs.watch = path.Join(dirs.base, "watch") + "/"
+	for _, p := range []string{dirs.pcap, dirs.index, dirs.snapshot, dirs.state, dirs.converter, dirs.watch} {
 		if err := os.Mkdir(p, 0755); err != nil {
 			t.Fatalf("Mkdir(%q) failed with error: %v", p, err)
 		}
@@ -70,7 +71,7 @@ func addConverter(dirs dirs, name string) {
 }
 
 func makeManager(t *testing.T, dirs dirs) *Manager {
-	mgr, err := New(dirs.pcap, dirs.index, dirs.snapshot, dirs.state, dirs.converter)
+	mgr, err := New(dirs.pcap, dirs.index, dirs.snapshot, dirs.state, dirs.converter, dirs.watch)
 	if err != nil {
 		t.Fatalf("manager.New failed with error: %v", err)
 	}
@@ -611,4 +612,18 @@ func TestConverters(t *testing.T) {
 	if got := mgr.ListTags(); len(got) != 1 || len(got[0].Converters) != 0 {
 		t.Fatalf("ListTags returned %v, want [{Converters: []}]", got)
 	}
+}
+
+func TestWatchDir(t *testing.T) {
+	dirs := makeTempdirs(t)
+	mgr := makeManager(t, dirs)
+	defer mgr.Close()
+	listener, listenerCloser := mgr.Listen()
+	_, err := writePcaps(mgr.WatchDir, []pcapOverIPPacket{
+		makeUDPPacket("1.2.3.4:1", "4.3.2.1:4321", t1.Add(time.Second*0), "foo"),
+	})
+	if err != nil {
+		t.Fatalf("writePcaps failed with error: %v", err)
+	}
+	waitForEvent(t, listener, listenerCloser, "pcapArrived")
 }
