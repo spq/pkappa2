@@ -10,7 +10,6 @@ require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/gopacket/gopacket v1.3.1
 	github.com/gorilla/websocket v1.5.3
-	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
 	golang.org/x/sys v0.32.0
 	rsc.io/binaryregexp v0.2.0
 )

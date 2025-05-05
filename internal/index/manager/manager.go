@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -32,8 +34,6 @@ import (
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -457,7 +457,7 @@ func (t tag) referencedTags() []string {
 			m[v] = struct{}{}
 		}
 	}
-	return maps.Keys(m)
+	return slices.AppendSeq(make([]string, 0, len(m)), maps.Keys(m))
 }
 
 func (t tag) converterNames() []string {
@@ -1050,7 +1050,7 @@ func (mgr *Manager) DelTag(name string) error {
 				return fmt.Errorf("unknown tag %q", name)
 			}
 			if len(tag.referencedBy) != 0 {
-				return fmt.Errorf("tag %q still references the tag to be deleted", maps.Keys(tag.referencedBy)[0])
+				return fmt.Errorf("tag %q still references the tag to be deleted", slices.AppendSeq(make([]string, 0, len(tag.referencedBy)), maps.Keys(tag.referencedBy))[0])
 			}
 			// remove converter results of attached converters from cache
 			if len(tag.converters) > 0 {
@@ -1345,7 +1345,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					return fmt.Errorf("tag %q already exists", info.name)
 				}
 				if len(tag.referencedBy) != 0 {
-					return fmt.Errorf("tag %q still references the tag to be renamed", maps.Keys(tag.referencedBy)[0])
+					return fmt.Errorf("tag %q still references the tag to be renamed", slices.AppendSeq(make([]string, 0, len(tag.referencedBy)), maps.Keys(tag.referencedBy))[0])
 				}
 				delete(mgr.tags, name)
 				mgr.tags[info.name] = tag
@@ -2054,6 +2054,7 @@ func triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
 			return fmt.Errorf("failed to making webhook request for processed pcap: %w", err)
 		}
 
+		defer res.Body.Close()
 		if res.StatusCode != 200 {
 			return fmt.Errorf("webhook request for processed pcap failed: %q", res.Status)
 		}
