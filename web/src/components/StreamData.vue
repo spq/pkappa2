@@ -126,12 +126,12 @@ const inlineAscii = (chunk: Data) => {
         asciiEscaped[index] = `</span>${asciiEscaped[index]}`;
       }
       asciiEscaped[index + length - 1] =
-        `${asciiEscaped[index + length - 1]}</span>`;
-      if (highlightIndex < highlights.length - 1) {
-        asciiEscaped[index + length - 1] =
-          `${asciiEscaped[index + length - 1]}<span data-offset="${index + length}">`;
-      }
+        `${asciiEscaped[index + length - 1]}</span><span data-offset="${index + length}">`;
       highlightIndex++;
+    }
+    if (highlightIndex > 0) {
+      asciiEscaped[asciiEscaped.length - 1] =
+        `${asciiEscaped[asciiEscaped.length - 1]}</span>`;
     }
   }
 
