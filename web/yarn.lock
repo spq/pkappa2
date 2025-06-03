@@ -3844,10 +3844,10 @@ vue@^3.5.13:
     "@vue/server-renderer" "3.5.13"
     "@vue/shared" "3.5.13"
 
-vuetify@^3.8.3:
-  version "3.8.3"
-  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.8.3.tgz#6bee55aefdf0b3789f6a2e53058c88c63b54db44"
-  integrity sha512-hzlYRGY6O+GB2R2Ujg1HBtHjVAgJc3NkeymZl1IahZ+0vEyV0qLCFvTqYhXziB04O5roidBe6sca9TED7VYA/A==
+vuetify@^3.8.7:
+  version "3.8.7"
+  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.8.7.tgz#59377e406551c92f5d532694095462c9ee2bc6fa"
+  integrity sha512-Xid5za36cOA9We0QShcjiI4qoWXcwABhlhDHi8/0qpjSrBgJ63GobQdZ9YYyRvjMT3XXJqgbkdis1RS/oGL8Bw==
 
 webpack-virtual-modules@^0.6.2:
   version "0.6.2"
