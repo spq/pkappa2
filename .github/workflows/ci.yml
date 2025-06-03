@@ -75,7 +75,7 @@ jobs:
           touch web/dist/index.html
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
 
   yarnlint:
     name: Lint Frontend
