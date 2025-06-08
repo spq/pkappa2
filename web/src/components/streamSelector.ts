@@ -3,11 +3,14 @@ import { useStreamStore } from "@/stores/stream";
 import { Ref } from "vue";
 import type { ComponentPublicInstance } from "vue";
 import { Data } from "@/apiClient";
+import { decodeChunkContent, escape } from "@/lib/utils";
 
 const listenerBag = new ListenerBag();
 
 type ThisProxy = {
   streamData: ComponentPublicInstance | null;
+  presentation: Ref<string>;
+  urlDecode: Ref<boolean>;
   selectionData: Ref<string>;
   selectionQuery: Ref<string>;
 };
@@ -52,26 +55,6 @@ function getDataSetContainer(outerBound: Node, container: Node, data: string) {
     currentNode = currentNode.parentNode;
   }
   return currentNode;
-}
-
-export const escapeRegex =
-  /[^ !#%&',/0123456789:;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz~-]/;
-
-function escape(text: string) {
-  return text
-    .split("")
-    .map((char) =>
-      char.replace(
-        escapeRegex,
-        (match) =>
-          `\\x{${match
-            .charCodeAt(0)
-            .toString(16)
-            .toUpperCase()
-            .padStart(2, "0")}}`,
-      ),
-    )
-    .join("");
 }
 
 function chunkToQueryPart(chunk: Data, data: string) {
@@ -145,7 +128,21 @@ function onSelectionChange(this: ThisProxy) {
     const chunk = chunks[currentChunkIdx];
     const start = currentChunkIdx === startChunkIdx ? startChunkOffset : 0;
     const end = currentChunkIdx === endChunkIdx ? endChunkOffset : undefined;
-    const data = atob(chunk.Content).substring(start, end);
+    let data = decodeChunkContent(
+      chunk,
+      this.presentation.value,
+      this.urlDecode.value,
+    ).substring(start, end);
+    if (this.presentation.value === "utf-8") {
+      try {
+        const bytes = new TextEncoder().encode(data);
+        data = bytes.reduce((acc, byte) => {
+          return acc + String.fromCharCode(byte);
+        }, "");
+      } catch (e) {
+        console.error("Failed to encode UTF-8 chunk data:", e);
+      }
+    }
     queryData += data;
     queryParts.push(chunkToQueryPart(chunk, data));
   }

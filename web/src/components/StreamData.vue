@@ -13,6 +13,17 @@
         >
         </span>
       </template>
+      <template v-else-if="presentation === 'utf-8'">
+        <span
+          v-for="(chunk, index) in data"
+          :key="index"
+          class="chunk"
+          :data-chunk-idx="index"
+          :class="[classes(chunk)]"
+          v-html="inlineUnicode(chunk)"
+        >
+        </span>
+      </template>
       <template v-else-if="presentation === 'hexdump'">
         <pre
           v-for="(chunk, index) in data"
@@ -36,7 +47,11 @@
 <script lang="ts" setup>
 import { Data, DataRegexes } from "@/apiClient";
 import { PropType, computed } from "vue";
-import { escapeRegex } from "./streamSelector";
+import {
+  escapeRegex,
+  handleUnicodeDecode,
+  tryURLDecodeIfEnabled,
+} from "@/lib/utils";
 
 const props = defineProps({
   presentation: {
@@ -88,30 +103,18 @@ const asciiMap = Array.from({ length: 0x100 }, (_, i) => {
   return `&#x${i.toString(16).padStart(2, "0")};`;
 });
 
-const handleURLEncode = (chunkData: string) => {
-  if (!props.urlDecode) {
-    return chunkData;
-  }
-  try {
-    return decodeURIComponent(chunkData);
-  } catch (e) {
-    console.error("Failed to URL decode chunk:", e);
-    return chunkData;
-  }
-};
-
-const inlineAscii = (chunk: Data) => {
-  const chunkData = handleURLEncode(atob(chunk.Content));
-  const asciiEscaped = chunkData
-    .split("")
-    .map((c) => asciiMap[c.charCodeAt(0)]);
-  const highlightMatches =
-    chunk.Direction === 0
+const handleHighlightMatches = (
+  direction: number,
+  chunkData: string,
+  asciiEscaped: string[],
+) => {
+  const highlightMatchesRegex =
+    direction === 0
       ? highlightMatchesClient.value
       : highlightMatchesServer.value;
-  if (highlightMatches !== undefined) {
+  if (highlightMatchesRegex !== undefined) {
     const highlights: number[][] = [];
-    for (const regex of highlightMatches) {
+    for (const regex of highlightMatchesRegex) {
       if (regex === undefined) continue;
       for (const match of chunkData.matchAll(regex)) {
         highlights.push([match.index, match[0].length]);
@@ -136,6 +139,23 @@ const inlineAscii = (chunk: Data) => {
   }
 
   return asciiEscaped.join("");
+};
+
+const inlineUnicode = (chunk: Data) => {
+  const chunkData = handleUnicodeDecode(chunk, props.urlDecode);
+  const asciiEscaped = chunkData.split("").map((c) => {
+    const charCode = c.charCodeAt(0);
+    return asciiMap[charCode] !== undefined ? asciiMap[charCode] : c;
+  });
+  return handleHighlightMatches(chunk.Direction, chunkData, asciiEscaped);
+};
+
+const inlineAscii = (chunk: Data) => {
+  const chunkData = tryURLDecodeIfEnabled(atob(chunk.Content), props.urlDecode);
+  const asciiEscaped = chunkData
+    .split("")
+    .map((c) => asciiMap[c.charCodeAt(0)]);
+  return handleHighlightMatches(chunk.Direction, chunkData, asciiEscaped);
 };
 
 const classes = (chunk: Data) => ({
