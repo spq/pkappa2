@@ -5,7 +5,12 @@
         <v-card-title>
           <span class="text-h5"
             >Change Name of {{ capitalize(tagType) }}
-            <v-chip :color="tagColor">{{ tagName }}</v-chip></span
+            <v-chip
+              variant="flat"
+              :color="tagColor"
+              :style="{ color: getContrastTextColor(tagColor) }"
+              >{{ tagName }}</v-chip
+            ></span
           >
         </v-card-title>
         <v-card-text>
@@ -14,9 +19,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="visible = false">Cancel</v-btn>
+          <v-btn variant="text" @click="visible = false">Cancel</v-btn>
           <v-btn
-            text
+            variant="text"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
@@ -35,6 +40,7 @@ import { EventBus } from "./EventBus";
 import { ref } from "vue";
 import { useRootStore } from "@/stores";
 import { capitalize } from "@/filters";
+import { getContrastTextColor } from "@/lib/colors";
 
 const store = useRootStore();
 const visible = ref(false);
@@ -67,10 +73,10 @@ function updateName() {
     .then(() => {
       visible.value = false;
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       error.value = true;
       loading.value = false;
-      EventBus.emit("showError", err);
+      EventBus.emit("showError", err.message);
     });
 }
 </script>

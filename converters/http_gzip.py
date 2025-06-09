@@ -117,7 +117,7 @@ class HTTPConverter(Pkappa2Converter):
                         self.handle_http1_response(header, body, chunk, response)
                     )
                 except ProtocolError as ex:
-                    if isinstance(ex.__cause__, IncompleteRead):
+                    if isinstance(ex.__context__, IncompleteRead):
                         data = f"Incomplete read: {ex}\n".encode()
                         result_data.append(
                             StreamChunk(chunk.Direction, data + chunk.Content)

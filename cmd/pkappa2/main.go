@@ -19,8 +19,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/pcapgo"
+	"github.com/gopacket/gopacket/pcap"
+	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/gorilla/websocket"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/manager"
@@ -48,9 +48,10 @@ var (
 	snapshotDir  = flag.String("snapshot_dir", "", "Path where snapshots will be stored")
 	stateDir     = flag.String("state_dir", "", "Path where state files will be stored")
 	converterDir = flag.String("converter_dir", "./converters", "Path where converter executables are searched")
+	watchDir     = flag.String("watch_dir", "", "Path where new pcap files are searched and imported")
 
 	userPassword = flag.String("user_password", "", "HTTP auth password for users")
-	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps")
+	pcapPassword = flag.String("pcap_password", "", "HTTP auth password for pcaps (/upload endpoint)")
 
 	listenAddress = flag.String("address", ":8080", "Listen address")
 
@@ -101,6 +102,7 @@ func main() {
 		filepath.Join(*baseDir, *snapshotDir),
 		filepath.Join(*baseDir, *stateDir),
 		*converterDir,
+		*watchDir,
 	)
 	if err != nil {
 		log.Fatalf("manager.New failed: %v", err)
@@ -183,6 +185,33 @@ func main() {
 		http.Error(w, "OK", http.StatusOK)
 	})
 	rUser.Mount("/debug", middleware.Profiler())
+	rUser.Get("/api/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(mgr.Config()); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+		}
+	})
+	rUser.Post("/api/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var config manager.Config
+		if err = json.Unmarshal([]byte(body), &config); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if err = mgr.SetConfig(config); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	})
 	rUser.Get("/api/status.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -452,15 +481,16 @@ func main() {
 			http.Error(w, fmt.Sprintf("AllConverters() failed: %v", err), http.StatusInternalServerError)
 			return
 		}
-		if converter == "auto" {
+		switch converter {
+		case "auto":
 			if len(converters) == 1 {
 				converter = converters[0]
 			} else {
 				converter = ""
 			}
-		} else if converter == "none" {
+		case "none":
 			converter = ""
-		} else {
+		default:
 			if !strings.HasPrefix(converter, "converter:") {
 				http.Error(w, fmt.Sprintf("invalid converter %q", converter), http.StatusBadRequest)
 				return
@@ -534,8 +564,13 @@ func main() {
 				Stream *index.Stream
 				Tags   []string
 			}
+			Elapsed     int64
 			Offset      uint
 			MoreResults bool
+			DataRegexes struct {
+				Client []string
+				Server []string
+			}
 		}{
 			Debug: qq.Debug,
 			Results: []struct {
@@ -543,9 +578,10 @@ func main() {
 				Tags   []string
 			}{},
 		}
+		start := time.Now()
 		v := mgr.GetView()
 		defer v.Release()
-		hasMore, offset, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
+		hasMore, offset, dataRegexes, err := v.SearchStreams(r.Context(), qq, func(c manager.StreamContext) error {
 			tags, err := c.AllTags()
 			if err != nil {
 				return err
@@ -563,6 +599,12 @@ func main() {
 			http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+
+		if dataRegexes == nil {
+			dataRegexes = &index.DataRegexes{}
+		}
+		response.DataRegexes = *dataRegexes
+		response.Elapsed = time.Since(start).Microseconds()
 		response.MoreResults = hasMore
 		response.Offset = offset
 		w.Header().Set("Content-Type", "application/json")
@@ -777,7 +819,7 @@ func main() {
 		}
 
 		if filter != nil {
-			_, _, err := v.SearchStreams(ctx, filter, handleStream, manager.PrefetchTags(groupingTags))
+			_, _, _, err := v.SearchStreams(ctx, filter, handleStream, manager.PrefetchTags(groupingTags))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("SearchStreams failed: %v", err), http.StatusInternalServerError)
 				return

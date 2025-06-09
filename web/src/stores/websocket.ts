@@ -1,15 +1,24 @@
-import { ConverterStatistics, TagInfo } from "@/apiClient";
+import {
+  Config,
+  ConverterStatistics,
+  PcapOverIPEndpoint,
+  TagInfo,
+} from "@/apiClient";
 import { useRootStore } from ".";
 import { useStreamStore } from "./stream";
 import { useStreamsStore } from "./streams";
 import {
+  isConfigEvent,
   isConverterEvent,
   isEvent,
+  isPcapOverIPEndpointsEvent,
   isPcapStatsEvent,
   isTagEvent,
+  isWebhooksEvent,
 } from "./websocket.guard";
 
 type EventTypes =
+  | "configUpdated"
   | "converterCompleted"
   | "converterDeleted"
   | "converterAdded"
@@ -20,11 +29,13 @@ type EventTypes =
   | "tagAdded"
   | "tagDeleted"
   | "tagUpdated"
-  | "tagEvaluated";
+  | "tagEvaluated"
+  | "webhooksUpdated"
+  | "pcapOverIPEndpointsUpdated";
 
 /** @see {isEvent} ts-auto-guard:type-guard */
 export type Event = {
-  Type: EventTypes | string;
+  Type: EventTypes | string; // eslint-disable-line @typescript-eslint/no-redundant-type-constituents
 };
 
 /** @see {isTagEvent} ts-auto-guard:type-guard */
@@ -59,6 +70,24 @@ export type PcapStatsEvent = {
   PcapStats: PcapStats;
 };
 
+/** @see {isConfigEvent} ts-auto-guard:type-guard */
+export type ConfigEvent = {
+  Type: "configUpdated";
+  Config: Config;
+};
+
+/** @see {isWebhooksEvent} ts-auto-guard:type-guard */
+export type WebhooksEvent = {
+  Type: "webhooksUpdated";
+  Webhooks: string[];
+};
+
+/** @see {isPcapOverIPEndpointsEvent} ts-auto-guard:type-guard */
+export type PcapOverIPEndpointsEvent = {
+  Type: "pcapOverIPEndpointsUpdated";
+  PcapOverIPEndpoints: PcapOverIPEndpoint[];
+};
+
 export function setupWebsocket() {
   let reconnectTimeout = 125;
   const connect = () => {
@@ -91,7 +120,6 @@ export function setupWebsocket() {
       const store = useRootStore();
       const streamStore = useStreamStore();
       const streamsStore = useStreamsStore();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const e = JSON.parse(event.data);
       if (!isEvent(e)) {
         console.error("Invalid event:", event.data);
@@ -192,6 +220,27 @@ export function setupWebsocket() {
             store.status.StreamRecordCount = e.PcapStats.StreamRecordCount;
             store.status.PacketRecordCount = e.PcapStats.PacketRecordCount;
           }
+          break;
+        case "configUpdated":
+          if (!isConfigEvent(e)) {
+            console.error("Invalid config event:", e);
+            return;
+          }
+          store.config.AutoInsertLimitToQuery = e.Config.AutoInsertLimitToQuery;
+          break;
+        case "webhooksUpdated":
+          if (!isWebhooksEvent(e)) {
+            console.error("Invalid webhooks event:", e);
+            return;
+          }
+          store.webhooks = e.Webhooks;
+          break;
+        case "pcapOverIPEndpointsUpdated":
+          if (!isPcapOverIPEndpointsEvent(e)) {
+            console.error("Invalid pcap over IP endpoints event:", e);
+            return;
+          }
+          store.pcapOverIPEndpoints = e.PcapOverIPEndpoints;
           break;
         default:
           console.log(`Unhandled event type: ${e.Type}`);

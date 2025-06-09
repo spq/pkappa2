@@ -2,7 +2,7 @@
  * Generated type guards for "apiClient.ts".
  * WARNING: Do not manually change this file.
  */
-import { Error, SearchResult, SearchResponse, StreamData, Statistics, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, TagsResponse, GraphResponse } from "./apiClient";
+import { Error, SearchResult, SearchResponse, StreamData, Statistics, Config, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, Webhooks, TagsResponse, GraphResponse } from "./apiClient";
 
 export function isError(obj: unknown): obj is Error {
     const typedObj = obj as Error
@@ -54,8 +54,22 @@ export function isSearchResult(obj: unknown): obj is SearchResult {
                 typeof e === "string"
             )
         ) &&
+        typeof typedObj["Elapsed"] === "number" &&
         typeof typedObj["Offset"] === "number" &&
-        typeof typedObj["MoreResults"] === "boolean"
+        typeof typedObj["MoreResults"] === "boolean" &&
+        (typedObj["DataRegexes"] !== null &&
+            typeof typedObj["DataRegexes"] === "object" ||
+            typeof typedObj["DataRegexes"] === "function") &&
+        (typedObj["DataRegexes"]["Client"] === null ||
+            Array.isArray(typedObj["DataRegexes"]["Client"]) &&
+            typedObj["DataRegexes"]["Client"].every((e: any) =>
+                typeof e === "string"
+            )) &&
+        (typedObj["DataRegexes"]["Server"] === null ||
+            Array.isArray(typedObj["DataRegexes"]["Server"]) &&
+            typedObj["DataRegexes"]["Server"].every((e: any) =>
+                typeof e === "string"
+            ))
     )
 }
 
@@ -135,6 +149,16 @@ export function isStatistics(obj: unknown): obj is Statistics {
     )
 }
 
+export function isConfig(obj: unknown): obj is Config {
+    const typedObj = obj as Config
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typeof typedObj["AutoInsertLimitToQuery"] === "boolean"
+    )
+}
+
 export function isPcapsResponse(obj: unknown): obj is PcapsResponse {
     const typedObj = obj as PcapsResponse
     return (
@@ -203,6 +227,16 @@ export function isPcapOverIPResponse(obj: unknown): obj is PcapOverIPResponse {
             typeof e["LastConnected"] === "number" &&
             typeof e["LastDisconnected"] === "number" &&
             typeof e["ReceivedPackets"] === "number"
+        )
+    )
+}
+
+export function isWebhooks(obj: unknown): obj is Webhooks {
+    const typedObj = obj as Webhooks
+    return (
+        Array.isArray(typedObj) &&
+        typedObj.every((e: any) =>
+            typeof e === "string"
         )
     )
 }

@@ -1,15 +1,14 @@
 <template>
   <div>
     <ToolBar>
-      <v-tooltip bottom>
-        <template #activator="{ on, attrs }">
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
           <v-btn
-            v-bind="attrs"
             icon
             :disabled="
               streams.result == null || streams.result.Results.length == 0
             "
-            v-on="on"
+            v-bind="props"
             @click="checkboxAction"
           >
             <v-icon
@@ -26,9 +25,9 @@
         <span>Select</span>
       </v-tooltip>
       <div v-if="noneSelected">
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
-            <v-btn v-bind="attrs" icon v-on="on" @click="fetchStreams">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
+            <v-btn icon v-bind="props" @click="fetchStreams(true)">
               <v-icon>mdi-refresh</v-icon>
             </v-btn>
           </template>
@@ -36,18 +35,18 @@
         </v-tooltip>
       </div>
       <div v-else>
-        <v-menu offset-y right bottom
-          ><template #activator="{ on: onMenu, attrs }">
-            <v-tooltip bottom>
-              <template #activator="{ on: onTooltip }">
-                <v-btn v-bind="attrs" icon v-on="{ ...onMenu, ...onTooltip }">
+        <v-menu location="bottom left"
+          ><template #activator="{ props: propsMenu }">
+            <v-tooltip location="bottom">
+              <template #activator="{ props: propsTooltip }">
+                <v-btn icon v-bind="{ ...propsMenu, ...propsTooltip }">
                   <v-icon>mdi-checkbox-multiple-outline</v-icon>
                 </v-btn>
               </template>
               <span>Marks</span>
             </v-tooltip>
           </template>
-          <v-list dense>
+          <v-list density="compact">
             <v-list-item
               v-for="tag of groupedTags.mark"
               :key="tag.Name"
@@ -58,8 +57,9 @@
                   tagStatusForSelection[tag.Name] !== true,
                 )
               "
+              slim
             >
-              <v-list-item-action>
+              <template #prepend>
                 <v-icon
                   >mdi-{{
                     tagStatusForSelection[tag.Name] === true
@@ -69,12 +69,11 @@
                         : "checkbox-blank-outline"
                   }}</v-icon
                 >
-              </v-list-item-action>
-              <v-list-item-content>
-                <v-list-item-title>{{
-                  tagify(tag.Name, "name")
-                }}</v-list-item-title>
-              </v-list-item-content>
+              </template>
+
+              <v-list-item-title>{{
+                tagify(tag.Name, "name")
+              }}</v-list-item-title>
             </v-list-item>
             <v-divider />
             <v-list-item link @click="createMarkFromSelection">
@@ -88,10 +87,16 @@
         v-if="streams.outdated"
         class="toolbar-alert"
         type="info"
-        outlined
-        dense
+        variant="outlined"
+        density="compact"
         >Results might be outdated.</v-alert
       >
+      <v-spacer />
+      <div v-if="streams.result">
+        <span class="text-caption">
+          Query took {{ (streams.result.Elapsed / 1_000_000).toFixed(6) }}s
+        </span>
+      </div>
       <v-spacer />
       <div
         v-if="
@@ -112,44 +117,40 @@
               : streams.result.Results.length + streams.result.Offset
           }}</span
         >
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
             <v-btn
-              v-bind="attrs"
               icon
               :disabled="streams.page == 0"
-              v-on="on"
-              @click="
-                $router.push({
-                  name: 'search',
-                  query: {
-                    q: $route.query.q,
-                    p: (Number($route.query.p ?? 0) - 1).toString(),
-                  },
-                })
-              "
+              v-bind="props"
+              variant="plain"
+              :to="{
+                name: 'search',
+                query: {
+                  q: $route.query.q,
+                  p: (Number($route.query.p ?? 0) - 1).toString(),
+                },
+              }"
             >
               <v-icon>mdi-chevron-left</v-icon>
             </v-btn>
           </template>
           <span>Previous Page</span>
         </v-tooltip>
-        <v-tooltip bottom>
-          <template #activator="{ on, attrs }">
+        <v-tooltip location="bottom">
+          <template #activator="{ props }">
             <v-btn
-              v-bind="attrs"
               icon
               :disabled="!streams.result.MoreResults"
-              v-on="on"
-              @click="
-                $router.push({
-                  name: 'search',
-                  query: {
-                    q: $route.query.q,
-                    p: (Number($route.query.p ?? 0) + 1).toString(),
-                  },
-                })
-              "
+              v-bind="props"
+              variant="plain"
+              :to="{
+                name: 'search',
+                query: {
+                  q: $route.query.q,
+                  p: (Number($route.query.p ?? 0) + 1).toString(),
+                },
+              }"
             >
               <v-icon>mdi-chevron-right</v-icon>
             </v-btn>
@@ -163,22 +164,20 @@
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
     <div v-else-if="streams.error">
-      <v-alert type="error" border="left">{{ streams.error }}</v-alert>
-      <v-alert type="info" border="left"
+      <v-alert type="error" border="start">{{ streams.error }}</v-alert>
+      <v-alert type="info" border="start"
         ><v-row>
           <v-col class="grow"
             >did you mean to search for the text directly?</v-col
           >
           <v-col class="shrink">
             <v-btn
-              @click="
-                $router.push({
-                  name: 'search',
-                  query: {
-                    q: `data:\x22${regexEscape($route.query.q)}\x22`,
-                  },
-                })
-              "
+              :to="{
+                name: 'search',
+                query: {
+                  q: `data:\x22${regexEscape($route.query.q as string)}\x22`,
+                },
+              }"
               >Search for the input</v-btn
             >
           </v-col></v-row
@@ -191,7 +190,7 @@
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </center>
-    <v-simple-table v-else dense>
+    <v-table v-else density="compact" hover>
       <template #default>
         <thead>
           <tr>
@@ -212,30 +211,40 @@
             v-slot="{ navigate }"
             :to="{
               name: 'stream',
-              query: { q: $route.query.q, p: $route.query.p },
+              query: {
+                q: $route.query.q,
+                p: $route.query.p,
+                converter: $route.query.converter,
+              },
               params: { streamId: stream.Stream.ID.toString() },
             }"
             custom
             style="cursor: pointer"
-            :class="{ blue: selected[index], 'lighten-5': selected[index] }"
+            :class="{ 'blue-lighten-5': selected[index] }"
           >
             <tr
               role="link"
-              @click="isTextSelected() || navigate($event)"
-              @keypress.enter="navigate"
+              @click="isTextSelected() || navigate()"
+              @keypress.enter="navigate()"
             >
               <td style="width: 0" class="pr-0">
-                <v-simple-checkbox
+                <v-checkbox-btn
                   v-model="selected[index]"
-                ></v-simple-checkbox>
+                  @click.stop
+                ></v-checkbox-btn>
               </td>
               <td class="pl-0">
                 <v-hover
                   v-for="tag in stream.Tags"
-                  v-slot="{ hover }"
+                  v-slot="{ isHovering, props }"
                   :key="tag"
-                  ><v-chip small :color="tagColors[tag]"
-                    ><template v-if="hover"
+                  ><v-chip
+                    v-bind="props"
+                    size="small"
+                    variant="flat"
+                    :color="tagColors[tag]"
+                    :style="{ color: getContrastTextColor(tagColors[tag]) }"
+                    ><template v-if="isHovering"
                       >{{ capitalize(tagify(tag, "type")) }}
                       {{ tagify(tag, "name") }}</template
                     ><template v-else>{{
@@ -249,11 +258,10 @@
               </td>
               <td>
                 <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
-                  $options.filters?.prettyBytes(
-                    stream.Stream.Client.Bytes,
-                    1,
-                    true,
-                  )
+                  prettyBytes(stream.Stream.Client.Bytes, {
+                    maximumFractionDigits: 1,
+                    binary: true,
+                  })
                 }}</span>
               </td>
               <td>
@@ -261,11 +269,10 @@
               </td>
               <td>
                 <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
-                  $options.filters?.prettyBytes(
-                    stream.Stream.Server.Bytes,
-                    1,
-                    true,
-                  )
+                  prettyBytes(stream.Stream.Server.Bytes, {
+                    maximumFractionDigits: 1,
+                    binary: true,
+                  })
                 }}</span>
               </td>
               <td
@@ -277,30 +284,32 @@
               <td style="width: 0" class="px-0">
                 <v-btn
                   :href="`/api/download/${stream.Stream.ID}.pcap`"
-                  icon
-                  @click.native.stop
+                  icon="mdi-download"
+                  variant="plain"
+                  density="compact"
+                  @click.stop
                 >
-                  <v-icon>mdi-download</v-icon>
                 </v-btn>
               </td>
             </tr>
           </router-link>
         </tbody>
       </template>
-    </v-simple-table>
+    </v-table>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { EventBus } from "./EventBus";
-import ToolBar from "./ToolBar.vue";
 import { useRootStore } from "@/stores";
 import { useStreamsStore } from "@/stores/streams";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import { useRoute, useRouter } from "vue-router/composables";
+import { useRoute, useRouter } from "vue-router";
 import { Result } from "@/apiClient";
 import { capitalize, formatDate, formatDateLong, tagify } from "@/filters";
+import { getContrastTextColor } from "@/lib/colors";
+import prettyBytes from "pretty-bytes";
 
 const store = useRootStore();
 const route = useRoute();
@@ -354,7 +363,7 @@ onMounted(() => {
 
   const handle = (e: KeyboardEvent, pageOffset: number) => {
     if (pageOffset >= 1 && !streams.result?.MoreResults) return;
-    let p = +route.query.p;
+    let p = Number(route.query.p ?? 0);
     p += pageOffset;
     if (p < 0) return;
     e.preventDefault();
@@ -385,7 +394,7 @@ onMounted(() => {
 });
 
 function checkboxAction() {
-  let tmp: boolean[] = [];
+  const tmp: boolean[] = [];
   const v = noneSelected.value;
   for (let i = 0; i < (streams.result?.Results.length || 0); i++) {
     tmp[i] = v;
@@ -393,17 +402,28 @@ function checkboxAction() {
   selected.value = tmp;
 }
 
-function fetchStreams() {
-  streams
-    .searchStreams(route.query.q as string, +route.query.p)
-    .catch((err: string) => {
-      EventBus.emit("showError", `Failed to fetch streams: ${err}`);
-    });
+function fetchStreams(forceUpdate = false) {
+  const query = route.query.q as string;
+  const page = Number(route.query.p) || 0;
+
+  if (
+    !forceUpdate &&
+    streams.query === query &&
+    streams.page === page &&
+    streams.result
+  ) {
+    console.debug("Using cached store:", query, page);
+    selected.value = [];
+    return;
+  }
+
+  streams.searchStreams(query, page).catch((err: Error) => {
+    EventBus.emit("showError", `Failed to fetch streams: ${err.message}`);
+  });
   selected.value = [];
 }
-
 function createMarkFromSelection() {
-  let ids: number[] = [];
+  const ids: number[] = [];
   for (const s of selectedStreams.value) {
     ids.push(s.Stream.ID);
   }
@@ -411,17 +431,23 @@ function createMarkFromSelection() {
 }
 
 function markSelectedStreams(tagId: string, value: boolean) {
-  let ids: number[] = [];
+  const ids: number[] = [];
   for (const s of selectedStreams.value) {
     ids.push(s.Stream.ID);
   }
   if (value)
-    store.markTagAdd(tagId, ids).catch((err: string) => {
-      EventBus.emit("showError", `Failed to add streams to tag: ${err}`);
+    store.markTagAdd(tagId, ids).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to add streams to tag: ${err.message}`,
+      );
     });
   else
-    store.markTagDel(tagId, ids).catch((err: string) => {
-      EventBus.emit("showError", `Failed to remove streams from tag: ${err}`);
+    store.markTagDel(tagId, ids).catch((err: Error) => {
+      EventBus.emit(
+        "showError",
+        `Failed to remove streams from tag: ${err.message}`,
+      );
     });
 }
 

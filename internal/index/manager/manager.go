@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -14,16 +16,17 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/pcapgo"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcap"
+	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/spq/pkappa2/internal/index"
 	"github.com/spq/pkappa2/internal/index/builder"
 	"github.com/spq/pkappa2/internal/index/converters"
@@ -31,8 +34,6 @@ import (
 	"github.com/spq/pkappa2/internal/tools"
 	"github.com/spq/pkappa2/internal/tools/bitmask"
 	pcapmetadata "github.com/spq/pkappa2/internal/tools/pcapMetadata"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -55,10 +56,13 @@ type (
 	}
 
 	Event struct {
-		Type      string
-		Tag       *TagInfo               `json:",omitempty"`
-		Converter *converters.Statistics `json:",omitempty"`
-		PcapStats PcapStatistics         `json:",omitempty"`
+		Type                string
+		Tag                 *TagInfo                  `json:",omitempty"`
+		Converter           *converters.Statistics    `json:",omitempty"`
+		PcapStats           *PcapStatistics           `json:",omitempty"`
+		Config              *Config                   `json:",omitempty"`
+		Webhooks            *[]string                 `json:",omitempty"`
+		PcapOverIPEndpoints *[]PcapOverIPEndpointInfo `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -106,6 +110,7 @@ type (
 		IndexDir     string
 		SnapshotDir  string
 		ConverterDir string
+		WatchDir     string
 
 		jobs                chan func()
 		mergeJobRunning     bool
@@ -136,10 +141,13 @@ type (
 		tags       map[string]*tag
 		converters map[string]*converters.CachedConverter
 
-		usedIndexes map[*index.Reader]uint
-		watcher     *fsnotify.Watcher
+		usedIndexes       map[*index.Reader]uint
+		convertersWatcher *fsnotify.Watcher
+		pcapsWatcher      *fsnotify.Watcher
 
 		listeners map[chan Event]listener
+
+		config Config
 	}
 
 	Statistics struct {
@@ -154,6 +162,10 @@ type (
 		MergeJobRunning     bool
 		TaggingJobRunning   bool
 		ConverterJobRunning bool
+	}
+
+	Config struct {
+		AutoInsertLimitToQuery bool
 	}
 
 	indexReleaser []*index.Reader
@@ -171,6 +183,7 @@ type (
 		Pcaps                    []*pcapmetadata.PcapInfo
 		PcapProcessorWebhookUrls []string
 		PcapOverIPEndpoints      []string
+		Config                   Config
 	}
 
 	updateTagOperationInfo struct {
@@ -206,7 +219,7 @@ type (
 	StreamsOption func(*streamsOptions)
 )
 
-func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manager, error) {
+func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir, watchDir string) (*Manager, error) {
 	ctx := context.Background()
 	mgr := Manager{
 		PcapDir:      pcapDir,
@@ -214,6 +227,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		SnapshotDir:  snapshotDir,
 		StateDir:     stateDir,
 		ConverterDir: converterDir,
+		WatchDir:     watchDir,
 
 		usedIndexes:      make(map[*index.Reader]uint),
 		tags:             make(map[string]*tag),
@@ -221,14 +235,25 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir string) (*Manage
 		streamsToConvert: make(map[string]*bitmask.LongBitmask),
 		jobs:             make(chan func()),
 		listeners:        make(map[chan Event]listener),
+
+		config: Config{AutoInsertLimitToQuery: false},
 	}
 
-	watcher, err := fsnotify.NewWatcher()
+	convertersWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
+		return nil, fmt.Errorf("failed to create fsnotify watcher for converters: %w", err)
 	}
-	mgr.watcher = watcher
-	mgr.startMonitoringConverters(watcher)
+	mgr.convertersWatcher = convertersWatcher
+	mgr.startMonitoringConverters(convertersWatcher)
+
+	if watchDir != "" {
+		pcapsWatcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create fsnotify watcher for pcaps: %w", err)
+		}
+		mgr.pcapsWatcher = pcapsWatcher
+		mgr.startMonitoringPcaps(pcapsWatcher)
+	}
 
 	// Lookup all available converter binaries
 	entries, err := os.ReadDir(mgr.ConverterDir)
@@ -392,6 +417,7 @@ nextStateFile:
 		mgr.tags = newTags
 		mgr.pcapProcessorWebhookUrls = s.PcapProcessorWebhookUrls
 		mgr.stateFilename = fn
+		mgr.config = s.Config
 		pcapOverIPEndpoints = pcapOverIPEndpointsTemp
 		stateTimestamp = s.Saved
 		cachedKnownPcapData = s.Pcaps
@@ -433,7 +459,7 @@ func (t tag) referencedTags() []string {
 			m[v] = struct{}{}
 		}
 	}
-	return maps.Keys(m)
+	return slices.AppendSeq(make([]string, 0, len(m)), maps.Keys(m))
 }
 
 func (t tag) converterNames() []string {
@@ -445,9 +471,14 @@ func (t tag) converterNames() []string {
 }
 
 func (mgr *Manager) Close() {
-	if mgr.watcher != nil {
-		if err := mgr.watcher.Close(); err != nil {
-			log.Printf("Failed to close watcher: %v", err)
+	if mgr.convertersWatcher != nil {
+		if err := mgr.convertersWatcher.Close(); err != nil {
+			log.Printf("Failed to close converters watcher: %v", err)
+		}
+	}
+	if mgr.pcapsWatcher != nil {
+		if err := mgr.pcapsWatcher.Close(); err != nil {
+			log.Printf("Failed to close pcaps watcher: %v", err)
 		}
 	}
 	c := make(chan struct{})
@@ -479,6 +510,7 @@ func (mgr *Manager) saveState() error {
 		Pcaps:                    mgr.builder.KnownPcaps(),
 		PcapProcessorWebhookUrls: mgr.pcapProcessorWebhookUrls,
 		PcapOverIPEndpoints:      make([]string, 0, len(mgr.pcapOverIPEndpoints)),
+		Config:                   mgr.config,
 	}
 	for _, e := range mgr.pcapOverIPEndpoints {
 		j.PcapOverIPEndpoints = append(j.PcapOverIPEndpoints, e.Address)
@@ -629,7 +661,7 @@ func (mgr *Manager) importPcapJob(filenames []string, nextStreamID uint64, exist
 		}
 		mgr.event(Event{
 			Type: "pcapProcessed",
-			PcapStats: PcapStatistics{
+			PcapStats: &PcapStatistics{
 				PcapCount:         len(mgr.builder.KnownPcaps()),
 				ImportJobCount:    len(mgr.importJobs),
 				StreamCount:       int(mgr.nextStreamID),
@@ -734,7 +766,7 @@ func (mgr *Manager) mergeIndexesJob(offset int, indexes []*index.Reader, release
 		releaser.release(mgr)
 		mgr.event(Event{
 			Type: "indexesMerged",
-			PcapStats: PcapStatistics{
+			PcapStats: &PcapStatistics{
 				PcapCount:         len(mgr.builder.KnownPcaps()),
 				ImportJobCount:    len(mgr.importJobs),
 				StreamCount:       int(mgr.nextStreamID),
@@ -753,7 +785,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		if err != nil {
 			return err
 		}
-		streams, _, err := index.SearchStreams(context.Background(), indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters)
+		streams, _, _, err := index.SearchStreams(context.Background(), indexes, &t.Uncertain, q.ReferenceTime, q.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, tagDetails, converters, false)
 		if err != nil {
 			return err
 		}
@@ -821,6 +853,30 @@ func (mgr *Manager) getIndexesCopy(start int) ([]*index.Reader, indexReleaser) {
 	return indexes, mgr.lock(indexes)
 }
 
+func (mgr *Manager) SetConfig(config Config) error {
+	c := make(chan error)
+	mgr.jobs <- func() {
+		mgr.config = config
+
+		mgr.event(Event{
+			Type:   "configUpdated",
+			Config: &config,
+		})
+		c <- mgr.saveState()
+		close(c)
+	}
+	return <-c
+}
+
+func (mgr *Manager) Config() Config {
+	c := make(chan Config)
+	mgr.jobs <- func() {
+		c <- mgr.config
+		close(c)
+	}
+	return <-c
+}
+
 func (mgr *Manager) Status() Statistics {
 	c := make(chan Statistics)
 	mgr.jobs <- func() {
@@ -864,9 +920,13 @@ func (mgr *Manager) KnownPcaps() []pcapmetadata.PcapInfo {
 func makeTagInfo(name string, t *tag) *TagInfo {
 	m := t.Matches.Copy()
 	m.Sub(t.Uncertain)
+	definition := t.definition
+	if _, _, mark := parseTagName(name); mark {
+		definition = "..."
+	}
 	return &TagInfo{
 		Name:           name,
-		Definition:     t.definition,
+		Definition:     definition,
 		Color:          t.color,
 		MatchingCount:  uint(m.OnesCount()),
 		UncertainCount: uint(t.Uncertain.OnesCount()),
@@ -992,7 +1052,7 @@ func (mgr *Manager) DelTag(name string) error {
 				return fmt.Errorf("unknown tag %q", name)
 			}
 			if len(tag.referencedBy) != 0 {
-				return fmt.Errorf("tag %q still references the tag to be deleted", maps.Keys(tag.referencedBy)[0])
+				return fmt.Errorf("tag %q still references the tag to be deleted", slices.AppendSeq(make([]string, 0, len(tag.referencedBy)), maps.Keys(tag.referencedBy))[0])
 			}
 			// remove converter results of attached converters from cache
 			if len(tag.converters) > 0 {
@@ -1287,7 +1347,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					return fmt.Errorf("tag %q already exists", info.name)
 				}
 				if len(tag.referencedBy) != 0 {
-					return fmt.Errorf("tag %q still references the tag to be renamed", maps.Keys(tag.referencedBy)[0])
+					return fmt.Errorf("tag %q still references the tag to be renamed", slices.AppendSeq(make([]string, 0, len(tag.referencedBy)), maps.Keys(tag.referencedBy))[0])
 				}
 				delete(mgr.tags, name)
 				mgr.tags[info.name] = tag
@@ -1635,6 +1695,95 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 	}
 }
 
+func (mgr *Manager) startMonitoringPcaps(watcher *fsnotify.Watcher) {
+	go func() {
+		var (
+			waitFor = 500 * time.Millisecond
+			mu      sync.Mutex
+			timers  = make(map[string]*time.Timer)
+		)
+		for {
+			select {
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("error:", err)
+
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				log.Println("event:", event)
+
+				if !(event.Has(fsnotify.Create|fsnotify.Write|fsnotify.Chmod) && strings.HasPrefix(filepath.Ext(event.Name), ".pcap")) {
+					continue
+				}
+
+				mu.Lock()
+				timer, ok := timers[event.Name]
+				mu.Unlock()
+
+				if !ok {
+					timer = time.AfterFunc(math.MaxInt64, func() {
+						fileInfo, err := os.Stat(event.Name)
+						if err != nil || fileInfo.IsDir() {
+							return
+						}
+
+						src, err := os.Open(event.Name)
+						if err != nil {
+							log.Printf("error while opening new pcap: %v", err)
+							return
+						}
+						defer src.Close()
+
+						dstFilename := filepath.Join(mgr.PcapDir, fileInfo.Name())
+						dst, err := os.OpenFile(dstFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
+						if err != nil {
+							log.Printf("error while copying new pcap to PcapDir: %v", err)
+							return
+						}
+
+						if _, err := io.Copy(dst, src); err != nil {
+							log.Printf("error while copying new pcap to PcapDir: %v", err)
+							if err := dst.Close(); err != nil {
+								log.Printf("error while closing empty new pcap: %v", err)
+							}
+							if err := os.Remove(dstFilename); err != nil {
+								log.Printf("error while removing empty new pcap file: %v", err)
+							}
+							return
+						}
+						if err := dst.Close(); err != nil {
+							log.Printf("error while closing new pcap: %v", err)
+							if err := os.Remove(dstFilename); err != nil {
+								log.Printf("error while removing new pcap file after failed save: %v", err)
+							}
+							return
+						}
+						mgr.ImportPcaps([]string{fileInfo.Name()})
+
+						mu.Lock()
+						delete(timers, event.Name)
+						mu.Unlock()
+					})
+					timer.Stop()
+
+					mu.Lock()
+					timers[event.Name] = timer
+					mu.Unlock()
+				}
+				timer.Reset(waitFor)
+			}
+		}
+	}()
+	err := watcher.Add(mgr.WatchDir)
+	if err != nil {
+		log.Fatal(fmt.Errorf("error while adding pcaps dir to watcher %v: %w", mgr.WatchDir, err))
+	}
+}
+
 func (mgr *Manager) addConverter(path string) error {
 	// TODO: Do we want to check this now or when we start the converter?
 	if !tools.IsFileExecutable(path) {
@@ -1846,6 +1995,10 @@ func (mgr *Manager) AddPcapProcessorWebhook(url string) error {
 			}
 		}
 		mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls, url)
+		mgr.event(Event{
+			Type:     "webhooksUpdated",
+			Webhooks: &mgr.pcapProcessorWebhookUrls,
+		})
 		c <- mgr.saveState()
 		close(c)
 	}
@@ -1858,6 +2011,10 @@ func (mgr *Manager) DelPcapProcessorWebhook(url string) error {
 		for i, u := range mgr.pcapProcessorWebhookUrls {
 			if u == url {
 				mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls[:i], mgr.pcapProcessorWebhookUrls[i+1:]...)
+				mgr.event(Event{
+					Type:     "webhooksUpdated",
+					Webhooks: &mgr.pcapProcessorWebhookUrls,
+				})
 				c <- mgr.saveState()
 				close(c)
 				return
@@ -1907,6 +2064,7 @@ func triggerPcapProcessedWebhook(webhookUrl string, jsonBody []byte) {
 			return fmt.Errorf("failed to making webhook request for processed pcap: %w", err)
 		}
 
+		defer res.Body.Close()
 		if res.StatusCode != 200 {
 			return fmt.Errorf("webhook request for processed pcap failed: %q", res.Status)
 		}
@@ -2105,6 +2263,14 @@ func (mgr *Manager) AddPcapOverIPEndpoint(address string) error {
 				}
 			}
 			mgr.pcapOverIPEndpoints = append(mgr.pcapOverIPEndpoints, mgr.newPcapOverIPEndpoint(context.Background(), address))
+			endpoints := make([]PcapOverIPEndpointInfo, 0, len(mgr.pcapOverIPEndpoints))
+			for _, e := range mgr.pcapOverIPEndpoints {
+				endpoints = append(endpoints, e.PcapOverIPEndpointInfo)
+			}
+			mgr.event(Event{
+				Type:                "pcapOverIPEndpointsUpdated",
+				PcapOverIPEndpoints: &endpoints,
+			})
 			return mgr.saveState()
 		}()
 		c <- err
@@ -2125,6 +2291,14 @@ func (mgr *Manager) DelPcapOverIPEndpoint(address string) error {
 			}
 			mgr.pcapOverIPEndpoints[toDelete].cancel()
 			mgr.pcapOverIPEndpoints = slices.Delete(mgr.pcapOverIPEndpoints, toDelete, toDelete+1)
+			endpoints := make([]PcapOverIPEndpointInfo, 0, len(mgr.pcapOverIPEndpoints))
+			for _, e := range mgr.pcapOverIPEndpoints {
+				endpoints = append(endpoints, e.PcapOverIPEndpointInfo)
+			}
+			mgr.event(Event{
+				Type:                "pcapOverIPEndpointsUpdated",
+				PcapOverIPEndpoints: &endpoints,
+			})
 			return mgr.saveState()
 		}()
 		c <- err
@@ -2247,7 +2421,7 @@ func (v *View) prefetchTags(ctx context.Context, tags []string, bm bitmask.LongB
 					continue outer
 				}
 			}
-			matches, _, err := index.SearchStreams(ctx, v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters)
+			matches, _, _, err := index.SearchStreams(ctx, v.indexes, &uncertain, time.Time{}, ti.Conditions, nil, []query.Sorting{{Key: query.SortingKeyID, Dir: query.SortingDirAscending}}, 0, 0, v.tagDetails, v.converters, false)
 			if err != nil {
 				return err
 			}
@@ -2303,13 +2477,13 @@ func (v *View) AllStreams(ctx context.Context, f func(StreamContext) error, opti
 	return nil
 }
 
-func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, uint, error) {
+func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(StreamContext) error, options ...StreamsOption) (bool, uint, *index.DataRegexes, error) {
 	opts := streamsOptions{}
 	for _, o := range options {
 		o(&opts)
 	}
 	if err := v.fetch(); err != nil {
-		return false, 0, err
+		return false, 0, nil, err
 	}
 	if opts.prefetchAllTags {
 		for tn := range v.tagDetails {
@@ -2321,12 +2495,12 @@ func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(St
 		limit = *filter.Limit
 	}
 	offset := opts.page * limit
-	res, hasMore, err := index.SearchStreams(ctx, v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters)
+	res, hasMore, dataRegexes, err := index.SearchStreams(ctx, v.indexes, nil, filter.ReferenceTime, filter.Conditions, filter.Grouping, filter.Sorting, limit, offset, v.tagDetails, v.converters, true)
 	if err != nil {
-		return false, 0, err
+		return false, 0, nil, err
 	}
 	if len(res) == 0 {
-		return hasMore, offset, nil
+		return hasMore, offset, dataRegexes, nil
 	}
 	if len(opts.prefetchTags) != 0 {
 		searchedStreams := bitmask.LongBitmask{}
@@ -2334,7 +2508,7 @@ func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(St
 			searchedStreams.Set(uint(s.StreamID))
 		}
 		if err := v.prefetchTags(ctx, opts.prefetchTags, searchedStreams); err != nil {
-			return false, 0, err
+			return false, 0, nil, err
 		}
 	}
 	for _, s := range res {
@@ -2342,10 +2516,10 @@ func (v *View) SearchStreams(ctx context.Context, filter *query.Query, f func(St
 			s: s,
 			v: v,
 		}); err != nil {
-			return false, 0, err
+			return false, 0, nil, err
 		}
 	}
-	return hasMore, offset, nil
+	return hasMore, offset, dataRegexes, nil
 }
 
 func (v *View) ReferenceTime() (time.Time, error) {

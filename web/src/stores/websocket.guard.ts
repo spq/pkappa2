@@ -2,7 +2,8 @@
  * Generated type guards for "websocket.ts".
  * WARNING: Do not manually change this file.
  */
-import { Event, TagEvent, ConverterEvent, PcapStatsEvent } from "./websocket";
+import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent, WebhooksEvent, PcapOverIPEndpointsEvent } from "./websocket";
+import { isConfig } from "../apiClient.guard";
 
 export function isEvent(obj: unknown): obj is Event {
     const typedObj = obj as Event
@@ -86,5 +87,50 @@ export function isPcapStatsEvent(obj: unknown): obj is PcapStatsEvent {
         typeof typedObj["PcapStats"]["StreamCount"] === "number" &&
         typeof typedObj["PcapStats"]["StreamRecordCount"] === "number" &&
         typeof typedObj["PcapStats"]["PacketRecordCount"] === "number"
+    )
+}
+
+export function isConfigEvent(obj: unknown): obj is ConfigEvent {
+    const typedObj = obj as ConfigEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["Type"] === "configUpdated" &&
+        isConfig(typedObj["Config"]) as boolean
+    )
+}
+
+export function isWebhooksEvent(obj: unknown): obj is WebhooksEvent {
+    const typedObj = obj as WebhooksEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["Type"] === "webhooksUpdated" &&
+        Array.isArray(typedObj["Webhooks"]) &&
+        typedObj["Webhooks"].every((e: any) =>
+            typeof e === "string"
+        )
+    )
+}
+
+export function isPcapOverIPEndpointsEvent(obj: unknown): obj is PcapOverIPEndpointsEvent {
+    const typedObj = obj as PcapOverIPEndpointsEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["Type"] === "pcapOverIPEndpointsUpdated" &&
+        Array.isArray(typedObj["PcapOverIPEndpoints"]) &&
+        typedObj["PcapOverIPEndpoints"].every((e: any) =>
+            (e !== null &&
+                typeof e === "object" ||
+                typeof e === "function") &&
+            typeof e["Address"] === "string" &&
+            typeof e["LastConnected"] === "number" &&
+            typeof e["LastDisconnected"] === "number" &&
+            typeof e["ReceivedPackets"] === "number"
+        )
     )
 }

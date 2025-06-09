@@ -1,21 +1,20 @@
-import Vue from "vue";
-import VueRouter from "vue-router";
+import { createRouter, createWebHashHistory } from "vue-router";
 
 import Base from "./components/Base.vue";
 import Converters from "./components/Converters.vue";
 import PcapOverIP from "./components/PcapOverIP.vue";
+import Webhooks from "./components/Webhooks.vue";
 import Home from "./components/Home.vue";
 import Status from "./components/Status.vue";
 import Pcaps from "./components/Pcaps.vue";
+import Settings from "./components/Settings.vue";
 import Tags from "./components/Tags.vue";
 import Graph from "./components/Graph.vue";
 import Results from "./components/Results.vue";
 import Stream from "./components/Stream.vue";
 
-Vue.use(VueRouter);
-
-export default new VueRouter({
-  mode: "hash",
+export default createRouter({
+  history: createWebHashHistory(),
   routes: [
     {
       path: "/",
@@ -30,6 +29,11 @@ export default new VueRouter({
           path: "status",
           name: "status",
           component: Status,
+        },
+        {
+          path: "settings",
+          name: "settings",
+          component: Settings,
         },
         {
           path: "pcaps",
@@ -50,6 +54,11 @@ export default new VueRouter({
           path: "pcap-over-ip",
           name: "pcap-over-ip",
           component: PcapOverIP,
+        },
+        {
+          path: "webhooks",
+          name: "webhooks",
+          component: Webhooks,
         },
         {
           path: "graph",

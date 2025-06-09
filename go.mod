@@ -1,16 +1,17 @@
 module github.com/spq/pkappa2
 
-go 1.19
+go 1.24.0
+
+toolchain go1.24.1
 
 require (
-	github.com/alecthomas/participle/v2 v2.1.1
-	github.com/fsnotify/fsnotify v1.7.0
-	github.com/go-chi/chi/v5 v5.1.0
-	github.com/google/gopacket v1.1.19
+	github.com/alecthomas/participle/v2 v2.1.4
+	github.com/fsnotify/fsnotify v1.9.0
+	github.com/go-chi/chi/v5 v5.2.1
+	github.com/gopacket/gopacket v1.3.1
 	github.com/gorilla/websocket v1.5.3
-	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
-	golang.org/x/sys v0.24.0
+	golang.org/x/sys v0.33.0
 	rsc.io/binaryregexp v0.2.0
 )
 
-require golang.org/x/net v0.23.0 // indirect
+require golang.org/x/net v0.38.0 // indirect

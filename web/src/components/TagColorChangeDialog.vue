@@ -5,7 +5,12 @@
         <v-card-title>
           <span class="text-h5"
             >Change Color of {{ capitalize(tagType) }}
-            <v-chip :color="tagColor">{{ tagName }}</v-chip></span
+            <v-chip
+              variant="flat"
+              :color="tagColor"
+              :style="{ color: getContrastTextColor(tagColor) }"
+              >{{ tagName }}</v-chip
+            ></span
           >
         </v-card-title>
         <v-card-text>
@@ -13,24 +18,21 @@
             <template #append>
               <v-menu
                 v-model="colorPickerOpen"
-                top
-                nudge-bottom="182"
-                nudge-left="32"
+                location="top"
+                :offset="[-226, 30]"
                 :close-on-content-click="false"
               >
-                <template #activator="{ on }">
-                  <div :style="swatchStyle" v-on="on" />
+                <template #activator="{ props }">
+                  <div :style="swatchStyle" v-bind="props" />
                 </template>
                 <v-card>
                   <v-card-text>
                     <v-color-picker
                       v-model="colorPickerValue"
                       mode="hexa"
-                      hide-mode-switch
                       hide-inputs
                       show-swatches
-                      flat
-                      @update:color="colorPickerValueUpdate"
+                      @update:model-value="colorPickerValueUpdate"
                     />
                   </v-card-text>
                 </v-card>
@@ -40,9 +42,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="visible = false">Cancel</v-btn>
+          <v-btn variant="text" @click="visible = false">Cancel</v-btn>
           <v-btn
-            text
+            variant="text"
             :disabled="loading"
             :loading="loading"
             :color="error ? 'error' : 'primary'"
@@ -61,6 +63,7 @@ import { EventBus } from "./EventBus";
 import { ref, computed, watch } from "vue";
 import { useRootStore } from "@/stores";
 import { capitalize } from "@/filters";
+import { getContrastTextColor } from "@/lib/colors";
 
 const store = useRootStore();
 const visible = ref(false);
@@ -103,8 +106,8 @@ function openDialog(tagIdValue: string) {
   error.value = false;
 }
 
-function colorPickerValueUpdate(color: { hex: string }) {
-  if (colorPickerOpen.value) tagColor.value = color.hex;
+function colorPickerValueUpdate(color: string) {
+  if (colorPickerOpen.value) tagColor.value = color;
 }
 
 function updateColor() {
@@ -115,10 +118,10 @@ function updateColor() {
     .then(() => {
       visible.value = false;
     })
-    .catch((err: string) => {
+    .catch((err: Error) => {
       error.value = true;
       loading.value = false;
-      EventBus.emit("showError", err);
+      EventBus.emit("showError", err.message);
     });
 }
 </script>

@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { Base64, DateTimeString } from "@/types/common";
 import {
+  isConfig,
   isConvertersResponse,
   isGraphResponse,
   isPcapOverIPResponse,
@@ -10,6 +11,7 @@ import {
   isStatistics,
   isStreamData,
   isTagsResponse,
+  isWebhooks,
 } from "./apiClient.guard";
 
 const client = axios.create({
@@ -42,12 +44,19 @@ export type Error = {
   Error: string;
 };
 
+export type DataRegexes = {
+  Client: string[] | null;
+  Server: string[] | null;
+};
+
 /** @see {isSearchResult} ts-auto-guard:type-guard */
 export type SearchResult = {
   Debug: string[];
   Results: Result[];
+  Elapsed: number;
   Offset: number;
   MoreResults: boolean;
+  DataRegexes: DataRegexes;
 };
 
 /** @see {isSearchResponse} ts-auto-guard:type-guard */
@@ -81,6 +90,11 @@ export type Statistics = {
   MergeJobRunning: boolean;
   TaggingJobRunning: boolean;
   ConverterJobRunning: boolean;
+};
+
+/** @see {isConfig} ts-auto-guard:type-guard */
+export type Config = {
+  AutoInsertLimitToQuery: boolean;
 };
 
 export type PcapInfo = {
@@ -126,6 +140,9 @@ export type PcapOverIPEndpoint = {
 
 /** @see {isPcapOverIPResponse} ts-auto-guard:type-guard */
 export type PcapOverIPResponse = PcapOverIPEndpoint[];
+
+/** @see {isWebhooks} ts-auto-guard:type-guard */
+export type Webhooks = string[];
 
 export type TagInfo = {
   Name: string;
@@ -180,6 +197,12 @@ const APIClient = {
   async getStatus() {
     return this.performGuarded("get", `/status.json`, isStatistics);
   },
+  async getConfig() {
+    return this.performGuarded("get", `/config`, isConfig);
+  },
+  async updateConfig(config: Config) {
+    return this.perform("post", `/config`, JSON.stringify(config), undefined);
+  },
   async getPcaps() {
     return this.performGuarded("get", `/pcaps.json`, isPcapsResponse);
   },
@@ -191,6 +214,15 @@ const APIClient = {
   },
   async delPcapOverIPEndpoint(address: string) {
     return this.perform("delete", `/pcap-over-ip`, null, { address });
+  },
+  async getWebhooks() {
+    return this.performGuarded("get", "/webhooks", isWebhooks);
+  },
+  async addWebhook(url: string) {
+    return this.perform("put", "/webhooks", null, { url });
+  },
+  async delWebhook(url: string) {
+    return this.perform("delete", "/webhooks", null, { url });
   },
   async getConverters() {
     return this.performGuarded("get", `/converters`, isConvertersResponse);
@@ -325,7 +357,7 @@ const APIClient = {
     if (guard(response.data)) {
       return response.data;
     }
-    throw "Unexpected response, types mismatch";
+    throw new Error("Unexpected response, types mismatch");
   },
 };
 

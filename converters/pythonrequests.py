@@ -26,7 +26,7 @@ class PythonRequestsConverter(HTTPConverter):
         if len(headers) > 0:
             self.requests_output += f", headers={headers}"
         if len(data) > 0:
-            self.requests_output += f", data={data}"
+            self.requests_output += f", data={data!r}"
         self.requests_output += ")\n"
 
         return []
@@ -42,8 +42,8 @@ class PythonRequestsConverter(HTTPConverter):
 import requests
 import sys
 
-IP = '{stream.Metadata.ServerHost}'
-# IP = sys.argv[1]
+IP = sys.argv[1]
+# IP = '{stream.Metadata.ServerHost}'
 
 # Generated from stream {stream.Metadata.StreamID}
 s = requests.Session()
@@ -52,7 +52,10 @@ s = requests.Session()
         port = ""
         if stream.Metadata.ServerPort != 80:
             port = f":{stream.Metadata.ServerPort}"
-        self.target_host = f"{{IP}}{port}"
+        if ":" in stream.Metadata.ServerHost:
+            self.target_host = f"[{{IP}}]{port}"
+        else:
+            self.target_host = f"{{IP}}{port}"
         result = super().handle_stream(stream)
 
         return Result(

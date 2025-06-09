@@ -1,4 +1,4 @@
-import { Framework } from "vuetify";
+import { ThemeInstance } from "vuetify";
 import { isColorSchemeConfiguration } from "./darkmode.guard";
 
 const STORAGE_KEY = "colorScheme";
@@ -9,18 +9,18 @@ export type ColorSchemeConfiguration = ColorScheme | "system";
 type ColorSchemeChangeCallback = (colorScheme: ColorScheme) => void;
 const colorSchemeChangeListeners: ColorSchemeChangeCallback[] = [];
 
-let registeredVuetify: Framework | null = null;
+let theme: ThemeInstance | null = null;
 
 function updateVuetifyTheme(colorScheme: ColorScheme) {
-  if (null === registeredVuetify) {
+  if (null === theme) {
     return;
   }
-  registeredVuetify.theme.dark = colorScheme === "dark";
+  theme.global.name.value = colorScheme;
 }
 
-export function registerVuetifyTheme(vuetify: Framework) {
-  registeredVuetify = vuetify;
-  vuetify.theme.dark = getColorScheme() === "dark";
+export function registerVuetifyTheme(themeInstance: ThemeInstance) {
+  theme = themeInstance;
+  updateVuetifyTheme(getColorScheme());
   onSystemColorSchemeChange(updateVuetifyTheme);
 }
 
