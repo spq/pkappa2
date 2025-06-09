@@ -2,7 +2,7 @@
  * Generated type guards for "websocket.ts".
  * WARNING: Do not manually change this file.
  */
-import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent } from "./websocket";
+import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent, WebhooksEvent } from "./websocket";
 import { isConfig } from "../apiClient.guard";
 
 export function isEvent(obj: unknown): obj is Event {
@@ -98,5 +98,19 @@ export function isConfigEvent(obj: unknown): obj is ConfigEvent {
             typeof typedObj === "function") &&
         typedObj["Type"] === "configUpdated" &&
         isConfig(typedObj["Config"]) as boolean
+    )
+}
+
+export function isWebhooksEvent(obj: unknown): obj is WebhooksEvent {
+    const typedObj = obj as WebhooksEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["Type"] === "webhooksUpdated" &&
+        Array.isArray(typedObj["Webhooks"]) &&
+        typedObj["Webhooks"].every((e: any) =>
+            typeof e === "string"
+        )
     )
 }
