@@ -200,6 +200,7 @@
             <th class="text-left">Bytes</th>
             <th class="text-left">Server</th>
             <th class="text-left">Bytes</th>
+            <th class="text-right">Duration</th>
             <th class="text-right pr-0">Time</th>
             <th style="width: 0" class="px-0"></th>
           </tr>
@@ -275,6 +276,14 @@
                   })
                 }}</span>
               </td>
+              <td class="text-right">
+                {{
+                  formatDateDifference(
+                    stream.Stream.LastPacket,
+                    stream.Stream.FirstPacket,
+                  )
+                }}
+              </td>
               <td
                 class="text-right pr-0"
                 :title="formatDateLong(stream.Stream.FirstPacket)"
@@ -307,7 +316,13 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router";
 import { Result } from "@/apiClient";
-import { capitalize, formatDate, formatDateLong, tagify } from "@/filters";
+import {
+  capitalize,
+  formatDate,
+  formatDateDifference,
+  formatDateLong,
+  tagify,
+} from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";
 import prettyBytes from "pretty-bytes";
 

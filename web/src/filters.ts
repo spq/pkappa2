@@ -16,6 +16,26 @@ export function formatDuration(seconds: number) {
   return moment.duration(seconds, "seconds").humanize();
 }
 
+export function formatDateDifference(
+  first: string | Date,
+  second: string | Date | undefined,
+) {
+  if (second === undefined) return "0 ms";
+  if (first === second) return "0 ms";
+  const ms = moment(first).diff(moment(second));
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) {
+    return `${seconds} s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} m ${(seconds % 60).toFixed(3)} s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours} h ${minutes % 60} m ${(seconds % 60).toFixed(3)} s`;
+}
+
 export function formatDate(time: string | Date | null) {
   if (time === null) return undefined;
   const date = moment(time).local();
