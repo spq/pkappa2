@@ -492,7 +492,7 @@ func (s *Stream) Data() ([]Data, error) {
 		if p.DataSize != 0 {
 			ts := refTime.Add(time.Duration(p.RelPacketTimeMS) * time.Microsecond)
 			ci := &packetTimes[((p.Flags&flagsPacketDirection)/flagsPacketDirection)^uint8(DirectionClientToServer)^(flagsPacketDirectionClientToServer/flagsPacketDirection)]
-			if len(*ci) != 0 && (*ci)[len(*ci)-1].ts == ts {
+			if len(*ci) != 0 && (*ci)[len(*ci)-1].ts.Equal(ts) {
 				(*ci)[len(*ci)-1].sz += uint64(p.DataSize)
 			} else {
 				*ci = append(*ci, packetTime{ts, uint64(p.DataSize)})
