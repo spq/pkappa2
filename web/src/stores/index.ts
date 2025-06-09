@@ -19,6 +19,7 @@ interface State {
   converters: ConverterStatistics[] | null;
   config: Config;
   pcapOverIPEndpoints: PcapOverIPEndpoint[] | null;
+  webhooks: string[] | null;
 }
 
 export const useRootStore = defineStore("root", {
@@ -30,6 +31,7 @@ export const useRootStore = defineStore("root", {
       tags: null,
       converters: null,
       pcapOverIPEndpoints: null,
+      webhooks: null,
       config: {
         // Default should match the ones in the backend at Manager::New
         AutoInsertLimitToQuery: false,
@@ -105,6 +107,21 @@ export const useRootStore = defineStore("root", {
     async delPcapOverIPEndpoint(address: string) {
       return APIClient.delPcapOverIPEndpoint(address)
         .then(() => this.updatePcapOverIPEndpoints())
+        .catch(handleAxiosDefaultError);
+    },
+    async updateWebhooks() {
+      return APIClient.getWebhooks()
+        .then((data) => (this.webhooks = data))
+        .catch(handleAxiosDefaultError);
+    },
+    async addWebhook(url: string) {
+      return APIClient.addWebhook(url)
+        .then(() => this.updateWebhooks())
+        .catch(handleAxiosDefaultError);
+    },
+    async delWebhook(url: string) {
+      return APIClient.delWebhook(url)
+        .then(() => this.updateWebhooks())
         .catch(handleAxiosDefaultError);
     },
     async updateConverters() {

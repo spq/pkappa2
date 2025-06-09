@@ -285,6 +285,16 @@
       >
         <v-list-item-title>Manage PCAP-over-IP</v-list-item-title>
       </v-list-item>
+      <v-list-item
+        link
+        density="compact"
+        exact
+        :to="{
+          name: 'webhooks',
+        }"
+      >
+        <v-list-item-title>Manage Webhooks</v-list-item-title>
+      </v-list-item>
 
       <v-btn-toggle v-model="colorscheme" mandatory class="pl-9 pt-2">
         <v-btn>

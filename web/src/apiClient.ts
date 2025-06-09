@@ -11,6 +11,7 @@ import {
   isStatistics,
   isStreamData,
   isTagsResponse,
+  isWebhooks,
 } from "./apiClient.guard";
 
 const client = axios.create({
@@ -139,6 +140,9 @@ export type PcapOverIPEndpoint = {
 /** @see {isPcapOverIPResponse} ts-auto-guard:type-guard */
 export type PcapOverIPResponse = PcapOverIPEndpoint[];
 
+/** @see {isWebhooks} ts-auto-guard:type-guard */
+export type Webhooks = string[];
+
 export type TagInfo = {
   Name: string;
   Definition: string;
@@ -209,6 +213,15 @@ const APIClient = {
   },
   async delPcapOverIPEndpoint(address: string) {
     return this.perform("delete", `/pcap-over-ip`, null, { address });
+  },
+  async getWebhooks() {
+    return this.performGuarded("get", "/webhooks", isWebhooks);
+  },
+  async addWebhook(url: string) {
+    return this.perform("put", "/webhooks", null, { url });
+  },
+  async delWebhook(url: string) {
+    return this.perform("delete", "/webhooks", null, { url });
   },
   async getConverters() {
     return this.performGuarded("get", `/converters`, isConvertersResponse);
