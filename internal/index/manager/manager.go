@@ -56,12 +56,13 @@ type (
 	}
 
 	Event struct {
-		Type      string
-		Tag       *TagInfo               `json:",omitempty"`
-		Converter *converters.Statistics `json:",omitempty"`
-		PcapStats *PcapStatistics        `json:",omitempty"`
-		Config    *Config                `json:",omitempty"`
-		Webhooks  *[]string              `json:",omitempty"`
+		Type                string
+		Tag                 *TagInfo                  `json:",omitempty"`
+		Converter           *converters.Statistics    `json:",omitempty"`
+		PcapStats           *PcapStatistics           `json:",omitempty"`
+		Config              *Config                   `json:",omitempty"`
+		Webhooks            *[]string                 `json:",omitempty"`
+		PcapOverIPEndpoints *[]PcapOverIPEndpointInfo `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -2262,6 +2263,14 @@ func (mgr *Manager) AddPcapOverIPEndpoint(address string) error {
 				}
 			}
 			mgr.pcapOverIPEndpoints = append(mgr.pcapOverIPEndpoints, mgr.newPcapOverIPEndpoint(context.Background(), address))
+			endpoints := make([]PcapOverIPEndpointInfo, 0, len(mgr.pcapOverIPEndpoints))
+			for _, e := range mgr.pcapOverIPEndpoints {
+				endpoints = append(endpoints, e.PcapOverIPEndpointInfo)
+			}
+			mgr.event(Event{
+				Type:                "pcapOverIPEndpointsUpdated",
+				PcapOverIPEndpoints: &endpoints,
+			})
 			return mgr.saveState()
 		}()
 		c <- err
@@ -2282,6 +2291,14 @@ func (mgr *Manager) DelPcapOverIPEndpoint(address string) error {
 			}
 			mgr.pcapOverIPEndpoints[toDelete].cancel()
 			mgr.pcapOverIPEndpoints = slices.Delete(mgr.pcapOverIPEndpoints, toDelete, toDelete+1)
+			endpoints := make([]PcapOverIPEndpointInfo, 0, len(mgr.pcapOverIPEndpoints))
+			for _, e := range mgr.pcapOverIPEndpoints {
+				endpoints = append(endpoints, e.PcapOverIPEndpointInfo)
+			}
+			mgr.event(Event{
+				Type:                "pcapOverIPEndpointsUpdated",
+				PcapOverIPEndpoints: &endpoints,
+			})
 			return mgr.saveState()
 		}()
 		c <- err

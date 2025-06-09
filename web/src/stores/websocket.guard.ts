@@ -2,7 +2,7 @@
  * Generated type guards for "websocket.ts".
  * WARNING: Do not manually change this file.
  */
-import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent, WebhooksEvent } from "./websocket";
+import { Event, TagEvent, ConverterEvent, PcapStatsEvent, ConfigEvent, WebhooksEvent, PcapOverIPEndpointsEvent } from "./websocket";
 import { isConfig } from "../apiClient.guard";
 
 export function isEvent(obj: unknown): obj is Event {
@@ -111,6 +111,26 @@ export function isWebhooksEvent(obj: unknown): obj is WebhooksEvent {
         Array.isArray(typedObj["Webhooks"]) &&
         typedObj["Webhooks"].every((e: any) =>
             typeof e === "string"
+        )
+    )
+}
+
+export function isPcapOverIPEndpointsEvent(obj: unknown): obj is PcapOverIPEndpointsEvent {
+    const typedObj = obj as PcapOverIPEndpointsEvent
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["Type"] === "pcapOverIPEndpointsUpdated" &&
+        Array.isArray(typedObj["PcapOverIPEndpoints"]) &&
+        typedObj["PcapOverIPEndpoints"].every((e: any) =>
+            (e !== null &&
+                typeof e === "object" ||
+                typeof e === "function") &&
+            typeof e["Address"] === "string" &&
+            typeof e["LastConnected"] === "number" &&
+            typeof e["LastDisconnected"] === "number" &&
+            typeof e["ReceivedPackets"] === "number"
         )
     )
 }

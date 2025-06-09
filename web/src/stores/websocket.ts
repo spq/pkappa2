@@ -1,4 +1,9 @@
-import { Config, ConverterStatistics, TagInfo } from "@/apiClient";
+import {
+  Config,
+  ConverterStatistics,
+  PcapOverIPEndpoint,
+  TagInfo,
+} from "@/apiClient";
 import { useRootStore } from ".";
 import { useStreamStore } from "./stream";
 import { useStreamsStore } from "./streams";
@@ -6,6 +11,7 @@ import {
   isConfigEvent,
   isConverterEvent,
   isEvent,
+  isPcapOverIPEndpointsEvent,
   isPcapStatsEvent,
   isTagEvent,
   isWebhooksEvent,
@@ -24,7 +30,8 @@ type EventTypes =
   | "tagDeleted"
   | "tagUpdated"
   | "tagEvaluated"
-  | "webhooksUpdated";
+  | "webhooksUpdated"
+  | "pcapOverIPEndpointsUpdated";
 
 /** @see {isEvent} ts-auto-guard:type-guard */
 export type Event = {
@@ -73,6 +80,12 @@ export type ConfigEvent = {
 export type WebhooksEvent = {
   Type: "webhooksUpdated";
   Webhooks: string[];
+};
+
+/** @see {isPcapOverIPEndpointsEvent} ts-auto-guard:type-guard */
+export type PcapOverIPEndpointsEvent = {
+  Type: "pcapOverIPEndpointsUpdated";
+  PcapOverIPEndpoints: PcapOverIPEndpoint[];
 };
 
 export function setupWebsocket() {
@@ -221,6 +234,13 @@ export function setupWebsocket() {
             return;
           }
           store.webhooks = e.Webhooks;
+          break;
+        case "pcapOverIPEndpointsUpdated":
+          if (!isPcapOverIPEndpointsEvent(e)) {
+            console.error("Invalid pcap over IP endpoints event:", e);
+            return;
+          }
+          store.pcapOverIPEndpoints = e.PcapOverIPEndpoints;
           break;
         default:
           console.log(`Unhandled event type: ${e.Type}`);
