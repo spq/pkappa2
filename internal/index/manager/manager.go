@@ -61,6 +61,7 @@ type (
 		Converter *converters.Statistics `json:",omitempty"`
 		PcapStats *PcapStatistics        `json:",omitempty"`
 		Config    *Config                `json:",omitempty"`
+		Webhooks  *[]string              `json:",omitempty"`
 	}
 
 	PcapOverIPEndpointInfo struct {
@@ -1993,6 +1994,10 @@ func (mgr *Manager) AddPcapProcessorWebhook(url string) error {
 			}
 		}
 		mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls, url)
+		mgr.event(Event{
+			Type:     "webhooksUpdated",
+			Webhooks: &mgr.pcapProcessorWebhookUrls,
+		})
 		c <- mgr.saveState()
 		close(c)
 	}
@@ -2005,6 +2010,10 @@ func (mgr *Manager) DelPcapProcessorWebhook(url string) error {
 		for i, u := range mgr.pcapProcessorWebhookUrls {
 			if u == url {
 				mgr.pcapProcessorWebhookUrls = append(mgr.pcapProcessorWebhookUrls[:i], mgr.pcapProcessorWebhookUrls[i+1:]...)
+				mgr.event(Event{
+					Type:     "webhooksUpdated",
+					Webhooks: &mgr.pcapProcessorWebhookUrls,
+				})
 				c <- mgr.saveState()
 				close(c)
 				return

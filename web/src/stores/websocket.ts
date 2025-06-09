@@ -8,6 +8,7 @@ import {
   isEvent,
   isPcapStatsEvent,
   isTagEvent,
+  isWebhooksEvent,
 } from "./websocket.guard";
 
 type EventTypes =
@@ -22,7 +23,8 @@ type EventTypes =
   | "tagAdded"
   | "tagDeleted"
   | "tagUpdated"
-  | "tagEvaluated";
+  | "tagEvaluated"
+  | "webhooksUpdated";
 
 /** @see {isEvent} ts-auto-guard:type-guard */
 export type Event = {
@@ -65,6 +67,12 @@ export type PcapStatsEvent = {
 export type ConfigEvent = {
   Type: "configUpdated";
   Config: Config;
+};
+
+/** @see {isWebhooksEvent} ts-auto-guard:type-guard */
+export type WebhooksEvent = {
+  Type: "webhooksUpdated";
+  Webhooks: string[];
 };
 
 export function setupWebsocket() {
@@ -206,6 +214,13 @@ export function setupWebsocket() {
             return;
           }
           store.config.AutoInsertLimitToQuery = e.Config.AutoInsertLimitToQuery;
+          break;
+        case "webhooksUpdated":
+          if (!isWebhooksEvent(e)) {
+            console.error("Invalid webhooks event:", e);
+            return;
+          }
+          store.webhooks = e.Webhooks;
           break;
         default:
           console.log(`Unhandled event type: ${e.Type}`);

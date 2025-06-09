@@ -35,5 +35,6 @@ declare module 'vue' {
     Tags: typeof import('./components/Tags.vue')['default']
     TagSetConverterDialog: typeof import('./components/TagSetConverterDialog.vue')['default']
     ToolBar: typeof import('./components/ToolBar.vue')['default']
+    Webhooks: typeof import('./components/Webhooks.vue')['default']
   }
 }

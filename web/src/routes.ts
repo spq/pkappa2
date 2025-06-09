@@ -3,6 +3,7 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import Base from "./components/Base.vue";
 import Converters from "./components/Converters.vue";
 import PcapOverIP from "./components/PcapOverIP.vue";
+import Webhooks from "./components/Webhooks.vue";
 import Home from "./components/Home.vue";
 import Status from "./components/Status.vue";
 import Pcaps from "./components/Pcaps.vue";
@@ -53,6 +54,11 @@ export default createRouter({
           path: "pcap-over-ip",
           name: "pcap-over-ip",
           component: PcapOverIP,
+        },
+        {
+          path: "webhooks",
+          name: "webhooks",
+          component: Webhooks,
         },
         {
           path: "graph",
