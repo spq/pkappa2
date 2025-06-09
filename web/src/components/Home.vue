@@ -141,7 +141,7 @@
               <code>[fl]time</code> variables can be used as well as simple
               calculations using <code>+</code> and <code>-</code>. For finding
               streams that lasted 5 minutes or longer you could e.g. use
-              <code>ltime:@ftime@+5m</code>.
+              <code>ltime:@ftime@+5m:</code>.
             </td>
           </tr>
           <tr>
