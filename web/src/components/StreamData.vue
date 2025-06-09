@@ -1,59 +1,170 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
-  <v-card>
-    <v-card-text>
-      <template v-if="presentation === 'ascii'">
-        <span
-          v-for="(chunk, index) in data"
-          :key="index"
-          class="chunk"
-          :data-chunk-idx="index"
-          :class="[classes(chunk)]"
-          v-html="inlineAscii(chunk)"
-        >
-        </span>
-      </template>
-      <template v-else-if="presentation === 'utf-8'">
-        <span
-          v-for="(chunk, index) in data"
-          :key="index"
-          class="chunk"
-          :data-chunk-idx="index"
-          :class="[classes(chunk)]"
-          v-html="inlineUnicode(chunk)"
-        >
-        </span>
-      </template>
-      <template v-else-if="presentation === 'hexdump'">
-        <pre
-          v-for="(chunk, index) in data"
-          :key="index"
-          :class="[classes(chunk), 'hexdump']"
-          >{{ hexdump(chunk.Content) }}</pre
-        >
-      </template>
-      <template v-else>
-        <span
-          v-for="(chunk, index) in data"
-          :key="index"
-          :class="[classes(chunk)]"
-          >{{ inlineHex(chunk.Content) }}<br
-        /></span>
-      </template>
-    </v-card-text>
-  </v-card>
+  <div v-if="viewmode === 'cards'">
+    <v-card v-for="(chunk, index) in data" :key="index" flat>
+      <v-card-item>
+        <template #prepend>
+          <v-icon v-if="chunk.Direction === 0" color="red"
+            >mdi-arrow-right-thin-circle-outline</v-icon
+          >
+          <v-icon v-else color="green"
+            >mdi-arrow-left-thin-circle-outline</v-icon
+          >
+          <span class="text-caption">
+            {{ chunk.Direction === 0 ? "Client" : "Server" }}
+          </span>
+        </template>
+        <div class="text-caption">
+          <span v-if="chunk.Time !== undefined">
+            <v-tooltip location="bottom">
+              <template #activator="{ props: tprops }">
+                <v-chip v-bind="tprops" size="small" variant="outlined"
+                  >+{{
+                    formatDateDifference(chunk.Time, data[index - 1]?.Time)
+                  }}</v-chip
+                >
+              </template>
+              <span>{{ formatDate(chunk.Time) }}</span>
+            </v-tooltip>
+          </span>
+          {{ formatChunkSize(chunk) }}
+          <v-btn-toggle
+            v-model="chunk.Presentation"
+            mandatory
+            density="compact"
+            variant="text"
+            color="primary"
+          >
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="ascii" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-text-long</v-icon>
+                </v-btn>
+              </template>
+              <span>ASCII</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="utf-8" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-format-font</v-icon>
+                </v-btn>
+              </template>
+              <span>UTF-8</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="hexdump" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-format-columns</v-icon>
+                </v-btn>
+              </template>
+              <span>HEXDUMP</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="raw" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-hexadecimal</v-icon>
+                </v-btn>
+              </template>
+              <span>RAW</span>
+            </v-tooltip>
+          </v-btn-toggle>
+        </div>
+      </v-card-item>
+      <v-card-text>
+        <template v-if="chunk.Presentation === 'ascii'">
+          <span
+            class="chunk"
+            :data-chunk-idx="index"
+            :class="[classes(chunk)]"
+            v-html="inlineAscii(chunk)"
+          >
+          </span>
+        </template>
+        <template v-else-if="chunk.Presentation === 'utf-8'">
+          <span
+            class="chunk"
+            :data-chunk-idx="index"
+            :class="[classes(chunk)]"
+            v-html="inlineUnicode(chunk)"
+          >
+          </span>
+        </template>
+        <template v-else-if="chunk.Presentation === 'hexdump'">
+          <pre :class="[classes(chunk), 'hexdump']">{{
+            hexdump(chunk.Content)
+          }}</pre>
+        </template>
+        <template v-else>
+          <span :class="[classes(chunk)]"
+            >{{ inlineHex(chunk.Content) }}<br
+          /></span>
+        </template>
+      </v-card-text>
+    </v-card>
+  </div>
+  <div v-else>
+    <v-card>
+      <v-card-text>
+        <template v-if="presentation === 'ascii'">
+          <span
+            v-for="(chunk, index) in data"
+            :key="index"
+            class="chunk"
+            :data-chunk-idx="index"
+            :class="[classes(chunk)]"
+            v-html="inlineAscii(chunk)"
+          >
+          </span>
+        </template>
+        <template v-else-if="presentation === 'utf-8'">
+          <span
+            v-for="(chunk, index) in data"
+            :key="index"
+            class="chunk"
+            :data-chunk-idx="index"
+            :class="[classes(chunk)]"
+            v-html="inlineUnicode(chunk)"
+          >
+          </span>
+        </template>
+        <template v-else-if="presentation === 'hexdump'">
+          <pre
+            v-for="(chunk, index) in data"
+            :key="index"
+            :class="[classes(chunk), 'hexdump']"
+            >{{ hexdump(chunk.Content) }}</pre
+          >
+        </template>
+        <template v-else>
+          <span
+            v-for="(chunk, index) in data"
+            :key="index"
+            :class="[classes(chunk)]"
+            >{{ inlineHex(chunk.Content) }}<br
+          /></span>
+        </template>
+      </v-card-text>
+    </v-card>
+  </div>
 </template>
 
 <script lang="ts" setup>
 import { Data, DataRegexes } from "@/apiClient";
-import { PropType, computed } from "vue";
+import { PropType, computed, ref, watch } from "vue";
+import { formatDate } from "@/filters";
 import {
   escapeRegex,
   handleUnicodeDecode,
   tryURLDecodeIfEnabled,
 } from "@/lib/utils";
+import moment from "moment";
+import prettyBytes from "pretty-bytes";
 
 const props = defineProps({
+  viewmode: {
+    type: String,
+    required: true,
+  },
   presentation: {
     type: String,
     required: true,
@@ -73,8 +184,52 @@ const props = defineProps({
     default: false,
   },
 });
-const presentation = computed(() => props.presentation);
-const data = computed(() => props.data);
+
+const formatDateDifference = (first: string, second: string | undefined) => {
+  if (second === undefined) return "0 ms";
+  if (first === second) return "0 ms";
+  const ms = moment(first).diff(moment(second));
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) {
+    return `${seconds} s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${seconds} s`;
+};
+
+const formatChunkSize = (chunk: Data) => {
+  const size = atob(chunk.Content).length;
+  return prettyBytes(size, {
+    maximumFractionDigits: 1,
+    binary: true,
+  });
+};
+
+type VisualChunk = Data & {
+  Presentation: string;
+};
+
+const data = ref(
+  props.data.map((chunk) => {
+    const visualChunk: VisualChunk = {
+      ...chunk,
+      Presentation: props.presentation,
+    };
+    return visualChunk;
+  }),
+);
+
+watch(
+  () => props.presentation,
+  (newPresentation) => {
+    for (const chunk of data.value) {
+      chunk.Presentation = newPresentation;
+    }
+  },
+  { immediate: true },
+);
+
 const highlightRegex = (highlight: string[] | null) =>
   highlight?.map((regex) => {
     try {
