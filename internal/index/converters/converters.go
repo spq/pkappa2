@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spq/pkappa2/internal/index"
 )
@@ -59,6 +60,7 @@ type (
 	converterStreamChunk struct {
 		Direction string
 		Content   string
+		Time      string
 	}
 )
 
@@ -282,11 +284,20 @@ func (converter *Converter) Data(stream *index.Stream, moreDetails bool) (data [
 			return fmt.Errorf("converter (%s): Invalid direction: %q", converter.name, convertedPacket.Direction)
 		}
 
+		time, err := time.Parse("2006-01-02T15:04:05.999999999", convertedPacket.Time)
+		if err != nil {
+			converter.releaseProcess(process, -1)
+			return fmt.Errorf("converter (%s): Failed to parse time: %w. Time:\n%s", converter.name, err, convertedPacket.Time)
+		}
+
 		// Merge with previous packet if both are in the same direction.
+		// Discard the time of this packet in the process.
+		// We don't support two consecutive packets in the same direction in the cache file format.
+		// Would need to inject an empty chunk in the opposite direction to make it work if desired.
 		if len(data) > 0 && data[len(data)-1].Direction == direction {
 			data[len(data)-1].Content = append(data[len(data)-1].Content, decodedData...)
 		} else {
-			data = append(data, index.Data{Content: decodedData, Direction: direction})
+			data = append(data, index.Data{Content: decodedData, Direction: direction, Time: time})
 		}
 		if direction == index.DirectionClientToServer {
 			clientBytes += uint64(len(decodedData))
@@ -316,6 +327,7 @@ func (converter *Converter) Data(stream *index.Stream, moreDetails bool) (data [
 		jsonPacket := converterStreamChunk{
 			Direction: directionsToString[packet.Direction],
 			Content:   base64.StdEncoding.EncodeToString(packet.Content),
+			Time:      packet.Time.Format("2006-01-02T15:04:05.999999999"),
 		}
 		// FIXME: Should we notify the converter about this somehow?
 		jsonPacketEncoded, err := json.Marshal(jsonPacket)

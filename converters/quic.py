@@ -3,11 +3,10 @@ from aioquic._buffer import Buffer
 from aioquic.quic.connection import dump_cid
 from aioquic.quic.crypto import CryptoPair
 from aioquic.quic.logger import QuicLoggerTrace
-from aioquic.quic.packet import (PACKET_TYPE_INITIAL, PACKET_TYPE_MASK,
-                                 pull_quic_header)
+from aioquic.quic.packet import PACKET_TYPE_INITIAL, PACKET_TYPE_MASK, pull_quic_header
 from scapy.layers.tls.all import TLS
 
-from pkappa2lib import Direction, Pkappa2Converter, Result, Stream, StreamChunk
+from pkappa2lib import Direction, Pkappa2Converter, Result, Stream
 
 
 class QUICConverter(Pkappa2Converter):
@@ -15,7 +14,7 @@ class QUICConverter(Pkappa2Converter):
         logger = QuicLoggerTrace(is_client=True, odcid=b"1234")
         result_data = []
         connection_id_length = 8
-        for chunk in stream.Chunks:
+        for chunk in stream.coalesce_chunks_in_same_direction_iter():
             buf = Buffer(data=chunk.Content)
             while not buf.eof():
                 start_off = buf.tell()
@@ -29,8 +28,8 @@ class QUICConverter(Pkappa2Converter):
                         + f"  packet_type: {logger.packet_type(header.packet_type)} ({header.packet_type})\n"
                         + f"  destination_cid: {dump_cid(header.destination_cid)}\n"
                         + f"  source_cid: {dump_cid(header.source_cid)}\n"
-                        + f"  token: {header.token}\n"
-                        + f"  integrity_tag: {header.integrity_tag}\n"
+                        + f"  token: {header.token!r}\n"
+                        + f"  integrity_tag: {header.integrity_tag!r}\n"
                         + f"  rest_length: {header.rest_length}\n"
                     )
 
@@ -61,19 +60,16 @@ class QUICConverter(Pkappa2Converter):
                         )
                         tls = TLS(plain_header + plain_payload)
                         output += (
-                            f"  plain_header: {plain_header}\n"
+                            f"  plain_header: {plain_header!r}\n"
                             + f"  plain_payload: \n{tls.show(dump=True)}\n"
                         )
                     else:
-                        output += f"  encrypted: {chunk.Content[start_off:end_off]}\n"
-                    result_data.append(
-                        StreamChunk(chunk.Direction, output.encode() + b"\n")
-                    )
+                        output += f"  encrypted: {chunk.Content[start_off:end_off]!r}\n"
+                    result_data.append(chunk.derive(content=output.encode() + b"\n"))
                 except Exception as ex:
                     result_data.append(
-                        StreamChunk(
-                            chunk.Direction,
-                            output.encode()
+                        chunk.derive(
+                            content=output.encode()
                             + str(ex).encode()
                             + b"\n"
                             + chunk.Content[start_off:]

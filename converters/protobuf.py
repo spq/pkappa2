@@ -4,7 +4,7 @@ from io import BytesIO
 
 from protobuf_inspector.types import StandardParser
 
-from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
+from pkappa2lib import Pkappa2Converter, Result, Stream
 
 
 class ProtobufConverter(Pkappa2Converter):
@@ -14,22 +14,23 @@ class ProtobufConverter(Pkappa2Converter):
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
-        for chunk in stream.Chunks:
+        for chunk in stream.coalesce_chunks_in_same_direction_iter():
             try:
                 parser = StandardParser()
                 frame_data = BytesIO(chunk.Content)
                 protobuf_message = parser.parse_message(frame_data, "message")
                 result_data.append(
-                    StreamChunk(
-                        chunk.Direction,
-                        self._ansi_escape.sub("", protobuf_message).encode(),
+                    chunk.derive(
+                        content=self._ansi_escape.sub("", protobuf_message).encode(),
                     )
                 )
             except Exception as ex:
                 result_data.append(
-                    StreamChunk(
-                        chunk.Direction,
-                        b"Protobuf ERROR: " + str(ex).encode() + b"\n" + chunk.Content,
+                    chunk.derive(
+                        content=b"Protobuf ERROR: "
+                        + str(ex).encode()
+                        + b"\n"
+                        + chunk.Content,
                     )
                 )
         return Result(result_data)

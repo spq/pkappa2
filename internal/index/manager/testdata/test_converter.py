@@ -15,7 +15,8 @@ while 1:
             "converter": sys.argv[0],
             "info": lines[0],
             "data": lines[1:]
-        }).encode()).decode()
+        }).encode()).decode(),
+        "Time": "2222-02-22T22:22:22.222222"
     }))
     print()
     print("{}", flush=True)

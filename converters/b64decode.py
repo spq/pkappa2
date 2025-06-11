@@ -3,7 +3,7 @@ import base64
 import binascii
 import re
 
-from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
+from pkappa2lib import Pkappa2Converter, Result, Stream
 
 
 class Base64DecodeConverter(Pkappa2Converter):
@@ -38,9 +38,9 @@ class Base64DecodeConverter(Pkappa2Converter):
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
-        for chunk in stream.Chunks:
+        for chunk in stream.coalesce_chunks_in_same_direction_iter():
             content = self.decode_possible_base64(chunk.Content)
-            result_data.append(StreamChunk(chunk.Direction, content))
+            result_data.append(chunk.derive(content=content))
         return Result(result_data)
 
 

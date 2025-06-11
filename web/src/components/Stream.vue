@@ -359,6 +359,7 @@
       <StreamData
         ref="streamData"
         :data="stream.stream.Data"
+        viewmode="cards"
         :presentation="presentation"
         :highlight-matches="streams.result?.DataRegexes"
         :url-decode="urlDecode"

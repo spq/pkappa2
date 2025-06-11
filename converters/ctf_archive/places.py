@@ -75,7 +75,7 @@ class PlacesConverter(HTTPConverter):
                     placeid = request.path[len("/api/get/place/") :]
                     place = PlaceIdFromString(placeid)
                     prefix = f"### {str(place)} ###\n".encode()
-                    return [StreamChunk(chunk.Direction, prefix + chunk.Content)]
+                    return [chunk.derive(content=prefix + chunk.Content)]
                 elif request.path.startswith("/api/auth"):
                     self.is_place_request = True
 
@@ -85,9 +85,8 @@ class PlacesConverter(HTTPConverter):
                     route = json.loads(body)
                     decoded = [str(PlaceIdFromString(placeid)) for placeid in route]
                     return [
-                        StreamChunk(
-                            chunk.Direction,
-                            chunk.Content
+                        chunk.derive(
+                            content=chunk.Content
                             + b"\n\n### Places decoded ###\n"
                             + "\n".join(decoded).encode(),
                         )
@@ -98,11 +97,11 @@ class PlacesConverter(HTTPConverter):
                     placeid = request.path[len("/api/put/place/") :]
                     place = PlaceIdFromString(placeid)
                     prefix = f"### {str(place)} ###\n".encode()
-                    return [StreamChunk(chunk.Direction, prefix + chunk.Content)]
+                    return [chunk.derive(content=prefix + chunk.Content)]
 
         except Exception as ex:
             self.log(str(ex))
-            return [StreamChunk(chunk.Direction, str(ex).encode() + chunk.Content)]
+            return [chunk.derive(content=str(ex).encode() + chunk.Content)]
         return super().handle_http1_request(chunk, request)
 
     def handle_http1_response(
@@ -120,7 +119,7 @@ class PlacesConverter(HTTPConverter):
                     + b"\n### "
                     + str(place).encode()
                 )
-                return [StreamChunk(chunk.Direction, data)]
+                return [chunk.derive(content=data)]
         except Exception as ex:
             self.log(str(ex))
         return super().handle_http1_response(header, body, chunk, response)
