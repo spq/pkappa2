@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from datetime import datetime
 from pkappa2lib import (
     Direction,
     Pkappa2Converter,
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 
 # Maximum number of bytes to receive until
 RECEIVE_UNTIL_MAX = 40
+
 
 @dataclass
 class Chunk:
@@ -35,7 +37,7 @@ import sys
 io = remote(sys.argv[1], {stream.Metadata.ServerPort}{typ})
 """
         chunks: list[Chunk] = []
-        for i, chunk in enumerate(stream.Chunks):
+        for chunk in stream.coalesce_chunks_in_same_direction_iter():
             data_recvuntil = chunk.Content
             # recvuntil after the last newline
             # b'bla\n...\n -> b'...\n'
@@ -79,7 +81,15 @@ io = remote(sys.argv[1], {stream.Metadata.ServerPort}{typ})
                 after_data = ""
 
         output += "io.stream()\n"
-        return Result([StreamChunk(Direction.CLIENTTOSERVER, output.encode())])
+        return Result(
+            [
+                StreamChunk(
+                    Direction.CLIENTTOSERVER,
+                    output.encode(),
+                    stream.Chunks[0].Time if stream.Chunks else datetime.now(),
+                )
+            ]
+        )
 
 
 if __name__ == "__main__":

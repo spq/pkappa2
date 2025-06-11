@@ -43,6 +43,17 @@ class ConverterDecoder(json.JSONDecoder):
             obj["Direction"] = Direction.from_json(obj["Direction"])
         if "Content" in obj:
             obj["Content"] = base64.b64decode(obj["Content"])
+        if "Time" in obj:
+            # Make sure there are 6 digits in the microseconds part
+            if "." in obj["Time"]:
+                time_parts = obj["Time"].split(".")
+                if len(time_parts) == 2:
+                    time_parts[1] = time_parts[1].ljust(6, "0")
+                obj["Time"] = ".".join(time_parts)
+            obj["Time"] = datetime.datetime.strptime(
+                obj["Time"], "%Y-%m-%dT%H:%M:%S.%f"
+            )
+
         return obj
 
 
@@ -52,6 +63,7 @@ class ConverterEncoder(json.JSONEncoder):
             return {
                 "Content": base64.b64encode(o.Content).decode(),
                 "Direction": o.Direction.to_json(),
+                "Time": o.Time.strftime("%Y-%m-%dT%H:%M:%S.%f"),
             }
 
         else:
@@ -84,12 +96,52 @@ class Direction(Enum):
 class StreamChunk:
     Direction: Direction
     Content: bytes
+    Time: datetime.datetime
+
+    def derive(
+        self,
+        *,
+        direction: Direction | None = None,
+        content: bytes | None = None,
+        time: datetime.datetime | None = None,
+    ) -> "StreamChunk":
+        """
+        Derive a new StreamChunk with the given parameters.
+        If a parameter is not provided, the current value is used.
+        """
+        return StreamChunk(
+            Direction=direction if direction is not None else self.Direction,
+            Content=content if content is not None else self.Content,
+            Time=time if time is not None else self.Time,
+        )
 
 
 @dataclass
 class Stream:
     Metadata: StreamMetadata
     Chunks: List[StreamChunk]
+
+    def coalesce_chunks_in_same_direction_iter(self):
+        """
+        Coalesce chunks in the same direction into a single chunk.
+        This method yields chunks where consecutive chunks in the same direction
+        are combined into a single chunk.
+
+        There can be multiple chunks in the same direction with differing Time.
+        This method will yield a new chunk for each change in direction with the
+        Time of the first chunk in that direction.
+        """
+        if not self.Chunks:
+            return
+        current_chunk = self.Chunks[0]
+        for chunk in self.Chunks[1:]:
+            if chunk.Direction == current_chunk.Direction:
+                current_chunk.Content += chunk.Content
+            else:
+                yield current_chunk
+                current_chunk = chunk
+
+        yield current_chunk
 
 
 @dataclass

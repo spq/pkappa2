@@ -84,51 +84,53 @@ class HTTP2Converter(HTTPConverter):
         self.h2_client_buffer = h2.frame_buffer.FrameBuffer(server=False)
         self.h2_client_buffer.max_frame_size = 16384
 
-    def handle_http2_upgrade(self, request: HTTPRequest) -> List[StreamChunk]:
+    def handle_http2_upgrade(
+        self, chunk: StreamChunk, request: HTTPRequest
+    ) -> List[StreamChunk]:
         self.setup_http2_buffers()
         settings = request.headers.get("HTTP2-Settings")
         if settings:
             f = hyperframe.frame.SettingsFrame(0)
             f.parse_body(urlsafe_b64decode(settings))
             return [
-                StreamChunk(
-                    Direction.CLIENTTOSERVER,
-                    self.handle_http2_event(Direction.CLIENTTOSERVER, f) + b"\n",
+                chunk.derive(
+                    content=self.handle_http2_event(Direction.CLIENTTOSERVER, f)
+                    + b"\n",
                 )
             ]
         return []
 
-    def handle_http2_init(self, chunk: bytes) -> List[StreamChunk]:
+    def handle_http2_init(self, chunk: StreamChunk) -> List[StreamChunk]:
         self.setup_http2_buffers()
         self.h2_active = True
         return self.handle_http2_request(chunk)
 
-    def handle_http2_request(self, chunk: bytes) -> List[StreamChunk]:
+    def handle_http2_request(self, chunk: StreamChunk) -> List[StreamChunk]:
         if not self.h2_server_buffer:
-            return [StreamChunk(Direction.CLIENTTOSERVER, chunk)]
-        self.h2_server_buffer.add_data(chunk)
+            return [chunk]
+        self.h2_server_buffer.add_data(chunk.Content)
         # TODO: Update max_frame_size when observing SETTINGS frames updating it
         events = []
         for event in self.h2_server_buffer:
             events.append(
-                StreamChunk(
-                    Direction.CLIENTTOSERVER,
-                    self.handle_http2_event(Direction.CLIENTTOSERVER, event) + b"\n",
+                chunk.derive(
+                    content=self.handle_http2_event(Direction.CLIENTTOSERVER, event)
+                    + b"\n",
                 )
             )
         return events
 
-    def handle_http2_response(self, chunk: bytes) -> List[StreamChunk]:
+    def handle_http2_response(self, chunk: StreamChunk) -> List[StreamChunk]:
         if not self.h2_client_buffer:
-            return [StreamChunk(Direction.SERVERTOCLIENT, chunk)]
+            return [chunk]
         self.h2_active = True
         self.h2_client_buffer.add_data(chunk)
         events = []
         for event in self.h2_client_buffer:
             events.append(
-                StreamChunk(
-                    Direction.SERVERTOCLIENT,
-                    self.handle_http2_event(Direction.SERVERTOCLIENT, event) + b"\n",
+                chunk.derive(
+                    content=self.handle_http2_event(Direction.SERVERTOCLIENT, event)
+                    + b"\n",
                 )
             )
         return events
@@ -138,14 +140,14 @@ class HTTP2Converter(HTTPConverter):
     ) -> Optional[List[StreamChunk]]:
         try:
             if self.h2_active:
-                return self.handle_http2_request(chunk.Content)
+                return self.handle_http2_request(chunk)
 
             if chunk.Content.startswith(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"):
                 # HTTP/2
-                return self.handle_http2_init(chunk.Content)
+                return self.handle_http2_init(chunk)
         except H2Error as ex:
             data = f"Unable to parse HTTP2 init request: {ex}\n".encode()
-            return [StreamChunk(chunk.Direction, data + chunk.Content)]
+            return [chunk.derive(content=data + chunk.Content)]
         # continue parsing HTTP/1 request
         return super().handle_raw_client_chunk(chunk)
 
@@ -155,10 +157,10 @@ class HTTP2Converter(HTTPConverter):
         if self.h2_active:
             # HTTP/2
             try:
-                return self.handle_http2_response(chunk.Content)
+                return self.handle_http2_response(chunk)
             except H2Error as ex:
                 data = f"Unable to parse HTTP2 response: {ex}\n".encode()
-                return [StreamChunk(chunk.Direction, data + chunk.Content)]
+                return [chunk.derive(content=data + chunk.Content)]
         # continue parsing HTTP/1 response
         return super().handle_raw_server_chunk(chunk)
 
@@ -174,7 +176,7 @@ class HTTP2Converter(HTTPConverter):
                 and request.headers.get("Upgrade") == "h2c"
             ):
                 # HTTP/2
-                return [chunk] + self.handle_http2_upgrade(request)
+                return [chunk] + self.handle_http2_upgrade(chunk, request)
 
         return super().handle_http1_request(chunk, request)
 
@@ -190,8 +192,8 @@ class HTTP2Converter(HTTPConverter):
                 raise Exception("HTTP/2 upgrade request not found")
 
             return [
-                StreamChunk(chunk.Direction, header + b"\r\n\r\n")
-            ] + self.handle_http2_response(response.data)
+                chunk.derive(content=header + b"\r\n\r\n")
+            ] + self.handle_http2_response(chunk.derive(content=response.data))
 
         return super().handle_http1_response(header, body, chunk, response)
 

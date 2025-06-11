@@ -550,7 +550,7 @@ func (s *Stream) Data() ([]Data, error) {
 			data = append(data, Data{
 				Direction: dir,
 				Content:   content[dir][position[dir]:][:szCur],
-				Time:      pt.ts.Local(),
+				Time:      pt.ts.UTC(),
 			})
 			position[dir] += szCur
 			pt.sz -= szCur
