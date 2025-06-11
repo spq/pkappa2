@@ -66,6 +66,8 @@ type (
 const (
 	DirectionClientToServer Direction = 0
 	DirectionServerToClient Direction = 1
+
+	ChunkSplitThreshold = 50 * time.Millisecond
 )
 
 func (dir Direction) Reverse() Direction {
@@ -478,6 +480,7 @@ func (s *Stream) Data() ([]Data, error) {
 	expectWraps := (time.Duration(s.LastPacketTimeNS-s.FirstPacketTimeNS)*time.Nanosecond + time.Microsecond) / (time.Microsecond << 32)
 	packetTimes := [2][]packetTime{nil, nil}
 	lastRelPacketTimeMS := uint32(0)
+	prevTs := [2]time.Time{}
 	for {
 		if err := binary.Read(br, binary.LittleEndian, &p); err != nil {
 			return nil, err
@@ -491,12 +494,15 @@ func (s *Stream) Data() ([]Data, error) {
 		}
 		if p.DataSize != 0 {
 			ts := refTime.Add(time.Duration(p.RelPacketTimeMS) * time.Microsecond)
-			ci := &packetTimes[((p.Flags&flagsPacketDirection)/flagsPacketDirection)^uint8(DirectionClientToServer)^(flagsPacketDirectionClientToServer/flagsPacketDirection)]
-			if len(*ci) != 0 && (*ci)[len(*ci)-1].ts.Equal(ts) {
+			dir := ((p.Flags & flagsPacketDirection) / flagsPacketDirection) ^ uint8(DirectionClientToServer) ^ (flagsPacketDirectionClientToServer / flagsPacketDirection)
+			ci := &packetTimes[dir]
+			pts := &prevTs[dir]
+			if len(*ci) != 0 && ts.Sub(*pts) < ChunkSplitThreshold {
 				(*ci)[len(*ci)-1].sz += uint64(p.DataSize)
 			} else {
 				*ci = append(*ci, packetTime{ts, uint64(p.DataSize)})
 			}
+			*pts = ts
 		}
 		if (p.Flags & flagsPacketHasNext) == 0 {
 			break
