@@ -10,6 +10,33 @@
         <span>Refresh</span>
       </v-tooltip>
     </ToolBar>
+    <v-card density="compact" variant="flat">
+      <v-card-title>Converter Status</v-card-title>
+      <v-card-text>
+        Every stream can be post-processed by a custom converter to parse or
+        decode the stream data. The converters are standalone programs
+        communicating over <code>stdin</code>/<code>stdout</code> running in the
+        background. Multiple processes of the same converter can run in
+        parallel.
+        <br />
+        The converters can be reset by clicking the
+        <v-icon>mdi-restart-alert</v-icon> button in the expanded row. This will
+        stop all processes of the converter and delete the cache file.
+        <br />
+        If a converter has errors, you can click on the
+        <v-icon>mdi-alert-outline</v-icon> icon to view the stderr of the
+        process.
+        <br />
+        See the
+        <a
+          href="https://github.com/spq/pkappa2?tab=readme-ov-file#using-stream-data-converters"
+          target="_blank"
+          rel="noopener"
+          >README</a
+        >
+        for more information on how to set up converters and add your own.
+      </v-card-text>
+    </v-card>
     <v-data-table
       :headers="headers"
       :items="items"

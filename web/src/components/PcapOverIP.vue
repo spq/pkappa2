@@ -56,6 +56,24 @@
         </template>
       </v-dialog>
     </ToolBar>
+    <v-card density="compact" variant="flat">
+      <v-card-title>PCAP-over-IP Sources</v-card-title>
+      <v-card-text>
+        PCAP-over-IP sources are used to receive live network traffic from
+        remote devices. The address should be in the format
+        <code>host:port</code>.
+        <br />
+        pkappa2 will connect to the specified address and start receiving
+        packets. See
+        <a
+          href="https://github.com/spq/pkappa2?tab=readme-ov-file#pcap-over-ip"
+          target="_blank"
+          rel="noopener"
+          >the README</a
+        >
+        for details on how to set this up.
+      </v-card-text>
+    </v-card>
     <v-data-table
       :headers="headers"
       :items="store.pcapOverIPEndpoints || []"

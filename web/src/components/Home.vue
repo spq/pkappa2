@@ -1,5 +1,24 @@
 <template>
   <v-card>
+    <v-card-title>Help</v-card-title>
+    <v-card-text>
+      This page provides a quick overview of the available filters and how to
+      use them to search for streams. You can use the search bar at the top of
+      the page to enter your query. You can use the filters to narrow down the
+      results.
+      <br />
+      Please refer to the
+      <a
+        href="https://github.com/spq/pkappa2?tab=readme-ov-file#searching-streams"
+        target="_blank"
+        rel="noopener"
+        >README</a
+      >
+      for a tutorial on how to search for streams and general usage
+      documentation.
+    </v-card-text>
+  </v-card>
+  <v-card>
     <v-card-title>Query format</v-card-title>
     <v-card-text>
       <v-table>

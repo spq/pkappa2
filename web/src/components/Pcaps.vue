@@ -1,5 +1,8 @@
 <template>
   <div>
+    <v-card density="compact" variant="flat">
+      <v-card-title>Processed PCAPs</v-card-title>
+    </v-card>
     <v-data-table
       :headers="headers"
       :items="store.pcaps || []"

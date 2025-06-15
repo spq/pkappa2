@@ -18,6 +18,9 @@
         <span>CTF Setup Wizards</span>
       </v-tooltip>
     </ToolBar>
+    <v-card density="compact" variant="flat">
+      <v-card-title>Manage Tags</v-card-title>
+    </v-card>
     <v-table density="compact" hover>
       <thead>
         <tr>
