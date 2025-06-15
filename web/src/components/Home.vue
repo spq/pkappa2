@@ -19,6 +19,48 @@
     </v-card-text>
   </v-card>
   <v-card>
+    <v-card-title>Keyboard Shortcuts</v-card-title>
+    <v-card-text>
+      <v-table>
+        <tbody>
+          <tr>
+            <th>Search</th>
+            <td><code>/</code></td>
+            <td>Focus the search input field.</td>
+          </tr>
+          <tr>
+            <th>Scroll query history</th>
+            <td><code>Arrow up / down</code></td>
+            <td>
+              Scroll through query history when search input field is focussed.
+            </td>
+          </tr>
+          <tr>
+            <th>Previous Result</th>
+            <td><code>j</code></td>
+            <td>
+              On results: go to previous page. On stream details: go to previous
+              stream in the result list.
+            </td>
+          </tr>
+          <tr>
+            <th>Next Result</th>
+            <td><code>k</code></td>
+            <td>
+              On results: go to next page. On stream details: go to next stream
+              in result list.
+            </td>
+          </tr>
+          <tr>
+            <th>Select multiple tags</th>
+            <td><code>Shift + click on tag in sidebar</code></td>
+            <td>Add/remove multiple services/tags to the query.</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card-text>
+  </v-card>
+  <v-card>
     <v-card-title>Query format</v-card-title>
     <v-card-text>
       <v-table>
