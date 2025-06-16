@@ -480,7 +480,8 @@ func (s *Stream) Data() ([]Data, error) {
 	expectWraps := (time.Duration(s.LastPacketTimeNS-s.FirstPacketTimeNS)*time.Nanosecond + time.Microsecond) / (time.Microsecond << 32)
 	packetTimes := [2][]packetTime{nil, nil}
 	lastRelPacketTimeMS := uint32(0)
-	prevTs := [2]time.Time{}
+	prevTs := time.Time{}
+	prevDir := uint8(0)
 	for {
 		if err := binary.Read(br, binary.LittleEndian, &p); err != nil {
 			return nil, err
@@ -496,13 +497,13 @@ func (s *Stream) Data() ([]Data, error) {
 			ts := refTime.Add(time.Duration(p.RelPacketTimeMS) * time.Microsecond)
 			dir := ((p.Flags & flagsPacketDirection) / flagsPacketDirection) ^ uint8(DirectionClientToServer) ^ (flagsPacketDirectionClientToServer / flagsPacketDirection)
 			ci := &packetTimes[dir]
-			pts := &prevTs[dir]
-			if len(*ci) != 0 && ts.Sub(*pts) < ChunkSplitThreshold {
+			if len(*ci) != 0 && dir == prevDir && ts.Sub(prevTs) < ChunkSplitThreshold {
 				(*ci)[len(*ci)-1].sz += uint64(p.DataSize)
 			} else {
 				*ci = append(*ci, packetTime{ts, uint64(p.DataSize)})
 			}
-			*pts = ts
+			prevTs = ts
+			prevDir = dir
 		}
 		if (p.Flags & flagsPacketHasNext) == 0 {
 			break
