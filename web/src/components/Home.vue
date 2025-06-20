@@ -1,5 +1,66 @@
 <template>
   <v-card>
+    <v-card-title>Help</v-card-title>
+    <v-card-text>
+      This page provides a quick overview of the available filters and how to
+      use them to search for streams. You can use the search bar at the top of
+      the page to enter your query. You can use the filters to narrow down the
+      results.
+      <br />
+      Please refer to the
+      <a
+        href="https://github.com/spq/pkappa2?tab=readme-ov-file#searching-streams"
+        target="_blank"
+        rel="noopener"
+        >README</a
+      >
+      for a tutorial on how to search for streams and general usage
+      documentation.
+    </v-card-text>
+  </v-card>
+  <v-card>
+    <v-card-title>Keyboard Shortcuts</v-card-title>
+    <v-card-text>
+      <v-table>
+        <tbody>
+          <tr>
+            <th>Search</th>
+            <td><code>/</code></td>
+            <td>Focus the search input field.</td>
+          </tr>
+          <tr>
+            <th>Scroll query history</th>
+            <td><code>Arrow up / down</code></td>
+            <td>
+              Scroll through query history when search input field is focussed.
+            </td>
+          </tr>
+          <tr>
+            <th>Previous Result</th>
+            <td><code>j</code></td>
+            <td>
+              On results: go to previous page. On stream details: go to previous
+              stream in the result list.
+            </td>
+          </tr>
+          <tr>
+            <th>Next Result</th>
+            <td><code>k</code></td>
+            <td>
+              On results: go to next page. On stream details: go to next stream
+              in result list.
+            </td>
+          </tr>
+          <tr>
+            <th>Select multiple tags</th>
+            <td><code>Shift + click on tag in sidebar</code></td>
+            <td>Add/remove multiple services/tags to the query.</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card-text>
+  </v-card>
+  <v-card>
     <v-card-title>Query format</v-card-title>
     <v-card-text>
       <v-table>
@@ -141,7 +202,7 @@
               <code>[fl]time</code> variables can be used as well as simple
               calculations using <code>+</code> and <code>-</code>. For finding
               streams that lasted 5 minutes or longer you could e.g. use
-              <code>ltime:@ftime@+5m</code>.
+              <code>ltime:@ftime@+5m:</code>.
             </td>
           </tr>
           <tr>

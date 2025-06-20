@@ -55,6 +55,15 @@
         </template>
       </v-dialog>
     </ToolBar>
+    <v-card density="compact" variant="flat">
+      <v-card-title>Webhook Endpoints</v-card-title>
+      <v-card-text>
+        All URIs that are registered as Webhook endpoints will be notified when
+        a new PCAP file was processed. The Webhook endpoints will receive a POST
+        request with a JSON body containing an array of strings with the
+        absolute paths of the processed PCAP files.
+      </v-card-text>
+    </v-card>
     <v-data-table
       :headers="headers"
       :items="store.webhooks || []"

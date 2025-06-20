@@ -143,24 +143,6 @@
           <span>RAW</span>
         </v-tooltip>
       </v-btn-toggle>
-      <v-tooltip
-        v-if="stream.stream !== null && selectableConverters.length > 1"
-        location="bottom"
-      >
-        <template #activator="{ props }">
-          <v-select
-            hide-details
-            density="compact"
-            label="Converter"
-            :items="selectableConverters"
-            :model-value="activeConverter"
-            v-bind="props"
-            :style="{ maxWidth: 'fit-content', minWidth: '200px' }"
-            @update:model-value="changeConverter"
-          />
-        </template>
-        <span>Select converter view</span>
-      </v-tooltip>
 
       <v-tooltip location="bottom">
         <template #activator="{ props }">
@@ -355,6 +337,34 @@
             ></v-col
           >
         </v-row>
+        <v-row>
+          <v-tabs
+            v-model="converterTab"
+            density="compact"
+            mandatory
+            show-arrows
+            @update:model-value="changeConverter"
+          >
+            <v-tooltip
+              location="bottom"
+              v-for="c in selectableConverters"
+              :key="c.value"
+            >
+              <template #activator="{ props }">
+                <v-tab
+                  :value="c.value"
+                  :text="c.title"
+                  :base-color="c.available ? 'primary' : 'grey lighten-2'"
+                  v-bind="props"
+                >
+                </v-tab>
+              </template>
+              <span
+                >Select converter: <code>{{ c.title }}</code></span
+              >
+            </v-tooltip>
+          </v-tabs>
+        </v-row>
       </v-container>
       <StreamData
         ref="streamData"
@@ -432,31 +442,42 @@ const streamId = computed(() => {
 });
 
 const converter = computed(() => {
-  return (route.query.converter as string) ?? "auto";
+  const newConverter = (route.query.converter as string) ?? "auto";
+  if (stream.stream === null || stream.stream.ActiveConverter === "") {
+    return newConverter;
+  }
+  if (newConverter === "auto") {
+    return "converter:" + stream.stream.ActiveConverter;
+  }
+  return newConverter;
 });
 
-const activeConverter = computed(() => {
-  if (stream.stream === null || stream.stream.ActiveConverter === "") {
-    return "none";
-  }
-  return "converter:" + stream.stream.ActiveConverter;
+const converterTab = computed(() => {
+  return converter.value === "auto" ? "none" : converter.value;
 });
 
 const selectableConverters = computed(() => {
   if (stream.stream === null) return [];
   const availableConverters =
-    converters.value?.map((converter) => ({
-      title: converter.Name,
-      value: "converter:" + converter.Name,
-    })) ?? [];
+    converters.value
+      ?.filter(
+        (converter) => !stream.stream?.Converters.includes(converter.Name),
+      )
+      .map((converter) => ({
+        title: converter.Name,
+        value: "converter:" + converter.Name,
+        available: false,
+      })) ?? [];
   return [
     {
-      title: "* none",
+      title: "none",
       value: "none",
+      available: true,
     },
     ...stream.stream.Converters.map((converter) => ({
-      title: `* ${converter}`,
+      title: converter,
       value: "converter:" + converter,
+      available: true,
     })),
     ...availableConverters,
   ];
@@ -540,13 +561,18 @@ onMounted(() => {
   });
 });
 
-function changeConverter(converter: string) {
+function changeConverter(converter: unknown) {
+  if (typeof converter !== "string") {
+    console.warn("Invalid converter type:", converter);
+    return;
+  }
   void router.push({
     query: { converter, q: route.query.q, p: route.query.p },
   });
 }
 
 function fetchStreamForId() {
+  stream.stream = null;
   if (streamId.value !== null) {
     stream.fetchStream(streamId.value, converter.value).catch((err: Error) => {
       EventBus.emit("showError", `Failed to fetch stream: ${err.message}`);
