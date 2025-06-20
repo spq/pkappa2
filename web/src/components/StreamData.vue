@@ -1,106 +1,123 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
   <div v-if="viewmode === 'cards'">
-    <v-card v-for="(chunk, index) in data" :key="index" flat>
-      <v-card-item>
-        <template #prepend>
-          <v-icon v-if="chunk.Direction === 0" color="red"
-            >mdi-arrow-right-thin-circle-outline</v-icon
-          >
-          <v-icon v-else color="green"
-            >mdi-arrow-left-thin-circle-outline</v-icon
-          >
-          <span class="text-caption">
-            {{ chunk.Direction === 0 ? "Client" : "Server" }}
-          </span>
-        </template>
-        <div class="text-caption">
-          <span v-if="chunk.Time !== undefined">
-            <v-tooltip location="bottom">
-              <template #activator="{ props: tprops }">
-                <v-chip v-bind="tprops" size="small" variant="outlined"
-                  >+{{
-                    formatDateDifference(chunk.Time, data[index - 1]?.Time)
-                  }}</v-chip
-                >
-              </template>
-              <span>{{ formatDate(chunk.Time) }}</span>
-            </v-tooltip>
-          </span>
-          {{ formatChunkSize(chunk) }}
-          <v-btn-toggle
-            v-model="chunk.Presentation"
-            mandatory
-            density="compact"
-            variant="text"
-            color="primary"
-          >
-            <v-tooltip location="bottom">
-              <template #activator="{ props: pprops }">
-                <v-btn value="ascii" v-bind="pprops" size="x-small">
-                  <v-icon>mdi-text-long</v-icon>
-                </v-btn>
-              </template>
-              <span>ASCII</span>
-            </v-tooltip>
-            <v-tooltip location="bottom">
-              <template #activator="{ props: pprops }">
-                <v-btn value="utf-8" v-bind="pprops" size="x-small">
-                  <v-icon>mdi-format-font</v-icon>
-                </v-btn>
-              </template>
-              <span>UTF-8</span>
-            </v-tooltip>
-            <v-tooltip location="bottom">
-              <template #activator="{ props: pprops }">
-                <v-btn value="hexdump" v-bind="pprops" size="x-small">
-                  <v-icon>mdi-format-columns</v-icon>
-                </v-btn>
-              </template>
-              <span>HEXDUMP</span>
-            </v-tooltip>
-            <v-tooltip location="bottom">
-              <template #activator="{ props: pprops }">
-                <v-btn value="raw" v-bind="pprops" size="x-small">
-                  <v-icon>mdi-hexadecimal</v-icon>
-                </v-btn>
-              </template>
-              <span>RAW</span>
-            </v-tooltip>
-          </v-btn-toggle>
-        </div>
-      </v-card-item>
-      <v-card-text>
-        <template v-if="chunk.Presentation === 'ascii'">
-          <span
-            class="chunk"
-            :data-chunk-idx="index"
-            :class="[classes(chunk)]"
-            v-html="inlineAscii(chunk)"
-          >
-          </span>
-        </template>
-        <template v-else-if="chunk.Presentation === 'utf-8'">
-          <span
-            class="chunk"
-            :data-chunk-idx="index"
-            :class="[classes(chunk)]"
-            v-html="inlineUnicode(chunk)"
-          >
-          </span>
-        </template>
-        <template v-else-if="chunk.Presentation === 'hexdump'">
-          <pre :class="[classes(chunk), 'hexdump']">{{
-            hexdump(chunk.Content)
-          }}</pre>
-        </template>
-        <template v-else>
-          <span :class="[classes(chunk)]"
-            >{{ inlineHex(chunk.Content) }}<br
-          /></span>
-        </template>
-      </v-card-text>
-    </v-card>
+    <v-expansion-panels v-model="openPanels" multiple variant="accordion">
+      <v-expansion-panel
+        v-for="(chunk, index) in data"
+        :key="index"
+        :value="index"
+        static
+        class="smol"
+      >
+        <v-expansion-panel-title
+          class="border-bottom elevation-2"
+          :class="[title_classes()]"
+        >
+          <v-row class="text-caption align-center" no-gutters>
+            <v-col class="v-col-1">
+              <v-icon v-if="chunk.Direction === 0" color="red"
+                >mdi-arrow-right-thin-circle-outline</v-icon
+              >
+              <v-icon v-else color="green"
+                >mdi-arrow-left-thin-circle-outline</v-icon
+              >
+              <span>
+                {{ chunk.Direction === 0 ? "Client" : "Server" }}
+              </span>
+            </v-col>
+            <v-col class="v-col-1" v-if="chunk.Time !== undefined">
+              <v-tooltip location="bottom">
+                <template #activator="{ props: tprops }">
+                  <v-chip v-bind="tprops" size="small" variant="text"
+                    >+{{
+                      formatDateDifference(chunk.Time, data[index - 1]?.Time)
+                    }}</v-chip
+                  >
+                </template>
+                <span>{{ formatDate(chunk.Time) }}</span>
+              </v-tooltip>
+            </v-col>
+            <v-col class="v-col-1">
+              {{ formatChunkSize(chunk) }}
+            </v-col>
+            <v-col>
+              <v-btn-toggle
+                v-model="chunk.Presentation"
+                mandatory
+                density="compact"
+                variant="text"
+                color="primary"
+                class="smol-group"
+                @click.stop
+              >
+                <v-tooltip location="bottom">
+                  <template #activator="{ props: pprops }">
+                    <v-btn value="ascii" v-bind="pprops" size="x-small">
+                      <v-icon>mdi-text-long</v-icon>
+                    </v-btn>
+                  </template>
+                  <span>ASCII</span>
+                </v-tooltip>
+                <v-tooltip location="bottom">
+                  <template #activator="{ props: pprops }">
+                    <v-btn value="utf-8" v-bind="pprops" size="x-small">
+                      <v-icon>mdi-format-font</v-icon>
+                    </v-btn>
+                  </template>
+                  <span>UTF-8</span>
+                </v-tooltip>
+                <v-tooltip location="bottom">
+                  <template #activator="{ props: pprops }">
+                    <v-btn value="hexdump" v-bind="pprops" size="x-small">
+                      <v-icon>mdi-format-columns</v-icon>
+                    </v-btn>
+                  </template>
+                  <span>HEXDUMP</span>
+                </v-tooltip>
+                <v-tooltip location="bottom">
+                  <template #activator="{ props: pprops }">
+                    <v-btn value="raw" v-bind="pprops" size="x-small">
+                      <v-icon>mdi-hexadecimal</v-icon>
+                    </v-btn>
+                  </template>
+                  <span>RAW</span>
+                </v-tooltip>
+              </v-btn-toggle>
+            </v-col>
+          </v-row>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <template v-if="chunk.Presentation === 'ascii'">
+            <span
+              class="chunk"
+              :data-chunk-idx="index"
+              :class="[classes(chunk)]"
+              v-html="inlineAscii(chunk)"
+            >
+            </span>
+          </template>
+          <template v-else-if="chunk.Presentation === 'utf-8'">
+            <span
+              class="chunk"
+              :data-chunk-idx="index"
+              :class="[classes(chunk)]"
+              v-html="inlineUnicode(chunk)"
+            >
+            </span>
+          </template>
+          <template v-else-if="chunk.Presentation === 'hexdump'">
+            <pre :class="[classes(chunk), 'hexdump']">{{
+              hexdump(chunk.Content)
+            }}</pre>
+          </template>
+          <template v-else>
+            <span :class="[classes(chunk)]"
+              >{{ inlineHex(chunk.Content) }}<br
+            /></span>
+          </template>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
   </div>
   <div v-else>
     <v-card>
@@ -159,6 +176,7 @@ import {
 } from "@/lib/utils";
 import moment from "moment";
 import prettyBytes from "pretty-bytes";
+import { getColorScheme } from "@/lib/darkmode";
 
 const props = defineProps({
   viewmode: {
@@ -219,6 +237,15 @@ const data = ref(
     return visualChunk;
   }),
 );
+const openPanels = ref<number[]>(data.value.map((_, index) => index));
+
+const title_classes = () => {
+  const colorScheme = getColorScheme();
+  return {
+    "bg-grey-lighten-3": colorScheme === "light",
+    "bg-grey-darken-3": colorScheme === "dark",
+  };
+};
 
 watch(
   () => props.presentation,
@@ -404,5 +431,14 @@ const hexdump = (b64: string) => {
     color: #ffffff;
     background-color: #561919;
   }
+}
+
+.smol-group {
+  height: 24px !important;
+}
+
+.smol > button {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 </style>
