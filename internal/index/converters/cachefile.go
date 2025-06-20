@@ -239,7 +239,11 @@ func (cachefile *cacheFile) Data(stream *index.Stream) ([]index.Data, uint64, ui
 	}
 
 	relativeTimes := make([]uint64, 0, len(dataSizes))
-	for {
+	for _, ds := range dataSizes {
+		if ds.Size == 0 {
+			relativeTimes = append(relativeTimes, 0)
+			continue
+		}
 		relDataTime, _, err := readVarInt(buffer)
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("failed to read time varint: %w", err)
