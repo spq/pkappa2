@@ -394,7 +394,7 @@ const hexdump = (b64: string) => {
   background-color: #ff8e5e;
 }
 
-.theme--dark {
+.v-theme--dark {
   .server {
     color: #ffffff;
     background-color: #261858;
