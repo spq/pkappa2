@@ -159,6 +159,22 @@
       </v-tooltip>
 
       <v-spacer />
+
+      <!-- <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-switch
+            v-model="cardsViewMode"
+            :true-value="'cards'"
+            :false-value="'table'"
+            label="Cards View"
+            density="compact"
+            hide-details
+            color="primary"
+            v-bind="props"
+          />
+        </template>
+        <span>View mode</span>
+      </v-tooltip> -->
       <div v-if="streamIndex !== null && streams.result !== null">
         <span class="text-caption"
           >{{ streams.result.Offset + streamIndex + 1 }} of
@@ -370,7 +386,7 @@
       <StreamData
         ref="streamData"
         :data="stream.stream.Data"
-        viewmode="cards"
+        :viewmode="cardsViewMode"
         :presentation="presentation"
         :highlight-matches="streams.result?.DataRegexes"
         :url-decode="urlDecode"
@@ -411,6 +427,7 @@ const selectionData = ref("");
 const selectionQuery = ref("");
 const streamData = ref<HTMLElement | null>(null);
 const urlDecode = ref(false);
+const cardsViewMode = ref("cards");
 
 if (localStorage.streamPresentation) {
   presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";
