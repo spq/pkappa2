@@ -82,6 +82,17 @@
                   </template>
                   <span>RAW</span>
                 </v-tooltip>
+                <v-tooltip
+                  location="bottom"
+                  v-if="supportsIframeVisualization(chunk)"
+                >
+                  <template #activator="{ props: pprops }">
+                    <v-btn value="web" v-bind="pprops" size="x-small">
+                      <v-icon>mdi-web</v-icon>
+                    </v-btn>
+                  </template>
+                  <span>WEB</span>
+                </v-tooltip>
               </v-btn-toggle>
             </v-col>
           </v-row>
@@ -110,10 +121,28 @@
               hexdump(chunk.Content)
             }}</pre>
           </template>
-          <template v-else>
+          <template v-else-if="chunk.Presentation === 'raw'">
             <span :class="[classes(chunk)]"
               >{{ inlineHex(chunk.Content) }}<br
             /></span>
+          </template>
+          <template v-else-if="chunk.Presentation === 'web'">
+            <div
+              class="iframe-content"
+              v-if="supportsIframeVisualization(chunk)"
+            >
+              <iframe
+                :src="`data:${chunk.ContentType};base64,${chunk.Content}`"
+                width="100%"
+                height="100%"
+                sandbox=""
+                csp="default-src 'none'"
+              ></iframe>
+            </div>
+            <span v-else>
+              <span class="text-caption">Unsupported content type: </span>
+              <span class="text-body-2">{{ chunk.ContentType }}</span>
+            </span>
           </template>
         </v-expansion-panel-text>
       </v-expansion-panel>
@@ -333,15 +362,6 @@ const inlineUnicode = (chunk: Data) => {
 };
 
 const inlineAscii = (chunk: Data) => {
-  if (chunk.ContentType?.startsWith("text/html")) {
-    return `<iframe src="data:text/html;base64,${chunk.Content}" width="100%" height="300px" sandbox="" csp="default-src 'none'"></iframe>`;
-  }
-  const imageTypes = ["image/png", "image/x-icon"];
-  for (const type of imageTypes) {
-    if (chunk.ContentType?.startsWith(type)) {
-      return `<img src="data:${type};base64,${chunk.Content}" />`;
-    }
-  }
   const chunkData = tryURLDecodeIfEnabled(atob(chunk.Content), props.urlDecode);
   const asciiEscaped = chunkData
     .split("")
@@ -405,6 +425,18 @@ const hexdump = (b64: string) => {
     .join("\n");
   return str;
 };
+
+const isHTMLMimeType = (chunk: Data) => {
+  return chunk.ContentType?.startsWith("text/html") ?? false;
+};
+
+const isImageMimeType = (chunk: Data) => {
+  return chunk.ContentType?.startsWith("image/") ?? false;
+};
+
+const supportsIframeVisualization = (chunk: Data) => {
+  return isHTMLMimeType(chunk) || isImageMimeType(chunk);
+};
 </script>
 <style scoped>
 .chunk {
@@ -449,5 +481,14 @@ const hexdump = (b64: string) => {
 .smol > button {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+
+.iframe-content {
+  max-height: 300px;
+  resize: both;
+  overflow: hidden;
+}
+.iframe-content iframe {
+  max-height: 300px;
 }
 </style>
