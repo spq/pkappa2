@@ -5,6 +5,10 @@
  */
 
 // https://vuetifyjs.com/features/sass-variables/`
-// @use 'vuetify/settings' with (
-//   $color-pack: false
-// );
+@use "vuetify/settings" with (
+  // For StreamData component row compacting.
+  // If this is global and annoying, we need to find a way
+  // to set this only for StreamData component.
+  $expansion-panel-title-min-height: 16px,
+  $expansion-panel-active-title-min-height: 16px
+);

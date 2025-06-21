@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from datetime import datetime
 from typing import List
 
 from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
@@ -60,7 +61,13 @@ s = requests.Session()
 
         return Result(
             result.Chunks
-            + [StreamChunk(Direction.CLIENTTOSERVER, self.requests_output.encode())]
+            + [
+                StreamChunk(
+                    Direction.CLIENTTOSERVER,
+                    self.requests_output.encode(),
+                    stream.Chunks[0].Time if stream.Chunks else datetime.now(),
+                )
+            ]
         )
 
 

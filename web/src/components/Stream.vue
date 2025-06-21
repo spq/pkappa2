@@ -159,6 +159,22 @@
       </v-tooltip>
 
       <v-spacer />
+
+      <!-- <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-switch
+            v-model="cardsViewMode"
+            :true-value="'cards'"
+            :false-value="'table'"
+            label="Cards View"
+            density="compact"
+            hide-details
+            color="primary"
+            v-bind="props"
+          />
+        </template>
+        <span>View mode</span>
+      </v-tooltip> -->
       <div v-if="streamIndex !== null && streams.result !== null">
         <span class="text-caption"
           >{{ streams.result.Offset + streamIndex + 1 }} of
@@ -231,7 +247,7 @@
     }}</v-alert>
     <div v-else-if="stream.stream !== null">
       <v-container fluid>
-        <v-row>
+        <v-row no-gutters>
           <v-col cols="1" class="text-subtitle-2">Client:</v-col>
           <v-col cols="2" class="text-body-2"
             ><span
@@ -271,7 +287,7 @@
             ></v-col
           >
         </v-row>
-        <v-row>
+        <v-row no-gutters>
           <v-col cols="1" class="text-subtitle-2">Server:</v-col>
           <v-col cols="2" class="text-body-2"
             ><span
@@ -323,7 +339,7 @@
             ></v-col
           >
         </v-row>
-        <v-row v-if="streamTags.generated.length > 0">
+        <v-row v-if="streamTags.generated.length > 0" no-gutters>
           <v-col cols="1" class="text-subtitle-2">Generated:</v-col>
           <v-col cols="11" class="text-body-2"
             ><v-chip
@@ -337,12 +353,13 @@
             ></v-col
           >
         </v-row>
-        <v-row>
+        <v-row no-gutters>
           <v-tabs
             v-model="converterTab"
             density="compact"
             mandatory
             show-arrows
+            height="24px"
             @update:model-value="changeConverter"
           >
             <v-tooltip
@@ -369,6 +386,7 @@
       <StreamData
         ref="streamData"
         :data="stream.stream.Data"
+        :viewmode="cardsViewMode"
         :presentation="presentation"
         :highlight-matches="streams.result?.DataRegexes"
         :url-decode="urlDecode"
@@ -409,6 +427,7 @@ const selectionData = ref("");
 const selectionQuery = ref("");
 const streamData = ref<HTMLElement | null>(null);
 const urlDecode = ref(false);
+const cardsViewMode = ref("cards");
 
 if (localStorage.streamPresentation) {
   presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";

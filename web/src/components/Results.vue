@@ -184,12 +184,13 @@
         ></v-alert
       >
     </div>
-    <center
+    <div
+      class="text-center"
       v-else-if="streams.result === null || streams.result.Results.length === 0"
     >
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
-    </center>
+    </div>
     <v-table v-else density="compact" hover>
       <template #default>
         <thead>

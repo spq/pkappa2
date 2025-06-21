@@ -56,19 +56,19 @@ class HTTPConverter(Pkappa2Converter):
         self, chunk: StreamChunk, request: HTTPRequest
     ) -> List[StreamChunk]:
         # Just pass HTTP1 requests through untouched
-        return [StreamChunk(chunk.Direction, chunk.Content)]
+        return [chunk]
 
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
     ) -> List[StreamChunk]:
         data = header + b"\r\n\r\n" + response.data
-        return [StreamChunk(chunk.Direction, data)]
+        return [chunk.derive(content=data)]
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
         last_request_method = None
         self.is_last_chunk = False
-        for chunk_idx, chunk in enumerate(stream.Chunks):
+        for chunk_idx, chunk in enumerate(stream.coalesce_chunks_in_same_direction_iter()):
             if chunk_idx == len(stream.Chunks) - 1:
                 self.is_last_chunk = True
 
@@ -92,14 +92,12 @@ class HTTPConverter(Pkappa2Converter):
                 except Exception as ex:
                     last_request_method = None
                     data = f"Unable to parse HTTP request: {ex}\n".encode()
-                    result_data.append(
-                        StreamChunk(chunk.Direction, data + chunk.Content)
-                    )
+                    result_data.append(chunk.derive(content=data + chunk.Content))
             else:
                 try:
-                    raw_response: Optional[
-                        List[StreamChunk]
-                    ] = self.handle_raw_server_chunk(chunk)
+                    raw_response: Optional[List[StreamChunk]] = (
+                        self.handle_raw_server_chunk(chunk)
+                    )
                     if raw_response is not None:
                         result_data.extend(raw_response)
                         continue
@@ -119,18 +117,14 @@ class HTTPConverter(Pkappa2Converter):
                 except ProtocolError as ex:
                     if isinstance(ex.__context__, IncompleteRead):
                         data = f"Incomplete read: {ex}\n".encode()
-                        result_data.append(
-                            StreamChunk(chunk.Direction, data + chunk.Content)
-                        )
+                        result_data.append(chunk.derive(content=data + chunk.Content))
                     else:
                         raise
                 except Exception as ex:
                     data = f"Unable to parse HTTP response: {ex}\n".encode()
                     self.log(f"Unable to parse HTTP response: {ex}")
                     self.log(traceback.format_exc())
-                    result_data.append(
-                        StreamChunk(chunk.Direction, data + chunk.Content)
-                    )
+                    result_data.append(chunk.derive(content=data + chunk.Content))
         return Result(result_data)
 
 

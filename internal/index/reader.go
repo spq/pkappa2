@@ -59,19 +59,19 @@ type (
 	Data struct {
 		Direction Direction
 		Content   []byte
+		Time      time.Time
 	}
 )
 
 const (
 	DirectionClientToServer Direction = 0
 	DirectionServerToClient Direction = 1
+
+	ChunkSplitThreshold = 50 * time.Millisecond
 )
 
 func (dir Direction) Reverse() Direction {
-	if dir == DirectionClientToServer {
-		return DirectionServerToClient
-	}
-	return DirectionClientToServer
+	return dir ^ DirectionClientToServer ^ DirectionServerToClient
 }
 
 func (hg *readerHostGroup) get(id uint16) net.IP {
@@ -468,9 +468,55 @@ func (s *Stream) Packets() ([]Packet, error) {
 }
 
 func (s *Stream) Data() ([]Data, error) {
-	data := []Data{}
-	sr := io.NewSectionReader(s.r.file, int64(s.r.header.Sections[sectionData].Begin+s.DataStart), s.r.header.Sections[sectionData].size()-int64(s.DataStart))
+	off := int64(s.PacketInfoStart) * int64(unsafe.Sizeof(packet{}))
+	sr := io.NewSectionReader(s.r.file, int64(s.r.header.Sections[sectionPackets].Begin)+off, s.r.header.Sections[sectionPackets].size()-off)
 	br := bufio.NewReader(sr)
+	p := packet{}
+	refTime := s.FirstPacket()
+	type packetTime struct {
+		ts time.Time
+		sz uint64
+	}
+	expectWraps := (time.Duration(s.LastPacketTimeNS-s.FirstPacketTimeNS)*time.Nanosecond + time.Microsecond) / (time.Microsecond << 32)
+	packetTimes := [2][]packetTime{nil, nil}
+	lastRelPacketTimeMS := uint32(0)
+	prevTs := time.Time{}
+	prevDir := uint8(0)
+	for {
+		if err := binary.Read(br, binary.LittleEndian, &p); err != nil {
+			return nil, err
+		}
+		if expectWraps != 0 {
+			if p.RelPacketTimeMS < lastRelPacketTimeMS {
+				refTime = refTime.Add(time.Microsecond << 32)
+				expectWraps--
+			}
+			lastRelPacketTimeMS = p.RelPacketTimeMS
+		}
+		if p.DataSize != 0 {
+			ts := refTime.Add(time.Duration(p.RelPacketTimeMS) * time.Microsecond)
+			dir := ((p.Flags & flagsPacketDirection) / flagsPacketDirection) ^ uint8(DirectionClientToServer) ^ (flagsPacketDirectionClientToServer / flagsPacketDirection)
+			ci := &packetTimes[dir]
+			if len(*ci) != 0 && dir == prevDir && ts.Sub(prevTs) < ChunkSplitThreshold {
+				(*ci)[len(*ci)-1].sz += uint64(p.DataSize)
+			} else {
+				*ci = append(*ci, packetTime{ts, uint64(p.DataSize)})
+			}
+			prevTs = ts
+			prevDir = dir
+		}
+		if (p.Flags & flagsPacketHasNext) == 0 {
+			break
+		}
+		if p.SkipPacketsForData != 0 && expectWraps == 0 {
+			if _, err := br.Discard(int(p.SkipPacketsForData) * int(unsafe.Sizeof(packet{}))); err != nil {
+				return nil, err
+			}
+		}
+	}
+	data := []Data{}
+	sr = io.NewSectionReader(s.r.file, int64(s.r.header.Sections[sectionData].Begin+s.DataStart), s.r.header.Sections[sectionData].size()-int64(s.DataStart))
+	br = bufio.NewReader(sr)
 
 	content := [2][]byte{}
 	content[DirectionClientToServer] = make([]byte, s.ClientBytes)
@@ -483,7 +529,7 @@ func (s *Stream) Data() ([]Data, error) {
 	}
 
 	position := [2]uint64{}
-	for dir := DirectionClientToServer; ; dir ^= DirectionClientToServer ^ DirectionServerToClient {
+	for dir := DirectionClientToServer; ; dir = dir.Reverse() {
 		if position[DirectionClientToServer] == s.ClientBytes && position[DirectionServerToClient] == s.ServerBytes {
 			break
 		}
@@ -502,14 +548,35 @@ func (s *Stream) Data() ([]Data, error) {
 		if sz == 0 {
 			continue
 		}
-		data = append(data, Data{
-			Direction: dir,
-			Content:   content[dir][position[dir]:][:sz],
-		})
-		position[dir] += sz
+		pt := &packetTimes[dir][0]
+		for {
+			szCur := sz
+			if szCur > pt.sz {
+				szCur = pt.sz
+			}
+			data = append(data, Data{
+				Direction: dir,
+				Content:   content[dir][position[dir]:][:szCur],
+				Time:      pt.ts.UTC(),
+			})
+			position[dir] += szCur
+			pt.sz -= szCur
+			sz -= szCur
+			if sz == 0 {
+				break
+			}
+			if pt.sz == 0 {
+				packetTimes[dir] = packetTimes[dir][1:]
+				pt = &packetTimes[dir][0]
+			}
+		}
+		if pt.sz == 0 {
+			packetTimes[dir] = packetTimes[dir][1:]
+		}
 	}
 	return data, nil
 }
+
 func (s *Stream) FirstPacket() time.Time {
 	return s.r.ReferenceTime.Add(time.Duration(s.FirstPacketTimeNS) * time.Nanosecond)
 }
@@ -573,4 +640,19 @@ func (r *Reader) AllStreams(handler func(*Stream) error) error {
 func (r *Reader) sectionReader(section section) *io.SectionReader {
 	s := r.header.Sections[section]
 	return io.NewSectionReader(r.file, int64(s.Begin), s.size())
+}
+
+func (d *Data) MarshalJSON() ([]byte, error) {
+	if d.Time.IsZero() {
+		return json.Marshal(struct {
+			Direction Direction
+			Content   []byte
+		}{Direction: d.Direction, Content: d.Content})
+	} else {
+		return json.Marshal(struct {
+			Direction Direction
+			Content   []byte
+			Time      time.Time
+		}{Direction: d.Direction, Content: d.Content, Time: d.Time})
+	}
 }
