@@ -84,6 +84,22 @@
                 </v-tooltip>
               </v-btn-toggle>
             </v-col>
+            <v-col class="v-col-1">
+              <v-tooltip location="bottom">
+                <template #activator="{ props: pprops }">
+                  <v-btn
+                    v-bind="pprops"
+                    size="x-small"
+                    variant="text"
+                    @click="downloadChunk(index, chunk)"
+                    @click.stop
+                  >
+                    <v-icon>mdi-download</v-icon>
+                  </v-btn>
+                </template>
+                <span>Download</span>
+              </v-tooltip>
+            </v-col>
           </v-row>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
@@ -177,7 +193,9 @@ import {
 import moment from "moment";
 import prettyBytes from "pretty-bytes";
 import { getColorScheme } from "@/lib/darkmode";
+import { useStreamStore } from "@/stores/stream";
 
+const stream = useStreamStore();
 const props = defineProps({
   viewmode: {
     type: String,
@@ -395,6 +413,20 @@ const hexdump = (b64: string) => {
     })
     .join("\n");
   return str;
+};
+
+const downloadChunk = (index: number, chunk: Data) => {
+  const blob = new Blob([atob(chunk.Content)], {
+    type: "application/octet-stream",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `chunk-${stream.id}-${index}.bin`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 </script>
 <style scoped>
