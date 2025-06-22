@@ -61,8 +61,17 @@ class HTTPConverter(Pkappa2Converter):
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
     ) -> List[StreamChunk]:
-        data = header + b"\r\n\r\n" + response.data
-        return [chunk.derive(content=data)]
+        content_type = response.headers.get("Content-Type")
+        if content_type:
+            chunks = [
+                chunk.derive(content=header + b"\r\n\r\n"),
+                chunk.derive(content=response.data, content_type=content_type),
+            ]
+        else:
+            chunks = [
+                chunk.derive(content=header + b"\r\n\r\n" + response.data)
+            ]
+        return chunks
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []

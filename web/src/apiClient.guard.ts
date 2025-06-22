@@ -115,7 +115,9 @@ export function isStreamData(obj: unknown): obj is StreamData {
             typeof e["Direction"] === "number" &&
             typeof e["Content"] === "string" &&
             (typeof e["Time"] === "undefined" ||
-                typeof e["Time"] === "string")
+                typeof e["Time"] === "string") &&
+            (typeof e["ContentType"] === "undefined" ||
+                typeof e["ContentType"] === "string")
         ) &&
         Array.isArray(typedObj["Tags"]) &&
         typedObj["Tags"].every((e: any) =>

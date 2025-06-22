@@ -57,9 +57,10 @@ type (
 		Direction    Direction
 	}
 	Data struct {
-		Direction Direction
-		Content   []byte
-		Time      time.Time
+		Direction   Direction
+		Content     []byte
+		Time        time.Time
+		ContentType string `json:",omitempty"`
 	}
 )
 
@@ -645,14 +646,16 @@ func (r *Reader) sectionReader(section section) *io.SectionReader {
 func (d *Data) MarshalJSON() ([]byte, error) {
 	if d.Time.IsZero() {
 		return json.Marshal(struct {
-			Direction Direction
-			Content   []byte
-		}{Direction: d.Direction, Content: d.Content})
+			Direction   Direction
+			Content     []byte
+			ContentType string `json:",omitempty"`
+		}{Direction: d.Direction, Content: d.Content, ContentType: d.ContentType})
 	} else {
 		return json.Marshal(struct {
-			Direction Direction
-			Content   []byte
-			Time      time.Time
-		}{Direction: d.Direction, Content: d.Content, Time: d.Time})
+			Direction   Direction
+			Content     []byte
+			Time        time.Time
+			ContentType string `json:",omitempty"`
+		}{Direction: d.Direction, Content: d.Content, Time: d.Time, ContentType: d.ContentType})
 	}
 }
