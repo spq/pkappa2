@@ -85,10 +85,10 @@ function onSelectionChange(this: ThisProxy) {
   }
 
   // Assume continuous selection across chunks.
-  const { startContainer, startOffset } =
-    selection.getRangeAt(0);
-  const { endContainer, endOffset } =
-    selection.getRangeAt(selection.rangeCount - 1);
+  const { startContainer, startOffset } = selection.getRangeAt(0);
+  const { endContainer, endOffset } = selection.getRangeAt(
+    selection.rangeCount - 1,
+  );
   const startChunkIdxString = getFromDataSet(
     streamDataNode,
     startContainer,
