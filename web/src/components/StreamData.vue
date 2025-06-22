@@ -84,7 +84,21 @@
                 </v-tooltip>
               </v-btn-toggle>
             </v-col>
-            <v-col class="v-col-1">
+            <v-col class="v-col-2">
+              <v-tooltip location="bottom">
+                <template #activator="{ props: pprops }">
+                  <v-btn
+                    v-bind="pprops"
+                    size="x-small"
+                    variant="text"
+                    icon="mdi-chef-hat"
+                    @click="openInCyberChef(chunk)"
+                    @click.stop
+                  >
+                  </v-btn>
+                </template>
+                <span>Open in CyberChef</span>
+              </v-tooltip>
               <v-tooltip location="bottom">
                 <template #activator="{ props: pprops }">
                   <v-btn
@@ -209,6 +223,7 @@ import prettyBytes from "pretty-bytes";
 import { getColorScheme } from "@/lib/darkmode";
 import { useStreamStore } from "@/stores/stream";
 import { EventBus } from "./EventBus";
+import { CYBERCHEF_URL } from "@/lib/constants";
 
 const stream = useStreamStore();
 const props = defineProps({
@@ -475,6 +490,14 @@ const copyToClipboard = (chunk: VisualChunk) => {
       EventBus.emit("showError", `Failed to copy to clipboard: ${err}`);
     });
 };
+
+function openInCyberChef(chunk: Data) {
+  window.open(
+    `${CYBERCHEF_URL}#input=${encodeURIComponent(chunk.Content)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
+}
 </script>
 <style scoped>
 .chunk {

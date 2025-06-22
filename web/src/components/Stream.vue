@@ -416,8 +416,7 @@ import {
 import { formatDate, formatDateLong, tagify } from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";
 import prettyBytes from "pretty-bytes";
-
-const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
+import { CYBERCHEF_URL } from "@/lib/constants";
 
 const store = useRootStore();
 const route = useRoute();
@@ -607,7 +606,11 @@ function openInCyberChef() {
     }
   }
   const encoded_data = btoa(data);
-  window.open(`${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`);
+  window.open(
+    `${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 
 function createMark() {
