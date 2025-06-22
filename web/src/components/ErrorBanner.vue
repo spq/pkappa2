@@ -31,6 +31,6 @@ function showMessage(msg: string) {
   message.value = msg;
   color.value = "success";
   visible.value = true;
-  console.error(msg);
+  console.log(msg);
 }
 </script>

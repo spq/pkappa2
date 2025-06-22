@@ -99,6 +99,20 @@
                 </template>
                 <span>Download</span>
               </v-tooltip>
+              <v-tooltip location="bottom">
+                <template #activator="{ props: pprops }">
+                  <v-btn
+                    v-bind="pprops"
+                    size="x-small"
+                    variant="text"
+                    icon="mdi-content-copy"
+                    @click="copyToClipboard(chunk)"
+                    @click.stop
+                  >
+                  </v-btn>
+                </template>
+                <span>Copy Content</span>
+              </v-tooltip>
             </v-col>
           </v-row>
         </v-expansion-panel-title>
@@ -194,6 +208,7 @@ import moment from "moment";
 import prettyBytes from "pretty-bytes";
 import { getColorScheme } from "@/lib/darkmode";
 import { useStreamStore } from "@/stores/stream";
+import { EventBus } from "./EventBus";
 
 const stream = useStreamStore();
 const props = defineProps({
@@ -427,6 +442,38 @@ const downloadChunk = (index: number, chunk: Data) => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+const copyToClipboard = (chunk: VisualChunk) => {
+  let content = "";
+  switch (chunk.Presentation) {
+    case "ascii":
+      content = tryURLDecodeIfEnabled(atob(chunk.Content), props.urlDecode);
+      break;
+    case "utf-8":
+      content = handleUnicodeDecode(chunk, props.urlDecode);
+      break;
+    case "hexdump":
+      content = hexdump(chunk.Content) ?? "";
+      break;
+    case "raw":
+      content = inlineHex(chunk.Content);
+      break;
+    default:
+      EventBus.emit(
+        "showError",
+        `Unknown presentation format: ${chunk.Presentation}`,
+      );
+      return;
+  }
+  navigator.clipboard
+    .writeText(content)
+    .then(() => {
+      EventBus.emit("showMessage", "Copied content to clipboard.");
+    })
+    .catch((err) => {
+      EventBus.emit("showError", `Failed to copy to clipboard: ${err}`);
+    });
 };
 </script>
 <style scoped>
