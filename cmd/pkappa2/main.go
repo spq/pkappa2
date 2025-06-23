@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"container/ring"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -118,6 +121,41 @@ func main() {
 		os.Exit(1)
 	}()
 
+	// Intercept and capture logging on stderr to expose it via API too
+	stderrRing := ring.New(256)
+	stderrLock := sync.RWMutex{}
+	if os.Stderr != nil {
+		r, w, err := os.Pipe()
+		if err != nil {
+			log.Fatalf("failed to create pipe to capture stderr: %v", err)
+		}
+		log.SetOutput(w)
+		defer func() {
+			if err := w.Close(); err != nil {
+				log.Printf("Failed to close pipe: %v", err)
+			}
+			log.SetOutput(os.Stderr)
+		}()
+
+		go func() {
+			reader := bufio.NewReaderSize(r, 65536)
+			for {
+				line, err := tools.ReadLine(reader)
+				if err != nil {
+					break
+				}
+				// Print to original stderr
+				fmt.Fprintln(os.Stderr, string(line))
+
+				// Store the line in the ring buffer
+				stderrLock.Lock()
+				stderrRing.Value = line
+				stderrRing = stderrRing.Next()
+				stderrLock.Unlock()
+			}
+		}()
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.SetHeader("Access-Control-Allow-Origin", "*"))
 	r.Use(middleware.SetHeader("Access-Control-Allow-Methods", "*"))
@@ -185,6 +223,21 @@ func main() {
 		http.Error(w, "OK", http.StatusOK)
 	})
 	rUser.Mount("/debug", middleware.Profiler())
+	rUser.Get("/api/stderr", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		output := []string{}
+		stderrLock.RLock()
+		stderrRing.Do(func(value any) {
+			if value != nil {
+				output = append(output, string(value.([]byte)))
+			}
+		})
+		stderrLock.RUnlock()
+		if err := json.NewEncoder(w).Encode(output); err != nil {
+			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+	})
 	rUser.Get("/api/config", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
