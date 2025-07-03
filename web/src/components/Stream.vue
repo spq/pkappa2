@@ -386,7 +386,7 @@
       <StreamData
         ref="streamData"
         :data="stream.stream.Data"
-        :viewmode="cardsViewMode"
+        viewmode="virtual"
         :presentation="presentation"
         :highlight-matches="streams.result?.DataRegexes"
         :url-decode="urlDecode"
@@ -591,7 +591,11 @@ function changeConverter(converter: unknown) {
 function fetchStreamForId() {
   stream.stream = null;
   if (streamId.value !== null) {
-    stream.fetchStream(streamId.value, converter.value).catch((err: Error) => {
+    stream.fetchStream(streamId.value, converter.value).then(() => {
+      if (stream.stream !== null && stream.stream.Data.length > 50) {
+        cardsViewMode.value = "table";
+      }
+    }).catch((err: Error) => {
       EventBus.emit("showError", `Failed to fetch stream: ${err.message}`);
     });
     document.getSelection()?.empty();

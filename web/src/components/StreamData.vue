@@ -1,136 +1,177 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
-  <div v-if="viewmode === 'cards'">
-    <v-expansion-panels v-model="openPanels" multiple variant="accordion">
-      <v-expansion-panel
-        v-for="(chunk, index) in data"
-        :key="index"
-        :value="index"
-        static
-        class="smol"
-      >
-        <v-expansion-panel-title
-          class="border-bottom elevation-2"
-          :class="[title_classes()]"
-        >
-          <v-row class="text-caption align-center" no-gutters>
-            <v-col class="v-col-1">
-              <v-icon v-if="chunk.Direction === 0" color="red"
-                >mdi-arrow-right-thin-circle-outline</v-icon
+  <div v-if="viewmode === 'virtual'">
+    <v-data-table-virtual
+    :items="virtualData"
+    hide-default-header
+    class="w-100"
+    >
+      <template #item="{ item: chunk }">
+        <tr>
+          <td>Header</td>
+        </tr>
+        <tr>
+          <td>
+              <span
+                v-if="presentation === 'ascii'"
+                class="chunk text-wrap"
+                :data-chunk-idx="chunk.index"
+                :class="[classes(chunk)]"
+                v-html="inlineAscii(chunk)"
               >
-              <v-icon v-else color="green"
-                >mdi-arrow-left-thin-circle-outline</v-icon
-              >
-              <span>
-                {{ chunk.Direction === 0 ? "Client" : "Server" }}
               </span>
-            </v-col>
-            <v-col class="v-col-1" v-if="chunk.Time !== undefined">
-              <v-tooltip location="bottom">
-                <template #activator="{ props: tprops }">
-                  <v-chip v-bind="tprops" size="small" variant="text"
-                    >+{{
-                      formatDateDifference(chunk.Time, data[index - 1]?.Time)
-                    }}</v-chip
-                  >
-                </template>
-                <span>{{ formatDate(chunk.Time) }}</span>
-              </v-tooltip>
-            </v-col>
-            <v-col class="v-col-1">
-              {{ formatChunkSize(chunk) }}
-            </v-col>
-            <v-col>
-              <v-btn-toggle
-                v-model="chunk.Presentation"
-                mandatory
-                density="compact"
+              <span
+                v-else-if="presentation === 'utf-8'"
+                class="chunk"
+                :data-chunk-idx="chunk.index"
+                :class="[classes(chunk)]"
+                v-html="inlineUnicode(chunk)"
+              >
+              </span>
+              <pre
+                v-else-if="presentation === 'hexdump'"
+                :class="[classes(chunk), 'hexdump']"
+                >{{ hexdump(chunk.Content) }}</pre
+              >
+              <span
+                v-else
+                :class="[classes(chunk)]"
+                >{{ inlineHex(chunk.Content) }}<br
+              /></span>
+          </td>
+        </tr>
+      </template>
+    </v-data-table-virtual>
+  </div>
+  <div v-else-if="viewmode === 'cards'">
+    <div v-for="(chunk, index) in data" :key="index">
+      <v-row
+        static
+        class="border-bottom elevation-2"
+        :class="[title_classes(), 'text-caption', 'align-center']"
+        no-gutters
+      >
+        <v-col class="v-col-1">
+          <v-icon v-if="chunk.Direction === 0" color="red"
+            >mdi-arrow-right-thin-circle-outline</v-icon
+          >
+          <v-icon v-else color="green"
+            >mdi-arrow-left-thin-circle-outline</v-icon
+          >
+          <span>
+            {{ chunk.Direction === 0 ? "Client" : "Server" }}
+          </span>
+        </v-col>
+        <v-col class="v-col-1" v-if="chunk.Time !== undefined">
+          <v-tooltip location="bottom">
+            <template #activator="{ props: tprops }">
+              <v-chip v-bind="tprops" size="small" variant="text"
+                >+{{
+                  formatDateDifference(chunk.Time, data[index - 1]?.Time)
+                }}</v-chip
+              >
+            </template>
+            <span>{{ formatDate(chunk.Time) }}</span>
+          </v-tooltip>
+        </v-col>
+        <v-col class="v-col-1">
+          {{ formatChunkSize(chunk) }}
+        </v-col>
+        <v-col class="v-col-1">
+          {{ formatChunkSize(chunk) }}
+        </v-col>
+        <v-col>
+          <v-btn-toggle
+            v-model="chunk.Presentation"
+            mandatory
+            density="compact"
+            variant="text"
+            color="primary"
+            class="smol-group"
+            @click.stop
+          >
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="ascii" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-text-long</v-icon>
+                </v-btn>
+              </template>
+              <span>ASCII</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="utf-8" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-format-font</v-icon>
+                </v-btn>
+              </template>
+              <span>UTF-8</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="hexdump" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-format-columns</v-icon>
+                </v-btn>
+              </template>
+              <span>HEXDUMP</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="raw" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-hexadecimal</v-icon>
+                </v-btn>
+              </template>
+              <span>RAW</span>
+            </v-tooltip>
+          </v-btn-toggle>
+        </v-col>
+        <v-col class="v-col-2">
+          <v-tooltip location="bottom">
+            <template #activator="{ props: pprops }">
+              <v-btn
+                v-bind="pprops"
+                size="x-small"
                 variant="text"
-                color="primary"
-                class="smol-group"
+                icon="mdi-chef-hat"
+                @click="openInCyberChef(chunk)"
                 @click.stop
               >
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="ascii" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-text-long</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>ASCII</span>
-                </v-tooltip>
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="utf-8" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-format-font</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>UTF-8</span>
-                </v-tooltip>
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="hexdump" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-format-columns</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>HEXDUMP</span>
-                </v-tooltip>
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="raw" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-hexadecimal</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>RAW</span>
-                </v-tooltip>
-              </v-btn-toggle>
-            </v-col>
-            <v-col class="v-col-2">
-              <v-tooltip location="bottom">
-                <template #activator="{ props: pprops }">
-                  <v-btn
-                    v-bind="pprops"
-                    size="x-small"
-                    variant="text"
-                    icon="mdi-chef-hat"
-                    @click="openInCyberChef(chunk)"
-                    @click.stop
-                  >
-                  </v-btn>
-                </template>
-                <span>Open in CyberChef</span>
-              </v-tooltip>
-              <v-tooltip location="bottom">
-                <template #activator="{ props: pprops }">
-                  <v-btn
-                    v-bind="pprops"
-                    size="x-small"
-                    variant="text"
-                    @click="downloadChunk(index, chunk)"
-                    @click.stop
-                  >
-                    <v-icon>mdi-download</v-icon>
-                  </v-btn>
-                </template>
-                <span>Download</span>
-              </v-tooltip>
-              <v-tooltip location="bottom">
-                <template #activator="{ props: pprops }">
-                  <v-btn
-                    v-bind="pprops"
-                    size="x-small"
-                    variant="text"
-                    icon="mdi-content-copy"
-                    @click="copyToClipboard(chunk)"
-                    @click.stop
-                  >
-                  </v-btn>
-                </template>
-                <span>Copy Content</span>
-              </v-tooltip>
-            </v-col>
-          </v-row>
-        </v-expansion-panel-title>
-        <v-expansion-panel-text>
+              </v-btn>
+            </template>
+            <span>Open in CyberChef</span>
+          </v-tooltip>
+          <v-tooltip location="bottom">
+            <template #activator="{ props: pprops }">
+              <v-btn
+                v-bind="pprops"
+                size="x-small"
+                variant="text"
+                @click="downloadChunk(index, chunk)"
+                @click.stop
+              >
+                <v-icon>mdi-download</v-icon>
+              </v-btn>
+            </template>
+            <span>Download</span>
+          </v-tooltip>
+          <v-tooltip location="bottom">
+            <template #activator="{ props: pprops }">
+              <v-btn
+                v-bind="pprops"
+                size="x-small"
+                variant="text"
+                icon="mdi-content-copy"
+                @click="copyToClipboard(chunk)"
+                @click.stop
+              >
+              </v-btn>
+            </template>
+            <span>Copy Content</span>
+          </v-tooltip>
+        </v-col>
+      </v-row>
+
+      <v-row>
+        <v-col cols="12">
           <template v-if="chunk.Presentation === 'ascii'">
             <span
               class="chunk"
@@ -159,9 +200,9 @@
               >{{ inlineHex(chunk.Content) }}<br
             /></span>
           </template>
-        </v-expansion-panel-text>
-      </v-expansion-panel>
-    </v-expansion-panels>
+        </v-col>
+      </v-row>
+    </div>
   </div>
   <div v-else>
     <v-card>
@@ -212,13 +253,12 @@
 <script lang="ts" setup>
 import { Data, DataRegexes } from "@/apiClient";
 import { PropType, computed, ref, watch } from "vue";
-import { formatDate } from "@/filters";
+import { formatDate, formatDateDifference } from "@/filters";
 import {
   escapeRegex,
   handleUnicodeDecode,
   tryURLDecodeIfEnabled,
 } from "@/lib/utils";
-import moment from "moment";
 import prettyBytes from "pretty-bytes";
 import { getColorScheme } from "@/lib/darkmode";
 import { useStreamStore } from "@/stores/stream";
@@ -251,19 +291,6 @@ const props = defineProps({
   },
 });
 
-const formatDateDifference = (first: string, second: string | undefined) => {
-  if (second === undefined) return "0 ms";
-  if (first === second) return "0 ms";
-  const ms = moment(first).diff(moment(second));
-  if (ms < 1000) return `${ms} ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) {
-    return `${seconds} s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}:${seconds} s`;
-};
-
 const formatChunkSize = (chunk: Data) => {
   const size = atob(chunk.Content).length;
   return prettyBytes(size, {
@@ -285,7 +312,13 @@ const data = ref(
     return visualChunk;
   }),
 );
-const openPanels = ref<number[]>(data.value.map((_, index) => index));
+const virtualData = computed(() => {
+  return data.value.map((chunk, index) => ({
+    ...chunk,
+    index,
+  }));
+});
+// const openPanels = ref<number[]>(data.value.map((_, index) => index));
 
 const title_classes = () => {
   const colorScheme = getColorScheme();
