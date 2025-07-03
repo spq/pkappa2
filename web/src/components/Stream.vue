@@ -160,11 +160,11 @@
 
       <v-spacer />
 
-      <!-- <v-tooltip location="bottom">
+      <v-tooltip location="bottom">
         <template #activator="{ props }">
           <v-switch
             v-model="cardsViewMode"
-            :true-value="'cards'"
+            :true-value="'virtual'"
             :false-value="'table'"
             label="Cards View"
             density="compact"
@@ -174,7 +174,7 @@
           />
         </template>
         <span>View mode</span>
-      </v-tooltip> -->
+      </v-tooltip>
       <div v-if="streamIndex !== null && streams.result !== null">
         <span class="text-caption"
           >{{ streams.result.Offset + streamIndex + 1 }} of
@@ -386,7 +386,7 @@
       <StreamData
         ref="streamData"
         :data="stream.stream.Data"
-        viewmode="virtual"
+        :viewmode="cardsViewMode"
         :presentation="presentation"
         :highlight-matches="streams.result?.DataRegexes"
         :url-decode="urlDecode"
@@ -426,7 +426,7 @@ const selectionData = ref("");
 const selectionQuery = ref("");
 const streamData = ref<HTMLElement | null>(null);
 const urlDecode = ref(false);
-const cardsViewMode = ref("cards");
+const cardsViewMode = ref("virtual");
 
 if (localStorage.streamPresentation) {
   presentation.value = localStorage.getItem("streamPresentation") ?? "ascii";
@@ -591,13 +591,16 @@ function changeConverter(converter: unknown) {
 function fetchStreamForId() {
   stream.stream = null;
   if (streamId.value !== null) {
-    stream.fetchStream(streamId.value, converter.value).then(() => {
-      if (stream.stream !== null && stream.stream.Data.length > 50) {
-        cardsViewMode.value = "table";
-      }
-    }).catch((err: Error) => {
-      EventBus.emit("showError", `Failed to fetch stream: ${err.message}`);
-    });
+    stream
+      .fetchStream(streamId.value, converter.value)
+      // .then(() => {
+      //   if (stream.stream !== null && stream.stream.Data.length > 50) {
+      //     cardsViewMode.value = "table";
+      //   }
+      // })
+      .catch((err: Error) => {
+        EventBus.emit("showError", `Failed to fetch stream: ${err.message}`);
+      });
     document.getSelection()?.empty();
   }
 }
