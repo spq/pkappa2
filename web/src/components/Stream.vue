@@ -5,6 +5,7 @@
         <template #activator="{ props }">
           <v-btn
             icon
+            exact
             :to="{
               name: 'search',
               query: {
@@ -15,10 +16,19 @@
             }"
             v-bind="props"
           >
-            <v-icon>mdi-arrow-left</v-icon>
+            <v-icon>mdi-close</v-icon>
           </v-btn>
         </template>
         <span>Back to Search Results</span>
+      </v-tooltip>
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="toggleExpand()">
+            <v-icon v-if="isExpanded">mdi-fullscreen-exit</v-icon>
+            <v-icon v-else>mdi-fullscreen</v-icon>
+          </v-btn>
+        </template>
+        <span>Expand</span>
       </v-tooltip>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
@@ -200,6 +210,7 @@
                         q: $route.query.q,
                         p: $route.query.p,
                         converter: $route.query.converter,
+                        expand: $route.query.expand,
                       },
                       params: { streamId: prevStreamId },
                     }
@@ -224,6 +235,7 @@
                         q: $route.query.q,
                         p: $route.query.p,
                         converter: $route.query.converter,
+                        expand: $route.query.expand,
                       },
                       params: { streamId: nextStreamId },
                     }
@@ -353,7 +365,7 @@
             ></v-col
           >
         </v-row>
-        <v-row no-gutters>
+        <v-row dense>
           <v-tabs
             v-model="converterTab"
             density="compact"
@@ -532,6 +544,8 @@ watch(presentation, (v) => {
   document.getSelection()?.empty();
 });
 
+const isExpanded = computed(() => route.query.expand === "true");
+
 onMounted(() => {
   fetchStreamForId();
   const proxy = {
@@ -633,5 +647,12 @@ function markStream(tagId: string, value: boolean) {
       );
     });
   }
+}
+
+function toggleExpand() {
+  const query = { ...route.query };
+  if (query.expand === "true") delete query.expand;
+  else query.expand = "true";
+  void router.replace({ query });
 }
 </script>

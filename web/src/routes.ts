@@ -10,7 +10,7 @@ import Pcaps from "./components/Pcaps.vue";
 import Settings from "./components/Settings.vue";
 import Tags from "./components/Tags.vue";
 import Graph from "./components/Graph.vue";
-import Results from "./components/Results.vue";
+import ResultsLayout from "./components/ResultsLayout.vue";
 import Stream from "./components/Stream.vue";
 
 export default createRouter({
@@ -69,20 +69,22 @@ export default createRouter({
         {
           path: "search",
           name: "search",
-          component: Results,
+          component: ResultsLayout,
           props: (route) => ({
             searchTerm: route.query.q,
             searchPage: route.query.p,
           }),
-        },
-        {
-          path: "stream/:streamId(\\d+)",
-          name: "stream",
-          component: Stream,
-          props: (route) => ({
-            searchTerm: route.query.q,
-            searchPage: route.query.p,
-          }),
+          children: [
+            {
+              path: "/stream/:streamId(\\d+)",
+              name: "stream",
+              component: Stream,
+              props: (route) => ({
+                searchTerm: route.query.q,
+                searchPage: route.query.p,
+              }),
+            },
+          ],
         },
       ],
     },
