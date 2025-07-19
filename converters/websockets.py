@@ -121,7 +121,9 @@ class WebsocketConverter(HTTP2Converter):
     ) -> bytes:
         try:
             frames: List[bytes] = []
-            frame = bytearray(self.websocket_remaining_data[stream_id][direction] + content)
+            frame = bytearray(
+                self.websocket_remaining_data[stream_id][direction] + content
+            )
             del self.websocket_remaining_data[stream_id][direction]
             while len(frame) > 1:
                 try:
@@ -189,15 +191,15 @@ class WebsocketConverter(HTTP2Converter):
         window_bits = 15
         if "server_max_window_bits" in websocket_deflate_parameters:
             window_bits = int(websocket_deflate_parameters["server_max_window_bits"])
-        self.websocket_deflate_decompressor[stream_id][
-            Direction.SERVERTOCLIENT
-        ] = zlib.decompressobj(wbits=-window_bits)
+        self.websocket_deflate_decompressor[stream_id][Direction.SERVERTOCLIENT] = (
+            zlib.decompressobj(wbits=-window_bits)
+        )
         window_bits = 15
         if "client_max_window_bits" in websocket_deflate_parameters:
             window_bits = int(websocket_deflate_parameters["client_max_window_bits"])
-        self.websocket_deflate_decompressor[stream_id][
-            Direction.CLIENTTOSERVER
-        ] = zlib.decompressobj(wbits=-window_bits)
+        self.websocket_deflate_decompressor[stream_id][Direction.CLIENTTOSERVER] = (
+            zlib.decompressobj(wbits=-window_bits)
+        )
 
     def decode_websocket_extensions(
         self, extensions_header: str
@@ -304,14 +306,15 @@ class WebsocketConverter(HTTP2Converter):
         try:
             if self.switched_protocols:
                 return [
-                    StreamChunk(
-                        chunk.Direction,
-                        self.handle_websocket_frames(chunk.Direction, 0, chunk.Content),
+                    chunk.derive(
+                        content=self.handle_websocket_frames(
+                            chunk.Direction, 0, chunk.Content
+                        ),
                     )
                 ]
             return super().handle_raw_client_chunk(chunk)
         except Exception as ex:
-            return [StreamChunk(chunk.Direction, str(ex).encode())]
+            return [chunk.derive(content=str(ex).encode())]
 
     def handle_raw_server_chunk(
         self, chunk: StreamChunk
@@ -319,27 +322,30 @@ class WebsocketConverter(HTTP2Converter):
         try:
             if self.switched_protocols:
                 return [
-                    StreamChunk(
-                        chunk.Direction,
-                        self.handle_websocket_frames(chunk.Direction, 0, chunk.Content),
+                    chunk.derive(
+                        content=self.handle_websocket_frames(
+                            chunk.Direction, 0, chunk.Content
+                        ),
                     )
                 ]
             return super().handle_raw_server_chunk(chunk)
         except Exception as ex:
-            return [StreamChunk(chunk.Direction, str(ex).encode())]
+            return [chunk.derive(content=str(ex).encode())]
 
     def handle_http1_request(
         self, chunk: StreamChunk, request: HTTPRequest
     ) -> List[StreamChunk]:
         # Allow "Connection: keep-alive, Upgrade"
-        connection = request.headers.get("Connection", "").lower().replace(" ", "").split(",")
+        connection = (
+            request.headers.get("Connection", "").lower().replace(" ", "").split(",")
+        )
         if (
             "upgrade" in connection
             and request.headers.get("Upgrade", "").lower() == "websocket"
         ):
             websocket_key = request.headers.get("Sec-WebSocket-Key", None)
             if websocket_key is None:
-                return [StreamChunk(chunk.Direction, b"No websocket key found")]
+                return [chunk.derive(content=b"No websocket key found")]
             self.websocket_key = websocket_key.encode()
 
         return super().handle_http1_request(chunk, request)
@@ -348,7 +354,12 @@ class WebsocketConverter(HTTP2Converter):
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
     ) -> List[StreamChunk]:
         try:
-            connection = response.headers.get("Connection", "").lower().replace(" ", "").split(",")
+            connection = (
+                response.headers.get("Connection", "")
+                .lower()
+                .replace(" ", "")
+                .split(",")
+            )
             if (
                 response.status == 101
                 and "upgrade" in connection
@@ -382,14 +393,13 @@ class WebsocketConverter(HTTP2Converter):
                 if len(body) > 0:
                     data = self.handle_websocket_frames(chunk.Direction, 0, body)
 
-                return [StreamChunk(chunk.Direction, header + b"\r\n\r\n" + data)]
+                return [chunk.derive(content=header + b"\r\n\r\n" + data)]
 
             return super().handle_http1_response(header, body, chunk, response)
         except Exception as ex:
             return [
-                StreamChunk(
-                    chunk.Direction,
-                    f"Unable to parse HTTP1 response (websockets): {ex}".encode(),
+                chunk.derive(
+                    content=f"Unable to parse HTTP1 response (websockets): {ex}".encode(),
                 )
             ]
 
