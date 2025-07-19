@@ -19,6 +19,7 @@ declare module 'vue' {
     PcapOverIP: typeof import('./components/PcapOverIP.vue')['default']
     Pcaps: typeof import('./components/Pcaps.vue')['default']
     Results: typeof import('./components/Results.vue')['default']
+    ResultsLayout: typeof import('./components/ResultsLayout.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SearchBox: typeof import('./components/SearchBox.vue')['default']

@@ -228,6 +228,7 @@
               role="link"
               @click="isTextSelected() || navigate()"
               @keypress.enter="navigate()"
+              :class="currentStream === stream.Stream.ID ? ['selected'] : []"
             >
               <td style="width: 0" class="pr-0">
                 <v-checkbox-btn
@@ -313,7 +314,14 @@
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { useStreamsStore } from "@/stores/streams";
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import {
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  ref,
+  watch,
+} from "vue";
 import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router";
 import { Result } from "@/apiClient";
@@ -369,6 +377,20 @@ const tagColors = computed(() => {
   tags.value?.forEach((t) => (colors[t.Name] = t.Color));
   return colors;
 });
+const currentStream = computed(() => {
+  return route.name === "stream"
+    ? parseInt(route.params.streamId.toString(), 10)
+    : null;
+});
+
+watch(
+  () => currentStream.value,
+  async () => {
+    await nextTick();
+    const s = document.querySelector(".selected");
+    if (s) s.scrollIntoView({ behavior: "smooth", block: "center" });
+  },
+);
 
 watch(route, () => {
   fetchStreams();
@@ -491,5 +513,8 @@ function regexEscape(text: string) {
 <style scoped>
 .toolbar-alert {
   margin: 0px;
+}
+tr.selected td {
+  background: rgba(var(--v-theme-primary), var(--v-border-opacity));
 }
 </style>
