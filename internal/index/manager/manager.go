@@ -265,7 +265,7 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir, watchDir string
 			continue
 		}
 		if err := mgr.addConverter(filepath.Join(mgr.ConverterDir, entry.Name())); err != nil {
-			return nil, fmt.Errorf("failed to add converter %q: %w", entry.Name(), err)
+			log.Printf("failed to add converter %q: %v", entry.Name(), err)
 		}
 	}
 
@@ -1648,6 +1648,7 @@ func (mgr *Manager) startMonitoringConverters(watcher *fsnotify.Watcher) {
 								}
 								if err := mgr.addConverter(event.Name); err != nil {
 									log.Printf("error while adding converter: %v", err)
+									return
 								}
 								name := strings.TrimSuffix(filepath.Base(event.Name), filepath.Ext(event.Name))
 								converter := mgr.converters[name]
