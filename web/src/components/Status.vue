@@ -21,6 +21,16 @@
         </tbody>
       </v-table>
     </v-card>
+    <v-card>
+      <v-card-title>Console Stderr</v-card-title>
+      <v-table density="compact">
+        <tbody>
+          <tr v-for="line in store.mainStderr || []" :key="line">
+            <td width="100%">{{ line }}</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card>
   </div>
 </template>
 
@@ -38,6 +48,9 @@ onMounted(() => {
 function updateStatus() {
   store.updateStatus().catch((err: Error) => {
     EventBus.emit("showError", `Failed to update status: ${err.message}`);
+  });
+  store.updateMainStderr().catch((err: Error) => {
+    EventBus.emit("showError", `Failed to update main stderr: ${err.message}`);
   });
 }
 </script>
