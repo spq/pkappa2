@@ -7,7 +7,7 @@
         :key="index"
         :value="index"
         static
-        class="smol"
+        class="smol break-all"
       >
         <v-expansion-panel-title
           class="border-bottom elevation-2"
@@ -533,6 +533,11 @@ function openInCyberChef(chunk: Data) {
     color: #ffffff;
     background-color: #561919;
   }
+}
+
+.break-all {
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .smol-group {
