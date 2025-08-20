@@ -421,6 +421,7 @@ onMounted(() => {
   const keyListener = (e: KeyboardEvent) => {
     if (e.target === null || !(e.target instanceof Element)) return;
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
+    if (currentStream.value !== null) return;
 
     if (!Object.keys(handlers).includes(e.key)) return;
     handlers[e.key](e);
