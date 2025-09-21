@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.24", "1.25"]
         node: [22]
     name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
@@ -52,7 +52,7 @@ jobs:
           chart: true
           amend: true
         if: |
-          matrix.go == '1.24' &&
+          matrix.go == '1.25' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main'
 
@@ -64,7 +64,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
 
       - name: Install dependencies
         run: sudo apt-get install -y libpcap-dev
