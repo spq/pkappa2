@@ -17,6 +17,8 @@
       "ES2021",
       "DOM",
       "DOM.Iterable"
-    ]
+    ],
+    // Enabled by default in vuejs/tsconfig 8.0 but disabled until we go through the codebase and fix the issues
+    "noUncheckedIndexedAccess": false
   }
 }
