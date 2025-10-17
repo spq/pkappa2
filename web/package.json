@@ -58,6 +58,7 @@
     "vite-plugin-checker": "^0.11.0",
     "vite-plugin-node-polyfills": "^0.24.0",
     "vite-plugin-vuetify": "^2.1.2",
+    "vue-eslint-parser": "^10.2.0",
     "vue-router": "^4.5.1",
     "vue-tsc": "^3.1.1"
   }
