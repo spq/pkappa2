@@ -20,7 +20,7 @@ export default defineConfigWithVueTs(
     ],
   },
   eslint.configs.recommended,
-  pluginVue.configs["flat/strongly-recommended"],
+  pluginVue.configs["flat/recommended"],
   vueTsConfigs.recommendedTypeChecked,
   {
     // https://typescript-eslint.io/rules/

@@ -51,13 +51,13 @@
               v-for="tag of groupedTags.mark"
               :key="tag.Name"
               link
+              slim
               @click="
                 markSelectedStreams(
                   tag.Name,
                   tagStatusForSelection[tag.Name] !== true,
                 )
               "
-              slim
             >
               <template #prepend>
                 <v-icon
@@ -185,8 +185,8 @@
       >
     </div>
     <div
-      class="text-center"
       v-else-if="streams.result === null || streams.result.Results.length === 0"
+      class="text-center"
     >
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
@@ -226,9 +226,9 @@
           >
             <tr
               role="link"
+              :class="currentStream === stream.Stream.ID ? ['selected'] : []"
               @click="isTextSelected() || navigate()"
               @keypress.enter="navigate()"
-              :class="currentStream === stream.Stream.ID ? ['selected'] : []"
             >
               <td style="width: 0" class="pr-0">
                 <v-checkbox-btn

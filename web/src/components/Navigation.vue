@@ -1,8 +1,8 @@
 <template>
   <v-list
+    v-model:opened="tagTypesKeys"
     density="compact"
     nav
-    v-model:opened="tagTypesKeys"
     open-strategy="multiple"
     :class="{ shiftPressed: shiftPressed }"
   >

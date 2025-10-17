@@ -25,7 +25,7 @@
                 {{ chunk.Direction === 0 ? "Client" : "Server" }}
               </span>
             </v-col>
-            <v-col class="v-col-1" v-if="chunk.Time !== undefined">
+            <v-col v-if="chunk.Time !== undefined" class="v-col-1">
               <v-tooltip location="bottom">
                 <template #activator="{ props: tprops }">
                   <v-chip v-bind="tprops" size="small" variant="text"

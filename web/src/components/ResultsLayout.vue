@@ -1,15 +1,15 @@
 <template>
   <div class="search-layout">
     <div
-      :class="['top-pane', 'overflow-auto', { 'stream-open': streamOpen }]"
       v-if="!isExpanded"
+      :class="['top-pane', 'overflow-auto', { 'stream-open': streamOpen }]"
     >
       <Results />
     </div>
     <v-scroll-y-reverse-transition>
       <div
-        class="bottom-pane elevation-4 border-t overflow-auto"
         v-if="streamOpen"
+        class="bottom-pane elevation-4 border-t overflow-auto"
       >
         <router-view />
       </div>

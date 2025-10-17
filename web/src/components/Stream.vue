@@ -58,7 +58,7 @@
       </v-tooltip>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
-          <v-btn exact icon @click="openInCyberChef()" v-bind="props"
+          <v-btn exact icon v-bind="props" @click="openInCyberChef()"
             ><v-icon>mdi-chef-hat</v-icon></v-btn
           >
         </template>
@@ -375,9 +375,9 @@
             @update:model-value="changeConverter"
           >
             <v-tooltip
-              location="bottom"
               v-for="c in selectableConverters"
               :key="c.value"
+              location="bottom"
             >
               <template #activator="{ props }">
                 <v-tab
