@@ -38,9 +38,9 @@
       </v-card-text>
     </v-card>
     <v-data-table
+      v-model:expanded="expanded"
       :headers="headers"
       :items="items"
-      v-model:expanded="expanded"
       item-value="name"
       items-per-page="-1"
       single-expand

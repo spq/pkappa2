@@ -80,12 +80,15 @@ function onSelectionChange(this: ThisProxy) {
 
   const streamData = this.streamData;
   const streamDataNode = streamData?.$el as HTMLElement | null;
-  // Do not support multi-range selection
-  if (selection.rangeCount !== 1 || streamDataNode == null) {
+  if (streamDataNode === null) {
     return;
   }
-  const { startContainer, startOffset, endContainer, endOffset } =
-    selection.getRangeAt(0);
+
+  // Assume continuous selection across chunks.
+  const { startContainer, startOffset } = selection.getRangeAt(0);
+  const { endContainer, endOffset } = selection.getRangeAt(
+    selection.rangeCount - 1,
+  );
   const startChunkIdxString = getFromDataSet(
     streamDataNode,
     startContainer,

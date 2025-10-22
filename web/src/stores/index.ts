@@ -10,6 +10,8 @@ import APIClient, {
   Statistics,
   TagInfo,
   Config,
+  Webhooks,
+  MainStderr,
 } from "@/apiClient";
 
 interface State {
@@ -19,7 +21,8 @@ interface State {
   converters: ConverterStatistics[] | null;
   config: Config;
   pcapOverIPEndpoints: PcapOverIPEndpoint[] | null;
-  webhooks: string[] | null;
+  webhooks: Webhooks | null;
+  mainStderr: MainStderr | null;
 }
 
 export const useRootStore = defineStore("root", {
@@ -32,6 +35,7 @@ export const useRootStore = defineStore("root", {
       converters: null,
       pcapOverIPEndpoints: null,
       webhooks: null,
+      mainStderr: null,
       config: {
         // Default should match the ones in the backend at Manager::New
         AutoInsertLimitToQuery: false,
@@ -87,6 +91,11 @@ export const useRootStore = defineStore("root", {
     async updateStatus() {
       return APIClient.getStatus()
         .then((data) => (this.status = data))
+        .catch(handleAxiosDefaultError);
+    },
+    async updateMainStderr() {
+      return APIClient.getMainStderr()
+        .then((data) => (this.mainStderr = data))
         .catch(handleAxiosDefaultError);
     },
     async updateTags() {

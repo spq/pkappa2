@@ -11,14 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.24", "1.25"]
         node: [22]
     name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
           cache: "yarn"
@@ -31,7 +31,7 @@ jobs:
           yarn build
 
       - name: Set up Go ${{ matrix.go }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
           cache: true
@@ -52,7 +52,7 @@ jobs:
           chart: true
           amend: true
         if: |
-          matrix.go == '1.24' &&
+          matrix.go == '1.25' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main'
 
@@ -60,11 +60,11 @@ jobs:
     name: Lint Go
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
-          go-version: "1.24"
+          go-version: "1.25"
 
       - name: Install dependencies
         run: sudo apt-get install -y libpcap-dev
@@ -81,9 +81,9 @@ jobs:
     name: Lint Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: "yarn"

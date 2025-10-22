@@ -237,6 +237,7 @@ func (cachefile *cacheFile) Data(stream *index.Stream) ([]index.Data, uint64, ui
 		bytes[direction] += sz
 		direction = direction.Reverse()
 	}
+	dataSizes = dataSizes[:len(dataSizes)-1] // Remove the last zero size chunk
 
 	relativeTimes := make([]uint64, 0, len(dataSizes))
 	for _, ds := range dataSizes {
@@ -252,6 +253,9 @@ func (cachefile *cacheFile) Data(stream *index.Stream) ([]index.Data, uint64, ui
 			break
 		}
 		relativeTimes = append(relativeTimes, relDataTime)
+	}
+	if n, err := buffer.ReadByte(); err != nil || n != 0 {
+		return nil, 0, 0, fmt.Errorf("failed to read end of relative times")
 	}
 
 	// Read data

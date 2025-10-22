@@ -6,6 +6,8 @@ import (
 	"log"
 	"os/exec"
 	"sync"
+
+	"github.com/spq/pkappa2/internal/tools"
 )
 
 type (
@@ -41,20 +43,6 @@ func NewProcess(converterName string, executablePath string) *Process {
 
 	go process.run()
 	return &process
-}
-
-func ReadLine(reader *bufio.Reader) ([]byte, error) {
-	result := []byte{}
-	for {
-		line, isPrefix, err := reader.ReadLine()
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, line...)
-		if !isPrefix {
-			return result, nil
-		}
-	}
 }
 
 func (process *Process) Stderr() []string {
@@ -101,7 +89,7 @@ func (process *Process) run() {
 	go func() {
 		reader := bufio.NewReaderSize(stdout, 65536)
 		for {
-			line, err := ReadLine(reader)
+			line, err := tools.ReadLine(reader)
 			if err != nil {
 				break
 			}
@@ -125,7 +113,7 @@ func (process *Process) run() {
 	go func() {
 		reader := bufio.NewReaderSize(stderr, 65536)
 		for {
-			line, err := ReadLine(reader)
+			line, err := tools.ReadLine(reader)
 			if err != nil {
 				break
 			}

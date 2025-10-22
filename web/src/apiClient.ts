@@ -4,6 +4,7 @@ import {
   isConfig,
   isConvertersResponse,
   isGraphResponse,
+  isMainStderr,
   isPcapOverIPResponse,
   isPcapsResponse,
   isProcessStderr,
@@ -92,6 +93,9 @@ export type Statistics = {
   TaggingJobRunning: boolean;
   ConverterJobRunning: boolean;
 };
+
+/** @see {isMainStderr} ts-auto-guard:type-guard */
+export type MainStderr = string[];
 
 /** @see {isConfig} ts-auto-guard:type-guard */
 export type Config = {
@@ -197,6 +201,9 @@ const APIClient = {
   },
   async getStatus() {
     return this.performGuarded("get", `/status.json`, isStatistics);
+  },
+  async getMainStderr() {
+    return this.performGuarded("get", `/stderr`, isMainStderr);
   },
   async getConfig() {
     return this.performGuarded("get", `/config`, isConfig);

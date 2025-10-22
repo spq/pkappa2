@@ -50,7 +50,7 @@
                 ></v-list-subheader
               >
             </v-list-item>
-            <v-list-item density="compact" v-else v-bind="props">
+            <v-list-item v-else density="compact" v-bind="props">
               <template #prepend="{ isActive }">
                 <v-list-item-action start>
                   <v-checkbox-btn

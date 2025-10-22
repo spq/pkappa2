@@ -7,7 +7,7 @@
         :key="index"
         :value="index"
         static
-        class="smol"
+        class="smol break-all"
       >
         <v-expansion-panel-title
           class="border-bottom elevation-2"
@@ -25,7 +25,7 @@
                 {{ chunk.Direction === 0 ? "Client" : "Server" }}
               </span>
             </v-col>
-            <v-col class="v-col-1" v-if="chunk.Time !== undefined">
+            <v-col v-if="chunk.Time !== undefined" class="v-col-1">
               <v-tooltip location="bottom">
                 <template #activator="{ props: tprops }">
                   <v-chip v-bind="tprops" size="small" variant="text"
@@ -83,8 +83,8 @@
                   <span>RAW</span>
                 </v-tooltip>
                 <v-tooltip
-                  location="bottom"
                   v-if="supportsIframeVisualization(chunk)"
+                  location="bottom"
                 >
                   <template #activator="{ props: pprops }">
                     <v-btn value="web" v-bind="pprops" size="x-small">
@@ -94,6 +94,50 @@
                   <span>WEB</span>
                 </v-tooltip>
               </v-btn-toggle>
+            </v-col>
+            <v-col class="v-col-2">
+              <v-tooltip location="bottom">
+                <template #activator="{ props: pprops }">
+                  <v-btn
+                    v-bind="pprops"
+                    size="x-small"
+                    variant="text"
+                    icon="mdi-chef-hat"
+                    @click="openInCyberChef(chunk)"
+                    @click.stop
+                  >
+                  </v-btn>
+                </template>
+                <span>Open in CyberChef</span>
+              </v-tooltip>
+              <v-tooltip location="bottom">
+                <template #activator="{ props: pprops }">
+                  <v-btn
+                    v-bind="pprops"
+                    size="x-small"
+                    variant="text"
+                    @click="downloadChunk(index, chunk)"
+                    @click.stop
+                  >
+                    <v-icon>mdi-download</v-icon>
+                  </v-btn>
+                </template>
+                <span>Download</span>
+              </v-tooltip>
+              <v-tooltip location="bottom">
+                <template #activator="{ props: pprops }">
+                  <v-btn
+                    v-bind="pprops"
+                    size="x-small"
+                    variant="text"
+                    icon="mdi-content-copy"
+                    @click="copyToClipboard(chunk)"
+                    @click.stop
+                  >
+                  </v-btn>
+                </template>
+                <span>Copy Content</span>
+              </v-tooltip>
             </v-col>
           </v-row>
         </v-expansion-panel-title>
@@ -128,8 +172,8 @@
           </template>
           <template v-else-if="chunk.Presentation === 'web'">
             <div
-              class="iframe-content"
               v-if="supportsIframeVisualization(chunk)"
+              class="iframe-content"
             >
               <iframe
                 :src="`data:${chunk.ContentType};base64,${chunk.Content}`"
@@ -206,7 +250,11 @@ import {
 import moment from "moment";
 import prettyBytes from "pretty-bytes";
 import { getColorScheme } from "@/lib/darkmode";
+import { useStreamStore } from "@/stores/stream";
+import { EventBus } from "./EventBus";
+import { CYBERCHEF_URL } from "@/lib/constants";
 
+const stream = useStreamStore();
 const props = defineProps({
   viewmode: {
     type: String,
@@ -437,6 +485,59 @@ const isImageMimeType = (chunk: Data) => {
 const supportsIframeVisualization = (chunk: Data) => {
   return isHTMLMimeType(chunk) || isImageMimeType(chunk);
 };
+const downloadChunk = (index: number, chunk: Data) => {
+  const blob = new Blob([atob(chunk.Content)], {
+    type: "application/octet-stream",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `chunk-${stream.id}-${index}.bin`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+const copyToClipboard = (chunk: VisualChunk) => {
+  let content = "";
+  switch (chunk.Presentation) {
+    case "ascii":
+      content = tryURLDecodeIfEnabled(atob(chunk.Content), props.urlDecode);
+      break;
+    case "utf-8":
+      content = handleUnicodeDecode(chunk, props.urlDecode);
+      break;
+    case "hexdump":
+      content = hexdump(chunk.Content) ?? "";
+      break;
+    case "raw":
+      content = inlineHex(chunk.Content);
+      break;
+    default:
+      EventBus.emit(
+        "showError",
+        `Unknown presentation format: ${chunk.Presentation}`,
+      );
+      return;
+  }
+  navigator.clipboard
+    .writeText(content)
+    .then(() => {
+      EventBus.emit("showMessage", "Copied content to clipboard.");
+    })
+    .catch((err) => {
+      EventBus.emit("showError", `Failed to copy to clipboard: ${err}`);
+    });
+};
+
+function openInCyberChef(chunk: Data) {
+  window.open(
+    `${CYBERCHEF_URL}#input=${encodeURIComponent(chunk.Content)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
+}
 </script>
 <style scoped>
 .chunk {
@@ -472,6 +573,11 @@ const supportsIframeVisualization = (chunk: Data) => {
     color: #ffffff;
     background-color: #561919;
   }
+}
+
+.break-all {
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .smol-group {

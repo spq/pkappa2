@@ -51,13 +51,13 @@
               v-for="tag of groupedTags.mark"
               :key="tag.Name"
               link
+              slim
               @click="
                 markSelectedStreams(
                   tag.Name,
                   tagStatusForSelection[tag.Name] !== true,
                 )
               "
-              slim
             >
               <template #prepend>
                 <v-icon
@@ -185,8 +185,8 @@
       >
     </div>
     <div
-      class="text-center"
       v-else-if="streams.result === null || streams.result.Results.length === 0"
+      class="text-center"
     >
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
@@ -226,6 +226,7 @@
           >
             <tr
               role="link"
+              :class="currentStream === stream.Stream.ID ? ['selected'] : []"
               @click="isTextSelected() || navigate()"
               @keypress.enter="navigate()"
             >
@@ -313,7 +314,14 @@
 import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { useStreamsStore } from "@/stores/streams";
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import {
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  ref,
+  watch,
+} from "vue";
 import { RouterLink } from "vue-router";
 import { useRoute, useRouter } from "vue-router";
 import { Result } from "@/apiClient";
@@ -369,6 +377,20 @@ const tagColors = computed(() => {
   tags.value?.forEach((t) => (colors[t.Name] = t.Color));
   return colors;
 });
+const currentStream = computed(() => {
+  return route.name === "stream"
+    ? parseInt(route.params.streamId.toString(), 10)
+    : null;
+});
+
+watch(
+  () => currentStream.value,
+  async () => {
+    await nextTick();
+    const s = document.querySelector(".selected");
+    if (s) s.scrollIntoView({ behavior: "smooth", block: "center" });
+  },
+);
 
 watch(route, () => {
   fetchStreams();
@@ -399,6 +421,7 @@ onMounted(() => {
   const keyListener = (e: KeyboardEvent) => {
     if (e.target === null || !(e.target instanceof Element)) return;
     if (["input", "textarea"].includes(e.target.tagName.toLowerCase())) return;
+    if (currentStream.value !== null) return;
 
     if (!Object.keys(handlers).includes(e.key)) return;
     handlers[e.key](e);
@@ -491,5 +514,8 @@ function regexEscape(text: string) {
 <style scoped>
 .toolbar-alert {
   margin: 0px;
+}
+tr.selected td {
+  background: rgba(var(--v-theme-primary), var(--v-border-opacity));
 }
 </style>

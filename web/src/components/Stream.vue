@@ -5,6 +5,7 @@
         <template #activator="{ props }">
           <v-btn
             icon
+            exact
             :to="{
               name: 'search',
               query: {
@@ -15,10 +16,19 @@
             }"
             v-bind="props"
           >
-            <v-icon>mdi-arrow-left</v-icon>
+            <v-icon>mdi-close</v-icon>
           </v-btn>
         </template>
         <span>Back to Search Results</span>
+      </v-tooltip>
+      <v-tooltip location="bottom">
+        <template #activator="{ props }">
+          <v-btn icon v-bind="props" @click="toggleExpand()">
+            <v-icon v-if="isExpanded">mdi-fullscreen-exit</v-icon>
+            <v-icon v-else>mdi-fullscreen</v-icon>
+          </v-btn>
+        </template>
+        <span>Expand</span>
       </v-tooltip>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
@@ -48,7 +58,7 @@
       </v-tooltip>
       <v-tooltip location="bottom">
         <template #activator="{ props }">
-          <v-btn exact icon @click="openInCyberChef()" v-bind="props"
+          <v-btn exact icon v-bind="props" @click="openInCyberChef()"
             ><v-icon>mdi-chef-hat</v-icon></v-btn
           >
         </template>
@@ -200,6 +210,7 @@
                         q: $route.query.q,
                         p: $route.query.p,
                         converter: $route.query.converter,
+                        expand: $route.query.expand,
                       },
                       params: { streamId: prevStreamId },
                     }
@@ -224,6 +235,7 @@
                         q: $route.query.q,
                         p: $route.query.p,
                         converter: $route.query.converter,
+                        expand: $route.query.expand,
                       },
                       params: { streamId: nextStreamId },
                     }
@@ -353,7 +365,7 @@
             ></v-col
           >
         </v-row>
-        <v-row no-gutters>
+        <v-row dense>
           <v-tabs
             v-model="converterTab"
             density="compact"
@@ -363,9 +375,9 @@
             @update:model-value="changeConverter"
           >
             <v-tooltip
-              location="bottom"
               v-for="c in selectableConverters"
               :key="c.value"
+              location="bottom"
             >
               <template #activator="{ props }">
                 <v-tab
@@ -416,8 +428,7 @@ import {
 import { formatDate, formatDateLong, tagify } from "@/filters";
 import { getContrastTextColor } from "@/lib/colors";
 import prettyBytes from "pretty-bytes";
-
-const CYBERCHEF_URL = "https://gchq.github.io/CyberChef/";
+import { CYBERCHEF_URL } from "@/lib/constants";
 
 const store = useRootStore();
 const route = useRoute();
@@ -533,6 +544,8 @@ watch(presentation, (v) => {
   document.getSelection()?.empty();
 });
 
+const isExpanded = computed(() => route.query.expand === "true");
+
 onMounted(() => {
   fetchStreamForId();
   const proxy = {
@@ -607,7 +620,11 @@ function openInCyberChef() {
     }
   }
   const encoded_data = btoa(data);
-  window.open(`${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`);
+  window.open(
+    `${CYBERCHEF_URL}#input=${encodeURIComponent(encoded_data)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 
 function createMark() {
@@ -630,5 +647,12 @@ function markStream(tagId: string, value: boolean) {
       );
     });
   }
+}
+
+function toggleExpand() {
+  const query = { ...route.query };
+  if (query.expand === "true") delete query.expand;
+  else query.expand = "true";
+  void router.replace({ query });
 }
 </script>
