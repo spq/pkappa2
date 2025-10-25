@@ -88,9 +88,9 @@ func (cache *CachedConverter) Data(stream *index.Stream, moreDetails bool) (data
 	}
 
 	// Save it to the cache.
-	// if err := cache.cacheFile.SetData(stream, convertedPackets); err != nil {
-	// 	return nil, 0, 0, false, err
-	// }
+	if err := cache.cacheFile.SetData(stream, convertedPackets); err != nil {
+		return nil, 0, 0, false, err
+	}
 	return convertedPackets, clientBytes, serverBytes, false, nil
 }
 
