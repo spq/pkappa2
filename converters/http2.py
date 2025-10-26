@@ -124,7 +124,7 @@ class HTTP2Converter(HTTPConverter):
         if not self.h2_client_buffer:
             return [chunk]
         self.h2_active = True
-        self.h2_client_buffer.add_data(chunk)
+        self.h2_client_buffer.add_data(chunk.Content)
         events = []
         for event in self.h2_client_buffer:
             events.append(
