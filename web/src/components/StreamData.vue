@@ -82,6 +82,17 @@
                   </template>
                   <span>RAW</span>
                 </v-tooltip>
+                <v-tooltip
+                  v-if="supportsIframeVisualization(chunk)"
+                  location="bottom"
+                >
+                  <template #activator="{ props: pprops }">
+                    <v-btn value="web" v-bind="pprops" size="x-small">
+                      <v-icon>mdi-web</v-icon>
+                    </v-btn>
+                  </template>
+                  <span>WEB</span>
+                </v-tooltip>
               </v-btn-toggle>
             </v-col>
             <v-col class="v-col-2">
@@ -154,10 +165,28 @@
               hexdump(chunk.Content)
             }}</pre>
           </template>
-          <template v-else>
+          <template v-else-if="chunk.Presentation === 'raw'">
             <span :class="[classes(chunk)]"
               >{{ inlineHex(chunk.Content) }}<br
             /></span>
+          </template>
+          <template v-else-if="chunk.Presentation === 'web'">
+            <div
+              v-if="supportsIframeVisualization(chunk)"
+              class="iframe-content"
+            >
+              <iframe
+                :src="`data:${chunk.ContentType};base64,${chunk.Content}`"
+                width="100%"
+                height="100%"
+                sandbox=""
+                csp="default-src 'none'"
+              ></iframe>
+            </div>
+            <span v-else>
+              <span class="text-caption">Unsupported content type: </span>
+              <span class="text-body-2">{{ chunk.ContentType }}</span>
+            </span>
           </template>
         </v-expansion-panel-text>
       </v-expansion-panel>
@@ -445,6 +474,46 @@ const hexdump = (b64: string) => {
   return str;
 };
 
+const validateMediaTypeWithCharsetParameter = (
+  chunk: Data,
+  mediaType: string,
+) => {
+  if (!chunk.ContentType?.toLowerCase().startsWith(mediaType)) return false;
+  const params = chunk.ContentType.split(";");
+  if (params.length > 2) return false;
+  for (let i = 1; i < params.length; i++) {
+    const param = params[i].trim().toLowerCase();
+    if (!param.startsWith("charset=")) return false;
+    const charset = param.substring("charset=".length);
+    if (!/^[a-zA-Z0-9\-+./]+$/.test(charset)) return false;
+  }
+  return true;
+};
+
+const isHTMLMediaType = (chunk: Data) => {
+  // text/html;charset=UTF-8
+  return validateMediaTypeWithCharsetParameter(chunk, "text/html");
+};
+
+const isImageMediaType = (chunk: Data) => {
+  // https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types#image_types
+  // https://www.iana.org/assignments/media-types/media-types.xhtml#image
+  return [
+    "image/apng",
+    "image/avif",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/svg+xml",
+    "image/webp",
+    "image/x-icon",
+    "image/bmp",
+  ].includes(chunk.ContentType?.toLowerCase() ?? "");
+};
+
+const supportsIframeVisualization = (chunk: Data) => {
+  return isHTMLMediaType(chunk) || isImageMediaType(chunk);
+};
 const downloadChunk = (index: number, chunk: Data) => {
   const blob = new Blob([atob(chunk.Content)], {
     type: "application/octet-stream",
@@ -547,5 +616,14 @@ function openInCyberChef(chunk: Data) {
 .smol > button {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+
+.iframe-content {
+  max-height: 300px;
+  resize: both;
+  overflow: hidden;
+}
+.iframe-content iframe {
+  max-height: 300px;
 }
 </style>

@@ -67,6 +67,7 @@ export type Data = {
   Direction: number;
   Content: Base64;
   Time?: DateTimeString;
+  ContentType: string | undefined;
 };
 
 /** @see {isStreamData} ts-auto-guard:type-guard */

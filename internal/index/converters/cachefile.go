@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -36,14 +37,23 @@ type (
 	converterStreamSection struct {
 		StreamID uint64
 	}
+
+	converterCacheFileHeader struct {
+		Magic   [4]byte
+		Version uint32
+	}
 )
 
 const (
-	headerSize = int64(unsafe.Sizeof(converterStreamSection{}))
+	streamHeaderSize    = int64(unsafe.Sizeof(converterStreamSection{}))
+	cacheFileHeaderSize = int64(unsafe.Sizeof(converterCacheFileHeader{}))
 
 	// cleanup if at least 16 MiB are free and at least 50%
 	cleanupMinFreeSize   = 16 * 1024 * 1024
 	cleanupMinFreeFactor = 0.5
+
+	cacheFileMagic   = "P2CC"
+	cacheFileVersion = 1
 )
 
 func readVarInt(r io.ByteReader) (uint64, int, error) {
@@ -76,6 +86,137 @@ func writeVarInt(writer io.Writer, number uint64) (int, error) {
 	}
 }
 
+func readString(r *bufio.Reader) (string, int, error) {
+	length, bytes, err := readVarInt(r)
+	if err != nil {
+		return "", 0, err
+	}
+	strBytes := make([]byte, length)
+	if _, err := io.ReadFull(r, strBytes); err != nil {
+		return "", 0, err
+	}
+	return string(strBytes), bytes + int(length), nil
+}
+
+func writeString(writer io.Writer, str string) (int, error) {
+	bytesWritten, err := writeVarInt(writer, uint64(len(str)))
+	if err != nil {
+		return 0, err
+	}
+	n, err := writer.Write([]byte(str))
+	if err != nil {
+		return 0, err
+	}
+	return bytesWritten + n, nil
+}
+
+func readVarBytes(r io.ByteReader) ([]byte, int, error) {
+	bytes := 0
+	result := make([]byte, 0, 1)
+	buf := uint16(0)
+	bufFilled := 0
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return nil, 0, err
+		}
+		bytes++
+		buf |= uint16(b&0x7f) << bufFilled
+		bufFilled += 7
+		if bufFilled >= 8 {
+			result = append(result, byte(buf))
+			buf >>= 8
+			bufFilled -= 8
+		}
+		if b < 0x80 {
+			break
+		}
+	}
+	return result, bytes, nil
+}
+
+func writeVarBytes(writer io.Writer, data []byte) (int, error) {
+	buf := uint16(0)
+	bufFilled := 0
+	bytesWritten := 0
+	for _, b := range data {
+		buf |= uint16(b) << bufFilled
+		bufFilled += 8
+		for {
+			if _, err := writer.Write([]byte{byte(0x80 | (buf & 0x7f))}); err != nil {
+				return 0, err
+			}
+			bytesWritten++
+			buf >>= 7
+			bufFilled -= 7
+			if bufFilled <= 7 {
+				break
+			}
+		}
+	}
+	if bufFilled != 0 || len(data) == 0 {
+		if _, err := writer.Write([]byte{byte(buf)}); err != nil {
+			return 0, err
+		}
+		bytesWritten++
+	}
+	return bytesWritten, nil
+}
+
+// skipStream skips a single stream in the given buffer, returning how many bytes were skipped.
+func skipStream(buffer *bufio.Reader) (uint64, error) {
+	// Read total data size of the stream by adding all chunk sizes up.
+	streamSize, dataSize, chunkCount := 0, 0, 0
+	for nZeros := 0; nZeros < 2; {
+		sz, n, err := readVarInt(buffer)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read size varint: %w", err)
+		}
+		streamSize += n
+		dataSize += int(sz)
+		if sz != 0 {
+			nZeros = 0
+			chunkCount++
+		} else {
+			nZeros++
+		}
+	}
+
+	// skip data
+	if _, err := buffer.Discard(int(dataSize)); err != nil {
+		return 0, fmt.Errorf("failed to discard %d bytes: %w", dataSize, err)
+	}
+	streamSize += dataSize
+
+	// read times
+	for range chunkCount {
+		_, n, err := readVarInt(buffer)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read time varint: %w", err)
+		}
+		streamSize += n
+	}
+
+	// read content type
+	for {
+		chunks, n, err := readVarBytes(buffer)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read content type varbytes: %w", err)
+		}
+		streamSize += n
+		if len(chunks) == 0 {
+			break
+		}
+		// read content type string
+		_, n, err = readString(buffer)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read content type string: %w", err)
+		}
+		streamSize += n
+	}
+	return uint64(streamSize), nil
+}
+
 func NewCacheFile(cachePath string) (*cacheFile, error) {
 	file, err := os.OpenFile(cachePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -86,10 +227,33 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 		file:        file,
 		cachePath:   cachePath,
 		streamInfos: map[uint64]streamInfo{},
+		fileSize:    cacheFileHeaderSize,
+		freeStart:   cacheFileHeaderSize,
+	}
+	buffer := bufio.NewReader(file)
+
+	// read the file header
+	fh := converterCacheFileHeader{}
+	if err := binary.Read(buffer, binary.LittleEndian, &fh); err != nil {
+		if err == io.EOF {
+			if err := res.Reset(); err != nil {
+				return nil, fmt.Errorf("failed to reset cache file: %w", err)
+			}
+			return &res, nil
+		}
+		return nil, fmt.Errorf("failed to read stream header: %w", err)
+	}
+	if string(fh.Magic[:]) != cacheFileMagic || fh.Version != cacheFileVersion {
+		log.Printf("Invalid converter cache file(%q) magic or version: %q/%d, expected %q/%d, resetting file\n",
+			res.cachePath, string(fh.Magic[:]), fh.Version, cacheFileMagic, cacheFileVersion)
+		if err := res.Reset(); err != nil {
+			return nil, fmt.Errorf("failed to reset cache file: %w", err)
+		}
+		return &res, nil
 	}
 
 	// Read all stream ids
-	for buffer := bufio.NewReader(file); ; {
+	for {
 		streamSection := converterStreamSection{}
 		if err := binary.Read(buffer, binary.LittleEndian, &streamSection); err != nil {
 			if err == io.EOF {
@@ -97,51 +261,24 @@ func NewCacheFile(cachePath string) (*cacheFile, error) {
 			}
 			return nil, fmt.Errorf("failed to read stream header: %w", err)
 		}
-		res.fileSize += headerSize
+		res.fileSize += streamHeaderSize
 
-		// Read total data size of the stream by adding all chunk sizes up.
-		lengthSize, dataSize := uint64(0), uint64(0)
-		for nZeros := 0; nZeros < 2; {
-			sz, n, err := readVarInt(buffer)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read size varint: %w", err)
-			}
-			lengthSize += uint64(n)
-			dataSize += sz
-			if sz != 0 {
-				nZeros = 0
-			} else {
-				nZeros++
-			}
-		}
-
-		// Skip relative chunk times
-		timeSize := uint64(0)
-		for {
-			relDataTime, n, err := readVarInt(buffer)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read time varint: %w", err)
-			}
-			timeSize += uint64(n)
-			if relDataTime == 0 {
-				break
-			}
+		streamSize, err := skipStream(buffer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to skip stream data: %w", err)
 		}
 
 		if info, ok := res.streamInfos[streamSection.StreamID]; ok {
-			if res.freeSize == 0 || res.freeStart > info.offset-headerSize {
-				res.freeStart = info.offset - headerSize
+			if res.freeSize == 0 || res.freeStart > info.offset-streamHeaderSize {
+				res.freeStart = info.offset - streamHeaderSize
 			}
-			res.freeSize += headerSize + int64(info.size)
+			res.freeSize += streamHeaderSize + int64(info.size)
 		}
 		res.streamInfos[streamSection.StreamID] = streamInfo{
 			offset: res.fileSize,
-			size:   lengthSize + timeSize + dataSize,
+			size:   uint64(streamSize),
 		}
-		if _, err := buffer.Discard(int(dataSize)); err != nil {
-			return nil, fmt.Errorf("failed to discard %d bytes: %w", dataSize, err)
-		}
-		res.fileSize += int64(lengthSize + timeSize + dataSize)
+		res.fileSize += int64(streamSize)
 	}
 	if res.freeSize == 0 {
 		res.freeStart = res.fileSize
@@ -188,10 +325,25 @@ func (cachefile *cacheFile) Reset() error {
 	if err := cachefile.file.Truncate(0); err != nil {
 		return err
 	}
+	// write header
+	fh := converterCacheFileHeader{
+		Magic:   [4]byte([]byte(cacheFileMagic)),
+		Version: cacheFileVersion,
+	}
+	if _, err := cachefile.file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek to start of file: %w", err)
+	}
+	if err := binary.Write(cachefile.file, binary.LittleEndian, &fh); err != nil {
+		return fmt.Errorf("failed to write cache file header: %w", err)
+	}
+	// Keep the file pointer at the end of the file.
+	if _, err := cachefile.file.Seek(0, io.SeekEnd); err != nil {
+		return fmt.Errorf("failed to seek to end of file: %w", err)
+	}
 	cachefile.streamInfos = map[uint64]streamInfo{}
 	cachefile.freeSize = 0
-	cachefile.fileSize = 0
-	cachefile.freeStart = 0
+	cachefile.fileSize = cacheFileHeaderSize
+	cachefile.freeStart = cacheFileHeaderSize
 	return nil
 }
 
@@ -204,10 +356,14 @@ func (cachefile *cacheFile) Contains(streamID uint64) bool {
 }
 
 func (cachefile *cacheFile) Data(stream *index.Stream) ([]index.Data, uint64, uint64, error) {
+	return cachefile.data(stream.ID(), stream.FirstPacket())
+}
+
+func (cachefile *cacheFile) data(streamID uint64, firstPacketTime time.Time) ([]index.Data, uint64, uint64, error) {
 	cachefile.rwmutex.RLock()
 	defer cachefile.rwmutex.RUnlock()
 
-	info, ok := cachefile.streamInfos[stream.ID()]
+	info, ok := cachefile.streamInfos[streamID]
 	if !ok {
 		return nil, 0, 0, nil
 	}
@@ -239,25 +395,6 @@ func (cachefile *cacheFile) Data(stream *index.Stream) ([]index.Data, uint64, ui
 	}
 	dataSizes = dataSizes[:len(dataSizes)-1] // Remove the last zero size chunk
 
-	relativeTimes := make([]uint64, 0, len(dataSizes))
-	for _, ds := range dataSizes {
-		if ds.Size == 0 {
-			relativeTimes = append(relativeTimes, 0)
-			continue
-		}
-		relDataTime, _, err := readVarInt(buffer)
-		if err != nil {
-			return nil, 0, 0, fmt.Errorf("failed to read time varint: %w", err)
-		}
-		if relDataTime == 0 {
-			break
-		}
-		relativeTimes = append(relativeTimes, relDataTime)
-	}
-	if n, err := buffer.ReadByte(); err != nil || n != 0 {
-		return nil, 0, 0, fmt.Errorf("failed to read end of relative times")
-	}
-
 	// Read data
 	clientData := make([]byte, bytes[index.DirectionClientToServer])
 	if _, err := io.ReadFull(buffer, clientData); err != nil {
@@ -268,9 +405,9 @@ func (cachefile *cacheFile) Data(stream *index.Stream) ([]index.Data, uint64, ui
 		return nil, 0, 0, fmt.Errorf("failed to read server data: %w", err)
 	}
 
-	// Split data into chunks
-	lastTime := stream.FirstPacket()
-	for i, ds := range dataSizes {
+	// Split data into chunks and read times
+	lastTime := firstPacketTime
+	for _, ds := range dataSizes {
 		if ds.Size == 0 {
 			continue
 		}
@@ -282,12 +419,45 @@ func (cachefile *cacheFile) Data(stream *index.Stream) ([]index.Data, uint64, ui
 			bytes = serverData[:ds.Size]
 			serverData = serverData[ds.Size:]
 		}
-		lastTime = lastTime.Add(time.Duration(relativeTimes[i]) * time.Microsecond)
+
+		relMS, _, err := readVarInt(buffer)
+		if err != nil {
+			return nil, 0, 0, fmt.Errorf("failed to read time varint: %w", err)
+		}
+		lastTime = lastTime.Add(time.Duration(relMS) * time.Microsecond)
 		data = append(data, index.Data{
 			Direction: ds.Direction,
 			Content:   bytes,
 			Time:      lastTime.UTC(),
 		})
+	}
+
+	// Read content types and enrich the data
+	for {
+		chunks, _, err := readVarBytes(buffer)
+		if err != nil {
+			return nil, 0, 0, fmt.Errorf("failed to read content type varbytes: %w", err)
+		}
+		if len(chunks) == 0 {
+			break
+		}
+		ct, _, err := readString(buffer)
+		if err != nil {
+			return nil, 0, 0, fmt.Errorf("failed to read content type string: %w", err)
+		}
+		for i, b := range chunks {
+			bit := i * 8
+			for b != 0 {
+				if (b & 1) != 0 {
+					if bit >= len(data) {
+						return nil, 0, 0, fmt.Errorf("content type bitmask out of range")
+					}
+					data[bit].ContentType = ct
+				}
+				bit++
+				b >>= 1
+			}
+		}
 	}
 	return data, bytes[index.DirectionClientToServer], bytes[index.DirectionServerToClient], nil
 }
@@ -338,17 +508,6 @@ func (cachefile *cacheFile) DataForSearch(streamID uint64) ([2][]byte, [][2]int,
 		direction = direction.Reverse()
 	}
 
-	// Skip relative chunk times not relevant for search
-	for {
-		relDataTime, _, err := readVarInt(buffer)
-		if err != nil {
-			return [2][]byte{}, [][2]int{}, 0, 0, true, fmt.Errorf("failed to read time varint: %w", err)
-		}
-		if relDataTime == 0 {
-			break
-		}
-	}
-
 	// Read data
 	clientData := make([]byte, clientBytes)
 	if _, err := io.ReadFull(buffer, clientData); err != nil {
@@ -379,7 +538,7 @@ func (cachefile *cacheFile) truncateFile() error {
 			}
 			return fmt.Errorf("failed to read stream header: %w", err)
 		}
-		oldFileOffset += headerSize
+		oldFileOffset += streamHeaderSize
 		// only copy the stream if we have the metadata for it
 		if info, ok := cachefile.streamInfos[header.StreamID]; ok && info.offset == oldFileOffset {
 			if err := binary.Write(writer, binary.LittleEndian, header); err != nil {
@@ -389,38 +548,17 @@ func (cachefile *cacheFile) truncateFile() error {
 				return fmt.Errorf("failed to copy stream data: %w", err)
 			}
 			oldFileOffset += int64(info.size)
-			info.offset = newFilesize + headerSize
-			newFilesize += headerSize + int64(info.size)
+			info.offset = newFilesize + streamHeaderSize
+			cachefile.streamInfos[header.StreamID] = info
+			newFilesize += streamHeaderSize + int64(info.size)
 			continue
 		}
-		dataSize := 0
-		for nZeros := 0; nZeros < 2; {
-			sz, n, err := readVarInt(reader)
-			if err != nil {
-				return fmt.Errorf("failed to read size varint: %w", err)
-			}
-			dataSize += int(sz)
-			oldFileOffset += int64(n)
-			if sz != 0 {
-				nZeros = 0
-			} else {
-				nZeros++
-			}
+		// skip the stream
+		n, err := skipStream(reader)
+		if err != nil {
+			return fmt.Errorf("failed to skip stream: %w", err)
 		}
-		for {
-			relDataTime, n, err := readVarInt(reader)
-			if err != nil {
-				return fmt.Errorf("failed to read time varint: %w", err)
-			}
-			oldFileOffset += int64(n)
-			if relDataTime == 0 {
-				break
-			}
-		}
-		if _, err := reader.Discard(dataSize); err != nil {
-			return fmt.Errorf("failed to discard %d bytes: %w", dataSize, err)
-		}
-		oldFileOffset += int64(dataSize)
+		oldFileOffset += int64(n)
 	}
 	if err := writer.Flush(); err != nil {
 		return fmt.Errorf("failed to flush writer: %w", err)
@@ -438,6 +576,10 @@ func (cachefile *cacheFile) truncateFile() error {
 }
 
 func (cachefile *cacheFile) SetData(stream *index.Stream, convertedPackets []index.Data) error {
+	return cachefile.setData(stream.ID(), stream.FirstPacket(), convertedPackets)
+}
+
+func (cachefile *cacheFile) setData(streamID uint64, streamTime time.Time, convertedPackets []index.Data) error {
 	cachefile.rwmutex.Lock()
 	defer cachefile.rwmutex.Unlock()
 
@@ -450,7 +592,7 @@ func (cachefile *cacheFile) SetData(stream *index.Stream, convertedPackets []ind
 	writer := bufio.NewWriter(cachefile.file)
 	// Write stream header
 	streamSection := converterStreamSection{
-		StreamID: stream.ID(),
+		StreamID: streamID,
 	}
 	if err := binary.Write(writer, binary.LittleEndian, &streamSection); err != nil {
 		return fmt.Errorf("failed to write stream header: %w", err)
@@ -484,26 +626,6 @@ func (cachefile *cacheFile) SetData(stream *index.Stream, convertedPackets []ind
 	}
 	streamSize += 2
 
-	// Write RelPacketTimeMS times
-	if len(convertedPackets) > 0 {
-		lastTime := stream.FirstPacket()
-		for _, convertedPacket := range convertedPackets {
-			relTime := convertedPacket.Time.Sub(lastTime)
-			bytesWritten, err := writeVarInt(writer, uint64(relTime.Microseconds()))
-			if err != nil {
-				return fmt.Errorf("failed to write relative packet time: %w", err)
-			}
-			streamSize += uint64(bytesWritten)
-			lastTime = lastTime.Add(relTime)
-		}
-	}
-	// Mark the end of the relative packet times with a 0.
-	if err := binary.Write(writer, binary.LittleEndian, []byte{0}); err != nil {
-		// TODO: The cache file is corrupt now. We should probably delete it.
-		return fmt.Errorf("failed to write end of relative packet times: %w", err)
-	}
-	streamSize += 1
-
 	// Write chunk data
 	for _, direction := range []index.Direction{index.DirectionClientToServer, index.DirectionServerToClient} {
 		for _, convertedPacket := range convertedPackets {
@@ -517,20 +639,65 @@ func (cachefile *cacheFile) SetData(stream *index.Stream, convertedPackets []ind
 		}
 	}
 
+	// Write times and collect content types
+	lastTime := streamTime
+	contentTypes := map[string][]byte{}
+	for i, convertedPacket := range convertedPackets {
+		relTime := convertedPacket.Time.Sub(lastTime)
+		bytesWritten, err := writeVarInt(writer, uint64(relTime.Microseconds()))
+		if err != nil {
+			return fmt.Errorf("failed to write relative packet time: %w", err)
+		}
+		streamSize += uint64(bytesWritten)
+		lastTime = lastTime.Add(relTime)
+
+		ct := convertedPacket.ContentType
+		if ct == "" {
+			continue
+		}
+		bm := contentTypes[ct]
+		for i >= len(bm)*8 {
+			bm = append(bm, 0)
+		}
+		bm[i/8] |= 1 << (i & 7)
+		contentTypes[ct] = bm
+	}
+
+	// Write content types
+	for contentType, chunks := range contentTypes {
+		// Write chunk bitmask
+		bytesWritten, err := writeVarBytes(writer, chunks)
+		if err != nil {
+			return fmt.Errorf("failed to write content type chunk bitmask: %w", err)
+		}
+		streamSize += uint64(bytesWritten)
+		// Write content type string
+		bytesWritten, err = writeString(writer, contentType)
+		if err != nil {
+			return fmt.Errorf("failed to write content type string: %w", err)
+		}
+		streamSize += uint64(bytesWritten)
+	}
+	// Write ending zero chunk bitmask
+	if err := writer.WriteByte(0); err != nil {
+		return fmt.Errorf("failed to write ending zero content type chunk bitmask: %w", err)
+	}
+	streamSize++
+
 	if err := writer.Flush(); err != nil {
 		return fmt.Errorf("failed to flush writer: %w", err)
 	}
 
 	// Remember where to look for this stream.
-	cachefile.streamInfos[stream.ID()] = streamInfo{
-		offset: cachefile.fileSize + headerSize,
+	cachefile.streamInfos[streamID] = streamInfo{
+		offset: cachefile.fileSize + streamHeaderSize,
 		size:   streamSize,
 	}
 
 	if cachefile.freeStart == cachefile.fileSize {
-		cachefile.freeStart += headerSize + int64(streamSize)
+		cachefile.freeStart += streamHeaderSize + int64(streamSize)
 	}
-	cachefile.fileSize += headerSize + int64(streamSize)
+	cachefile.fileSize += streamHeaderSize + int64(streamSize)
 
 	return nil
 }
@@ -546,9 +713,9 @@ func (cachefile *cacheFile) InvalidateChangedStreams(streams *bitmask.LongBitmas
 		// delete the stream from the in-memory index
 		// it will be re-added when the stream is converted again
 		if info, ok := cachefile.streamInfos[uint64(streamID)]; ok {
-			cachefile.freeSize += int64(info.size) + headerSize
-			if cachefile.freeStart > info.offset-headerSize {
-				cachefile.freeStart = info.offset - headerSize
+			cachefile.freeSize += int64(info.size) + streamHeaderSize
+			if cachefile.freeStart > info.offset-streamHeaderSize {
+				cachefile.freeStart = info.offset - streamHeaderSize
 			}
 			delete(cachefile.streamInfos, uint64(streamID))
 			invalidatedStreams.Set(streamID)
