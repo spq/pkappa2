@@ -246,7 +246,11 @@
                     size="small"
                     variant="flat"
                     :color="tagColors[tag]"
-                    :style="{ color: getContrastTextColor(tagColors[tag]) }"
+                    :style="{
+                      color: tagColors[tag]
+                        ? getContrastTextColor(tagColors[tag])
+                        : undefined,
+                    }"
                     ><template v-if="isHovering"
                       >{{ capitalize(tagify(tag, "type")) }}
                       {{ tagify(tag, "name") }}</template
@@ -373,7 +377,7 @@ const tagStatusForSelection = computed(() => {
   return res;
 });
 const tagColors = computed(() => {
-  const colors: { [key: string]: string } = {};
+  const colors: { [key: string]: string | undefined } = {};
   tags.value?.forEach((t) => (colors[t.Name] = t.Color));
   return colors;
 });
