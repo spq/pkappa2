@@ -474,16 +474,45 @@ const hexdump = (b64: string) => {
   return str;
 };
 
-const isHTMLMimeType = (chunk: Data) => {
-  return chunk.ContentType?.startsWith("text/html") ?? false;
+const validateMediaTypeWithCharsetParameter = (
+  chunk: Data,
+  mediaType: string,
+) => {
+  if (!chunk.ContentType?.toLowerCase().startsWith(mediaType)) return false;
+  const params = chunk.ContentType.split(";");
+  if (params.length > 2) return false;
+  for (let i = 1; i < params.length; i++) {
+    const param = params[i].trim().toLowerCase();
+    if (!param.startsWith("charset=")) return false;
+    const charset = param.substring("charset=".length);
+    if (!/^[a-zA-Z0-9\-+./]+$/.test(charset)) return false;
+  }
+  return true;
 };
 
-const isImageMimeType = (chunk: Data) => {
-  return chunk.ContentType?.startsWith("image/") ?? false;
+const isHTMLMediaType = (chunk: Data) => {
+  // text/html;charset=UTF-8
+  return validateMediaTypeWithCharsetParameter(chunk, "text/html");
+};
+
+const isImageMediaType = (chunk: Data) => {
+  // https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types#image_types
+  // https://www.iana.org/assignments/media-types/media-types.xhtml#image
+  return [
+    "image/apng",
+    "image/avif",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/svg+xml",
+    "image/webp",
+    "image/x-icon",
+    "image/bmp",
+  ].includes(chunk.ContentType?.toLowerCase() ?? "");
 };
 
 const supportsIframeVisualization = (chunk: Data) => {
-  return isHTMLMimeType(chunk) || isImageMimeType(chunk);
+  return isHTMLMediaType(chunk) || isImageMediaType(chunk);
 };
 const downloadChunk = (index: number, chunk: Data) => {
   const blob = new Blob([atob(chunk.Content)], {
