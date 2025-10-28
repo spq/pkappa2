@@ -42,13 +42,13 @@ class GRPCConverter(HTTP2Converter):
             try:
                 deflate = zlib.decompressobj(wbits=15)
                 return deflate.decompress(message_data)
-            except:
+            except zlib.error:
                 return message_data
         elif encoding == "gzip":
             try:
                 deflate = zlib.decompressobj(wbits=15 | 16)
                 return deflate.decompress(message_data)
-            except:
+            except zlib.error:
                 return message_data
         else:
             raise ValueError(f"Unknown encoding '{encoding}'")

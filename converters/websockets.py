@@ -52,7 +52,7 @@ class WebsocketConverter(HTTP2Converter):
 
     def handle_websocket_permessage_deflate(
         self, stream_id: int, frame: WebsocketFrame
-    ) -> Union[WebsocketFrame, None]:
+    ) -> Optional[WebsocketFrame]:
         opcode = frame.Header[0] & 0x0F
         # control frames are not compressed
         if opcode & 0x08 != 0:
@@ -61,17 +61,17 @@ class WebsocketConverter(HTTP2Converter):
         # handle fragmented messages
         if frame.Header[0] & 0x80 == 0:  # FIN bit not set
             self.websocket_message_fragmented_frames[stream_id].append(frame)
-            if len(self.websocket_message_fragmented_frames) > 0 and opcode != 0:
-                self.websocket_message_fragmented_frames = []
+            if len(self.websocket_message_fragmented_frames[stream_id]) > 1 and opcode != 0:
+                del self.websocket_message_fragmented_frames[stream_id]
                 raise Exception("Invalid fragmented message")
-            if len(self.websocket_message_fragmented_frames) > 50:  # arbitrary limit
-                self.websocket_message_fragmented_frames = []
+            if len(self.websocket_message_fragmented_frames[stream_id]) > 50:  # arbitrary limit
+                del self.websocket_message_fragmented_frames[stream_id]
                 raise Exception("Fragmented message too long")
             return None
 
-        if len(self.websocket_message_fragmented_frames) > 0:
+        if len(self.websocket_message_fragmented_frames[stream_id]) > 0:
             if opcode != 0:
-                self.websocket_message_fragmented_frames = []
+                del self.websocket_message_fragmented_frames[stream_id]
                 raise Exception("Invalid fragmented message")
             # this is the last frame of a fragmented message
             self.websocket_message_fragmented_frames[stream_id].append(frame)
@@ -89,7 +89,7 @@ class WebsocketConverter(HTTP2Converter):
             )
             frame.Header[0] |= 0x80  # set FIN bit
             # datalength in the header is wrong now, but we don't care
-            self.websocket_message_fragmented_frames = []
+            del self.websocket_message_fragmented_frames[stream_id]
 
         # only the first frame of a fragmented message has the RSV1 bit set
         if frame.Header[0] & 0x40 == 0:  # RSV1 "Per-Message Compressed" bit not set
@@ -155,12 +155,13 @@ class WebsocketConverter(HTTP2Converter):
                         Data=frame[mask_offset : data_offset + data_length],
                     )
                     websocket_frame = self.unmask_websocket_frames(websocket_frame)
-                    if self.websocket_deflate:
-                        websocket_frame = self.handle_websocket_permessage_deflate(
+                    if self.websocket_deflate[stream_id]:
+                        deflated_websocket_frame = self.handle_websocket_permessage_deflate(
                             stream_id, websocket_frame
                         )
-                        if websocket_frame is None:
+                        if deflated_websocket_frame is None:
                             break
+                        websocket_frame = deflated_websocket_frame
                     websocket_frame = self.handle_websocket_frame(websocket_frame)
 
                     frames.append(websocket_frame.Header + bytes(websocket_frame.Data))
@@ -214,18 +215,18 @@ class WebsocketConverter(HTTP2Converter):
                     extension.split(";", 1) if ";" in extension else (extension, "")
                 )
                 params: Dict[str, Union[str, bool]] = {}
-                raw_params = filter(
+                reduced_raw_params = filter(
                     lambda p: len(p) != 0,
                     map(lambda p: p.strip(), raw_params.split(";")),
                 )
-                for param in raw_params:
-                    param = param.split("=", 1)
-                    if len(param) == 1:
-                        params[param[0]] = True
+                for param in reduced_raw_params:
+                    param_and_value = param.split("=", 1)
+                    if len(param_and_value) == 1:
+                        params[param_and_value[0]] = True
                     else:
-                        if param[1].startswith('"') and param[1].endswith('"'):
-                            param[1] = param[1][1:-1]
-                        params[param[0]] = param[1]
+                        if param_and_value[1].startswith('"') and param_and_value[1].endswith('"'):
+                            param_and_value[1] = param_and_value[1][1:-1]
+                        params[param_and_value[0]] = param_and_value[1]
                 extensions[extension] = params
         return extensions
 
