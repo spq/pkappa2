@@ -28,7 +28,7 @@ export const useStreamsStore = defineStore("streams", {
     async searchStreams(query: string, page: number, append = false) {
       if (!page) page = 0;
       this.query = query;
-      this.page = page;
+      if (!append) this.page = page;
       this.running = true;
       this.error = null;
       if (!append) this.result = null;
@@ -53,8 +53,6 @@ export const useStreamsStore = defineStore("streams", {
               this.latestPage = page;
             }
           }
-          this.query = query;
-          this.page = page;
           this.running = false;
         })
         .catch((err: unknown) => {
