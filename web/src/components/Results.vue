@@ -398,10 +398,9 @@ watch(
   },
 );
 
-watch(
-  () => route.query,
-  () => fetchStreams(),
-);
+watch(route, () => {
+  fetchStreams();
+});
 
 onMounted(() => {
   fetchStreams();
