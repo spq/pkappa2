@@ -192,126 +192,130 @@
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </div>
     <v-infinite-scroll v-else @load="load">
-    <v-table density="compact" hover>
-      <template #default>
-        <thead>
-          <tr>
-            <th style="width: 0" class="pr-0"></th>
-            <th class="text-left pl-0">Tags</th>
-            <th class="text-left">Client</th>
-            <th class="text-left">Bytes</th>
-            <th class="text-left">Server</th>
-            <th class="text-left">Bytes</th>
-            <th class="text-right">Duration</th>
-            <th class="text-right pr-0">Time</th>
-            <th style="width: 0" class="px-0"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <router-link
-            v-for="(stream, index) in streams.result.Results"
-            :key="index"
-            v-slot="{ navigate }"
-            :to="{
-              name: 'stream',
-              query: {
-                q: $route.query.q,
-                p: $route.query.p,
-                converter: $route.query.converter,
-              },
-              params: { streamId: stream.Stream.ID.toString() },
-            }"
-            custom
-            style="cursor: pointer"
-            :class="{ 'blue-lighten-5': selected[index] }"
-          >
-            <tr
-              role="link"
-              :class="currentStream === stream.Stream.ID ? ['selected'] : []"
-              @click="isTextSelected() || navigate()"
-              @keypress.enter="navigate()"
-            >
-              <td style="width: 0" class="pr-0">
-                <v-checkbox-btn
-                  v-model="selected[index]"
-                  @click.stop
-                ></v-checkbox-btn>
-              </td>
-              <td class="pl-0">
-                <v-hover
-                  v-for="tag in stream.Tags"
-                  v-slot="{ isHovering, props }"
-                  :key="tag"
-                  ><v-chip
-                    v-bind="props"
-                    size="small"
-                    variant="flat"
-                    :color="tagColors[tag]"
-                    :style="{
-                      color: tagColors[tag]
-                        ? getContrastTextColor(tagColors[tag])
-                        : undefined,
-                    }"
-                    ><template v-if="isHovering"
-                      >{{ capitalize(tagify(tag, "type")) }}
-                      {{ tagify(tag, "name") }}</template
-                    ><template v-else>{{
-                      tagify(tag, "name")
-                    }}</template></v-chip
-                  ></v-hover
-                >
-              </td>
-              <td>
-                {{ stream.Stream.Client.Host }}:{{ stream.Stream.Client.Port }}
-              </td>
-              <td>
-                <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
-                  prettyBytes(stream.Stream.Client.Bytes, {
-                    maximumFractionDigits: 1,
-                    binary: true,
-                  })
-                }}</span>
-              </td>
-              <td>
-                {{ stream.Stream.Server.Host }}:{{ stream.Stream.Server.Port }}
-              </td>
-              <td>
-                <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
-                  prettyBytes(stream.Stream.Server.Bytes, {
-                    maximumFractionDigits: 1,
-                    binary: true,
-                  })
-                }}</span>
-              </td>
-              <td class="text-right">
-                {{
-                  formatDateDifference(
-                    stream.Stream.LastPacket,
-                    stream.Stream.FirstPacket,
-                  )
-                }}
-              </td>
-              <td
-                class="text-right pr-0"
-                :title="formatDateLong(stream.Stream.FirstPacket)"
-              >
-                {{ formatDate(stream.Stream.FirstPacket) }}
-              </td>
-              <td style="width: 0" class="px-0">
-                <v-btn
-                  :href="`/api/download/${stream.Stream.ID}.pcap`"
-                  icon="mdi-download"
-                  variant="plain"
-                  density="compact"
-                  @click.stop
-                >
-                </v-btn>
-              </td>
+      <v-table density="compact" hover>
+        <template #default>
+          <thead>
+            <tr>
+              <th style="width: 0" class="pr-0"></th>
+              <th class="text-left pl-0">Tags</th>
+              <th class="text-left">Client</th>
+              <th class="text-left">Bytes</th>
+              <th class="text-left">Server</th>
+              <th class="text-left">Bytes</th>
+              <th class="text-right">Duration</th>
+              <th class="text-right pr-0">Time</th>
+              <th style="width: 0" class="px-0"></th>
             </tr>
-          </router-link>
-        </tbody>
-      </template>
-    </v-table>
+          </thead>
+          <tbody>
+            <router-link
+              v-for="(stream, index) in streams.result.Results"
+              :key="index"
+              v-slot="{ navigate }"
+              :to="{
+                name: 'stream',
+                query: {
+                  q: $route.query.q,
+                  p: $route.query.p,
+                  converter: $route.query.converter,
+                },
+                params: { streamId: stream.Stream.ID.toString() },
+              }"
+              custom
+              style="cursor: pointer"
+              :class="{ 'blue-lighten-5': selected[index] }"
+            >
+              <tr
+                role="link"
+                :class="currentStream === stream.Stream.ID ? ['selected'] : []"
+                @click="isTextSelected() || navigate()"
+                @keypress.enter="navigate()"
+              >
+                <td style="width: 0" class="pr-0">
+                  <v-checkbox-btn
+                    v-model="selected[index]"
+                    @click.stop
+                  ></v-checkbox-btn>
+                </td>
+                <td class="pl-0">
+                  <v-hover
+                    v-for="tag in stream.Tags"
+                    v-slot="{ isHovering, props }"
+                    :key="tag"
+                    ><v-chip
+                      v-bind="props"
+                      size="small"
+                      variant="flat"
+                      :color="tagColors[tag]"
+                      :style="{
+                        color: tagColors[tag]
+                          ? getContrastTextColor(tagColors[tag])
+                          : undefined,
+                      }"
+                      ><template v-if="isHovering"
+                        >{{ capitalize(tagify(tag, "type")) }}
+                        {{ tagify(tag, "name") }}</template
+                      ><template v-else>{{
+                        tagify(tag, "name")
+                      }}</template></v-chip
+                    ></v-hover
+                  >
+                </td>
+                <td>
+                  {{ stream.Stream.Client.Host }}:{{
+                    stream.Stream.Client.Port
+                  }}
+                </td>
+                <td>
+                  <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
+                    prettyBytes(stream.Stream.Client.Bytes, {
+                      maximumFractionDigits: 1,
+                      binary: true,
+                    })
+                  }}</span>
+                </td>
+                <td>
+                  {{ stream.Stream.Server.Host }}:{{
+                    stream.Stream.Server.Port
+                  }}
+                </td>
+                <td>
+                  <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
+                    prettyBytes(stream.Stream.Server.Bytes, {
+                      maximumFractionDigits: 1,
+                      binary: true,
+                    })
+                  }}</span>
+                </td>
+                <td class="text-right">
+                  {{
+                    formatDateDifference(
+                      stream.Stream.LastPacket,
+                      stream.Stream.FirstPacket,
+                    )
+                  }}
+                </td>
+                <td
+                  class="text-right pr-0"
+                  :title="formatDateLong(stream.Stream.FirstPacket)"
+                >
+                  {{ formatDate(stream.Stream.FirstPacket) }}
+                </td>
+                <td style="width: 0" class="px-0">
+                  <v-btn
+                    :href="`/api/download/${stream.Stream.ID}.pcap`"
+                    icon="mdi-download"
+                    variant="plain"
+                    density="compact"
+                    @click.stop
+                  >
+                  </v-btn>
+                </td>
+              </tr>
+            </router-link>
+          </tbody>
+        </template>
+      </v-table>
     </v-infinite-scroll>
   </div>
 </template>
