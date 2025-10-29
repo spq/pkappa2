@@ -148,7 +148,7 @@
                 name: 'search',
                 query: {
                   q: $route.query.q,
-                  p: (Number($route.query.p ?? 0) + 1).toString(),
+                  p: (Number(streams.latestPage ?? 0) + 1).toString(),
                 },
               }"
             >
@@ -160,7 +160,7 @@
       </div>
     </ToolBar>
     <v-skeleton-loader
-      v-if="streams.running || (!streams.result && !streams.error)"
+      v-if="!streams.result && !streams.error"
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
     <div v-else-if="streams.error">
@@ -191,7 +191,8 @@
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </div>
-    <v-table v-else density="compact" hover>
+    <v-infinite-scroll v-else @load="load">
+    <v-table density="compact" hover>
       <template #default>
         <thead>
           <tr>
@@ -311,6 +312,7 @@
         </tbody>
       </template>
     </v-table>
+    </v-infinite-scroll>
   </div>
 </template>
 
@@ -396,9 +398,10 @@ watch(
   },
 );
 
-watch(route, () => {
-  fetchStreams();
-});
+watch(
+  () => route.query,
+  () => fetchStreams(),
+);
 
 onMounted(() => {
   fetchStreams();
@@ -465,6 +468,26 @@ function fetchStreams(forceUpdate = false) {
   });
   selected.value = [];
 }
+
+function load(options: { done: (status: "ok" | "empty" | "error") => void }) {
+  // exit early if we are at end of list or we are waiting for a response
+  if (!streams.result?.MoreResults || streams.running) {
+    options.done("empty");
+    return;
+  }
+
+  const query = route.query.q as string;
+  const nextPage = (streams.latestPage ?? 0) + 1;
+
+  streams
+    .searchStreams(query, nextPage, true)
+    .then(() => options.done("ok"))
+    .catch((err: Error) => {
+      EventBus.emit("showError", `Failed to load more streams: ${err.message}`);
+      options.done("error");
+    });
+}
+
 function createMarkFromSelection() {
   const ids: number[] = [];
   for (const s of selectedStreams.value) {
