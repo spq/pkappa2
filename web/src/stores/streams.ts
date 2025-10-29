@@ -44,6 +44,7 @@ export const useStreamsStore = defineStore("streams", {
             if (append && this.result) {
               this.result = {
                 ...data,
+                Offset: this.result.Offset,
                 Results: [...this.result.Results, ...data.Results],
               };
               this.latestPage = page;

@@ -121,7 +121,7 @@
           <template #activator="{ props }">
             <v-btn
               icon
-              :disabled="streams.page == 0"
+              :disabled="streams.page == 0 || Number($route.query.p ?? 0) <= 0"
               v-bind="props"
               variant="plain"
               :to="{
