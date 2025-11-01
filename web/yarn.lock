@@ -1022,10 +1022,10 @@ available-typed-arrays@^1.0.7:
   dependencies:
     possible-typed-array-names "^1.0.0"
 
-axios@^1.12.2:
-  version "1.12.2"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-1.12.2.tgz#6c307390136cf7a2278d09cec63b136dfc6e6da7"
-  integrity sha512-vMJzPewAlRyOgxV2dU0Cuz2O8zzzx9VYtbJOaBgXFeLc4IV/Eg50n4LowmehOOR61S8ZMpc2K5Sa7g6A4jfkUw==
+axios@^1.13.1:
+  version "1.13.1"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.13.1.tgz#45b62dc8fe04e0e92274e08b98e910ba3d7963a7"
+  integrity sha512-hU4EGxxt+j7TQijx1oYdAjw4xuIp1wRQSsbMFwSthCWeBQur1eF+qJ5iQ5sN3Tw8YRzQNKb8jszgBdMDVqwJcw==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.4"
@@ -1358,10 +1358,10 @@ copy-anything@^3.0.2:
   dependencies:
     is-what "^4.1.8"
 
-core-js@^3.45.1:
-  version "3.45.1"
-  resolved "https://registry.yarnpkg.com/core-js/-/core-js-3.45.1.tgz#5810e04a1b4e9bc5ddaa4dd12e702ff67300634d"
-  integrity sha512-L4NPsJlCfZsPeXukyzHFlg/i7IIVwHSItR0wg0FLNqYClJ4MQYTYLbC7EkjKYRLZF2iof2MUgN0EGy7MdQFChg==
+core-js@^3.46.0:
+  version "3.46.0"
+  resolved "https://registry.yarnpkg.com/core-js/-/core-js-3.46.0.tgz#323a092b96381a9184d0cd49ee9083b2f93373bb"
+  integrity sha512-vDMm9B0xnqqZ8uSBpZ8sNtRtOdmfShrvT6h2TuQGLs0Is+cR0DYbj/KWP6ALVNbWPpqA/qPLoOuppJN07humpA==
 
 core-util-is@~1.0.0:
   version "1.0.3"
@@ -3522,10 +3522,10 @@ vue-tsc@^3.1.1:
     "@volar/typescript" "2.4.23"
     "@vue/language-core" "3.1.1"
 
-vue3-apexcharts@^1.8.0:
-  version "1.8.0"
-  resolved "https://registry.yarnpkg.com/vue3-apexcharts/-/vue3-apexcharts-1.8.0.tgz#1984648d966aa91bc4dc3e87fa847f5289f7f1cf"
-  integrity sha512-5tSD4mXTBbIJ9ir+58qHE6oNtIe0RNgqIRYMKpcsIaxkKtwUww4JhvPkpUFlmiW4OJbbdklgjleXq1lfcM4gdA==
+vue3-apexcharts@^1.10.0:
+  version "1.10.0"
+  resolved "https://registry.yarnpkg.com/vue3-apexcharts/-/vue3-apexcharts-1.10.0.tgz#3142e79c8fcac9896501562ee186ffa1fb47da59"
+  integrity sha512-sBma2In4rU5n/JBrv8KVb8if+IoY019Dse2yRDD/eRU1WGZHK07zuy9erefKzbJ7T3wP9+Jsy9bH6Vdjy85HZg==
 
 vue@^3.5.13:
   version "3.5.13"
@@ -3538,10 +3538,10 @@ vue@^3.5.13:
     "@vue/server-renderer" "3.5.13"
     "@vue/shared" "3.5.13"
 
-vuetify@^3.10.4:
-  version "3.10.4"
-  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.10.4.tgz#8b1c3f4bf2cddbc3e1d2114f60835c4b6ef23c26"
-  integrity sha512-aatUQ0RM0i6VdkJaFyj3gydecuFmAgACNO3RwWznvjvIvRENQXxMRiv+vlGFoshbw2UG+zOPPMhO12OCPSa2UQ==
+vuetify@^3.10.8:
+  version "3.10.8"
+  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.10.8.tgz#2c65e0cd0924981953e4c7f3779a94207035306b"
+  integrity sha512-TV1bx8mUjOPbhmEsamm38/CBcVe5DHYepOZGE6aQJ2uxvg96B4k+QHgIJcD5uKVfKmxKkJRtHdEXyq6JP9wBtg==
 
 webpack-virtual-modules@^0.6.2:
   version "0.6.2"
