@@ -15,7 +15,7 @@ function updateVuetifyTheme(colorScheme: ColorScheme) {
   if (null === theme) {
     return;
   }
-  theme.global.name.value = colorScheme;
+  theme.change(colorScheme);
 }
 
 export function registerVuetifyTheme(themeInstance: ThemeInstance) {
