@@ -412,6 +412,7 @@ onMounted(() => {
   const handle = (e: KeyboardEvent, pageOffset: number) => {
     if (pageOffset >= 1 && !streams.result?.MoreResults) return;
     let p = Number(route.query.p ?? 0);
+    if (pageOffset >= 1) p = Number(streams.latestPage ?? 0);
     p += pageOffset;
     if (p < 0) return;
     e.preventDefault();
