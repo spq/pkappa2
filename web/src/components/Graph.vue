@@ -90,10 +90,7 @@ import { EventBus } from "./EventBus";
 import { useRootStore } from "@/stores";
 import { GraphType, useGraphStore } from "@/stores/graph";
 import { useRoute, useRouter } from "vue-router";
-import {
-  default as VueApexCharts,
-  VueApexChartsComponent,
-} from "vue3-apexcharts";
+import { default as VueApexCharts } from "vue3-apexcharts";
 import * as ApexCharts from "apexcharts";
 import { getColorScheme, onColorSchemeChange } from "../lib/darkmode";
 
@@ -104,7 +101,6 @@ const router = useRouter();
 const chartOptions = ref<ApexCharts.ApexOptions | null>(null);
 const chartData = ref<ChartData[] | null>(null);
 const chartTimeFilter = ref("");
-const chart = ref<VueApexChartsComponent | null>(null);
 
 type Group = {
   tags: string[];
@@ -656,25 +652,19 @@ graphStore.$subscribe((_mutation, state) => {
     },
   };
   onColorSchemeChange(() => {
-    if (chart.value === null) {
-      return;
-    }
     const colorscheme = getColorScheme();
-    chart.value
-      .updateOptions({
-        theme: {
-          mode: colorscheme,
-        },
-        chart: {
-          foreColor: colorscheme === "dark" ? "#f6f7f8" : "#373d3f",
-        },
-        tooltip: {
-          theme: colorscheme,
-        },
-      } as ApexCharts.ApexOptions)
-      .catch((err: Error) => {
-        EventBus.emit("showError", `Failed to update graph: ${err.message}`);
-      });
+    chartOptions.value = {
+      ...chartOptions.value,
+      theme: {
+        mode: colorscheme,
+      },
+      chart: {
+        foreColor: colorscheme === "dark" ? "#f6f7f8" : "#373d3f",
+      },
+      tooltip: {
+        theme: colorscheme,
+      },
+    };
   });
   chartData.value = [];
   obj.build(chartData.value, chartOptions.value);
