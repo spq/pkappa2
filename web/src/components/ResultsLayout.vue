@@ -2,6 +2,7 @@
   <div class="search-layout">
     <div
       v-if="!isExpanded"
+      tabindex="0"
       :class="['top-pane', 'overflow-auto', { 'stream-open': streamOpen }]"
     >
       <Results />

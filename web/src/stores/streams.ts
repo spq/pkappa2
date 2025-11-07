@@ -6,6 +6,8 @@ import { SearchResult } from "@/apiClient";
 interface State {
   query: string | null;
   page: number | null;
+  /** the latest page that is loaded. updated by pagination and infinite scroll */
+  latestPage: number | null;
   running: boolean;
   error: string | null;
   result: SearchResult | null;
@@ -16,19 +18,20 @@ export const useStreamsStore = defineStore("streams", {
   state: (): State => ({
     query: null,
     page: null,
+    latestPage: null,
     running: false,
     error: null,
     result: null,
     outdated: false,
   }),
   actions: {
-    async searchStreams(query: string, page: number) {
+    async searchStreams(query: string, page: number, append = false) {
       if (!page) page = 0;
       this.query = query;
-      this.page = page;
+      if (!append) this.page = page;
       this.running = true;
       this.error = null;
-      this.result = null;
+      if (!append) this.result = null;
       this.outdated = false;
       return APIClient.searchStreams(query, page)
         .then((data) => {
@@ -38,10 +41,18 @@ export const useStreamsStore = defineStore("streams", {
             this.outdated = false;
           } else {
             this.error = null;
-            this.result = data;
+            if (append && this.result) {
+              this.result = {
+                ...data,
+                Offset: this.result.Offset,
+                Results: [...this.result.Results, ...data.Results],
+              };
+              this.latestPage = page;
+            } else {
+              this.result = data;
+              this.latestPage = page;
+            }
           }
-          this.query = query;
-          this.page = page;
           this.running = false;
         })
         .catch((err: unknown) => {

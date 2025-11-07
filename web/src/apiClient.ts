@@ -56,6 +56,7 @@ export type SearchResult = {
   Results: Result[];
   Elapsed: number;
   Offset: number;
+  /** If there are more results available to load */
   MoreResults: boolean;
   DataRegexes: DataRegexes;
 };

@@ -121,7 +121,7 @@
           <template #activator="{ props }">
             <v-btn
               icon
-              :disabled="streams.page == 0"
+              :disabled="streams.page == 0 || Number($route.query.p ?? 0) <= 0"
               v-bind="props"
               variant="plain"
               :to="{
@@ -148,7 +148,7 @@
                 name: 'search',
                 query: {
                   q: $route.query.q,
-                  p: (Number($route.query.p ?? 0) + 1).toString(),
+                  p: (Number(streams.latestPage ?? 0) + 1).toString(),
                 },
               }"
             >
@@ -160,7 +160,7 @@
       </div>
     </ToolBar>
     <v-skeleton-loader
-      v-if="streams.running || (!streams.result && !streams.error)"
+      v-if="!streams.result && !streams.error"
       type="table-thead, table-tbody"
     ></v-skeleton-loader>
     <div v-else-if="streams.error">
@@ -191,126 +191,132 @@
       <v-icon>mdi-magnify</v-icon
       ><span class="text-subtitle-1">No streams matched your search.</span>
     </div>
-    <v-table v-else density="compact" hover>
-      <template #default>
-        <thead>
-          <tr>
-            <th style="width: 0" class="pr-0"></th>
-            <th class="text-left pl-0">Tags</th>
-            <th class="text-left">Client</th>
-            <th class="text-left">Bytes</th>
-            <th class="text-left">Server</th>
-            <th class="text-left">Bytes</th>
-            <th class="text-right">Duration</th>
-            <th class="text-right pr-0">Time</th>
-            <th style="width: 0" class="px-0"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <router-link
-            v-for="(stream, index) in streams.result.Results"
-            :key="index"
-            v-slot="{ navigate }"
-            :to="{
-              name: 'stream',
-              query: {
-                q: $route.query.q,
-                p: $route.query.p,
-                converter: $route.query.converter,
-              },
-              params: { streamId: stream.Stream.ID.toString() },
-            }"
-            custom
-            style="cursor: pointer"
-            :class="{ 'blue-lighten-5': selected[index] }"
-          >
-            <tr
-              role="link"
-              :class="currentStream === stream.Stream.ID ? ['selected'] : []"
-              @click="isTextSelected() || navigate()"
-              @keypress.enter="navigate()"
-            >
-              <td style="width: 0" class="pr-0">
-                <v-checkbox-btn
-                  v-model="selected[index]"
-                  @click.stop
-                ></v-checkbox-btn>
-              </td>
-              <td class="pl-0">
-                <v-hover
-                  v-for="tag in stream.Tags"
-                  v-slot="{ isHovering, props }"
-                  :key="tag"
-                  ><v-chip
-                    v-bind="props"
-                    size="small"
-                    variant="flat"
-                    :color="tagColors[tag]"
-                    :style="{
-                      color: tagColors[tag]
-                        ? getContrastTextColor(tagColors[tag])
-                        : undefined,
-                    }"
-                    ><template v-if="isHovering"
-                      >{{ capitalize(tagify(tag, "type")) }}
-                      {{ tagify(tag, "name") }}</template
-                    ><template v-else>{{
-                      tagify(tag, "name")
-                    }}</template></v-chip
-                  ></v-hover
-                >
-              </td>
-              <td>
-                {{ stream.Stream.Client.Host }}:{{ stream.Stream.Client.Port }}
-              </td>
-              <td>
-                <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
-                  prettyBytes(stream.Stream.Client.Bytes, {
-                    maximumFractionDigits: 1,
-                    binary: true,
-                  })
-                }}</span>
-              </td>
-              <td>
-                {{ stream.Stream.Server.Host }}:{{ stream.Stream.Server.Port }}
-              </td>
-              <td>
-                <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
-                  prettyBytes(stream.Stream.Server.Bytes, {
-                    maximumFractionDigits: 1,
-                    binary: true,
-                  })
-                }}</span>
-              </td>
-              <td class="text-right">
-                {{
-                  formatDateDifference(
-                    stream.Stream.LastPacket,
-                    stream.Stream.FirstPacket,
-                  )
-                }}
-              </td>
-              <td
-                class="text-right pr-0"
-                :title="formatDateLong(stream.Stream.FirstPacket)"
-              >
-                {{ formatDate(stream.Stream.FirstPacket) }}
-              </td>
-              <td style="width: 0" class="px-0">
-                <v-btn
-                  :href="`/api/download/${stream.Stream.ID}.pcap`"
-                  icon="mdi-download"
-                  variant="plain"
-                  density="compact"
-                  @click.stop
-                >
-                </v-btn>
-              </td>
+    <v-infinite-scroll v-else @load="load">
+      <v-table density="compact" hover>
+        <template #default>
+          <thead>
+            <tr>
+              <th style="width: 0" class="pr-0"></th>
+              <th class="text-left pl-0">Tags</th>
+              <th class="text-left">Client</th>
+              <th class="text-left">Bytes</th>
+              <th class="text-left">Server</th>
+              <th class="text-left">Bytes</th>
+              <th class="text-right">Duration</th>
+              <th class="text-right pr-0">Time</th>
+              <th style="width: 0" class="px-0"></th>
             </tr>
-          </router-link>
-        </tbody>
-      </template>
-    </v-table>
+          </thead>
+          <tbody>
+            <router-link
+              v-for="(stream, index) in streams.result.Results"
+              :key="index"
+              v-slot="{ navigate }"
+              :to="{
+                name: 'stream',
+                query: {
+                  q: $route.query.q,
+                  p: $route.query.p,
+                  converter: $route.query.converter,
+                },
+                params: { streamId: stream.Stream.ID.toString() },
+              }"
+              custom
+              style="cursor: pointer"
+              :class="{ 'blue-lighten-5': selected[index] }"
+            >
+              <tr
+                role="link"
+                :class="currentStream === stream.Stream.ID ? ['selected'] : []"
+                @click="isTextSelected() || navigate()"
+                @keypress.enter="navigate()"
+              >
+                <td style="width: 0" class="pr-0">
+                  <v-checkbox-btn
+                    v-model="selected[index]"
+                    @click.stop
+                  ></v-checkbox-btn>
+                </td>
+                <td class="pl-0">
+                  <v-hover
+                    v-for="tag in stream.Tags"
+                    v-slot="{ isHovering, props }"
+                    :key="tag"
+                    ><v-chip
+                      v-bind="props"
+                      size="small"
+                      variant="flat"
+                      :color="tagColors[tag]"
+                      :style="{
+                        color: tagColors[tag]
+                          ? getContrastTextColor(tagColors[tag])
+                          : undefined,
+                      }"
+                      ><template v-if="isHovering"
+                        >{{ capitalize(tagify(tag, "type")) }}
+                        {{ tagify(tag, "name") }}</template
+                      ><template v-else>{{
+                        tagify(tag, "name")
+                      }}</template></v-chip
+                    ></v-hover
+                  >
+                </td>
+                <td>
+                  {{ stream.Stream.Client.Host }}:{{
+                    stream.Stream.Client.Port
+                  }}
+                </td>
+                <td>
+                  <span :title="`${stream.Stream.Client.Bytes} Bytes`">{{
+                    prettyBytes(stream.Stream.Client.Bytes, {
+                      maximumFractionDigits: 1,
+                      binary: true,
+                    })
+                  }}</span>
+                </td>
+                <td>
+                  {{ stream.Stream.Server.Host }}:{{
+                    stream.Stream.Server.Port
+                  }}
+                </td>
+                <td>
+                  <span :title="`${stream.Stream.Server.Bytes} Bytes`">{{
+                    prettyBytes(stream.Stream.Server.Bytes, {
+                      maximumFractionDigits: 1,
+                      binary: true,
+                    })
+                  }}</span>
+                </td>
+                <td class="text-right">
+                  {{
+                    formatDateDifference(
+                      stream.Stream.LastPacket,
+                      stream.Stream.FirstPacket,
+                    )
+                  }}
+                </td>
+                <td
+                  class="text-right pr-0"
+                  :title="formatDateLong(stream.Stream.FirstPacket)"
+                >
+                  {{ formatDate(stream.Stream.FirstPacket) }}
+                </td>
+                <td style="width: 0" class="px-0">
+                  <v-btn
+                    :href="`/api/download/${stream.Stream.ID}.pcap`"
+                    icon="mdi-download"
+                    variant="plain"
+                    density="compact"
+                    @click.stop
+                  >
+                  </v-btn>
+                </td>
+              </tr>
+            </router-link>
+          </tbody>
+        </template>
+      </v-table>
+    </v-infinite-scroll>
   </div>
 </template>
 
@@ -406,6 +412,7 @@ onMounted(() => {
   const handle = (e: KeyboardEvent, pageOffset: number) => {
     if (pageOffset >= 1 && !streams.result?.MoreResults) return;
     let p = Number(route.query.p ?? 0);
+    if (pageOffset >= 1) p = Number(streams.latestPage ?? 0);
     p += pageOffset;
     if (p < 0) return;
     e.preventDefault();
@@ -465,6 +472,26 @@ function fetchStreams(forceUpdate = false) {
   });
   selected.value = [];
 }
+
+function load(options: { done: (status: "ok" | "empty" | "error") => void }) {
+  // exit early if we are at end of list or we are waiting for a response
+  if (!streams.result?.MoreResults || streams.running) {
+    options.done("empty");
+    return;
+  }
+
+  const query = route.query.q as string;
+  const nextPage = (streams.latestPage ?? 0) + 1;
+
+  streams
+    .searchStreams(query, nextPage, true)
+    .then(() => options.done("ok"))
+    .catch((err: Error) => {
+      EventBus.emit("showError", `Failed to load more streams: ${err.message}`);
+      options.done("error");
+    });
+}
+
 function createMarkFromSelection() {
   const ids: number[] = [];
   for (const s of selectedStreams.value) {
