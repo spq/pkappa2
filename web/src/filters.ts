@@ -1,5 +1,21 @@
 import moment from "moment";
 
+// Cache moment objects for reoccuring dates.
+// The moment() constructor showed up pretty high up in the
+// performance profiler while rendering a large stream with
+// lots of chunks.
+const momentCache: Record<string, moment.Moment> = {};
+function getMoment(time: string | Date): moment.Moment {
+  if (typeof time === "string" && time in momentCache) {
+    return momentCache[time];
+  }
+  const m = moment(time);
+  if (typeof time === "string") {
+    momentCache[time] = m;
+  }
+  return m;
+}
+
 export function capitalize(value: string | null) {
   if (!value) return "";
   value = value.toString();
@@ -22,7 +38,7 @@ export function formatDateDifference(
 ) {
   if (second === undefined) return "0 ms";
   if (first === second) return "0 ms";
-  const ms = moment(first).diff(moment(second));
+  const ms = getMoment(first).diff(getMoment(second));
   if (ms < 1000) return `${ms} ms`;
   const seconds = ms / 1000;
   if (seconds < 60) {
@@ -38,7 +54,7 @@ export function formatDateDifference(
 
 export function formatDate(time: string | Date | null) {
   if (time === null) return undefined;
-  const date = moment(time).local();
+  const date = getMoment(time).local();
   let format = "HH:mm:ss.SSS";
   if (!date.isSame(moment(), "day")) format = `YYYY-MM-DD ${format}`;
   return date.format(format);
@@ -46,7 +62,7 @@ export function formatDate(time: string | Date | null) {
 
 export function formatDateLong(time: string | Date | null) {
   if (time === null) return undefined;
-  const date = moment(time).local();
+  const date = getMoment(time).local();
   return date.format("YYYY-MM-DD HH:mm:ss.SSS ZZ");
 }
 
