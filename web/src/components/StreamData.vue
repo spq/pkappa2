@@ -1,175 +1,167 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
   <div v-if="viewmode === 'cards'">
-    <v-expansion-panels v-model="openPanels" multiple variant="accordion">
-      <v-expansion-panel
-        v-for="(chunk, index) in data"
-        :key="index"
-        :value="index"
+    <template v-for="(chunk, index) in data" :key="index">
+      <v-row
         static
-        class="smol break-all"
+        :class="[title_classes, 'text-caption', 'align-center']"
+        no-gutters
       >
-        <v-expansion-panel-title
-          class="border-bottom elevation-2"
-          :class="[title_classes()]"
-        >
-          <v-row class="text-caption align-center" no-gutters>
-            <v-col class="v-col-1">
-              <v-icon v-if="chunk.Direction === 0" color="red"
-                >mdi-arrow-right-thin-circle-outline</v-icon
+        <v-col class="v-col-1 ml-4">
+          <v-icon v-if="chunk.Direction === 0" color="red"
+            >mdi-arrow-right-thin-circle-outline</v-icon
+          >
+          <v-icon v-else color="green"
+            >mdi-arrow-left-thin-circle-outline</v-icon
+          >
+          <span>
+            {{ chunk.Direction === 0 ? "Client" : "Server" }}
+          </span>
+        </v-col>
+        <v-col v-if="chunk.Time !== undefined" class="v-col-1">
+          <v-tooltip location="bottom">
+            <template #activator="{ props: tprops }">
+              <v-chip v-bind="tprops" size="small" variant="text"
+                >+{{
+                  formatDateDifference(chunk.Time, data[index - 1]?.Time)
+                }}</v-chip
               >
-              <v-icon v-else color="green"
-                >mdi-arrow-left-thin-circle-outline</v-icon
-              >
-              <span>
-                {{ chunk.Direction === 0 ? "Client" : "Server" }}
-              </span>
-            </v-col>
-            <v-col v-if="chunk.Time !== undefined" class="v-col-1">
-              <v-tooltip location="bottom">
-                <template #activator="{ props: tprops }">
-                  <v-chip v-bind="tprops" size="small" variant="text"
-                    >+{{
-                      formatDateDifference(chunk.Time, data[index - 1]?.Time)
-                    }}</v-chip
-                  >
-                </template>
-                <span>{{ formatDate(chunk.Time) }}</span>
-              </v-tooltip>
-            </v-col>
-            <v-col class="v-col-1">
-              {{ formatChunkSize(chunk) }}
-            </v-col>
-            <v-col>
-              <v-btn-toggle
-                v-model="chunk.Presentation"
-                mandatory
-                density="compact"
+            </template>
+            <span>{{ formatDate(chunk.Time) }}</span>
+          </v-tooltip>
+        </v-col>
+        <v-col class="v-col-1">
+          {{ formatChunkSize(chunk) }}
+        </v-col>
+        <v-col>
+          <v-btn-toggle
+            v-model="chunk.Presentation"
+            mandatory
+            density="compact"
+            variant="text"
+            color="primary"
+            class="smol-group"
+            @click.stop
+          >
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="ascii" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-text-long</v-icon>
+                </v-btn>
+              </template>
+              <span>ASCII</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="utf-8" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-format-font</v-icon>
+                </v-btn>
+              </template>
+              <span>UTF-8</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="hexdump" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-format-columns</v-icon>
+                </v-btn>
+              </template>
+              <span>HEXDUMP</span>
+            </v-tooltip>
+            <v-tooltip location="bottom">
+              <template #activator="{ props: pprops }">
+                <v-btn value="raw" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-hexadecimal</v-icon>
+                </v-btn>
+              </template>
+              <span>RAW</span>
+            </v-tooltip>
+            <v-tooltip
+              v-if="supportsIframeVisualization(chunk)"
+              location="bottom"
+            >
+              <template #activator="{ props: pprops }">
+                <v-btn value="web" v-bind="pprops" size="x-small">
+                  <v-icon>mdi-web</v-icon>
+                </v-btn>
+              </template>
+              <span>WEB</span>
+            </v-tooltip>
+          </v-btn-toggle>
+        </v-col>
+        <v-col class="v-col-2">
+          <v-tooltip location="bottom">
+            <template #activator="{ props: pprops }">
+              <v-btn
+                v-bind="pprops"
+                size="x-small"
                 variant="text"
-                color="primary"
-                class="smol-group"
+                icon="mdi-chef-hat"
+                @click="openInCyberChef(chunk)"
                 @click.stop
               >
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="ascii" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-text-long</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>ASCII</span>
-                </v-tooltip>
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="utf-8" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-format-font</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>UTF-8</span>
-                </v-tooltip>
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="hexdump" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-format-columns</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>HEXDUMP</span>
-                </v-tooltip>
-                <v-tooltip location="bottom">
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="raw" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-hexadecimal</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>RAW</span>
-                </v-tooltip>
-                <v-tooltip
-                  v-if="supportsIframeVisualization(chunk)"
-                  location="bottom"
-                >
-                  <template #activator="{ props: pprops }">
-                    <v-btn value="web" v-bind="pprops" size="x-small">
-                      <v-icon>mdi-web</v-icon>
-                    </v-btn>
-                  </template>
-                  <span>WEB</span>
-                </v-tooltip>
-              </v-btn-toggle>
-            </v-col>
-            <v-col class="v-col-2">
-              <v-tooltip location="bottom">
-                <template #activator="{ props: pprops }">
-                  <v-btn
-                    v-bind="pprops"
-                    size="x-small"
-                    variant="text"
-                    icon="mdi-chef-hat"
-                    @click="openInCyberChef(chunk)"
-                    @click.stop
-                  >
-                  </v-btn>
-                </template>
-                <span>Open in CyberChef</span>
-              </v-tooltip>
-              <v-tooltip location="bottom">
-                <template #activator="{ props: pprops }">
-                  <v-btn
-                    v-bind="pprops"
-                    size="x-small"
-                    variant="text"
-                    @click="downloadChunk(index, chunk)"
-                    @click.stop
-                  >
-                    <v-icon>mdi-download</v-icon>
-                  </v-btn>
-                </template>
-                <span>Download</span>
-              </v-tooltip>
-              <v-tooltip location="bottom">
-                <template #activator="{ props: pprops }">
-                  <v-btn
-                    v-bind="pprops"
-                    size="x-small"
-                    variant="text"
-                    icon="mdi-content-copy"
-                    @click="copyToClipboard(chunk)"
-                    @click.stop
-                  >
-                  </v-btn>
-                </template>
-                <span>Copy Content</span>
-              </v-tooltip>
-            </v-col>
-          </v-row>
-        </v-expansion-panel-title>
-        <v-expansion-panel-text>
-          <template v-if="chunk.Presentation === 'ascii'">
-            <span
-              class="chunk"
-              :data-chunk-idx="index"
-              :class="[classes(chunk)]"
-              v-html="inlineAscii(chunk)"
-            >
-            </span>
-          </template>
-          <template v-else-if="chunk.Presentation === 'utf-8'">
-            <span
-              class="chunk"
-              :data-chunk-idx="index"
-              :class="[classes(chunk)]"
-              v-html="inlineUnicode(chunk)"
-            >
-            </span>
-          </template>
-          <template v-else-if="chunk.Presentation === 'hexdump'">
-            <pre :class="[classes(chunk), 'hexdump']">{{
-              hexdump(chunk.Content)
-            }}</pre>
-          </template>
-          <template v-else-if="chunk.Presentation === 'raw'">
-            <span :class="[classes(chunk)]"
-              >{{ inlineHex(chunk.Content) }}<br
-            /></span>
-          </template>
+              </v-btn>
+            </template>
+            <span>Open in CyberChef</span>
+          </v-tooltip>
+          <v-tooltip location="bottom">
+            <template #activator="{ props: pprops }">
+              <v-btn
+                v-bind="pprops"
+                size="x-small"
+                variant="text"
+                @click="downloadChunk(index, chunk)"
+                @click.stop
+              >
+                <v-icon>mdi-download</v-icon>
+              </v-btn>
+            </template>
+            <span>Download</span>
+          </v-tooltip>
+          <v-tooltip location="bottom">
+            <template #activator="{ props: pprops }">
+              <v-btn
+                v-bind="pprops"
+                size="x-small"
+                variant="text"
+                icon="mdi-content-copy"
+                @click="copyToClipboard(chunk)"
+                @click.stop
+              >
+              </v-btn>
+            </template>
+            <span>Copy Content</span>
+          </v-tooltip>
+        </v-col>
+      </v-row>
+      <v-row no-gutters class="break-all ma-4 mt-2">
+        <v-col cols="12">
+          <span
+            v-if="chunk.Presentation === 'ascii'"
+            class="chunk"
+            :data-chunk-idx="index"
+            :class="[classes(chunk)]"
+            v-html="inlineAscii(chunk)"
+          >
+          </span>
+          <span
+            v-else-if="chunk.Presentation === 'utf-8'"
+            class="chunk"
+            :data-chunk-idx="index"
+            :class="[classes(chunk)]"
+            v-html="inlineUnicode(chunk)"
+          >
+          </span>
+          <pre
+            v-else-if="chunk.Presentation === 'hexdump'"
+            :class="[classes(chunk), 'hexdump']"
+            >{{ hexdump(chunk.Content) }}</pre
+          >
+
+          <span
+            v-else-if="chunk.Presentation === 'raw'"
+            :class="[classes(chunk)]"
+            >{{ inlineHex(chunk.Content) }}<br
+          /></span>
           <template v-else-if="chunk.Presentation === 'web'">
             <div
               v-if="supportsIframeVisualization(chunk)"
@@ -188,9 +180,9 @@
               <span class="text-body-2">{{ chunk.ContentType }}</span>
             </span>
           </template>
-        </v-expansion-panel-text>
-      </v-expansion-panel>
-    </v-expansion-panels>
+        </v-col>
+      </v-row>
+    </template>
   </div>
   <div v-else>
     <v-card>
@@ -249,7 +241,7 @@ import {
 } from "@/lib/utils";
 import moment from "moment";
 import prettyBytes from "pretty-bytes";
-import { getColorScheme } from "@/lib/darkmode";
+import { getColorScheme, onColorSchemeChange } from "@/lib/darkmode";
 import { useStreamStore } from "@/stores/stream";
 import { EventBus } from "./EventBus";
 import { CYBERCHEF_URL } from "@/lib/constants";
@@ -314,15 +306,18 @@ const data = ref(
     return visualChunk;
   }),
 );
-const openPanels = ref<number[]>(data.value.map((_, index) => index));
 
-const title_classes = () => {
+const getBgThemeColor = () => {
   const colorScheme = getColorScheme();
   return {
     "bg-grey-lighten-3": colorScheme === "light",
     "bg-grey-darken-3": colorScheme === "dark",
   };
 };
+const title_classes = ref(getBgThemeColor());
+onColorSchemeChange(() => {
+  title_classes.value = getBgThemeColor();
+});
 
 watch(
   () => props.presentation,
@@ -611,11 +606,6 @@ function openInCyberChef(chunk: Data) {
 
 .smol-group {
   height: 24px !important;
-}
-
-.smol > button {
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
 }
 
 .iframe-content {
