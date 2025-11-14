@@ -187,7 +187,7 @@ func main() {
 	rUser := r.With(checkBasicAuth(*userPassword))
 	rPcap := r.With(checkBasicAuth(*pcapPassword))
 
-	rPcap.Post("/upload/{filename:.+[.]pcap[ng]?}", func(w http.ResponseWriter, r *http.Request) {
+	rPcap.Post("/upload/{filename:.+[.]pcap(ng)?}", func(w http.ResponseWriter, r *http.Request) {
 		filename := chi.URLParam(r, "filename")
 		if filename != filepath.Base(filename) {
 			http.Error(w, "Invalid filename", http.StatusBadRequest)
