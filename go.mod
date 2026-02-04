@@ -7,10 +7,10 @@ toolchain go1.24.1
 require (
 	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-chi/chi/v5 v5.2.3
+	github.com/go-chi/chi/v5 v5.2.4
 	github.com/gopacket/gopacket v1.5.0
 	github.com/gorilla/websocket v1.5.3
-	golang.org/x/sys v0.39.0
+	golang.org/x/sys v0.40.0
 	rsc.io/binaryregexp v0.2.0
 )
 
