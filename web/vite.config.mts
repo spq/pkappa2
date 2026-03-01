@@ -30,10 +30,12 @@ export default defineConfig({
     checker({
       typescript: true,
       vueTsc: true,
-      eslint: {
-        lintCommand: "eslint",
-        useFlatConfig: true,
-      },
+      // https://github.com/fi3ework/vite-plugin-checker/issues/647
+      // Wait for eslint 10 support before enabling this.
+      // eslint: {
+      //   lintCommand: "eslint",
+      //   useFlatConfig: true,
+      // },
     }),
     Fonts({
       google: {
