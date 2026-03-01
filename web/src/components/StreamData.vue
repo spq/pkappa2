@@ -524,7 +524,7 @@ const downloadChunk = (index: number, chunk: Data) => {
 };
 
 const copyToClipboard = (chunk: VisualChunk) => {
-  let content = "";
+  let content;
   switch (chunk.Presentation) {
     case "ascii":
       content = tryURLDecodeIfEnabled(atob(chunk.Content), props.urlDecode);
