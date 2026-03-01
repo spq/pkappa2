@@ -1282,7 +1282,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						}
 						newTag.Matches.Set(uint(s))
 						newTag.Uncertain.Set(uint(s))
-						b.WriteString(fmt.Sprintf("%d,", s))
+						fmt.Fprintf(&b, "%d,", s)
 
 						for _, converter := range newTag.converters {
 							mgr.streamsToConvert[converter.Name()].Set(uint(s))
@@ -1313,7 +1313,7 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					b := strings.Builder{}
 					b.WriteString("id:")
 					for i := uint(0); newTag.Matches.Next(&i); i++ {
-						b.WriteString(fmt.Sprintf("%d,", i))
+						fmt.Fprintf(&b, "%d,", i)
 					}
 					if b.Len() == len("id:") {
 						newTag.definition = "id:-1"
