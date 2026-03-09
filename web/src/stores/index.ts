@@ -153,6 +153,16 @@ export const useRootStore = defineStore("root", {
         .then((data) => (this.pcaps = data))
         .catch(handleAxiosDefaultError);
     },
+    async uploadPcap(
+      file: File,
+      filename: string,
+      pcapPassword?: string,
+      onProgress?: (progress: number) => void,
+    ) {
+      return APIClient.uploadPcap(file, filename, pcapPassword, onProgress)
+        .then(() => this.updatePcaps())
+        .catch(handleAxiosDefaultError);
+    },
     async addTag(name: string, query: string, color: string) {
       return APIClient.addTag(name, query, color)
         .then(() => this.updateTags()) // TODO: not required with websocket?

@@ -1,4 +1,8 @@
-import axios from "axios";
+import axios, {
+  AxiosBasicCredentials,
+  AxiosProgressEvent,
+  AxiosRequestConfig,
+} from "axios";
 import type { Base64, DateTimeString } from "@/types/common";
 import {
   isConfig,
@@ -215,6 +219,31 @@ const APIClient = {
   async getPcaps() {
     return this.performGuarded("get", `/pcaps.json`, isPcapsResponse);
   },
+  async uploadPcap(
+    file: File,
+    filename: string,
+    pcapPassword?: string,
+    onProgress?: (percent: number) => void,
+  ) {
+    const url = `/upload/${encodeURIComponent(filename)}`;
+    let auth: AxiosBasicCredentials | undefined = undefined;
+    if (pcapPassword) {
+      auth = { username: "pcap", password: pcapPassword };
+    }
+    return this.perform("post", url, file, undefined, {
+      auth,
+      baseURL: "/",
+      headers: { "Content-Type": "application/octet-stream" },
+      onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total,
+          );
+          onProgress(percentCompleted);
+        }
+      },
+    });
+  },
   async getPcapOverIPEndpoints() {
     return this.performGuarded("get", `/pcap-over-ip`, isPcapOverIPResponse);
   },
@@ -337,8 +366,9 @@ const APIClient = {
   async perform(
     method: string,
     resource: string,
-    data?: string | null,
+    data?: string | File | null,
     params?: object | URLSearchParams,
+    config?: AxiosRequestConfig,
   ) {
     let signal: AbortSignal | undefined;
     if (resource == "/search.json" || resource == "/graph.json") {
@@ -347,12 +377,14 @@ const APIClient = {
       this._abort = controller.abort.bind(controller);
       signal = controller.signal;
     }
+
     return client.request({
       method,
       url: resource,
       data,
       params,
       signal,
+      ...config,
     });
   },
   async performGuarded<ResponseData>(
