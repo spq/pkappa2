@@ -11,7 +11,7 @@ from scapy.layers.tls.all import (
     load_nss_keys,
 )
 
-from pkappa2lib import Pkappa2Converter, Result, Stream
+from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
 from pathlib import Path
 
 # https://github.com/secdev/scapy/blob/5160430bd16c6084d5aef2a10e47dc0455aace40/doc/notebooks/tls/notebook3_tls_compromised.ipynb
@@ -31,6 +31,15 @@ nss_keylog_path = Path(__file__).parent / "tls" / "nss_keylogs"
 
 
 class TLSConverter(Pkappa2Converter):
+    def handle_decrypted_chunk(self, chunk: StreamChunk) -> None:
+        """
+        Allow subclasses to handle decrypted chunk, e.g. to feed it to another converter.
+
+        Args:
+            chunk (StreamChunk): Decrypted chunk.
+        """
+        pass
+
     def handle_stream(self, stream: Stream) -> Result:
         tls_session = tlsSession()
         tls_session.sport = stream.Metadata.ClientPort
@@ -76,6 +85,7 @@ class TLSConverter(Pkappa2Converter):
                     decrypted_chunk = chunk.derive(
                         content=bytes(decrypted_data),
                     )
+                    self.handle_decrypted_chunk(decrypted_chunk)
                     result_data.append(decrypted_chunk)
             except Exception as ex:
                 result_data.append(

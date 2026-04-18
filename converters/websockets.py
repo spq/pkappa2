@@ -244,10 +244,7 @@ class WebsocketConverter(HTTP2Converter):
         frame: hyperframe.frame.Frame,
         headers: Iterable[Tuple[str, str]],
     ) -> None:
-        if (
-            not self.websocket_enable_connect_protocol
-            or direction != Direction.CLIENTTOSERVER
-        ):
+        if direction != Direction.CLIENTTOSERVER:
             return
 
         # The client wants to use the extended CONNECT protocol
@@ -284,6 +281,13 @@ class WebsocketConverter(HTTP2Converter):
                 )
             elif len(extensions) > 0:
                 self.log(f"Unsupported extensions: {extensions}")
+
+        # TODO: Some clients send the extended CONNECT protocol header in the first request after the handshake, before the server
+        # signals support. Depending on the server's response, we might have to disable websocket support later, but for now we just log this case.
+        if not self.websocket_enable_connect_protocol:
+            self.log(
+                "Client wants to use extended CONNECT protocol before server enabled it"
+            )
 
         # Switch this stream to websocket mode
         self.websocket_stream[frame.stream_id] = True
