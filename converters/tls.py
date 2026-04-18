@@ -50,16 +50,22 @@ class TLSConverter(Pkappa2Converter):
             try:
                 tls = TLS(chunk.Content, tls_session=tls_session)
                 tls_session = tls.tls_session.mirror()
+                result_data.append(
+                    chunk.derive(content=tls.show(dump=True).encode())  # type: ignore[union-attr]
+                )
                 if TLSApplicationData in tls:
-                    result_data.append(
-                        chunk.derive(
-                            content=tls[TLSApplicationData].data,
-                        )
+                    decrypted_data = bytearray()
+                    layer_cnt = 1
+                    while True:
+                        app_data = tls.getlayer(TLSApplicationData, nb=layer_cnt)
+                        if app_data is None:
+                            break
+                        decrypted_data += app_data.data
+                        layer_cnt += 1
+                    decrypted_chunk = chunk.derive(
+                        content=bytes(decrypted_data),
                     )
-                else:
-                    result_data.append(
-                        chunk.derive(content=tls.show(dump=True).encode())  # type: ignore[union-attr]
-                    )
+                    result_data.append(decrypted_chunk)
             except Exception as ex:
                 result_data.append(
                     chunk.derive(content=str(ex).encode() + b"\n" + chunk.Content)
