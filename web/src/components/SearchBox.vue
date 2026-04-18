@@ -201,7 +201,7 @@ EventBus.on("setSearchTerm", setSearchTerm);
 watch(
   route,
   () => {
-    setSearchBox(route.query.q as string);
+    setSearchBox((route.query.q as string) ?? "");
   },
   { immediate: true },
 );
