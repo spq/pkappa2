@@ -91,7 +91,9 @@ import { useRootStore } from "@/stores";
 import { GraphType, useGraphStore } from "@/stores/graph";
 import { useRoute, useRouter } from "vue-router";
 import { default as VueApexCharts } from "vue3-apexcharts";
-import * as ApexCharts from "apexcharts";
+import ApexCharts from "apexcharts/core";
+import "apexcharts/area";
+import "apexcharts/features/legend";
 import { getColorScheme, onColorSchemeChange } from "../lib/darkmode";
 
 const store = useRootStore();
@@ -642,10 +644,18 @@ graphStore.$subscribe((_mutation, state) => {
         mounted() {
           updateChartFilter(undefined, undefined);
         },
-        zoomed(_, { xaxis }: ApexCharts.ApexOptions) {
+        zoomed(
+          _,
+          {
+            xaxis,
+          }: {
+            xaxis: { min: number; max: number };
+            yaxis?: { min: number; max: number }[];
+          },
+        ) {
           updateChartFilter(xaxis?.min, xaxis?.max);
         },
-        scrolled(_, { xaxis }: ApexCharts.ApexOptions) {
+        scrolled(_, { xaxis }: { xaxis: { min: number; max: number } }) {
           updateChartFilter(xaxis?.min, xaxis?.max);
         },
       },
