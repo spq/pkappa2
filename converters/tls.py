@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from collections import defaultdict
+
 from scapy.layers.tls.all import (
     TLS,
     TLSApplicationData,
@@ -23,8 +25,9 @@ cert_path = Path(__file__).parent / "tls" / "cert.pem"
 # use the `-keylogfile` option to enable it in openssl
 #    e.g.:   openssl s_client -connect localhost:443 -keylogfile nss_keylog.txt
 # or set the environment variable `SSLKEYLOGFILE` to the path of the file
-#   e.g.:   export SSLKEYLOGFILE=/path/to/converters/tls/nss_keylog.txt
-nss_keylog_path = Path(__file__).parent / "tls" / "nss_keylog.txt"
+#   e.g.:   export SSLKEYLOGFILE=/path/to/converters/tls/nss_keylogs/nss_keylog.txt
+# all files in the `converters/tls/nss_keylogs` folder will be loaded
+nss_keylog_path = Path(__file__).parent / "tls" / "nss_keylogs"
 
 
 class TLSConverter(Pkappa2Converter):
@@ -43,7 +46,15 @@ class TLSConverter(Pkappa2Converter):
             cert = Cert(cert_path)  # type: ignore[call-arg, ty:too-many-positional-arguments]
             tls_session.server_certs = [cert]
         if nss_keylog_path.exists():
-            tls_session.nss_keys = load_nss_keys(str(nss_keylog_path))
+            keys: defaultdict[str, dict[bytes, bytes]] = defaultdict(dict)
+            for key_file in nss_keylog_path.glob("*"):
+                if key_file.is_file():
+                    new_keys: defaultdict[str, dict[bytes, bytes]] = load_nss_keys(
+                        str(key_file)
+                    )  # type: ignore[assignment]
+                    for k, v in new_keys.items():
+                        keys[k].update(v)
+            tls_session.nss_keys = keys
 
         result_data = []
         for chunk in stream.coalesce_chunks_in_same_direction_iter():
