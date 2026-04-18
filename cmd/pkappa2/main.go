@@ -919,7 +919,7 @@ func main() {
 		}
 		for tagGroupId := range tagGroups {
 			tg := &tagGroups[tagGroupId]
-			data := [][]uint64(nil)
+			data := [][]uint64{}
 			for d, v := range tg.counts {
 				t := referenceTime.Add(d).Sub(response.Min) / delta
 				data = append(data, append([]uint64{uint64(t)}, v...))
