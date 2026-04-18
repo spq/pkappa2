@@ -94,7 +94,9 @@ class Direction(Enum):
         else:
             raise ValueError(f"Unknown direction: {self}")
 
+
 DirectionType: TypeAlias = Direction
+
 
 @dataclass
 class StreamChunk:

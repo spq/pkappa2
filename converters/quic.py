@@ -37,7 +37,10 @@ class QUICConverter(Pkappa2Converter):
                     end_off = header.packet_length + start_off
                     buf.seek(end_off)
 
-                    if header.packet_type == QuicPacketType.INITIAL and header.version is not None:
+                    if (
+                        header.packet_type == QuicPacketType.INITIAL
+                        and header.version is not None
+                    ):
                         crypto = CryptoPair()
                         if chunk.Direction == Direction.CLIENTTOSERVER:
                             crypto.setup_initial(

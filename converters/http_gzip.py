@@ -22,7 +22,9 @@ class HTTPRequest(BaseHTTPRequestHandler):
         self.error_code = self.error_message = None
         self.parse_request()
 
-    def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
+    def send_error(
+        self, code: int, message: str | None = None, explain: str | None = None
+    ) -> None:
         self.error_code = code
         self.error_message = message
 
@@ -71,16 +73,16 @@ class HTTPConverter(Pkappa2Converter):
                 chunk.derive(content=response.data, content_type=content_type),
             ]
         else:
-            chunks = [
-                chunk.derive(content=header + b"\r\n\r\n" + response.data)
-            ]
+            chunks = [chunk.derive(content=header + b"\r\n\r\n" + response.data)]
         return chunks
 
     def handle_stream(self, stream: Stream) -> Result:
         result_data = []
         last_request_method = None
         self.is_last_chunk = False
-        for chunk_idx, chunk in enumerate(stream.coalesce_chunks_in_same_direction_iter()):
+        for chunk_idx, chunk in enumerate(
+            stream.coalesce_chunks_in_same_direction_iter()
+        ):
             if chunk_idx == len(stream.Chunks) - 1:
                 self.is_last_chunk = True
 

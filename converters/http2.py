@@ -55,7 +55,12 @@ class HTTP2Converter(HTTPConverter):
         ):
             if "END_HEADERS" not in frame.flags:
                 raise Exception("TODO: Handle fragmented headers")
-            headers = cast(Iterable[tuple[str, str]], self.hpack_decoder[direction].decode(frame.data))
+            # hpack Decoder.decode with `raw=False` decodes the headers using UTF-8 by default.
+            # The type hints don't reflect that.
+            headers = cast(
+                Iterable[tuple[str, str]],
+                self.hpack_decoder[direction].decode(frame.data),
+            )
             self.handle_http2_headers(direction, frame, headers)
             output = ""
             for header in headers:

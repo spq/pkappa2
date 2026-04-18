@@ -63,9 +63,9 @@ class GRPCConverter(HTTP2Converter):
         # extract content-type and check if it is grpc
         content_type = next((x[1] for x in headers if x[0] == "content-type"), None)
         if content_type is not None:
-            self._stream_content_type[frame.stream_id][
-                direction
-            ] = content_type.lower() in ["application/grpc", "application/grpc+proto"]
+            self._stream_content_type[frame.stream_id][direction] = (
+                content_type.lower() in ["application/grpc", "application/grpc+proto"]
+            )
         if (
             self._stream_content_type[frame.stream_id][direction]
             and direction == Direction.SERVERTOCLIENT

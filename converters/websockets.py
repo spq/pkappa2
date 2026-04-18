@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hyperframe.frame
 
-from http2 import  HTTP2Converter, HTTPRequest, HTTPResponse
+from http2 import HTTP2Converter, HTTPRequest, HTTPResponse
 from pkappa2lib import Direction, Result, Stream, StreamChunk
 
 
@@ -62,10 +62,15 @@ class WebsocketConverter(HTTP2Converter):
         # handle fragmented messages
         if frame.Header[0] & 0x80 == 0:  # FIN bit not set
             self.websocket_message_fragmented_frames[stream_id].append(frame)
-            if len(self.websocket_message_fragmented_frames[stream_id]) > 1 and opcode != 0:
+            if (
+                len(self.websocket_message_fragmented_frames[stream_id]) > 1
+                and opcode != 0
+            ):
                 del self.websocket_message_fragmented_frames[stream_id]
                 raise Exception("Invalid fragmented message")
-            if len(self.websocket_message_fragmented_frames[stream_id]) > 50:  # arbitrary limit
+            if (
+                len(self.websocket_message_fragmented_frames[stream_id]) > 50
+            ):  # arbitrary limit
                 del self.websocket_message_fragmented_frames[stream_id]
                 raise Exception("Fragmented message too long")
             return None
@@ -155,8 +160,10 @@ class WebsocketConverter(HTTP2Converter):
                     )
                     websocket_frame = self.unmask_websocket_frames(websocket_frame)
                     if self.websocket_deflate[stream_id]:
-                        deflated_websocket_frame = self.handle_websocket_permessage_deflate(
-                            stream_id, websocket_frame
+                        deflated_websocket_frame = (
+                            self.handle_websocket_permessage_deflate(
+                                stream_id, websocket_frame
+                            )
                         )
                         if deflated_websocket_frame is None:
                             break
@@ -223,7 +230,9 @@ class WebsocketConverter(HTTP2Converter):
                     if len(param_and_value) == 1:
                         params[param_and_value[0]] = True
                     else:
-                        if param_and_value[1].startswith('"') and param_and_value[1].endswith('"'):
+                        if param_and_value[1].startswith('"') and param_and_value[
+                            1
+                        ].endswith('"'):
                             param_and_value[1] = param_and_value[1][1:-1]
                         params[param_and_value[0]] = param_and_value[1]
                 extensions[extension] = params
