@@ -11,14 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.24", "1.25", "1.26"]
+        go: ["1.25", "1.26"]
         node: [22, 24]
         exclude:
           - go: "1.26"
             node: 22
           - go: "1.25"
-            node: 22
-          - go: "1.24"
             node: 24
     name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
