@@ -103,3 +103,24 @@ jobs:
         run: |
           yarn run eslint
           yarn prettier --check .
+
+  pythonlint:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r converters/pkappa2lib/requirements.txt
+          pip install ty ruff pycryptodome
+
+      - name: Lint
+        run: |
+          ruff check converters
+          ty check converters

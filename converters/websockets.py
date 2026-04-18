@@ -3,13 +3,14 @@ import traceback
 import zlib
 from base64 import b64encode
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha1
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hyperframe.frame
 
-from http2 import HeaderTuple, HTTP2Converter, HTTPRequest, HTTPResponse
+from http2 import  HTTP2Converter, HTTPRequest, HTTPResponse
 from pkappa2lib import Direction, Result, Stream, StreamChunk
 
 
@@ -23,7 +24,7 @@ class WebsocketFrame:
 class WebsocketConverter(HTTP2Converter):
     websocket_key: Union[bytes, None]
     switched_protocols: bool
-    websocket_remaining_data: Dict[int, Dict[Direction, bytes]]
+    websocket_remaining_data: Dict[int, Dict[Direction, bytearray]]
     websocket_deflate: Dict[int, bool]
     websocket_deflate_decompressor: Dict[int, Dict[Direction, Any]]
     websocket_message_fragmented_frames: Dict[int, List[WebsocketFrame]]
@@ -120,10 +121,8 @@ class WebsocketConverter(HTTP2Converter):
         self, direction: Direction, stream_id: int, content: bytes
     ) -> bytes:
         try:
-            frames: List[bytes] = []
-            frame = bytearray(
-                self.websocket_remaining_data[stream_id][direction] + content
-            )
+            frames: List[bytearray] = []
+            frame = self.websocket_remaining_data[stream_id][direction] + content
             del self.websocket_remaining_data[stream_id][direction]
             while len(frame) > 1:
                 try:
@@ -203,7 +202,7 @@ class WebsocketConverter(HTTP2Converter):
         )
 
     def decode_websocket_extensions(
-        self, extensions_header: str
+        self, extensions_header: Optional[str]
     ) -> Dict[str, Dict[str, Union[bool, str]]]:
         extensions: Dict[str, Dict[str, Union[str, bool]]] = {}
         if extensions_header:
@@ -234,7 +233,7 @@ class WebsocketConverter(HTTP2Converter):
         self,
         direction: Direction,
         frame: hyperframe.frame.Frame,
-        headers: List[HeaderTuple],
+        headers: Iterable[Tuple[str, str]],
     ) -> None:
         if (
             not self.websocket_enable_connect_protocol
@@ -249,11 +248,11 @@ class WebsocketConverter(HTTP2Converter):
         extensions_header = None
         for header in headers:
             if header[0] == ":protocol":
-                protocol = header[1].decode()
+                protocol = header[1]
             elif header[0] == ":scheme":
-                scheme = header[1].decode()
+                scheme = header[1]
             elif header[0] == "sec-websocket-extensions":
-                extensions_header = header[1].decode()
+                extensions_header = header[1]
 
         # The client doesn't want to use the extended CONNECT protocol
         if protocol is None:
@@ -418,7 +417,7 @@ class WebsocketConverter(HTTP2Converter):
         self.websocket_deflate_decompressor = defaultdict(dict)
         self.websocket_message_fragmented_frames = defaultdict(list)
 
-        self.websocket_remaining_data = defaultdict(lambda: defaultdict(bytes))
+        self.websocket_remaining_data = defaultdict(lambda: defaultdict(bytearray))
         return super().handle_stream(stream)
 
 

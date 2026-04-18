@@ -4,4 +4,4 @@ protobuf-inspector
 dnslib
 cryptography
 scapy>=2.6.0.rc1
-aioquic
+aioquic>=1.3.0

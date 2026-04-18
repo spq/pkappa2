@@ -2,14 +2,15 @@
 import re
 import zlib
 from collections import defaultdict
+from collections.abc import Iterable
 from io import BytesIO
 from struct import unpack
-from typing import Dict, List
+from typing import Dict, Tuple
 
 import hyperframe.frame
 from protobuf_inspector.types import StandardParser
 
-from http2 import HeaderTuple, HTTP2Converter
+from http2 import HTTP2Converter
 from pkappa2lib import Direction, Result, Stream
 
 # TODO: Support for gRPC-Web https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md
@@ -57,7 +58,7 @@ class GRPCConverter(HTTP2Converter):
         self,
         direction: Direction,
         frame: hyperframe.frame.Frame,
-        headers: List[HeaderTuple],
+        headers: Iterable[Tuple[str, str]],
     ) -> None:
         # extract content-type and check if it is grpc
         content_type = next((x[1] for x in headers if x[0] == "content-type"), None)

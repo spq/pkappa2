@@ -5,7 +5,7 @@ import base64
 import json
 from dataclasses import dataclass
 from struct import unpack
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from Crypto.Cipher import AES
@@ -16,7 +16,7 @@ from pkappa2lib import Result, Stream, StreamChunk
 encryption_key = bytes.fromhex("b9fac3345069c4cb6e6e2ea47e17b0eb")
 
 
-def decrypt(data):
+def decrypt(data: bytes) -> bytes:
     aes = AES.new(encryption_key, AES.MODE_ECB)
     return aes.decrypt(data)
 
@@ -28,7 +28,7 @@ class Place:
     long: float
 
 
-def PlaceIdFromString(data):
+def PlaceIdFromString(data: str) -> Optional[Place]:
     place_raw = bytes.fromhex(data)
     place_bytes = decrypt(place_raw)
     if len(place_bytes) != 32:

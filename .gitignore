@@ -4,6 +4,9 @@ node_modules
 __pycache__
 docker_data/*
 tmp/*
+.venv/
+.mypy_cache/
+.ruff_cache/
 
 # local env files
 .env.local

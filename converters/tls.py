@@ -35,15 +35,15 @@ class TLSConverter(Pkappa2Converter):
         tls_session.ipsrc = stream.Metadata.ClientHost
         tls_session.ipdst = stream.Metadata.ServerHost
         if key_path.exists():
-            key = PrivKey(key_path)
+            key = PrivKey(key_path)  # type: ignore[call-arg, ty:too-many-positional-arguments]
             tls_session.server_key = key
             if isinstance(key, PrivKeyRSA):
                 tls_session.server_rsa_key = key
         if cert_path.exists():
-            cert = Cert(cert_path)
+            cert = Cert(cert_path)  # type: ignore[call-arg, ty:too-many-positional-arguments]
             tls_session.server_certs = [cert]
         if nss_keylog_path.exists():
-            tls_session.nss_keys = load_nss_keys(nss_keylog_path)
+            tls_session.nss_keys = load_nss_keys(str(nss_keylog_path))
 
         result_data = []
         for chunk in stream.coalesce_chunks_in_same_direction_iter():
@@ -58,7 +58,7 @@ class TLSConverter(Pkappa2Converter):
                     )
                 else:
                     result_data.append(
-                        chunk.derive(content=tls.show(dump=True).encode())
+                        chunk.derive(content=tls.show(dump=True).encode())  # type: ignore[union-attr]
                     )
             except Exception as ex:
                 result_data.append(

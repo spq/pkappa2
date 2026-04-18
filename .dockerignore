@@ -3,3 +3,6 @@
 **/__pycache__/
 docker_data
 tmp
+.venv/
+.mypy_cache/
+.ruff_cache/

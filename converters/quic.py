@@ -3,7 +3,7 @@ from aioquic._buffer import Buffer
 from aioquic.quic.connection import dump_cid
 from aioquic.quic.crypto import CryptoPair
 from aioquic.quic.logger import QuicLoggerTrace
-from aioquic.quic.packet import PACKET_TYPE_INITIAL, PACKET_TYPE_MASK, pull_quic_header
+from aioquic.quic.packet import QuicPacketType, pull_quic_header
 from scapy.layers.tls.all import TLS
 
 from pkappa2lib import Direction, Pkappa2Converter, Result, Stream
@@ -23,21 +23,21 @@ class QUICConverter(Pkappa2Converter):
                     header = pull_quic_header(buf, host_cid_length=connection_id_length)
 
                     output = (
-                        f"  is_long_header: {header.is_long_header}\n"
-                        + f"  version: {header.version}\n"
+                        f"  version: {header.version}\n"
                         + f"  packet_type: {logger.packet_type(header.packet_type)} ({header.packet_type})\n"
+                        + f"  packet length: {header.packet_length}\n"
                         + f"  destination_cid: {dump_cid(header.destination_cid)}\n"
                         + f"  source_cid: {dump_cid(header.source_cid)}\n"
                         + f"  token: {header.token!r}\n"
                         + f"  integrity_tag: {header.integrity_tag!r}\n"
-                        + f"  rest_length: {header.rest_length}\n"
+                        + f"  supported versions: {header.supported_versions}\n"
                     )
 
                     encrypted_off = buf.tell() - start_off
-                    end_off = buf.tell() + header.rest_length
+                    end_off = header.packet_length + start_off
                     buf.seek(end_off)
 
-                    if header.packet_type & PACKET_TYPE_MASK == PACKET_TYPE_INITIAL:
+                    if header.packet_type == QuicPacketType.INITIAL and header.version is not None:
                         crypto = CryptoPair()
                         if chunk.Direction == Direction.CLIENTTOSERVER:
                             crypto.setup_initial(

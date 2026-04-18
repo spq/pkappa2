@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 from base64 import urlsafe_b64decode
 from collections import defaultdict
-from typing import Dict, List, Optional
+from collections.abc import Iterable
+from typing import Dict, List, Optional, Tuple, cast
 
 import h2.frame_buffer
 import hyperframe.frame
 from h2.exceptions import H2Error
-from hpack import Decoder, HeaderTuple
+from hpack import Decoder
 
 from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
 from pkappa2lib import Direction, Result, Stream, StreamChunk
@@ -37,7 +38,7 @@ class HTTP2Converter(HTTPConverter):
         self,
         direction: Direction,
         frame: hyperframe.frame.Frame,
-        headers: List[HeaderTuple],
+        headers: Iterable[Tuple[str, str]],
     ) -> None:
         pass
 
@@ -54,7 +55,7 @@ class HTTP2Converter(HTTPConverter):
         ):
             if "END_HEADERS" not in frame.flags:
                 raise Exception("TODO: Handle fragmented headers")
-            headers = self.hpack_decoder[direction].decode(frame.data)
+            headers = cast(Iterable[tuple[str, str]], self.hpack_decoder[direction].decode(frame.data))
             self.handle_http2_headers(direction, frame, headers)
             output = ""
             for header in headers:
@@ -86,7 +87,7 @@ class HTTP2Converter(HTTPConverter):
         settings = request.headers.get("HTTP2-Settings")
         if settings:
             f = hyperframe.frame.SettingsFrame(0)
-            f.parse_body(urlsafe_b64decode(settings))
+            f.parse_body(memoryview(urlsafe_b64decode(settings)))
             return [
                 chunk.derive(
                     content=self.handle_http2_event(Direction.CLIENTTOSERVER, f)

@@ -13,21 +13,24 @@ from pkappa2lib import Direction, Pkappa2Converter, Result, Stream, StreamChunk
 
 # https://stackoverflow.com/questions/4685217/parse-raw-http-headers
 class HTTPRequest(BaseHTTPRequestHandler):
+    error_code: Optional[int]
+    error_message: Optional[str]
+
     def __init__(self, request_text: bytes):
         self.rfile = BytesIO(request_text)
         self.raw_requestline = self.rfile.readline()
         self.error_code = self.error_message = None
         self.parse_request()
 
-    def send_error(self, code, message):
+    def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
         self.error_code = code
         self.error_message = message
 
 
 class HTTPResponseBase(HTTPResponseChunked):
-    def __init__(self, data: bytes, method: str):
+    def __init__(self, data: bytes, method: Optional[str]):
         super().__init__(socket.socket(), method=method)
-        self.fp = BytesIO(data)
+        self.fp = BytesIO(data)  # type: ignore[assignment, ty:invalid-assignment]
 
 
 class HTTPConverter(Pkappa2Converter):
@@ -116,7 +119,7 @@ class HTTPConverter(Pkappa2Converter):
                     response_base.begin()
                     response = HTTPResponse(
                         body=response_base,
-                        headers=response_base.getheaders(),
+                        headers=dict(response_base.getheaders()),
                         status=response_base.status,
                     )
 

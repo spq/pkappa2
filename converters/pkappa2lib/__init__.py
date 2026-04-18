@@ -4,7 +4,7 @@ import json
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
+from typing import List, TypeAlias
 
 
 class Protocol(Enum):
@@ -94,10 +94,11 @@ class Direction(Enum):
         else:
             raise ValueError(f"Unknown direction: {self}")
 
+DirectionType: TypeAlias = Direction
 
 @dataclass
 class StreamChunk:
-    Direction: Direction
+    Direction: DirectionType
     Content: bytes
     Time: datetime.datetime
     ContentType: str = ""
@@ -105,7 +106,7 @@ class StreamChunk:
     def derive(
         self,
         *,
-        direction: Direction | None = None,
+        direction: DirectionType | None = None,
         content: bytes | None = None,
         time: datetime.datetime | None = None,
         content_type: str | None = None,
