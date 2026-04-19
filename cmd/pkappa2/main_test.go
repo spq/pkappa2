@@ -28,20 +28,23 @@ type (
 
 func NewWebsocketWrapper(url string) (*websocketWrapper, error) {
 	wsURL := "ws" + strings.TrimPrefix(url, "http") + "/ws"
-	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		return nil, err
 	}
+	resp.Body.Close()
 	return &websocketWrapper{ws: ws}, nil
 }
 
 func (w *websocketWrapper) Shutdown(t *testing.T) {
 	message := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Bye")
 	if err := w.ws.WriteControl(websocket.CloseMessage, message, time.Now().Add(writeWait)); err != nil {
-		t.Logf("could not send close message to WebSocket server: %v", err)
+		t.Fatalf("could not send close message to WebSocket server: %v", err)
 	}
 	timeStart := time.Now()
-	w.ws.SetReadDeadline(time.Now().Add(time.Minute))
+	if err := w.ws.SetReadDeadline(time.Now().Add(time.Minute)); err != nil {
+		t.Fatalf("could not set read deadline on WebSocket connection: %v", err)
+	}
 	for _, _, err := w.ws.ReadMessage(); reflect.TypeOf(err) != reflect.TypeOf(&websocket.CloseError{}); {
 		if time.Until(timeStart) > time.Minute {
 			break
