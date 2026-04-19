@@ -61,101 +61,7 @@ var (
 	startupCpuprofile = flag.String("startup_cpuprofile", "", "write cpu profile to file")
 )
 
-func main() {
-	// parse environment variables and if given, set as default values for flags
-	for _, env := range os.Environ() {
-		name, value, ok := strings.Cut(env, "=")
-		if !ok {
-			continue
-		}
-		if !strings.HasPrefix(name, "PKAPPA2_") {
-			continue
-		}
-		name = strings.ToLower(strings.TrimPrefix(name, "PKAPPA2_"))
-		f := flag.CommandLine.Lookup(name)
-		if f == nil {
-			continue
-		}
-		if err := f.Value.Set(value); err != nil {
-			log.Fatalf("Failed to set flag %q to %q: %v", name, value, err)
-		}
-	}
-	oldUsage := flag.Usage
-	flag.Usage = func() {
-		oldUsage()
-		fmt.Println("Flags can also be set via environment variables prefixed with PKAPPA2_")
-	}
-	flag.Parse()
-
-	if *startupCpuprofile != "" {
-		f, err := os.Create(*startupCpuprofile)
-		if err != nil {
-			log.Fatalf("Failed to create profile folder %s: %v", *startupCpuprofile, err)
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatalf("Failed to start CPU profile: %v", err)
-		}
-	}
-
-	tools.AssertFolderRWXPermissions("base_dir", *baseDir)
-
-	mgr, err := manager.New(
-		filepath.Join(*baseDir, *pcapDir),
-		filepath.Join(*baseDir, *indexDir),
-		filepath.Join(*baseDir, *snapshotDir),
-		filepath.Join(*baseDir, *stateDir),
-		*converterDir,
-		*watchDir,
-	)
-	if err != nil {
-		log.Fatalf("manager.New failed: %v", err)
-	}
-	defer mgr.Close()
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-signals
-		log.Println("Interrupt received. Cleaning up...")
-		mgr.Close()
-		os.Exit(1)
-	}()
-
-	// Intercept and capture logging on stderr to expose it via API too
-	stderrRing := ring.New(256)
-	stderrLock := sync.RWMutex{}
-	if os.Stderr != nil {
-		r, w, err := os.Pipe()
-		if err != nil {
-			log.Fatalf("failed to create pipe to capture stderr: %v", err)
-		}
-		log.SetOutput(w)
-		defer func() {
-			if err := w.Close(); err != nil {
-				log.Printf("Failed to close pipe: %v", err)
-			}
-			log.SetOutput(os.Stderr)
-		}()
-
-		go func() {
-			reader := bufio.NewReaderSize(r, 65536)
-			for {
-				line, err := tools.ReadLine(reader)
-				if err != nil {
-					break
-				}
-				// Print to original stderr
-				fmt.Fprintln(os.Stderr, string(line))
-
-				// Store the line in the ring buffer
-				stderrLock.Lock()
-				stderrRing.Value = line
-				stderrRing = stderrRing.Next()
-				stderrLock.Unlock()
-			}
-		}()
-	}
-
+func setupRouter(mgr *manager.Manager, stderrRing *ring.Ring, stderrLock *sync.RWMutex) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.SetHeader("Access-Control-Allow-Origin", "*"))
 	r.Use(middleware.SetHeader("Access-Control-Allow-Methods", "*"))
@@ -226,13 +132,15 @@ func main() {
 	rUser.Get("/api/stderr", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		output := []string{}
-		stderrLock.RLock()
-		stderrRing.Do(func(value any) {
-			if value != nil {
-				output = append(output, string(value.([]byte)))
-			}
-		})
-		stderrLock.RUnlock()
+		if stderrRing != nil && stderrLock != nil {
+			stderrLock.RLock()
+			stderrRing.Do(func(value any) {
+				if value != nil {
+					output = append(output, string(value.([]byte)))
+				}
+			})
+			stderrLock.RUnlock()
+		}
 		if err := json.NewEncoder(w).Encode(output); err != nil {
 			http.Error(w, fmt.Sprintf("Encode failed: %v", err), http.StatusInternalServerError)
 			return
@@ -723,10 +631,10 @@ func main() {
 		)
 		aspects := []Aspect(nil)
 		for _, a := range r.URL.Query()["aspect"] {
-			if !func() bool {
+			if err := func() error {
 				as := strings.Split(a, "@")
 				if len(as) != 1 && len(as) != 2 {
-					return false
+					return fmt.Errorf("too many parts in aspect %q", a)
 				}
 				aspect := Aspect(0)
 				if v, ok := map[string]Aspect{
@@ -738,7 +646,7 @@ func main() {
 				}[as[0]]; ok {
 					aspect |= v
 				} else {
-					return false
+					return fmt.Errorf("invalid type %q", as[0])
 				}
 				if len(as) == 2 {
 					if v, ok := map[string]Aspect{
@@ -747,12 +655,12 @@ func main() {
 					}[as[1]]; ok {
 						aspect |= v
 					} else {
-						return false
+						return fmt.Errorf("invalid anchor %q", as[1])
 					}
 				}
 				aspects = append(aspects, aspect)
-				return true
-			}() {
+				return nil
+			}(); err != nil {
 				http.Error(w, fmt.Sprintf("Invalid aspect %q: %v", a, err), http.StatusBadRequest)
 				return
 			}
@@ -1078,6 +986,105 @@ func main() {
 		log.Printf("WebSocket Client %q disconnected", c.RemoteAddr().String())
 	})
 	rUser.Get("/*", http.FileServer(http.FS(&web.FS{})).ServeHTTP)
+	return r
+}
+
+func main() {
+	// parse environment variables and if given, set as default values for flags
+	for _, env := range os.Environ() {
+		name, value, ok := strings.Cut(env, "=")
+		if !ok {
+			continue
+		}
+		if !strings.HasPrefix(name, "PKAPPA2_") {
+			continue
+		}
+		name = strings.ToLower(strings.TrimPrefix(name, "PKAPPA2_"))
+		f := flag.CommandLine.Lookup(name)
+		if f == nil {
+			continue
+		}
+		if err := f.Value.Set(value); err != nil {
+			log.Fatalf("Failed to set flag %q to %q: %v", name, value, err)
+		}
+	}
+	oldUsage := flag.Usage
+	flag.Usage = func() {
+		oldUsage()
+		fmt.Println("Flags can also be set via environment variables prefixed with PKAPPA2_")
+	}
+	flag.Parse()
+
+	if *startupCpuprofile != "" {
+		f, err := os.Create(*startupCpuprofile)
+		if err != nil {
+			log.Fatalf("Failed to create profile folder %s: %v", *startupCpuprofile, err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatalf("Failed to start CPU profile: %v", err)
+		}
+	}
+
+	tools.AssertFolderRWXPermissions("base_dir", *baseDir)
+
+	mgr, err := manager.New(
+		filepath.Join(*baseDir, *pcapDir),
+		filepath.Join(*baseDir, *indexDir),
+		filepath.Join(*baseDir, *snapshotDir),
+		filepath.Join(*baseDir, *stateDir),
+		*converterDir,
+		*watchDir,
+	)
+	if err != nil {
+		log.Fatalf("manager.New failed: %v", err)
+	}
+	defer mgr.Close()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-signals
+		log.Println("Interrupt received. Cleaning up...")
+		mgr.Close()
+		os.Exit(1)
+	}()
+
+	// Intercept and capture logging on stderr to expose it via API too
+	stderrRing := ring.New(256)
+	stderrLock := sync.RWMutex{}
+	if os.Stderr != nil {
+		r, w, err := os.Pipe()
+		if err != nil {
+			log.Fatalf("failed to create pipe to capture stderr: %v", err)
+		}
+		log.SetOutput(w)
+		defer func() {
+			if err := w.Close(); err != nil {
+				log.Printf("Failed to close pipe: %v", err)
+			}
+			log.SetOutput(os.Stderr)
+		}()
+
+		go func() {
+			reader := bufio.NewReaderSize(r, 65536)
+			for {
+				line, err := tools.ReadLine(reader)
+				if err != nil {
+					break
+				}
+				// Print to original stderr
+				fmt.Fprintln(os.Stderr, string(line))
+
+				// Store the line in the ring buffer
+				stderrLock.Lock()
+				stderrRing.Value = line
+				stderrRing = stderrRing.Next()
+				stderrLock.Unlock()
+			}
+		}()
+	}
+
+	r := setupRouter(mgr, stderrRing, &stderrLock)
 
 	server := &http.Server{
 		Addr:    *listenAddress,
