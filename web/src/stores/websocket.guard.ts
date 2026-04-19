@@ -22,8 +22,7 @@ export function isTagEvent(obj: unknown): obj is TagEvent {
             typeof typedObj === "object" ||
             typeof typedObj === "function") &&
         (typedObj["Type"] === "tagAdded" ||
-            typedObj["Type"] === "tagDeleted" ||
-            typedObj["Type"] === "tagEvaluated") &&
+            typedObj["Type"] === "tagDeleted") &&
         isTagInfo(typedObj["Tag"]) as boolean
     )
 }

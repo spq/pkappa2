@@ -834,10 +834,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
 		releaser.release(mgr)
-		mgr.event(Event{
-			Type: "tagEvaluated",
-			Tag:  makeTagInfo(name, &t),
-		})
+		mgr.updatedTagsToSignal[name] = struct{}{}
 	}
 }
 

@@ -30,7 +30,6 @@ type EventTypes =
   | "tagAdded"
   | "tagDeleted"
   | "tagUpdated"
-  | "tagEvaluated"
   | "webhooksUpdated"
   | "pcapOverIPEndpointsUpdated";
 
@@ -41,7 +40,7 @@ export type Event = {
 
 /** @see {isTagEvent} ts-auto-guard:type-guard */
 export type TagEvent = {
-  Type: "tagAdded" | "tagDeleted" | "tagEvaluated";
+  Type: "tagAdded" | "tagDeleted";
   Tag: TagInfo;
 };
 
@@ -163,16 +162,6 @@ export function setupWebsocket() {
                 result.Tags = result.Tags.filter((tag) => tag !== e.Tag.Name);
                 return result;
               },
-            );
-          break;
-        case "tagEvaluated":
-          if (!isTagEvent(e)) {
-            console.error("Invalid tag event:", e);
-            return;
-          }
-          if (store.tags != null)
-            store.tags = store.tags.map((t) =>
-              t.Name == e.Tag.Name ? e.Tag : t,
             );
           break;
         case "tagUpdated":
