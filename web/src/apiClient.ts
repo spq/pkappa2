@@ -154,6 +154,7 @@ export type PcapOverIPResponse = PcapOverIPEndpoint[];
 /** @see {isWebhooks} ts-auto-guard:type-guard */
 export type Webhooks = string[];
 
+/** @see {isTagInfo} ts-auto-guard:type-guard */
 export type TagInfo = {
   Name: string;
   Definition: string;

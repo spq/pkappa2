@@ -14,6 +14,7 @@ import {
   isPcapOverIPEndpointsEvent,
   isPcapStatsEvent,
   isTagEvent,
+  isTagUpdatedEvent,
   isWebhooksEvent,
 } from "./websocket.guard";
 
@@ -40,8 +41,14 @@ export type Event = {
 
 /** @see {isTagEvent} ts-auto-guard:type-guard */
 export type TagEvent = {
-  Type: "tagAdded" | "tagDeleted" | "tagUpdated" | "tagEvaluated";
+  Type: "tagAdded" | "tagDeleted" | "tagEvaluated";
   Tag: TagInfo;
+};
+
+/** @see {isTagUpdatedEvent} ts-auto-guard:type-guard */
+export type TagUpdatedEvent = {
+  Type: "tagUpdated";
+  Tags: TagInfo[];
 };
 
 /** @see {isConverterEvent} ts-auto-guard:type-guard */
@@ -158,7 +165,6 @@ export function setupWebsocket() {
               },
             );
           break;
-        case "tagUpdated":
         case "tagEvaluated":
           if (!isTagEvent(e)) {
             console.error("Invalid tag event:", e);
@@ -167,6 +173,16 @@ export function setupWebsocket() {
           if (store.tags != null)
             store.tags = store.tags.map((t) =>
               t.Name == e.Tag.Name ? e.Tag : t,
+            );
+          break;
+        case "tagUpdated":
+          if (!isTagUpdatedEvent(e)) {
+            console.error("Invalid tag updated event:", e);
+            return;
+          }
+          if (store.tags != null)
+            store.tags = store.tags.map(
+              (t) => e.Tags.find((tt) => t.Name == tt.Name) ?? t,
             );
           break;
         case "converterAdded":
