@@ -23,6 +23,11 @@ type (
 		PacketIndex uint64
 	}
 
+	TCPStats struct {
+		PSHCount       uint32
+		OverlapPackets uint32
+	}
+
 	Stream struct {
 		ClientAddr       []byte
 		ServerAddr       []byte
@@ -32,6 +37,7 @@ type (
 		PacketDirections []reassembly.TCPFlowDirection
 		Data             []StreamData
 		Flags            StreamFlags
+		TCP              TCPStats
 
 		tcpstate      *reassembly.TCPSimpleFSM
 		tcpoptchecker reassembly.TCPOptionCheck
@@ -51,6 +57,7 @@ const (
 	StreamFlagsProtocol    StreamFlags = 2
 	StreamFlagsProtocolTCP StreamFlags = 0
 	StreamFlagsProtocolUDP StreamFlags = 2
+	StreamFlagsRSTReceived StreamFlags = 4
 )
 
 func (ac *AssemblerContext) GetCaptureInfo() gopacket.CaptureInfo {
@@ -110,6 +117,12 @@ func (s *Stream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly
 			return false
 		}
 	}
+	if tcp.PSH {
+		s.TCP.PSHCount++
+	}
+	if tcp.RST {
+		s.Flags |= StreamFlagsRSTReceived
+	}
 	return true
 }
 
@@ -144,6 +157,7 @@ func (s *Stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 	if length == 0 {
 		return
 	}
+	s.TCP.OverlapPackets += uint32(sg.Stats().OverlapPackets)
 	ci := sg.CaptureInfo(0)
 	pmd := pcapmetadata.FromPacketMetadata(&ci)
 	for i := len(s.Packets) - 1; ; i-- {

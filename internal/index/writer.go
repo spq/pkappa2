@@ -184,12 +184,17 @@ func (w *Writer) AddStream(s *streams.Stream, streamID uint64) (bool, error) {
 		FirstPacketTimeNS: uint64(firstPacketTs.Sub(referenceTime).Nanoseconds()),
 		LastPacketTimeNS:  uint64(lastPacketTs.Sub(referenceTime).Nanoseconds()),
 		Flags:             flagsStreamSegmentationNone,
+		PSHCount:          s.TCP.PSHCount,
+		OverlapPackets:    s.TCP.OverlapPackets,
 	}
 	switch s.Flags & streams.StreamFlagsProtocol {
 	case streams.StreamFlagsProtocolTCP:
 		stream.Flags |= flagsStreamProtocolTCP
 	case streams.StreamFlagsProtocolUDP:
 		stream.Flags |= flagsStreamProtocolUDP
+	}
+	if s.Flags&streams.StreamFlagsRSTReceived != 0 {
+		stream.Flags |= flagsStreamRSTReceived
 	}
 
 	// when we can't add a stream to this writer, we might have

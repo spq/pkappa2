@@ -59,6 +59,8 @@ type (
 		HostGroup              uint16
 		ClientHost, ServerHost uint16
 		ClientPort, ServerPort uint16
+		PSHCount               uint32
+		OverlapPackets         uint32
 	}
 )
 
@@ -82,6 +84,7 @@ const (
 	flagsStreamSegmentation     = 0b100
 	flagsStreamSegmentationNone = 0b000
 	flagsStreamSegmentationHTTP = 0b100
+	flagsStreamRSTReceived      = 0b1000
 )
 
 func (fhs fileHeaderSection) size() int64 {
