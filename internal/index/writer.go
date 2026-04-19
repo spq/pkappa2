@@ -184,6 +184,7 @@ func (w *Writer) AddStream(s *streams.Stream, streamID uint64) (bool, error) {
 		FirstPacketTimeNS: uint64(firstPacketTs.Sub(referenceTime).Nanoseconds()),
 		LastPacketTimeNS:  uint64(lastPacketTs.Sub(referenceTime).Nanoseconds()),
 		Flags:             flagsStreamSegmentationNone,
+		PacketCount:       uint64(len(s.Packets)),
 		PSHCount:          s.TCP.PSHCount,
 		OverlapPackets:    s.TCP.OverlapPackets,
 	}

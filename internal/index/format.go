@@ -59,6 +59,7 @@ type (
 		HostGroup              uint16
 		ClientHost, ServerHost uint16
 		ClientPort, ServerPort uint16
+		PacketCount            uint64
 		PSHCount               uint32
 		OverlapPackets         uint32
 	}

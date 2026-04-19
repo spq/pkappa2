@@ -596,7 +596,8 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 		Port  uint16
 		Bytes uint64
 	}
-	type TCPStats struct {
+	type Stats struct {
+		PacketCount    uint64
 		PSHCount       uint32
 		OverlapPackets uint32
 		RSTReceived    bool
@@ -607,7 +608,7 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 		Client, Server          SideInfo
 		FirstPacket, LastPacket time.Time
 		Index                   string
-		TCPStats                TCPStats
+		Stats                   Stats
 	}{
 		ID:          s.ID(),
 		FirstPacket: s.FirstPacket().Local(),
@@ -624,7 +625,8 @@ func (s *Stream) MarshalJSON() ([]byte, error) {
 		},
 		Protocol: s.Protocol(),
 		Index:    s.r.filename,
-		TCPStats: TCPStats{
+		Stats: Stats{
+			PacketCount:    s.PacketCount,
 			PSHCount:       s.PSHCount,
 			OverlapPackets: s.OverlapPackets,
 			RSTReceived:    (s.Flags & flagsStreamRSTReceived) != 0,
