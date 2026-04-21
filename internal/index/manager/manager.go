@@ -2692,6 +2692,7 @@ func (mgr *Manager) Listen() (chan Event, func()) {
 	return ch, func() {
 		c := make(chan struct{})
 		mgr.jobs <- func() {
+			defer close(c)
 			l, ok := mgr.listeners[ch]
 			if !ok {
 				return
@@ -2701,7 +2702,6 @@ func (mgr *Manager) Listen() (chan Event, func()) {
 				close(ch)
 			}
 			close(l.close)
-			close(c)
 		}
 		<-c
 	}
