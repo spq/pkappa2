@@ -42,6 +42,10 @@ const (
 
 	pcapOverIPCmdFlush = pcapOverIPCmd(iota)
 	pcapOverIPCmdClose
+
+	// Interval for sending aggregated tag update events to the frontend, to avoid sending
+	// too many events when processing a lot of packets in a short time.
+	tagUpdateEventInterval = time.Second * 1
 )
 
 type (
@@ -58,6 +62,7 @@ type (
 	Event struct {
 		Type                string
 		Tag                 *TagInfo                  `json:",omitempty"`
+		Tags                []*TagInfo                `json:",omitempty"`
 		Converter           *converters.Statistics    `json:",omitempty"`
 		PcapStats           *PcapStatistics           `json:",omitempty"`
 		Config              *Config                   `json:",omitempty"`
@@ -145,7 +150,9 @@ type (
 		convertersWatcher *fsnotify.Watcher
 		pcapsWatcher      *fsnotify.Watcher
 
-		listeners map[chan Event]listener
+		listeners           map[chan Event]listener
+		updatedTagsToSignal map[string]struct{}
+		updatedTagsDone     chan struct{}
 
 		config Config
 	}
@@ -229,12 +236,14 @@ func New(pcapDir, indexDir, snapshotDir, stateDir, converterDir, watchDir string
 		ConverterDir: converterDir,
 		WatchDir:     watchDir,
 
-		usedIndexes:      make(map[*index.Reader]uint),
-		tags:             make(map[string]*tag),
-		converters:       make(map[string]*converters.CachedConverter),
-		streamsToConvert: make(map[string]*bitmask.LongBitmask),
-		jobs:             make(chan func()),
-		listeners:        make(map[chan Event]listener),
+		usedIndexes:         make(map[*index.Reader]uint),
+		tags:                make(map[string]*tag),
+		converters:          make(map[string]*converters.CachedConverter),
+		streamsToConvert:    make(map[string]*bitmask.LongBitmask),
+		jobs:                make(chan func()),
+		listeners:           make(map[chan Event]listener),
+		updatedTagsToSignal: make(map[string]struct{}),
+		updatedTagsDone:     make(chan struct{}),
 
 		config: Config{AutoInsertLimitToQuery: false},
 	}
@@ -442,6 +451,7 @@ nextStateFile:
 	}()
 	mgr.jobs <- func() {
 		go mgr.pcapOverIPPacketHandler()
+		go mgr.tagUpdateEventWorker()
 		mgr.startTaggingJobIfNeeded()
 		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
@@ -481,6 +491,7 @@ func (mgr *Manager) Close() {
 			log.Printf("Failed to close pcaps watcher: %v", err)
 		}
 	}
+	close(mgr.updatedTagsDone)
 	c := make(chan struct{})
 	mgr.jobs <- func() {
 		for _, converter := range mgr.converters {
@@ -823,10 +834,7 @@ func (mgr *Manager) updateTagJob(name string, t tag, tagDetails map[string]query
 		mgr.startConverterJobIfNeeded()
 		mgr.startMergeJobIfNeeded()
 		releaser.release(mgr)
-		mgr.event(Event{
-			Type: "tagEvaluated",
-			Tag:  makeTagInfo(name, &t),
-		})
+		mgr.updatedTagsToSignal[name] = struct{}{}
 	}
 }
 
@@ -1029,10 +1037,7 @@ func (mgr *Manager) AddTag(name, color, queryString string) error {
 				t := mgr.tags[tn]
 				t.referencedBy[name] = struct{}{}
 				if len(t.referencedBy) == 1 {
-					mgr.event(Event{
-						Type: "tagUpdated",
-						Tag:  makeTagInfo(tn, t),
-					})
+					mgr.updatedTagsToSignal[tn] = struct{}{}
 				}
 			}
 			return mgr.saveState()
@@ -1076,10 +1081,7 @@ func (mgr *Manager) DelTag(name string) error {
 				if len(t.referencedBy) != 0 {
 					continue
 				}
-				mgr.event(Event{
-					Type: "tagUpdated",
-					Tag:  makeTagInfo(tn, t),
-				})
+				mgr.updatedTagsToSignal[tn] = struct{}{}
 			}
 			return mgr.saveState()
 		}()
@@ -1216,20 +1218,14 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 					rt := mgr.tags[rtn]
 					delete(rt.referencedBy, name)
 					if len(rt.referencedBy) == 0 {
-						mgr.event(Event{
-							Type: "tagUpdated",
-							Tag:  makeTagInfo(rtn, rt),
-						})
+						mgr.updatedTagsToSignal[rtn] = struct{}{}
 					}
 				}
 				for rtn := range onlyAfter {
 					rt := mgr.tags[rtn]
 					rt.referencedBy[name] = struct{}{}
 					if len(rt.referencedBy) == 1 {
-						mgr.event(Event{
-							Type: "tagUpdated",
-							Tag:  makeTagInfo(rtn, rt),
-						})
+						mgr.updatedTagsToSignal[rtn] = struct{}{}
 					}
 				}
 				tag = newTag
@@ -1364,15 +1360,13 @@ func (mgr *Manager) UpdateTag(name string, operation UpdateTagOperation) error {
 						Converters: []string{},
 					},
 				})
+				delete(mgr.updatedTagsToSignal, name)
 				mgr.event(Event{
 					Type: "tagAdded",
 					Tag:  makeTagInfo(info.name, tag),
 				})
 			} else {
-				mgr.event(Event{
-					Type: "tagUpdated",
-					Tag:  makeTagInfo(name, tag),
-				})
+				mgr.updatedTagsToSignal[name] = struct{}{}
 			}
 			return mgr.saveState()
 		}()
@@ -1883,10 +1877,7 @@ func (mgr *Manager) attachConverterToTag(tag *tag, tagName string, converter *co
 
 	tag.converters = append(tag.converters, converter)
 	mgr.streamsToConvert[converter.Name()].Or(tag.Matches)
-	mgr.event(Event{
-		Type: "tagUpdated",
-		Tag:  makeTagInfo(tagName, tag),
-	})
+	mgr.updatedTagsToSignal[tagName] = struct{}{}
 	return nil
 }
 
@@ -1897,10 +1888,7 @@ func (mgr *Manager) detachConverterFromTag(tag *tag, tagName string, converter *
 			break
 		}
 	}
-	mgr.event(Event{
-		Type: "tagUpdated",
-		Tag:  makeTagInfo(tagName, tag),
-	})
+	mgr.updatedTagsToSignal[tagName] = struct{}{}
 	// delete/invalidate converter results for all matching streams now
 	// but only if they aren't matches of other tags the converter is attached to.
 	matchingStreams := bitmask.LongBitmask{}
@@ -2704,5 +2692,35 @@ func (mgr *Manager) Listen() (chan Event, func()) {
 			close(l.close)
 		}
 		<-c
+	}
+}
+
+func (mgr *Manager) tagUpdateEventWorker() {
+	ticker := time.NewTicker(tagUpdateEventInterval)
+	for {
+		select {
+		case <-mgr.updatedTagsDone:
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			if len(mgr.updatedTagsToSignal) == 0 {
+				continue
+			}
+			mgr.jobs <- func() {
+				infos := make([]*TagInfo, 0, len(mgr.updatedTagsToSignal))
+				for tn := range mgr.updatedTagsToSignal {
+					delete(mgr.updatedTagsToSignal, tn)
+					t, ok := mgr.tags[tn]
+					if !ok {
+						continue
+					}
+					infos = append(infos, makeTagInfo(tn, t))
+				}
+				mgr.event(Event{
+					Type: "tagUpdated",
+					Tags: infos,
+				})
+			}
+		}
 	}
 }

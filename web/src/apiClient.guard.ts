@@ -2,7 +2,7 @@
  * Generated type guards for "apiClient.ts".
  * WARNING: Do not manually change this file.
  */
-import { Error, SearchResult, SearchResponse, StreamData, Statistics, MainStderr, Config, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, Webhooks, TagsResponse, GraphResponse } from "./apiClient";
+import { Error, SearchResult, SearchResponse, StreamData, Statistics, MainStderr, Config, PcapsResponse, ConvertersResponse, ProcessStderr, PcapOverIPResponse, Webhooks, TagInfo, TagsResponse, GraphResponse } from "./apiClient";
 
 export function isError(obj: unknown): obj is Error {
     const typedObj = obj as Error
@@ -253,24 +253,31 @@ export function isWebhooks(obj: unknown): obj is Webhooks {
     )
 }
 
+export function isTagInfo(obj: unknown): obj is TagInfo {
+    const typedObj = obj as TagInfo
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typeof typedObj["Name"] === "string" &&
+        typeof typedObj["Definition"] === "string" &&
+        typeof typedObj["Color"] === "string" &&
+        typeof typedObj["MatchingCount"] === "number" &&
+        typeof typedObj["UncertainCount"] === "number" &&
+        typeof typedObj["Referenced"] === "boolean" &&
+        Array.isArray(typedObj["Converters"]) &&
+        typedObj["Converters"].every((e: any) =>
+            typeof e === "string"
+        )
+    )
+}
+
 export function isTagsResponse(obj: unknown): obj is TagsResponse {
     const typedObj = obj as TagsResponse
     return (
         Array.isArray(typedObj) &&
         typedObj.every((e: any) =>
-            (e !== null &&
-                typeof e === "object" ||
-                typeof e === "function") &&
-            typeof e["Name"] === "string" &&
-            typeof e["Definition"] === "string" &&
-            typeof e["Color"] === "string" &&
-            typeof e["MatchingCount"] === "number" &&
-            typeof e["UncertainCount"] === "number" &&
-            typeof e["Referenced"] === "boolean" &&
-            Array.isArray(e["Converters"]) &&
-            e["Converters"].every((e: any) =>
-                typeof e === "string"
-            )
+            isTagInfo(e) as boolean
         )
     )
 }

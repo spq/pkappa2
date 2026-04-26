@@ -214,7 +214,7 @@ func TestTags(t *testing.T) {
 	if err := mgr.AddTag("service/foo", "red", "cport:2,3"); err != nil {
 		t.Fatalf("Manager.AddTag failed with error: %v", err)
 	}
-	importSomePackets(t, mgr, t1, "tagEvaluated")
+	importSomePackets(t, mgr, t1, "tagUpdated")
 	if got := mgr.ListTags()[0]; got.MatchingCount != 2 || got.UncertainCount != 0 {
 		t.Fatalf("Manager.ListTags()[0] = %+v, want {MatchingCount: 2, UncertainCount: 0}", got)
 	}
