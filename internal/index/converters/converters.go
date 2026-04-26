@@ -261,6 +261,7 @@ func (converter *Converter) Data(stream *index.Stream, moreDetails bool) (data [
 	// Initiate converter protocol
 	process.input <- append(metadataEncoded, '\n')
 
+	data = []index.Data{}
 	readOutputLine := func(line []byte) error {
 		var convertedPacket converterStreamChunk
 		if err := json.Unmarshal(line, &convertedPacket); err != nil {
