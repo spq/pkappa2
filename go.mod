@@ -4,11 +4,11 @@ go 1.25.0
 
 require (
 	github.com/alecthomas/participle/v2 v2.1.4
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gopacket/gopacket v1.5.0
 	github.com/gorilla/websocket v1.5.3
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.43.0
 	rsc.io/binaryregexp v0.2.0
 )
 
