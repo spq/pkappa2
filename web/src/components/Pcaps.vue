@@ -448,7 +448,7 @@ async function uploadBatch() {
       } catch (err: unknown) {
         const message =
           typeof err === "object" && err !== null && "message" in err
-            ? String((err as { message: unknown }).message)
+            ? String(err.message)
             : String(err);
         EventBus.emit("showError", `Failed to upload ${f.name}: ${message}`);
         encounteredError = true;
