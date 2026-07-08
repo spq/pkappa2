@@ -131,9 +131,7 @@ type ChartData = {
 };
 
 type SomeGroup =
-  | MakeType<TrafficGroup>
-  | MakeType<ActiveConnectionsGroup>
-  | MakeType<Group>;
+  MakeType<TrafficGroup> | MakeType<ActiveConnectionsGroup> | MakeType<Group>;
 
 type ChartType = {
   aspects: string[];
