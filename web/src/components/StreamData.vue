@@ -154,8 +154,7 @@
           <pre
             v-else-if="chunk.Presentation === 'hexdump'"
             :class="[classes(chunk), 'hexdump']"
-            >{{ hexdump(chunk.Content) }}</pre
-          >
+            >{{ hexdump(chunk.Content) }}</pre>
 
           <span
             v-else-if="chunk.Presentation === 'raw'"
@@ -214,8 +213,7 @@
             v-for="(chunk, index) in data"
             :key="index"
             :class="[classes(chunk), 'hexdump']"
-            >{{ hexdump(chunk.Content) }}</pre
-          >
+            >{{ hexdump(chunk.Content) }}</pre>
         </template>
         <template v-else>
           <span
