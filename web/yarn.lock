@@ -976,10 +976,10 @@ ansi-styles@^6.2.1:
   resolved "https://registry.yarnpkg.com/ansi-styles/-/ansi-styles-6.2.1.tgz#0e62320cf99c21afff3b3012192546aacbfb05c5"
   integrity sha512-bN798gFfQX+viw3R7yrGWRqnrN2oRkEkUjjl4JNn4E8GxxbjtG3FbrEIIY3l8/hrwUwIeCZvi4QuOTP4MErVug==
 
-apexcharts@^5.15.2:
-  version "5.15.2"
-  resolved "https://registry.yarnpkg.com/apexcharts/-/apexcharts-5.15.2.tgz#f5e715072a9bae1c0354d66057675fdd67a3c0d7"
-  integrity sha512-qbd+ehDiRxo++wAqaGLmJcd683ktulTqoku4WYYyQ3XOgJIn4yhOQGV27KcdK7c2yhwxblyh4mgMm8ukI0wC0Q==
+apexcharts@^6.6.1:
+  version "6.6.1"
+  resolved "https://registry.yarnpkg.com/apexcharts/-/apexcharts-6.6.1.tgz#a08d093c469bb17494110ea6473f5328fd2f773b"
+  integrity sha512-958NXryBp9mtyqGQK1c8J2wzTHivc7L/lS/nsHOw13L52V2mGxbmjCfVu8oPHIbBCeBe26dYR2ZU1GjIqJkxIA==
 
 array-back@^6.2.2:
   version "6.2.2"
@@ -2816,10 +2816,10 @@ prettier@^3.9.4:
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.9.4.tgz#a9c477cf1614376bd1f6bbc593d8c0d414bcec87"
   integrity sha512-yWG/o/4oJfo036EKAfK6ACAoDOfHeRHx4tuxkfBZiauURiaSmYwlpOr5LQqKtIkRD2z1PLteme2WoxEnj4tHTg==
 
-pretty-bytes@^7.1.0:
-  version "7.1.0"
-  resolved "https://registry.yarnpkg.com/pretty-bytes/-/pretty-bytes-7.1.0.tgz#d788c9906241dbdcd4defab51b6d7470243db9bd"
-  integrity sha512-nODzvTiYVRGRqAOvE84Vk5JDPyyxsVk0/fbA/bq7RqlnhksGpset09XTxbpvLTIjoaF7K8Z8DG8yHtKGTPSYRw==
+pretty-bytes@^7.1.1:
+  version "7.1.1"
+  resolved "https://registry.yarnpkg.com/pretty-bytes/-/pretty-bytes-7.1.1.tgz#f1dd1a294396b78d6d1698a034bf447eed060b3c"
+  integrity sha512-X+vn9z8nOFZQlxOLmfJ0iKDdMD7jYTsTW12OAlCpdoE3Igik6L37pugIZi+N3usuyp5McfgKPWi12q3zvHLeGQ==
 
 process-nextick-args@~2.0.0:
   version "2.0.1"
@@ -3773,10 +3773,10 @@ vue@^3.5.13:
     "@vue/server-renderer" "3.5.13"
     "@vue/shared" "3.5.13"
 
-vuetify@^3.12.8:
-  version "3.12.8"
-  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.12.8.tgz#2ec5e962f3061e04bd7930031700c65643ea336d"
-  integrity sha512-gvmOWeLd6CG7LVh2Qonft5YrIb7MpbKZglRjg0ItEloSbu6hfUII2RZmRSVxGKYdiXTf7J1hI3BRSHr8J9LkxA==
+vuetify@^3.13.0:
+  version "3.13.0"
+  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.13.0.tgz#a33dd714d8c0856ae21ae345f17fb586eb77f3de"
+  integrity sha512-ODQZHKni5d9o2XVBVfnmlRwssdIko1WCM8DlPvpo4maeoPrNgjoIa38VvhLWYH/FeKgif4w0LlUTdW5Rkg7R5Q==
 
 webpack-virtual-modules@^0.6.2:
   version "0.6.2"
