@@ -62,7 +62,11 @@ func (w *websocketWrapper) ReadEvent(eventName string) (*manager.Event, error) {
 	if err := w.ws.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
 		return nil, fmt.Errorf("could not set read deadline on WebSocket connection: %w", err)
 	}
-	defer w.ws.SetReadDeadline(time.Time{})
+	defer func() {
+		if err := w.ws.SetReadDeadline(time.Time{}); err != nil {
+			fmt.Printf("could not reset read deadline on WebSocket connection: %v", err)
+		}
+	}()
 	messageType, message, err := w.ws.ReadMessage()
 	if err != nil {
 		return nil, fmt.Errorf("could not read message from WebSocket: %w", err)
