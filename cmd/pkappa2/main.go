@@ -916,6 +916,7 @@ func setupRouter(mgr *manager.Manager, stderrRing *ring.Ring, stderrLock *sync.R
 		}
 	})
 	rUser.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		testHarness := r.URL.Query().Get("test_harness") == "1"
 		c, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("WebSocket Upgrade failed: %v", err)
@@ -954,7 +955,18 @@ func setupRouter(mgr *manager.Manager, stderrRing *ring.Ring, stderrLock *sync.R
 				}
 			}
 		}()
-		// Write to websocket to send updates
+		// Write to websocket to send updates.
+		if testHarness {
+			// Tests use an explicit heartbeat to wait for the listener to be ready.
+			if err := c.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				log.Printf("WebSocket SetWriteDeadline failed: %v", err)
+				return
+			}
+			if err := c.WriteJSON(manager.Event{Type: "heartbeat"}); err != nil {
+				log.Printf("WebSocket WriteJSON failed: %v", err)
+				return
+			}
+		}
 		pingTicker := time.NewTicker(pingPeriod)
 		defer pingTicker.Stop()
 

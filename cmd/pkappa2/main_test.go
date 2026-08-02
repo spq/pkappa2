@@ -27,13 +27,18 @@ type (
 )
 
 func NewWebsocketWrapper(url string) (*websocketWrapper, error) {
-	wsURL := "ws" + strings.TrimPrefix(url, "http") + "/ws"
+	wsURL := "ws" + strings.TrimPrefix(url, "http") + "/ws?test_harness=1"
 	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	resp.Body.Close()
-	return &websocketWrapper{ws: ws}, nil
+	wrapper := &websocketWrapper{ws: ws}
+	if _, err := wrapper.ReadEvent("heartbeat"); err != nil {
+		ws.Close()
+		return nil, fmt.Errorf("could not wait for websocket readiness: %w", err)
+	}
+	return wrapper, nil
 }
 
 func (w *websocketWrapper) Shutdown(t *testing.T) {
@@ -54,6 +59,10 @@ func (w *websocketWrapper) Shutdown(t *testing.T) {
 }
 
 func (w *websocketWrapper) ReadEvent(eventName string) (*manager.Event, error) {
+	if err := w.ws.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return nil, fmt.Errorf("could not set read deadline on WebSocket connection: %w", err)
+	}
+	defer w.ws.SetReadDeadline(time.Time{})
 	messageType, message, err := w.ws.ReadMessage()
 	if err != nil {
 		return nil, fmt.Errorf("could not read message from WebSocket: %w", err)
