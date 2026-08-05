@@ -323,6 +323,7 @@ nextStateFile:
 			log.Printf("Unable to load state file %q: %v", fn, err)
 			continue
 		}
+		defer f.Close()
 		s := stateFile{}
 		if err := json.NewDecoder(f).Decode(&s); err != nil {
 			log.Printf("Unable to parse state file %q: %v", fn, err)
