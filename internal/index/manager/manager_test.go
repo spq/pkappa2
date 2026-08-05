@@ -464,9 +464,9 @@ func TestManagerMerging(t *testing.T) {
 			t.Fatalf("writePcaps failed with error: %v", err)
 		}
 		mgr.ImportPcaps(pcaps)
-		waitForEvent(t, events, func() {}, "pcapProcessed")
+		waitForEvent(t, events, nil, "pcapProcessed")
 	}
-	waitForEvent(t, events, eventsCloser, "indexesMerged")
+	waitForEvent(t, events, nil, "indexesMerged")
 }
 
 func TestManagerView(t *testing.T) {
