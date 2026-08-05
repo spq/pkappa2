@@ -4,7 +4,7 @@ import json
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, TypeAlias
+from typing import TypeAlias
 
 
 class Protocol(Enum):
@@ -33,7 +33,7 @@ class StreamMetadata:
 
 class ConverterDecoder(json.JSONDecoder):
     def __init__(self, *args, **kwargs):
-        super().__init__(object_hook=self.converter_object_hook, *args, **kwargs)
+        super().__init__(*args, object_hook=self.converter_object_hook, **kwargs)
 
     @staticmethod
     def converter_object_hook(obj):
@@ -52,7 +52,7 @@ class ConverterDecoder(json.JSONDecoder):
                 obj["Time"] = ".".join(time_parts)
             obj["Time"] = datetime.datetime.strptime(
                 obj["Time"], "%Y-%m-%dT%H:%M:%S.%f"
-            )
+            ).astimezone(datetime.timezone.utc)
 
         return obj
 
@@ -128,7 +128,7 @@ class StreamChunk:
 @dataclass
 class Stream:
     Metadata: StreamMetadata
-    Chunks: List[StreamChunk]
+    Chunks: list[StreamChunk]
 
     def coalesce_chunks_in_same_direction_iter(self):
         """
@@ -155,7 +155,7 @@ class Stream:
 
 @dataclass
 class Result:
-    Chunks: List[StreamChunk]
+    Chunks: list[StreamChunk]
 
 
 class Pkappa2Converter:
@@ -180,7 +180,9 @@ class Pkappa2Converter:
 
         Can be used for debugging.
         """
-        now = datetime.datetime.now().strftime("%d.%b %Y %H:%M:%S")
+        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(
+            "%d.%b %Y %H:%M:%S"
+        )
         print(
             f"{now} (stream: {self.current_stream_id}): {message}",
             flush=True,
@@ -214,8 +216,8 @@ class Pkappa2Converter:
                 result = self.handle_stream(stream)
                 for chunk in result.Chunks:
                     json.dump(chunk, sys.stdout, cls=ConverterEncoder)
-                    print("")
-                print("")
+                    print()
+                print()
                 print("{}", flush=True)
             except KeyboardInterrupt:
                 break

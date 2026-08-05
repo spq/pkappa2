@@ -4,9 +4,8 @@ from aioquic.quic.connection import dump_cid
 from aioquic.quic.crypto import CryptoPair
 from aioquic.quic.logger import QuicLoggerTrace
 from aioquic.quic.packet import QuicPacketType, pull_quic_header
-from scapy.layers.tls.all import TLS
-
 from pkappa2lib import Direction, Pkappa2Converter, Result, Stream
+from scapy.layers.tls.all import TLS
 
 
 class QUICConverter(Pkappa2Converter):
@@ -57,7 +56,7 @@ class QUICConverter(Pkappa2Converter):
                         (
                             plain_header,
                             plain_payload,
-                            packet_number,
+                            _packet_number,
                         ) = crypto.decrypt_packet(
                             chunk.Content[start_off:end_off], encrypted_off, 0
                         )

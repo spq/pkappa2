@@ -5,21 +5,19 @@ from collections import defaultdict
 from collections.abc import Iterable
 from io import BytesIO
 from struct import unpack
-from typing import Dict, Tuple
 
 import hyperframe.frame
-from protobuf_inspector.types import StandardParser
-
 from http2 import HTTP2Converter
 from pkappa2lib import Direction, Result, Stream
+from protobuf_inspector.types import StandardParser
 
 # TODO: Support for gRPC-Web https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md
 
 
 class GRPCConverter(HTTP2Converter):
-    _stream_content_type: Dict[int, Dict[Direction, bool]]
+    _stream_content_type: dict[int, dict[Direction, bool]]
     _stream_responded_grpc_once: bool
-    _stream_encoding: Dict[int, Dict[Direction, str]]
+    _stream_encoding: dict[int, dict[Direction, str]]
 
     def __init__(self):
         super().__init__()
@@ -58,7 +56,7 @@ class GRPCConverter(HTTP2Converter):
         self,
         direction: Direction,
         frame: hyperframe.frame.Frame,
-        headers: Iterable[Tuple[str, str]],
+        headers: Iterable[tuple[str, str]],
     ) -> None:
         # extract content-type and check if it is grpc
         content_type = next((x[1] for x in headers if x[0] == "content-type"), None)
@@ -90,18 +88,18 @@ class GRPCConverter(HTTP2Converter):
         if isinstance(frame, hyperframe.frame.DataFrame):
             # only look at grpc frames
             if (
-                frame.stream_id not in self._stream_content_type
-                or not self._stream_content_type[frame.stream_id][direction]
-            ):
+                (
+                    frame.stream_id not in self._stream_content_type
+                    or not self._stream_content_type[frame.stream_id][direction]
+                )
                 # Some servers only send a content-type header in the first
                 # response frame in a http2 connection.
                 # If we haven't seen a content-type header yet, we assume that
                 # the stream is not grpc.
-                if (
-                    direction == Direction.SERVERTOCLIENT
-                    and not self._stream_responded_grpc_once
-                ):
-                    return super().handle_http2_event(direction, frame)
+                and direction == Direction.SERVERTOCLIENT
+                and not self._stream_responded_grpc_once
+            ):
+                return super().handle_http2_event(direction, frame)
 
             if len(frame.data) == 0:
                 return super().handle_http2_event(direction, frame)

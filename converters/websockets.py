@@ -6,10 +6,9 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha1
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import hyperframe.frame
-
 from http2 import HTTP2Converter, HTTPRequest, HTTPResponse
 from pkappa2lib import Direction, Result, Stream, StreamChunk
 
@@ -22,14 +21,14 @@ class WebsocketFrame:
 
 
 class WebsocketConverter(HTTP2Converter):
-    websocket_key: Union[bytes, None]
+    websocket_key: bytes | None
     switched_protocols: bool
-    websocket_remaining_data: Dict[int, Dict[Direction, bytearray]]
-    websocket_deflate: Dict[int, bool]
-    websocket_deflate_decompressor: Dict[int, Dict[Direction, Any]]
-    websocket_message_fragmented_frames: Dict[int, List[WebsocketFrame]]
+    websocket_remaining_data: dict[int, dict[Direction, bytearray]]
+    websocket_deflate: dict[int, bool]
+    websocket_deflate_decompressor: dict[int, dict[Direction, Any]]
+    websocket_message_fragmented_frames: dict[int, list[WebsocketFrame]]
     websocket_enable_connect_protocol: bool
-    websocket_stream: Dict[int, bool]
+    websocket_stream: dict[int, bool]
 
     def __init__(self):
         super().__init__()
@@ -53,7 +52,7 @@ class WebsocketConverter(HTTP2Converter):
 
     def handle_websocket_permessage_deflate(
         self, stream_id: int, frame: WebsocketFrame
-    ) -> Optional[WebsocketFrame]:
+    ) -> WebsocketFrame | None:
         opcode = frame.Header[0] & 0x0F
         # control frames are not compressed
         if opcode & 0x08 != 0:
@@ -67,18 +66,18 @@ class WebsocketConverter(HTTP2Converter):
                 and opcode != 0
             ):
                 del self.websocket_message_fragmented_frames[stream_id]
-                raise Exception("Invalid fragmented message")
+                raise RuntimeError("Invalid fragmented message")
             if (
                 len(self.websocket_message_fragmented_frames[stream_id]) > 50
             ):  # arbitrary limit
                 del self.websocket_message_fragmented_frames[stream_id]
-                raise Exception("Fragmented message too long")
+                raise RuntimeError("Fragmented message too long")
             return None
 
         if len(self.websocket_message_fragmented_frames[stream_id]) > 0:
             if opcode != 0:
                 del self.websocket_message_fragmented_frames[stream_id]
-                raise Exception("Invalid fragmented message")
+                raise RuntimeError("Invalid fragmented message")
             # this is the last frame of a fragmented message
             self.websocket_message_fragmented_frames[stream_id].append(frame)
             frame = WebsocketFrame(
@@ -126,7 +125,7 @@ class WebsocketConverter(HTTP2Converter):
         self, direction: Direction, stream_id: int, content: bytes
     ) -> bytes:
         try:
-            frames: List[bytearray] = []
+            frames: list[bytearray] = []
             frame = self.websocket_remaining_data[stream_id][direction] + content
             del self.websocket_remaining_data[stream_id][direction]
             while len(frame) > 1:
@@ -188,10 +187,10 @@ class WebsocketConverter(HTTP2Converter):
             self.log(f"Error while handling websocket frame: {ex}")
             self.log(traceback.format_exc())
 
-            raise Exception(f"Error while handling websocket frame: {ex}") from ex
+            raise RuntimeError(f"Error while handling websocket frame: {ex}") from ex
 
     def handle_permessage_deflate_extension(
-        self, stream_id: int, websocket_deflate_parameters: Dict[str, Union[bool, str]]
+        self, stream_id: int, websocket_deflate_parameters: dict[str, bool | str]
     ) -> None:
         self.websocket_deflate[stream_id] = True
         self.websocket_message_fragmented_frames[stream_id] = []
@@ -209,22 +208,19 @@ class WebsocketConverter(HTTP2Converter):
         )
 
     def decode_websocket_extensions(
-        self, extensions_header: Optional[str]
-    ) -> Dict[str, Dict[str, Union[bool, str]]]:
-        extensions: Dict[str, Dict[str, Union[str, bool]]] = {}
+        self, extensions_header: str | None
+    ) -> dict[str, dict[str, bool | str]]:
+        extensions: dict[str, dict[str, str | bool]] = {}
         if extensions_header:
-            raw_extensions = map(
-                lambda s: s.strip().lower(), extensions_header.split(",")
-            )
+            raw_extensions = [s.strip().lower() for s in extensions_header.split(",")]
             for extension in raw_extensions:
                 extension, raw_params = (
                     extension.split(";", 1) if ";" in extension else (extension, "")
                 )
-                params: Dict[str, Union[str, bool]] = {}
-                reduced_raw_params = filter(
-                    lambda p: len(p) != 0,
-                    map(lambda p: p.strip(), raw_params.split(";")),
-                )
+                params: dict[str, str | bool] = {}
+                reduced_raw_params = [
+                    p.strip() for p in raw_params.split(";") if len(p.strip()) > 0
+                ]
                 for param in reduced_raw_params:
                     param_and_value = param.split("=", 1)
                     if len(param_and_value) == 1:
@@ -242,7 +238,7 @@ class WebsocketConverter(HTTP2Converter):
         self,
         direction: Direction,
         frame: hyperframe.frame.Frame,
-        headers: Iterable[Tuple[str, str]],
+        headers: Iterable[tuple[str, str]],
     ) -> None:
         if direction != Direction.CLIENTTOSERVER:
             return
@@ -313,9 +309,7 @@ class WebsocketConverter(HTTP2Converter):
 
         return super().handle_http2_event(direction, frame)
 
-    def handle_raw_client_chunk(
-        self, chunk: StreamChunk
-    ) -> Optional[List[StreamChunk]]:
+    def handle_raw_client_chunk(self, chunk: StreamChunk) -> list[StreamChunk] | None:
         try:
             if self.switched_protocols:
                 return [
@@ -329,9 +323,7 @@ class WebsocketConverter(HTTP2Converter):
         except Exception as ex:
             return [chunk.derive(content=str(ex).encode())]
 
-    def handle_raw_server_chunk(
-        self, chunk: StreamChunk
-    ) -> Optional[List[StreamChunk]]:
+    def handle_raw_server_chunk(self, chunk: StreamChunk) -> list[StreamChunk] | None:
         try:
             if self.switched_protocols:
                 return [
@@ -347,7 +339,7 @@ class WebsocketConverter(HTTP2Converter):
 
     def handle_http1_request(
         self, chunk: StreamChunk, request: HTTPRequest
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         # Allow "Connection: keep-alive, Upgrade"
         connection = (
             request.headers.get("Connection", "").lower().replace(" ", "").split(",")
@@ -365,7 +357,7 @@ class WebsocketConverter(HTTP2Converter):
 
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         try:
             connection = (
                 response.headers.get("Connection", "")
@@ -379,14 +371,14 @@ class WebsocketConverter(HTTP2Converter):
                 and response.headers.get("Upgrade", "").lower() == "websocket"
             ):
                 if not self.websocket_key:
-                    raise Exception("No websocket key found")
+                    raise RuntimeError("No websocket key found")
                 expected_accept = b64encode(
                     sha1(
                         self.websocket_key + b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
                     ).digest()
                 ).decode()
                 if response.headers.get("Sec-WebSocket-Accept") != expected_accept:
-                    raise Exception(
+                    raise RuntimeError(
                         f"Invalid websocket key: {response.headers.get('Sec-WebSocket-Accept')} != {expected_accept}"
                     )
                 self.switched_protocols = True

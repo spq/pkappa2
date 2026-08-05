@@ -5,11 +5,9 @@ import base64
 import json
 from dataclasses import dataclass
 from struct import unpack
-from typing import List, Optional
 from uuid import UUID
 
 from Crypto.Cipher import AES
-
 from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
 from pkappa2lib import Result, Stream, StreamChunk
 
@@ -28,7 +26,7 @@ class Place:
     long: float
 
 
-def PlaceIdFromString(data: str) -> Optional[Place]:
+def PlaceIdFromString(data: str) -> Place | None:
     place_raw = bytes.fromhex(data)
     place_bytes = decrypt(place_raw)
     if len(place_bytes) != 32:
@@ -48,7 +46,7 @@ class PlacesConverter(HTTPConverter):
 
     def handle_http1_request(
         self, chunk: StreamChunk, request: HTTPRequest
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         try:
             headers, body = chunk.Content.split(b"\r\n\r\n", 1)
             cookies = request.headers.get_all("Cookie")
@@ -74,7 +72,7 @@ class PlacesConverter(HTTPConverter):
                 if request.path.startswith("/api/get/place/"):
                     placeid = request.path[len("/api/get/place/") :]
                     place = PlaceIdFromString(placeid)
-                    prefix = f"### {str(place)} ###\n".encode()
+                    prefix = f"### {place!s} ###\n".encode()
                     return [chunk.derive(content=prefix + chunk.Content)]
                 elif request.path.startswith("/api/auth"):
                     self.is_place_request = True
@@ -96,8 +94,10 @@ class PlacesConverter(HTTPConverter):
                     self.is_place_request = True
                     placeid = request.path[len("/api/put/place/") :]
                     place = PlaceIdFromString(placeid)
-                    prefix = f"### {str(place)} ###\n".encode()
+                    prefix = f"### {place!s} ###\n".encode()
                     return [chunk.derive(content=prefix + chunk.Content)]
+            else:
+                pass
 
         except Exception as ex:
             self.log(str(ex))
@@ -106,7 +106,7 @@ class PlacesConverter(HTTPConverter):
 
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         try:
             if self.is_place_request:
                 self.is_place_request = False

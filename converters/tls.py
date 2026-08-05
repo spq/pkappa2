@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 from collections import defaultdict
+from pathlib import Path
 
+from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
 from scapy.layers.tls.all import (
     TLS,
-    TLSApplicationData,
     Cert,
     PrivKey,
     PrivKeyRSA,
-    tlsSession,
+    TLSApplicationData,
     load_nss_keys,
+    tlsSession,
 )
-
-from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
-from pathlib import Path
 
 # https://github.com/secdev/scapy/blob/5160430bd16c6084d5aef2a10e47dc0455aace40/doc/notebooks/tls/notebook3_tls_compromised.ipynb
 # Place your key.pem in the converters/tls folder
@@ -38,7 +37,6 @@ class TLSConverter(Pkappa2Converter):
         Args:
             chunk (StreamChunk): Decrypted chunk.
         """
-        pass
 
     def handle_stream(self, stream: Stream) -> Result:
         tls_session = tlsSession()

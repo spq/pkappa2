@@ -2,13 +2,12 @@
 from base64 import urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import Dict, List, Optional, Tuple, cast
+from typing import cast
 
 import h2.frame_buffer
 import hyperframe.frame
 from h2.exceptions import H2Error
 from hpack import Decoder
-
 from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
 from pkappa2lib import Direction, Result, Stream, StreamChunk
 
@@ -16,19 +15,20 @@ from pkappa2lib import Direction, Result, Stream, StreamChunk
 
 
 class HTTP2Converter(HTTPConverter):
-    SETTINGS_NAMES = {
-        1: "HEADER_TABLE_SIZE",
-        2: "ENABLE_PUSH",
-        3: "MAX_CONCURRENT_STREAMS",
-        4: "INITIAL_WINDOW_SIZE",
-        5: "MAX_FRAME_SIZE",
-        6: "MAX_HEADER_LIST_SIZE",
-    }
+    SETTINGS_NAMES: dict[int, str]
 
-    hpack_decoder: Dict[Direction, Decoder]
+    hpack_decoder: dict[Direction, Decoder]
 
     def __init__(self):
         super().__init__()
+        self.SETTINGS_NAMES = {
+            1: "HEADER_TABLE_SIZE",
+            2: "ENABLE_PUSH",
+            3: "MAX_CONCURRENT_STREAMS",
+            4: "INITIAL_WINDOW_SIZE",
+            5: "MAX_FRAME_SIZE",
+            6: "MAX_HEADER_LIST_SIZE",
+        }
         self.h2_client_buffer = None
         self.h2_server_buffer = None
         self.h2_active = False
@@ -38,7 +38,7 @@ class HTTP2Converter(HTTPConverter):
         self,
         direction: Direction,
         frame: hyperframe.frame.Frame,
-        headers: Iterable[Tuple[str, str]],
+        headers: Iterable[tuple[str, str]],
     ) -> None:
         pass
 
@@ -54,7 +54,7 @@ class HTTP2Converter(HTTPConverter):
             ),
         ):
             if "END_HEADERS" not in frame.flags:
-                raise Exception("TODO: Handle fragmented headers")
+                raise RuntimeError("TODO: Handle fragmented headers")
             # hpack Decoder.decode with `raw=False` decodes the headers using UTF-8 by default.
             # The type hints don't reflect that.
             headers = cast(
@@ -87,7 +87,7 @@ class HTTP2Converter(HTTPConverter):
 
     def handle_http2_upgrade(
         self, chunk: StreamChunk, request: HTTPRequest
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         self.setup_http2_buffers()
         settings = request.headers.get("HTTP2-Settings")
         if settings:
@@ -101,12 +101,12 @@ class HTTP2Converter(HTTPConverter):
             ]
         return []
 
-    def handle_http2_init(self, chunk: StreamChunk) -> List[StreamChunk]:
+    def handle_http2_init(self, chunk: StreamChunk) -> list[StreamChunk]:
         self.setup_http2_buffers()
         self.h2_active = True
         return self.handle_http2_request(chunk)
 
-    def handle_http2_request(self, chunk: StreamChunk) -> List[StreamChunk]:
+    def handle_http2_request(self, chunk: StreamChunk) -> list[StreamChunk]:
         if not self.h2_server_buffer:
             return [chunk]
         self.h2_server_buffer.add_data(chunk.Content)
@@ -121,7 +121,7 @@ class HTTP2Converter(HTTPConverter):
             )
         return events
 
-    def handle_http2_response(self, chunk: StreamChunk) -> List[StreamChunk]:
+    def handle_http2_response(self, chunk: StreamChunk) -> list[StreamChunk]:
         if not self.h2_client_buffer:
             return [chunk]
         self.h2_active = True
@@ -136,9 +136,7 @@ class HTTP2Converter(HTTPConverter):
             )
         return events
 
-    def handle_raw_client_chunk(
-        self, chunk: StreamChunk
-    ) -> Optional[List[StreamChunk]]:
+    def handle_raw_client_chunk(self, chunk: StreamChunk) -> list[StreamChunk] | None:
         try:
             if self.h2_active:
                 return self.handle_http2_request(chunk)
@@ -152,9 +150,7 @@ class HTTP2Converter(HTTPConverter):
         # continue parsing HTTP/1 request
         return super().handle_raw_client_chunk(chunk)
 
-    def handle_raw_server_chunk(
-        self, chunk: StreamChunk
-    ) -> Optional[List[StreamChunk]]:
+    def handle_raw_server_chunk(self, chunk: StreamChunk) -> list[StreamChunk] | None:
         if self.h2_active:
             # HTTP/2
             try:
@@ -167,11 +163,11 @@ class HTTP2Converter(HTTPConverter):
 
     def handle_http1_request(
         self, chunk: StreamChunk, request: HTTPRequest
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         # https://httpwg.org/specs/rfc7540.html#discover-http
         connection = request.headers.get("Connection")
         if connection:
-            connection_headers = list(map(lambda h: h.strip(), connection.split(",")))
+            connection_headers = [h.strip() for h in connection.split(",")]
             if (
                 "Upgrade" in connection_headers
                 and request.headers.get("Upgrade") == "h2c"
@@ -183,14 +179,14 @@ class HTTP2Converter(HTTPConverter):
 
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         if (
             response.headers.get("Connection") == "Upgrade"
             and response.headers.get("Upgrade") == "h2c"
         ):
             # HTTP/2
             if self.h2_server_buffer is None:
-                raise Exception("HTTP/2 upgrade request not found")
+                raise RuntimeError("HTTP/2 upgrade request not found")
 
             return [
                 chunk.derive(content=header + b"\r\n\r\n")

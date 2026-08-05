@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-from datetime import datetime
-from typing import List
+import datetime
 
 from http_gzip import HTTPConverter, HTTPRequest, HTTPResponse
 from pkappa2lib import Direction, Result, Stream, StreamChunk
@@ -10,11 +9,11 @@ class PythonRequestsConverter(HTTPConverter):
     requests_output: str
     target_host: str
 
-    SHORTCUT_METHODS = ["get", "post", "put", "delete", "head", "patch"]
+    SHORTCUT_METHODS = ("get", "post", "put", "delete", "head", "patch")
 
     def handle_http1_request(
         self, chunk: StreamChunk, request: HTTPRequest
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         data = request.rfile.read()
         headers = {}
         for k, v in request.headers.items():
@@ -35,7 +34,7 @@ class PythonRequestsConverter(HTTPConverter):
     # ignore responses
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         return []
 
     def handle_stream(self, stream: Stream) -> Result:
@@ -65,7 +64,9 @@ s = requests.Session()
                 StreamChunk(
                     Direction.CLIENTTOSERVER,
                     self.requests_output.encode(),
-                    stream.Chunks[0].Time if stream.Chunks else datetime.now(),
+                    stream.Chunks[0].Time
+                    if stream.Chunks
+                    else datetime.datetime.now(tz=datetime.timezone.utc),
                 )
             ]
         )

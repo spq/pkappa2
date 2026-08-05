@@ -2,9 +2,8 @@
 import re
 from io import BytesIO
 
-from protobuf_inspector.types import StandardParser
-
 from pkappa2lib import Pkappa2Converter, Result, Stream
+from protobuf_inspector.types import StandardParser
 
 
 class ProtobufConverter(Pkappa2Converter):

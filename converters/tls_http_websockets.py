@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+from pkappa2lib import Result, Stream, StreamChunk
 from tls import TLSConverter
 from websockets import WebsocketConverter
-from pkappa2lib import Result, Stream, StreamChunk
 
 
 class DecryptedHTTPSConverter(TLSConverter):

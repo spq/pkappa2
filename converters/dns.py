@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from dnslib import DNSRecord
-
 from pkappa2lib import Pkappa2Converter, Result, Stream
 
 

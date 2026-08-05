@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 import socket
 import traceback
-from http.client import HTTPResponse as HTTPResponseChunked, IncompleteRead
+from http.client import HTTPResponse as HTTPResponseChunked
+from http.client import IncompleteRead
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
-from typing import List, Optional
-
-from urllib3.response import HTTPResponse, ProtocolError
 
 from pkappa2lib import Direction, Pkappa2Converter, Result, Stream, StreamChunk
+from urllib3.response import HTTPResponse, ProtocolError
 
 
 # https://stackoverflow.com/questions/4685217/parse-raw-http-headers
 class HTTPRequest(BaseHTTPRequestHandler):
-    error_code: Optional[int]
-    error_message: Optional[str]
+    error_code: int | None
+    error_message: str | None
 
     def __init__(self, request_text: bytes):
         self.rfile = BytesIO(request_text)
@@ -30,7 +29,7 @@ class HTTPRequest(BaseHTTPRequestHandler):
 
 
 class HTTPResponseBase(HTTPResponseChunked):
-    def __init__(self, data: bytes, method: Optional[str]):
+    def __init__(self, data: bytes, method: str | None):
         super().__init__(socket.socket(), method=method)
         self.fp = BytesIO(data)  # type: ignore[assignment, ty:invalid-assignment]
 
@@ -38,9 +37,7 @@ class HTTPResponseBase(HTTPResponseChunked):
 class HTTPConverter(Pkappa2Converter):
     is_last_chunk: bool
 
-    def handle_raw_client_chunk(
-        self, chunk: StreamChunk
-    ) -> Optional[List[StreamChunk]]:
+    def handle_raw_client_chunk(self, chunk: StreamChunk) -> list[StreamChunk] | None:
         """
         Handle raw client chunk. Return None to continue parsing HTTP1 request.
 
@@ -52,20 +49,18 @@ class HTTPConverter(Pkappa2Converter):
         """
         return None
 
-    def handle_raw_server_chunk(
-        self, chunk: StreamChunk
-    ) -> Optional[List[StreamChunk]]:
+    def handle_raw_server_chunk(self, chunk: StreamChunk) -> list[StreamChunk] | None:
         return None
 
     def handle_http1_request(
         self, chunk: StreamChunk, request: HTTPRequest
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         # Just pass HTTP1 requests through untouched
         return [chunk]
 
     def handle_http1_response(
         self, header: bytes, body: bytes, chunk: StreamChunk, response: HTTPResponse
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         content_type = response.headers.get("Content-Type")
         if content_type:
             chunks = [
@@ -87,7 +82,7 @@ class HTTPConverter(Pkappa2Converter):
                 self.is_last_chunk = True
 
             if chunk.Direction == Direction.CLIENTTOSERVER:
-                raw_result: Optional[List[StreamChunk]] = self.handle_raw_client_chunk(
+                raw_result: list[StreamChunk] | None = self.handle_raw_client_chunk(
                     chunk
                 )
                 if raw_result is not None:
@@ -97,7 +92,7 @@ class HTTPConverter(Pkappa2Converter):
                 try:
                     request = HTTPRequest(chunk.Content)
                     if request.error_code:
-                        raise Exception(
+                        raise RuntimeError(
                             f"{request.error_code} {request.error_message}".encode()
                         )
 
@@ -109,7 +104,7 @@ class HTTPConverter(Pkappa2Converter):
                     result_data.append(chunk.derive(content=data + chunk.Content))
             else:
                 try:
-                    raw_response: Optional[List[StreamChunk]] = (
+                    raw_response: list[StreamChunk] | None = (
                         self.handle_raw_server_chunk(chunk)
                     )
                     if raw_response is not None:
