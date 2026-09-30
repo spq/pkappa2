@@ -47,7 +47,7 @@
             :to="{
               name: 'search',
               query: {
-                q: selectionQuery,
+                q: serviceTagsQueryPart + selectionQuery,
               },
             }"
             v-bind="props"
@@ -464,6 +464,16 @@ const streamTags = computed(() => {
     res[type].push({ name, color });
   }
   return res;
+});
+const serviceTagsQueryPart = computed(() => {
+  if (
+    streamTags.value.service == undefined ||
+    streamTags.value.service.length === 0
+  )
+    return "";
+  return (
+    streamTags.value.service.map((t) => `service:${t.name}`).join(" ") + " "
+  );
 });
 
 const streamId = computed(() => {
