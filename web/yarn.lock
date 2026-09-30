@@ -718,7 +718,7 @@
     "@vue/compiler-dom" "3.5.27"
     "@vue/shared" "3.5.27"
 
-"@vue/devtools-api@^8.1.5":
+"@vue/devtools-api@^8.1.5", "@vue/devtools-api@^8.2.1":
   version "8.2.1"
   resolved "https://registry.yarnpkg.com/@vue/devtools-api/-/devtools-api-8.2.1.tgz#9d95de2b908aa80b9957d737ddca51790e70c3b5"
   integrity sha512-6u4vXBlIBAC1wMplIZgpyPn7uh/s4Bf6F5bMzvLv+EdJ0aHs/+4B7Ygv864EStQSjRbsRzTko/kUG1A1IejQ3A==
