@@ -18,18 +18,18 @@
   "dependencies": {
     "@mdi/font": "^7.4.47",
     "@vue/devtools-api": "^8.2.1",
-    "apexcharts": "^7.0.0",
+    "apexcharts": "^7.6.1",
     "axios": "^1.20.0",
     "core-js": "^3.50.0",
     "moment": "^2.31.0",
     "moo": "^0.5.3",
     "nearley": "^2.20.1",
-    "pretty-bytes": "^7.1.2",
+    "pretty-bytes": "^7.2.0",
     "roboto-fontface": "*",
     "tiny-typed-emitter": "^2.1.0",
     "vue": "^3.5.13",
     "vue3-apexcharts": "^1.11.1",
-    "vuetify": "^3.13.2"
+    "vuetify": "^3.13.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
