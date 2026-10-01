@@ -875,17 +875,17 @@ ansi-styles@^7.0.0:
   resolved "https://registry.yarnpkg.com/ansi-styles/-/ansi-styles-7.0.0.tgz#859089a725560e235a41fecde8999196df6c78c0"
   integrity sha512-kKvt3m4uwzqL0wlkPd09CmljPJGOZZ4D0fP65sqFSvPkMRKhNi+74MgIJ5QxE6SxqB4t4KyUFGg8+n5zjo6hew==
 
-apex-commons@^0.5.0:
-  version "0.5.0"
-  resolved "https://registry.yarnpkg.com/apex-commons/-/apex-commons-0.5.0.tgz#de0a38b1c9d15fa13eac26097305a219020bc525"
-  integrity sha512-xz83SgPREE1wGtoflvxjwJtcjzl5bKTz2/bDxWCZNL6QVjUNE47kMg/1Zqt0bSh6eOnmFCWlTDc3RU8o85N+wg==
+apex-commons@^0.8.0:
+  version "0.8.1"
+  resolved "https://registry.yarnpkg.com/apex-commons/-/apex-commons-0.8.1.tgz#4adc82a63c634435032d88522dded7325e9803cc"
+  integrity sha512-F7fqJVh0smeTu1d86uuRSNNZvaM/l11GNQMbu6oAiSvuXp+K8KCufg0oZTy2VQBEEipRLAdFqkHnphlVpTG0Gw==
 
-apexcharts@^7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/apexcharts/-/apexcharts-7.0.0.tgz#4b3137851ab60c17354559baca75c64434b0b187"
-  integrity sha512-wX0LP5WajZXIAvQpCcDMVOlBUhlfhzUmEaKxPkUs54WFm0/GBbEyYCpw4G6iK7W5nU/R+kRzk+NHQSWlmp0qCA==
+apexcharts@^7.6.1:
+  version "7.6.1"
+  resolved "https://registry.yarnpkg.com/apexcharts/-/apexcharts-7.6.1.tgz#c2a60ff30841ea0c886579cbbbe57f1269bb271d"
+  integrity sha512-IeAgHCYk7G91X6zlLHZTd9MSQxnYeAMKDfSHn9WXCYYmVZisY5g1PkNBgG1U+1t6pXwkJutTtnq/UVyY3dELHA==
   dependencies:
-    apex-commons "^0.5.0"
+    apex-commons "^0.8.0"
 
 array-back@^6.2.2:
   version "6.2.2"
@@ -2695,10 +2695,10 @@ prettier@^3.9.6:
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.9.6.tgz#b3ea5146515d40fc53f18aa63f74dfab1e10dbf6"
   integrity sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==
 
-pretty-bytes@^7.1.2:
-  version "7.1.2"
-  resolved "https://registry.yarnpkg.com/pretty-bytes/-/pretty-bytes-7.1.2.tgz#2ff7ecfe78c999a2edf5f20449b047b0583108d2"
-  integrity sha512-spZIOSORH9joSPGN0L/tYfvINH+xbOpnI3kdcEkq0mzGMjFvDZzyRVbqEOV0wACF0gggdKE9RWO2mosGsBh/Rg==
+pretty-bytes@^7.2.0:
+  version "7.2.0"
+  resolved "https://registry.yarnpkg.com/pretty-bytes/-/pretty-bytes-7.2.0.tgz#e4727cc3b8ea2bec96d86e19c2e35984e791cbfd"
+  integrity sha512-T2kroepGB5DRVbkN/nOpW03+VRWqdtJhZNuCW3wYk3chdPjgi4GcTBOaxWfHq1MIM0ypidxsSWbQaAiRpxnXmg==
 
 process-nextick-args@~2.0.0:
   version "2.0.1"
@@ -3623,10 +3623,10 @@ vue@^3.5.13:
     "@vue/server-renderer" "3.5.13"
     "@vue/shared" "3.5.13"
 
-vuetify@^3.13.2:
-  version "3.13.2"
-  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.13.2.tgz#980d01c253a853b5d91a97e587481a7064bf76f8"
-  integrity sha512-CuBtJ2/lKo4s6vDmDr/oJ+77oRUb7X8goUhTKZG/qSqBkL5J2EzeBEhaZ57ZSLcYnnViWHObuVjHjRFmVzx55Q==
+vuetify@^3.13.5:
+  version "3.13.5"
+  resolved "https://registry.yarnpkg.com/vuetify/-/vuetify-3.13.5.tgz#4cd96b92cbacacf8a39a712cf701dd514127149d"
+  integrity sha512-1PKESHKgyIj6BfjVbpF1bLWvKIBOvyDqIcP6C0R173fNZDr4jyXH7ssigAZvfqV5nRmVS/N9sGtY/IekGQ9TSQ==
 
 webpack-virtual-modules@^0.6.2:
   version "0.6.2"
