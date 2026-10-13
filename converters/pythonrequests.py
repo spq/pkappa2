@@ -66,7 +66,7 @@ s = requests.Session()
                     self.requests_output.encode(),
                     stream.Chunks[0].Time
                     if stream.Chunks
-                    else datetime.datetime.now(tz=datetime.timezone.utc),
+                    else datetime.datetime.now(tz=datetime.UTC),
                 )
             ]
         )

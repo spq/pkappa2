@@ -52,7 +52,7 @@ class ConverterDecoder(json.JSONDecoder):
                 obj["Time"] = ".".join(time_parts)
             obj["Time"] = datetime.datetime.strptime(
                 obj["Time"], "%Y-%m-%dT%H:%M:%S.%f"
-            ).astimezone(datetime.timezone.utc)
+            ).astimezone(datetime.UTC)
 
         return obj
 
@@ -180,9 +180,7 @@ class Pkappa2Converter:
 
         Can be used for debugging.
         """
-        now = datetime.datetime.now(tz=datetime.timezone.utc).strftime(
-            "%d.%b %Y %H:%M:%S"
-        )
+        now = datetime.datetime.now(tz=datetime.UTC).strftime("%d.%b %Y %H:%M:%S")
         print(
             f"{now} (stream: {self.current_stream_id}): {message}",
             flush=True,

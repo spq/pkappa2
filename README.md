@@ -100,7 +100,7 @@ All command line options can be specified using environment variables.
 
 ### Manually
 
-- Requires [go](https://go.dev/dl/) 1.25+
+- Requires [go](https://go.dev/dl/) 1.26+
 - Install required dependencies
     - libpcap (e.g. `apt install libpcap-dev`)
 - Build the frontend: `yarn && yarn build` in `/web`

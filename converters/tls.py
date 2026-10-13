@@ -6,6 +6,7 @@ from pkappa2lib import Pkappa2Converter, Result, Stream, StreamChunk
 from scapy.layers.tls.all import (
     TLS,
     Cert,
+    CertList,
     PrivKey,
     PrivKeyRSA,
     TLSApplicationData,
@@ -51,7 +52,7 @@ class TLSConverter(Pkappa2Converter):
                 tls_session.server_rsa_key = key
         if cert_path.exists():
             cert = Cert(cert_path)  # type: ignore[call-arg, ty:too-many-positional-arguments]
-            tls_session.server_certs = [cert]
+            tls_session.server_certs = CertList(cert)
         if nss_keylog_path.exists():
             keys: defaultdict[str, dict[bytes, bytes]] = defaultdict(dict)
             for key_file in nss_keylog_path.glob("*"):

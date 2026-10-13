@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.25", "1.26"]
-        node: [22, 24]
+        go: ["1.26", "1.27"]
+        node: [24, 26]
         exclude:
-          - go: "1.26"
-            node: 22
-          - go: "1.25"
+          - go: "1.27"
             node: 24
+          - go: "1.26"
+            node: 26
     name: Go ${{ matrix.go }}, Node ${{ matrix.node }} build
     steps:
       - uses: actions/checkout@v7
@@ -57,7 +57,7 @@ jobs:
           chart: true
           amend: true
         if: |
-          matrix.go == '1.26' &&
+          matrix.go == '1.27' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main'
 
@@ -69,7 +69,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.26"
+          go-version: "1.27"
 
       - name: Install dependencies
         run: sudo apt-get install -y libpcap-dev
@@ -87,10 +87,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Node.js 24
+      - name: Set up Node.js 26
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: "yarn"
           cache-dependency-path: "web/yarn.lock"
 
@@ -110,10 +110,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.14
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install dependencies
         run: |
