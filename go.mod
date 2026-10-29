@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/go-chi/chi/v5 v5.3.2
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/gopacket/gopacket v1.7.3
 	github.com/gorilla/websocket v1.5.3
 	golang.org/x/sys v0.48.0
